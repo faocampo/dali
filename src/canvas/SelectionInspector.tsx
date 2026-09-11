@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ImageBlockModel } from '@blocksuite/affine/model';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, type GfxModel } from '@blocksuite/affine/std/gfx';
+import { Bound } from '@blocksuite/global/gfx';
 import {
   alignCanvasSelection, canvasSelectionEditable, duplicateCanvasSelection,
   groupCanvasSelection, ungroupCanvasSelection, selectedLayerCanGroup,
@@ -74,12 +75,12 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     if (selection?.kind !== 'image') return;
     const model = host.std.store.getBlock(selection.key)?.model;
     if (!model || model.flavour !== 'affine:image') return;
-    const bound = (model as ImageBlockModel).elementBound;
+    const bound = Bound.deserialize((model as ImageBlockModel).xywh);
     setGeometry({
-      x: String(Math.round(bound.x)),
-      y: String(Math.round(bound.y)),
-      width: String(Math.round(bound.w)),
-      height: String(Math.round(bound.h)),
+      x: String(bound.x),
+      y: String(bound.y),
+      width: String(bound.w),
+      height: String(bound.h),
     });
     setRatio(bound.h > 0 ? bound.w / bound.h : 1);
     setVisualDraft(imageVisualSettings(host.std.store, selection.key));

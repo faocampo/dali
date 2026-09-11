@@ -13,10 +13,14 @@ async function raster(page: Page, width = 200, height = 100) {
   return { name: 'synthetic-edit.png', mimeType: 'image/png', buffer: Buffer.from(data, 'base64') };
 }
 
-async function setup(page: Page) {
+async function setup(page: Page, rotate = 0) {
   await page.goto('/');
   await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles(await raster(page));
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
+  if (rotate) await page.locator('affine-edgeless-root').evaluate((el, rotate) => {
+    const store = (el as HTMLElement & { gfx: GfxController }).gfx.doc;
+    store.updateBlock(store.getBlocksByFlavour('affine:image')[0]!.model, { rotate });
+  }, rotate);
   await page.locator('affine-edgeless-image').click();
 }
 
@@ -67,6 +71,27 @@ test('crop edits preserve native movement and resize through brightness and rese
   await page.getByRole('button', { name: 'Reset edits', exact: true }).click();
   const [x, y, w, h] = arranged as [number, number, number, number];
   closeBounds((await state(page)).images[0]!.bounds, [x - w / 9, y, w / 0.9, h]);
+});
+
+for (const angle of [90, 37]) test(`rotated ${angle} degree image keeps native geometry across edits and replacement`, async ({ page }) => {
+  await setup(page, angle);
+  const initial = (await state(page)).images[0]!.bounds;
+  await page.getByRole('button', { name: 'Apply position & size', exact: true }).click();
+  closeBounds((await state(page)).images[0]!.bounds, initial);
+  await brighten(page);
+  closeBounds((await state(page)).images[0]!.bounds, initial);
+  await crop(page);
+  const [x, y, w, h] = initial as [number, number, number, number];
+  const radians = angle * Math.PI / 180;
+  closeBounds((await state(page)).images[0]!.bounds, [
+    x + w / 2 + w * 0.05 * Math.cos(radians) - w * 0.9 / 2,
+    y + w * 0.05 * Math.sin(radians), w * 0.9, h,
+  ]);
+  await page.getByRole('button', { name: 'Reset edits', exact: true }).click();
+  closeBounds((await state(page)).images[0]!.bounds, initial);
+  await page.locator('.selection-inspector input[type=file]').setInputFiles(await raster(page, 80, 160));
+  await expect.poll(async () => (await state(page)).images[0]!.bounds[3]).toBe(w * 2);
+  closeBounds((await state(page)).images[0]!.bounds, [x, y, w, w * 2]);
 });
 
 test('Duplicate gives edited images independent history and placement', async ({ page }) => {

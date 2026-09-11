@@ -247,7 +247,6 @@ export async function applyImageVisualEdit(
   const image = getImage(store, imageId);
   reconcileImageVisualEdits(store);
   const existing = getImageVisualEdit(store, imageId);
-  const bound = image.elementBound;
   const baseSourceId = existing?.props.sourceId ?? image.props.sourceId;
   if (!baseSourceId) throw new Error('The selected image has no local source.');
   const base = await store.blobSync.get(baseSourceId);
@@ -297,6 +296,7 @@ export async function applyImageVisualEdit(
     const output = await canvasBlob(canvas);
     const processedSourceId = await store.blobSync.set(output);
 
+    const bound = Bound.deserialize(image.xywh);
     const { baseX, baseY, baseWidth, baseHeight } = existing
       ? uncroppedGeometry(image, existing.props)
       : { baseX: bound.x, baseY: bound.y, baseWidth: bound.w, baseHeight: bound.h };
@@ -374,8 +374,8 @@ export async function replaceImageSource(store: Store, imageId: string, file: Fi
     assertSafeEdit(bitmap, file.size);
     if (!bitmap.width || !bitmap.height) throw new Error('That image has no usable pixels.');
     const image = getImage(store, imageId);
-    const bound = image.elementBound;
     const sourceId = await store.blobSync.set(file);
+    const bound = Bound.deserialize(image.xywh);
     const height = bound.w * (bitmap.height / bitmap.width);
     reconcileImageVisualEdits(store);
     const visual = getImageVisualEdit(store, imageId);
