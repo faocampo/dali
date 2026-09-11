@@ -3,7 +3,8 @@
 ## Public repository privacy boundary
 
 - Keep all repository content and publishable history organization-neutral.
-- Never commit private organizational information, internal product/customer data, real screenshots, user identities, host paths, credentials, tenant identifiers, production domains, deployment settings, or private operational evidence.
+- Never commit private organizational information, internal product/customer data, real screenshots, private organizational user data, host paths, credentials, tenant identifiers, production domains, deployment settings, or private operational evidence.
+- Personal Git author and committer attribution is permitted. Personal authorship alone is not confidential and does not block publication; organization-related private information remains prohibited.
 - Operator-specific identity configuration and deployment settings are defined and maintained exclusively in operator-controlled infrastructure outside this repository.
 - Public code exposes generic configuration interfaces. Documentation, examples, tests, demos, and screenshots use synthetic data and example domains.
 - Apply these rules to planning documents, research caches, generated files, logs, commit messages, and pull requests as well as code.

@@ -108,6 +108,9 @@ covered_files:
 covered_digest: "v1:sha256:2124dadbf853059f5b426bf27bfff30644f830d6192199ad2c7123f4e5354eb2"
 ---
 
+> Current disposition (2026-09-11): The approved 15-commit metadata rewrite is complete and verified. The user clarified that personal Git authorship is permitted. The authorship-based publication concern below is resolved; historical audit wording is retained for traceability. Private organizational information remains prohibited. See [01-HISTORY-REMEDIATION.md](01-HISTORY-REMEDIATION.md). Native OS-input acceptance remains pending.
+
+
 # Phase 1: Editable Canvas and Image Portability Verification
 
 **Goal:** As a canvas user, I want to compose editable content with reference images and export it, so that I can develop and share visual plans.

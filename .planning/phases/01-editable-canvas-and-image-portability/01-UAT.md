@@ -27,18 +27,19 @@ expected: Copy a synthetic raster image using the OS clipboard and paste into ea
 result: [pending]
 
 ### 3. Publication-history remediation
-expected: User-approved anonymization and review of the affected local commit metadata; publication remains blocked until verified. Existing automated export evidence needs no repeated manual test.
-result: [pending]
+expected: Resolve the author-metadata concern under the user-approved privacy boundary.
+result: [pass]
+evidence: Approved 15-commit anonymization verified; user clarified that remaining personal authorship is permitted. See 01-HISTORY-REMEDIATION.md.
 
 ## Summary
 
 total: 3
-passed: 0
+passed: 1
 issues: 0
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-Two native OS-input checks and one publication decision remain. See [01-VERIFICATION.md](01-VERIFICATION.md) and [01-SECURITY.md](01-SECURITY.md).
+Two native OS-input checks remain. The authorship concern is resolved. See [01-VERIFICATION.md](01-VERIFICATION.md) and [01-SECURITY.md](01-SECURITY.md).

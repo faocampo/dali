@@ -1,14 +1,17 @@
 ---
 phase: 01-editable-canvas-and-image-portability
-status: open_threats
-verdict: OPEN_THREATS
+status: secured
+verdict: SECURED
 audited_revision: 010a276
 asvs_level: 1
 block_on: high
 threats_total: 17
-threats_closed: 15
-threats_open: 2
+threats_closed: 17
+threats_open: 0
 ---
+
+> Current disposition (2026-09-11): The approved 15-commit metadata rewrite is complete and verified. The user clarified that personal Git authorship is permitted. The authorship-based publication concern below is resolved; historical audit wording is retained for traceability. Private organizational information remains prohibited. See [01-HISTORY-REMEDIATION.md](01-HISTORY-REMEDIATION.md). Native OS-input acceptance remains pending.
+
 
 # Phase 1 Security Audit
 
