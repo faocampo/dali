@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, EXPORT_LIMITS, type ExportBounds } from './export-plan';
 
 const bounds = { x: -20.25, y: 0, w: 100.25, h: 50.5 };
+describe('selection padding', () => {
+  it.each([-1, 0.5, 257, NaN, Infinity])('rejects invalid padding %s', padding => {
+    expect(computeExportPlan(['selected'], bounds, {...DEFAULT_EXPORT_OPTIONS, scope:'selection', padding}).valid).toBe(false);
+  });
+  it.each([1,2,4] as const)('adds padding before scale %s', scale => {
+    const plan=computeExportPlan(['selected'],bounds,{...DEFAULT_EXPORT_OPTIONS,scope:'selection',padding:16,scale});
+    expect([plan.pixelWidth,plan.pixelHeight]).toEqual([Math.ceil((bounds.w+32)*scale),Math.ceil((bounds.h+32)*scale)]);
+  });
+});
 describe('export dimensions and allocation preflight', () => {
   it.each([1,2,4] as const)('rounds once at source scale %i with zero default padding', scale => {
     const plan=computeExportPlan(['a'],bounds,{...DEFAULT_EXPORT_OPTIONS,scale});

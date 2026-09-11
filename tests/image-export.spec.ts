@@ -3,9 +3,11 @@ import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { writeFileSync } from 'node:fs';
 
-async function pngDownload(page: Page, scale: 1 | 2 | 4, transparent = true) {
+async function pngDownload(page: Page, scale: 1 | 2 | 4, transparent = true, scope = 'board', padding = 0) {
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByRole('radio', { name: 'PNG image' }).check();
+  await page.locator(`input[name="export-scope"][value="${scope}"]`).check();
+  if(scope==='selection') await page.getByLabel('Selection padding').fill(String(padding));
   await page.getByRole('radio', { name: `${scale}×`, exact: true }).check();
   await page.getByRole('checkbox', { name: 'Transparent background' }).setChecked(transparent);
   const preview = await page.getByTestId('export-dimensions').textContent();
@@ -49,6 +51,45 @@ async function mixedBoard(page: Page) {
     gfx.viewport.setCenter(300,200);
   });
   await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
+}
+
+test('selection nested groups exclude overlapping landmarks and support padding at every scale', async ({page}) => {
+  await page.goto('/');
+  const ids=await page.locator('affine-edgeless-root').evaluate(el=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    const shape=(xywh:string,color:string)=>gfx.surface!.addElement({type:'shape',xywh,shapeType:'rect',shapeStyle:'General',filled:true,fillColor:color,strokeWidth:0});
+    const red=shape('[0,0,100,100]','#ff0000');
+    const blue=shape('[100,0,100,100]','#0000ff');
+    const inner=gfx.surface!.addElement({type:'group',children:{[red]:true},title:''});
+    const outer=gfx.surface!.addElement({type:'group',children:{[inner]:true,[blue]:true},title:''});
+    const excluded=shape('[20,20,160,60]','#00ff00');
+    gfx.selection.set({elements:[outer],editing:false});
+    return {red,blue,inner,outer,excluded};
+  });
+  for(const scale of [1,2,4] as const) for(const padding of [0,16]) {
+    const png=await pngDownload(page,scale,true,'selection',padding);
+    expect([png.readUInt32BE(16),png.readUInt32BE(20)]).toEqual([(200+padding*2)*scale,(100+padding*2)*scale]);
+    const colors=await pixelCounts(page,png);
+    expect(colors.red).toBeGreaterThan(9000*scale*scale);
+    expect(colors.blue).toBeGreaterThan(9000*scale*scale);
+    expect(colors.green).toBe(0);
+  }
+  expect(new Set(Object.values(ids)).size).toBe(5);
+});
+
+async function pixelCounts(page:Page,png:Buffer) {
+  return page.evaluate(async base64=>{
+    const image=new Image();image.src=`data:image/png;base64,${base64}`;await image.decode();
+    const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+    const ctx=canvas.getContext('2d')!;ctx.drawImage(image,0,0);
+    const p=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+    const counts={red:0,blue:0,green:0,magenta:0,dark:0};
+    for(let i=0;i<p.length;i+=4) {if(p[i+3]!<200)continue;const r=p[i]!,g=p[i+1]!,b=p[i+2]!;
+      if(r>220&&g<30&&b<30)counts.red++;if(b>220&&r<30&&g<30)counts.blue++;
+      if(g>220&&r<30&&b<30)counts.green++;if(r>220&&b>220&&g<30)counts.magenta++;
+      if(r<100&&g<100&&b<100)counts.dark++;
+    }return counts;
+  },png.toString('base64'));
 }
 
 test('whole board source scale preserves primitive and DOM detail at every scale', async ({ page }, testInfo) => {
