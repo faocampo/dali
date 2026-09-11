@@ -18,8 +18,8 @@ Initial release includes the capabilities below. Delivery proceeds through small
 
 ### Canvas and images
 
-- [ ] **CAN-01**: Users can pan and zoom an infinite canvas and create editable frames, sticky notes, formatted text, shapes, arrows, connectors, and freehand drawings.
-- [ ] **CAN-02**: Users can select, move, resize, group, align, duplicate, layer, and style canvas objects.
+- [x] **CAN-01**: Users can pan and zoom an infinite canvas and create editable frames, sticky notes, formatted text, shapes, arrows, connectors, and freehand drawings.
+- [x] **CAN-02**: Users can select, move, resize, group, align, duplicate, layer, and style canvas objects.
 - [ ] **CAN-03**: Users can undo and redo their own canvas edits without undoing another participant's independent edits.
 - [ ] **IMG-01**: Users can import local images, including exported Miro boards and screen captures, and arrange them on the canvas.
 - [ ] **IMG-02**: Users can export board content to an image that preserves the visible text, shapes, connectors, and uploaded images.
@@ -129,8 +129,8 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 | BOARD-02 | Phase 3 | Pending |
 | BOARD-03 | Phase 3 | Pending |
 | BOARD-04 | Phase 3 | Pending |
-| CAN-01 | Phase 1 | Pending |
-| CAN-02 | Phase 1 | Pending |
+| CAN-01 | Phase 1 | Complete |
+| CAN-02 | Phase 1 | Complete |
 | CAN-03 | Phase 5 | Pending |
 | IMG-01 | Phase 1 | Pending |
 | IMG-02 | Phase 1 | Pending |
@@ -168,6 +168,7 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 | OPS-02 | Phase 4 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 42
 - Mapped to phases: 42 (proposed allocation; roadmap approval pending)
 - Unmapped: 0

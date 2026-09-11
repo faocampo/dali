@@ -70,9 +70,9 @@
     }
   ],
   "next": {
-    "command": "/gsd-execute-phase 1",
-    "label": "Continue Phase 1",
-    "reason": "Plan 01-01 complete; four plans remain"
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 1 of 13 · 0% · executing"
   },
-  "updated_at": "2026-09-11T18:29:23.539Z"
+  "updated_at": "2026-09-11T18:50:20.090Z"
 }
