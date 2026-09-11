@@ -39,24 +39,30 @@ All 42 v1 requirements are approved; the phase allocation and order below are us
 **Depends on**: Nothing (first phase)
 **Requirements**: CAN-01, CAN-02, IMG-01, IMG-02, IMG-03
 **Success Criteria** (what must be TRUE):
+
   1. A user can pan and zoom an infinite canvas and create editable frames, sticky notes, formatted text, shapes, arrows, connectors, and freehand drawings. (CAN-01)
   2. A user can select, move, resize, group, align, duplicate, layer, and style objects to arrange a readable board. (CAN-02)
   3. A user can import local images, including an exported Miro board and a screen capture, and arrange them alongside editable canvas content. (IMG-01)
   4. A user can export board content to an image that visibly preserves its text, shapes, connectors, and uploaded images. (IMG-02)
   5. A user can select a group of shapes and export an image containing only those selected shapes; unselected board content is excluded. (IMG-03)
-**Plans**: 5 plans across 4 waves; planning verified.
+
+**Plans**: 1/5 plans executed across 4 waves; planning verified.
 
 **Wave 1**
-- [ ] 01-01-PLAN.md — Incorporate and validate the local editor and storage skeleton.
+
+- [x] 01-01-PLAN.md — Incorporate and validate the local editor and storage skeleton.
 
 **Wave 2 (blocked on Wave 1)**
+
 - [ ] 01-02-PLAN.md — Canvas controls, primitive editing, and arrangement.
 - [ ] 01-04-PLAN.md — Whole-board PNG export, requested scale, and recovery.
 
 **Wave 3 (blocked on Plan 01-02)**
+
 - [ ] 01-03-PLAN.md — Local image picker, drop, and paste.
 
 **Wave 4 (blocked on Plans 01-03 and 01-04)**
+
 - [ ] 01-05-PLAN.md — Selected-object and frame PNG exports.
 
 Parallel browser checks and production builds share an exclusive execution slot; file ownership stays separate.
@@ -69,10 +75,12 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 1
 **Requirements**: MIND-01, MIND-02, MIND-03, MIND-04
 **Success Criteria** (what must be TRUE):
+
   1. A user can create and edit a hierarchical mind map and add child and sibling nodes using the agreed keyboard shortcuts. (MIND-01)
   2. A user can collapse a branch and later expand it with every descendant and its content preserved. (MIND-02)
   3. The visible mind-map layout adapts automatically when the user changes nodes or expands and collapses branches. (MIND-03)
   4. A user can format node text and style branches while continuing to edit the mind map as a hierarchy. (MIND-04)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -83,11 +91,13 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 2
 **Requirements**: AUTH-01, BOARD-01, BOARD-02, BOARD-03, BOARD-04
 **Success Criteria** (what must be TRUE):
+
   1. A member can sign in through configurable OIDC SSO with Okta compatibility and sign out. Public validation uses synthetic settings; operator-specific validation and evidence remain outside the public repository. (AUTH-01)
   2. A signed-in member can create a named board and reopen an authorized board from the home view. (BOARD-01)
   3. The home view distinguishes private and shared boards and displays the member's role for each accessible board. (BOARD-02)
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -98,10 +108,12 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 3
 **Requirements**: SAVE-01, SAVE-02, OPS-01, OPS-02
 **Success Criteria** (what must be TRUE):
+
   1. After the service restarts, an authorized member can open a saved board and all its images in another authenticated browser with no prior local board cache. (SAVE-01)
   2. A user can distinguish pending changes, acknowledged saved changes, and save failures, including when document or image storage fails. (SAVE-02)
   3. An operator can follow the documented configuration and startup procedure to deploy Dali and its required services on operator-managed infrastructure, then open an authenticated board. (OPS-01)
   4. An operator can back up and restore board documents and images, and an authorized member can reopen the restored boards with their content and images intact. (OPS-02)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -112,11 +124,13 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 4
 **Requirements**: CAN-03, COL-01, COL-02, COL-03, COL-04, MIND-05
 **Success Criteria** (what must be TRUE):
+
   1. Twenty authenticated participants can edit one canvas simultaneously, see changes without refreshing, and see who is present; their board content converges and acknowledged changes remain intact. The product imposes no concurrent-participant admission cap. (COL-01, COL-02)
   2. A participant can undo and redo their own canvas edits while another participant's independent edits remain intact. (CAN-03)
   3. After a temporary disconnection, participants reconnect to the same currently permitted content without losing acknowledged saved changes. (COL-03)
   4. When an owner revokes access, the affected member's active and reconnected sessions cannot continue unauthorized reads or writes, including direct synchronization and image requests and attempted queued writes. (COL-04)
   5. Participants can concurrently edit a mind map and later save and reopen it with its hierarchy and content intact. (MIND-05)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -127,8 +141,10 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 5
 **Requirements**: FOLLOW-01
 **Success Criteria** (what must be TRUE):
+
   1. A participant can choose to follow a presenter and see their viewport track the presenter's navigation across the board. (FOLLOW-01)
   2. A participant can leave following and pan or zoom independently while the presenter continues navigating. (FOLLOW-01)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -139,8 +155,10 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 6
 **Requirements**: COMMENT-01
 **Success Criteria** (what must be TRUE):
+
   1. An authorized participant can select a specific canvas entity, add a user comment attached to it, and read comments associated with that entity. (COMMENT-01)
   2. Authorized participants can move the commented entity and reopen the board while its saved comments remain readable and attached to that same entity. (COMMENT-01)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -151,8 +169,10 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 7
 **Requirements**: TIMER-01
 **Success Criteria** (what must be TRUE):
+
   1. A facilitator can run a shared timer and participants on the board see a consistent remaining time. (TIMER-01)
   2. A participant who refreshes or joins after the timer starts sees the remaining time for the same running timer, accounting for elapsed time. (TIMER-01)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -163,10 +183,12 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 8
 **Requirements**: VOTE-01, VOTE-02, VOTE-03, VOTE-04
 **Success Criteria** (what must be TRUE):
+
   1. A facilitator can choose eligible cards and invite participants into a voting session on those cards. (VOTE-01)
   2. A facilitator can assign each participant an individual vote allowance. (VOTE-02)
   3. A participant can vote only on eligible cards and cannot spend more than their allowance, including through concurrent attempts or retried requests. (VOTE-03)
   4. Participants can see the results after voting ends and continue editing and discussing the selected cards. (VOTE-04)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -177,10 +199,12 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 9
 **Requirements**: TPL-01, TPL-02, ROAD-01, ROAD-02
 **Success Criteria** (what must be TRUE):
+
   1. A user can start from customer-role, PMF/pains-and-gains, assumptions/findings, and design-sprint templates and edit their instantiated canvas content. (TPL-01)
   2. A user can create a reusable template from canvas content, instantiate two copies, and edit either copy without changing the other or the saved template. (TPL-02)
   3. A user can assemble a roadmap from ordinary canvas shapes, text, icons, arrows, and colors to communicate releases, goals, features, and status. (ROAD-01)
   4. A user can start from a roadmap template and edit its ordinary canvas objects using the established canvas controls. (ROAD-02)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -191,8 +215,10 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 10
 **Requirements**: DESIGN-01
 **Success Criteria** (what must be TRUE):
+
   1. A user can create a mockup screen on the canvas and edit its constituent content and arrangement. (DESIGN-01)
   2. A user can arrange editable mockup screens alongside imported reference images and notes to compare and discuss screen ideas. (DESIGN-01)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -203,9 +229,11 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 11
 **Requirements**: DIAG-01, DIAG-02
 **Success Criteria** (what must be TRUE):
+
   1. A user can choose from expanded icon and shape palettes to create editable product flows and UML-style sequence diagrams. (DIAG-01)
   2. A user can use the palettes to compose editable swimlanes and C4-style system diagrams. (DIAG-01)
   3. A user can move connected diagram objects while their connector relationships remain attached to the intended objects. (DIAG-02)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -216,10 +244,12 @@ Parallel browser checks and production builds share an exclusive execution slot;
 **Depends on**: Phase 12
 **Requirements**: GANTT-01, GANTT-02, GANTT-03, GANTT-04
 **Success Criteria** (what must be TRUE):
+
   1. A user can add a Gantt widget and manually create tasks with names, start dates, and end dates. (GANTT-01)
   2. The widget shows labeled task bars against a calendar axis and updates their position and duration when the user changes task dates. (GANTT-02)
   3. A user can navigate the Gantt timeline and distinguish tasks by their bar colors. (GANTT-03)
   4. A user can start from a Gantt template, change its tasks and dates, and save and reopen the board with the widget data intact. (GANTT-04)
+
 **Plans**: TBD
 **UI hint**: yes
 
@@ -259,7 +289,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Editable Canvas and Image Portability | 0/5 | Planned | - |
+| 1. Editable Canvas and Image Portability | 1/5 | In Progress|  |
 | 2. Daily Mind Maps | 0/TBD | Not started | - |
 | 3. Okta and Board Access | 0/TBD | Not started | - |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |

@@ -1,0 +1,5 @@
+# Deferred observations
+
+- **Inherited dependency advisory:** The maintained build's npm audit reports zero high/critical findings and eleven moderate affected dependency nodes propagated from BlockSuite data-view's nested Vitest 3.2.7 / mocker. The underlying advisory is GitHub Advisory Database [GHSA-82fw-gwwq-j7x9](https://github.com/advisories/GHSA-82fw-gwwq-j7x9) (redirect-mock path traversal). The direct runner is patched Vitest 4.1.11. BlockSuite remains pinned at the approved 0.22.4; a dependency override or editor migration needs a separate compatibility review. No assertion of universal non-applicability is made.
+- **Runtime engine declaration:** Inherited `@blocksuite/icons@2.2.17` declares Node `>=18.19.0 <23.0.0`; verification used Node 26.7.0 and npm 11.19.0. npm warns about the declaration despite passed local checks. Reconcile the supported runtime before CI/release infrastructure is selected.
+- **Build size:** The inherited editor and syntax-highlighting chunks exceed Vite's 500 kB warning threshold. Future performance work should measure user-facing load costs before changing chunk boundaries.
