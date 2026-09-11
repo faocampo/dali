@@ -30,30 +30,38 @@ export function selectionIds(ordered: readonly {id: string; children: readonly s
   return ordered.filter(node => included.has(node.id)).map(node => node.id);
 }
 
+export function positiveIntersection(a: ExportBounds, b: ExportBounds): boolean {
+  return Math.min(a.x+a.w,b.x+b.w)>Math.max(a.x,b.x) && Math.min(a.y+a.h,b.y+b.h)>Math.max(a.y,b.y);
+}
+
 export function computeExportPlan(
   includedIds: readonly string[], worldBounds: ExportBounds, options: ExportOptions,
-  revision = '',
+  revision = '', intermediateBounds: readonly ExportBounds[] = [],
 ): ExportPlan {
   const { x, y, w, h } = worldBounds;
   let error: string | null = null;
-  if (!includedIds.length) error = 'Add an object to this area before exporting.';
+  if (!includedIds.length && options.scope !== 'frame') error = 'Add an object to this area before exporting.';
   else if (![x, y, w, h, options.padding, x + w, y + h].every(value => Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER) || w <= 0 || h <= 0)
     error = 'The export area has invalid dimensions. Adjust the objects and retry.';
   else if (!Number.isInteger(options.padding) || options.padding < 0 || options.padding > 256)
     error = 'Choose a whole-number padding from 0 to 256.';
+  else if (options.scope === 'frame' && options.padding !== 0)
+    error = 'Frame exports use the exact frame rectangle with zero padding.';
+  else if (intermediateBounds.some(b => ![b.x,b.y,b.w,b.h].every(Number.isFinite) || b.w<=0 || b.h<=0))
+    error = 'An object has invalid raster dimensions. Resize it and retry.';
   else if (![1, 2, 4].includes(options.scale) || options.format !== 'png' || !['board','visible','selection','frame'].includes(options.scope) || !['white', 'transparent'].includes(options.background))
     error = 'Choose a supported export option.';
   const clipBounds = Object.freeze({ x: x - options.padding, y: y - options.padding, w: w + options.padding * 2, h: h + options.padding * 2 });
   const dimensions = (scale: number) => [Math.ceil(clipBounds.w * scale), Math.ceil(clipBounds.h * scale)];
   const fits = (scale: number) => {
-    const [width, height] = dimensions(scale);
-    return Number.isSafeInteger(width) && Number.isSafeInteger(height) && width! > 0 && height! > 0 && width! <= EXPORT_LIMITS.maxSide && height! <= EXPORT_LIMITS.maxSide && width! * height! <= EXPORT_LIMITS.maxPixels;
+    return [dimensions(scale), ...intermediateBounds.map(b => [Math.ceil(b.w*scale),Math.ceil(b.h*scale)])].every(([width,height]) =>
+      Number.isSafeInteger(width) && Number.isSafeInteger(height) && width! > 0 && height! > 0 && width! <= EXPORT_LIMITS.maxSide && height! <= EXPORT_LIMITS.maxSide && width! * height! <= EXPORT_LIMITS.maxPixels);
   };
   const [pixelWidth, pixelHeight] = dimensions(options.scale);
   let lowerScale: ExportScale | null = null;
   if (!error && !fits(options.scale)) {
     lowerScale = ([4, 2, 1] as const).find(scale => scale < options.scale && fits(scale)) ?? null;
-    error = lowerScale ? 'This resolution exceeds the supported export size. Choose a lower scale.' : 'This area exceeds the supported export size at every scale. Choose a smaller area.';
+    error = lowerScale ? 'This resolution exceeds the supported export size. Choose a lower scale.' : 'This area or an included object exceeds the supported export size at every scale. Resize the object or choose a smaller area.';
   }
   return Object.freeze({ options: Object.freeze({ ...options }), includedIds: Object.freeze([...includedIds]), worldBounds: Object.freeze({ ...worldBounds }), clipBounds, scale: options.scale, pixelWidth: pixelWidth!, pixelHeight: pixelHeight!, valid: !error, error, lowerScale, revision });
 }

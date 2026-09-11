@@ -9,8 +9,10 @@ import {
   type GfxPrimitiveElementModel,
 } from '@blocksuite/affine/std/gfx';
 import { Bound } from '@blocksuite/global/gfx';
+import { getBezierParameters, getBezierTangent } from '@blocksuite/global/gfx';
+import { ConnectorElementModel } from '@blocksuite/affine/model';
 
-import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, selectionIds, type ExportOptions, type ExportPlan, type PresentationScope } from "./export-plan";
+import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, selectionIds, positiveIntersection, type ExportOptions, type ExportPlan, type PresentationScope } from "./export-plan";
 export type { PresentationScope } from "./export-plan";
 export type PresentationRenderOptions = { scope: PresentationScope; transparent?: boolean; scale?: 1 | 2 | 4; plan?: ExportPlan };
 
@@ -66,6 +68,41 @@ function withDescendants(models: readonly GfxModel[]): GfxModel[] {
   return [...result.values()];
 }
 
+function visualBound(model: GfxModel): Bound {
+  const b = model.elementBound.clone();
+  const stroke = 'strokeWidth' in model && typeof model.strokeWidth === 'number' ? model.strokeWidth : 0;
+  const margin = stroke / 2;
+  let result = new Bound(b.x-margin,b.y-margin,b.w+margin*2,b.h+margin*2);
+  if (!(model instanceof ConnectorElementModel) || model.path.length<2) return result;
+  // Match pinned native endpoint geometry (15 * stroke/2 arrows, 10 *
+  // stroke/2 diamonds, 5 * stroke/2 circles), including curved tangents.
+  const path=model.absolutePath;
+  for(const [front,style] of [[true,model.frontEndpointStyle],[false,model.rearEndpointStyle]] as const) {
+    if(style==='None')continue;
+    const anchor=path[front?0:path.length-1]!;
+    const neighbor=path[front?1:path.length-2]!;
+    let dx=neighbor[0]-anchor[0],dy=neighbor[1]-anchor[1];
+    if(model.mode===2) {
+      const tangent=getBezierTangent(getBezierParameters(model.path),front?0:1);
+      if(tangent){dx=tangent[0]*(front?1:-1);dy=tangent[1]*(front?1:-1);}
+    }
+    const length=Math.hypot(dx,dy)||1;dx/=length;dy/=length;
+    const radius=2.5*stroke;
+    if(style==='Circle') {
+      result=result.unite(new Bound(anchor[0]+dx*radius-radius-margin,anchor[1]+dy*radius-radius-margin,2*(radius+margin),2*(radius+margin)));
+      continue;
+    }
+    const size=(style==='Diamond'?5:7.5)*stroke;
+    const angle=style==='Triangle'?Math.PI/6:Math.PI/4;
+    const points=[anchor, ...[-angle,angle].map(a=>[anchor[0]+size*(dx*Math.cos(a)-dy*Math.sin(a)),anchor[1]+size*(dx*Math.sin(a)+dy*Math.cos(a))])];
+    if(style==='Diamond')points.push([anchor[0]+dx*size*Math.SQRT2,anchor[1]+dy*size*Math.SQRT2]);
+    for(const p of points)result=result.unite(new Bound(p[0]!-margin,p[1]!-margin,stroke,stroke));
+  }
+  // Native rough paths can perturb the nominal geometry.
+  if(model.rough) return new Bound(result.x-stroke,result.y-stroke,result.w+stroke*2,result.h+stroke*2);
+  return result;
+}
+
 function resolveScope(host: EditorHost, scope: PresentationScope) {
   const gfx = host.std.get(GfxControllerIdentifier);
   if (scope === 'board') {
@@ -96,8 +133,11 @@ function resolveScope(host: EditorHost, scope: PresentationScope) {
   const bound = frame.elementBound.clone();
   // A frame defines the crop; its editor-only border/title are not presentation
   // content. Nested objects remain ordinary layers and retain their z-order.
-  const models = gfx.getElementsByBound(bound, { type: 'all' }).filter(model => model.id !== frame.id);
-  return { models: withDescendants(models), bound };
+  // Filter each descendant independently; an intersecting group must never pull
+  // its outside children into a frame's membership.
+  const models = gfx.layer.layers.flatMap<GfxModel>(layer => layer.elements).filter(model =>
+    model.id !== frame.id && positiveIntersection(visualBound(model), bound));
+  return { models: [...new Map(models.map(model => [model.id,model])).values()], bound };
 }
 
 function revision(host: EditorHost): string {
@@ -110,15 +150,11 @@ export function boardExportPlan(options: ExportOptions): ExportPlan {
     const { models, bound } = resolveScope(host, options.scope);
     // Native elementBound already includes rotated corners and connector labels.
     // Include stroke caps/arrowheads in addition to those native geometry bounds.
-    const visual = models.map(model => {
-      const b = model.elementBound.clone();
-      const stroke = 'strokeWidth' in model && typeof model.strokeWidth === 'number' ? model.strokeWidth : 0;
-      const margin = 'type' in model && model.type === 'connector' ? Math.max(12, stroke * 4) : stroke / 2;
-      return new Bound(b.x - margin, b.y - margin, b.w + margin * 2, b.h + margin * 2);
-    });
+    const visual = models.map(visualBound);
     const world = options.scope === 'board' || options.scope === 'selection'
       ? visual.slice(1).reduce((a, b) => a.unite(b), visual[0]!) : bound;
-    return computeExportPlan(models.map(m => m.id), world, options, revision(host));
+    const intermediates = models.filter(model => !isPrimitiveModel(model) && model.flavour !== 'affine:image').map(model => Bound.deserialize(model.xywh));
+    return computeExportPlan(models.map(m => m.id), world, options, revision(host), intermediates);
   } catch (cause) {
     const plan = computeExportPlan([], { x: 0, y: 0, w: 0, h: 0 }, options, revision(host));
     return Object.freeze({ ...plan, error: cause instanceof Error ? cause.message : 'Refresh the export area and retry.' });
@@ -171,16 +207,24 @@ export async function renderBoardPresentation(options: PresentationRenderOptions
   if (plan.options.background === 'white') {
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
+  // Clip in output coordinates before either native or DOM rendering. Keep the
+  // fractional final edge transparent instead of painting beyond world extent.
+  ctx.beginPath(); ctx.rect(0,0,w*plan.scale,h*plan.scale); ctx.clip();
   const included = new Set(plan.includedIds);
   try {
     for (const layer of gfx.layer.layers) {
-      const elements = layer.elements.filter(model => included.has(model.id));
+      // Group IDs remain in the scope; their native renderer paints selection
+      // outlines/title handles rather than document content.
+      const elements = layer.elements.filter(model => included.has(model.id) && !('type' in model && model.type === 'group'));
       if (!elements.length) continue;
       if (layer.type === 'canvas') {
         ctx.save();
-        const matrix = new DOMMatrix().scaleSelf(plan.scale);
+        // Native culling ignores stroke/arrow extents. Widen only its search
+        // rectangle, compensating the matrix so the output crop stays exact.
+        const renderBound = elements.reduce((area,model)=>area.unite(model.elementBound),bound.clone());
+        const matrix = new DOMMatrix().scaleSelf(plan.scale).translateSelf(renderBound.x-x,renderBound.y-y);
         ctx.setTransform(matrix);
-        native._renderByBound(ctx, matrix, new RoughCanvas(canvas), bound, elements as GfxPrimitiveElementModel[]);
+        native._renderByBound(ctx, matrix, new RoughCanvas(canvas), renderBound, elements as GfxPrimitiveElementModel[]);
         continue;
       }
       for (const model of elements as GfxBlockElementModel[]) {

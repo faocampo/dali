@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, EXPORT_LIMITS, selectionIds, type ExportBounds } from './export-plan';
+import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, EXPORT_LIMITS, selectionIds, positiveIntersection, type ExportBounds } from './export-plan';
 
 const bounds = { x: -20.25, y: 0, w: 100.25, h: 50.5 };
 describe('frame boundaries',()=>{
+  it('requires positive intersection at every edge',()=>{
+    const frame={x:0,y:0,w:100,h:100};
+    for(const b of [{x:-10,y:0,w:10,h:10},{x:100,y:0,w:10,h:10},{x:0,y:-10,w:10,h:10},{x:0,y:100,w:10,h:10}]) {
+      expect(positiveIntersection(b,frame)).toBe(false);
+      expect(positiveIntersection({...b,x:b.x-0.1,y:b.y-0.1,w:b.w+0.2,h:b.h+0.2},frame)).toBe(true);
+    }
+  });
+  it('preflights large intermediate rasters even for a small frame',()=>{
+    const options={...DEFAULT_EXPORT_OPTIONS,scope:'frame' as const,scale:4 as const};
+    const small={x:0,y:0,w:100,h:100};
+    const plan=computeExportPlan(['large-note'],small,options,'',[{x:0,y:0,w:3000,h:1000}]);
+    expect(plan.valid).toBe(false);expect(plan.lowerScale).toBe(2);
+    expect(computeExportPlan(['large-note'],small,options,'',[{x:0,y:0,w:9000,h:1000}]).valid).toBe(false);
+  });
   it('exports an empty valid frame and rejects frame padding',()=>{
     expect(computeExportPlan([],bounds,{...DEFAULT_EXPORT_OPTIONS,scope:'frame'}).valid).toBe(true);
     expect(computeExportPlan(['a'],bounds,{...DEFAULT_EXPORT_OPTIONS,scope:'frame',padding:16}).valid).toBe(false);

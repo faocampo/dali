@@ -95,6 +95,14 @@ test('selection connector membership excludes endpoints and endpoint-only select
     colors=await pixelCounts(page,await pngDownload(page,1,true,'selection',0,[ids.a,ids.b]));
     expect(colors.red).toBeGreaterThan(2000);expect(colors.blue).toBeGreaterThan(2000);expect(colors.green).toBe(0);
   }
+  const groupedIds=await page.locator('affine-edgeless-root').evaluate((el,link)=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    const group=gfx.surface!.addElement({type:'group',children:{[link]:true},title:''});
+    gfx.selection.set({elements:[group],editing:false});
+    return gfx.layer.layers.flatMap<{id:string}>(layer=>layer.elements).filter(m=>[group,link].includes(m.id)).map(m=>m.id);
+  },ids.link);
+  colors=await pixelCounts(page,await pngDownload(page,1,true,'selection',0,groupedIds));
+  expect(colors.green).toBeGreaterThan(200);expect(colors.red).toBe(0);expect(colors.blue).toBe(0);
 });
 
 async function pixelCounts(page:Page,png:Buffer) {
@@ -117,12 +125,13 @@ test('frame workflow clips all four edges and preserves picker-imported image pi
   const ids=await page.locator('affine-edgeless-root').evaluate(el=>{
     const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
     const image=gfx.doc.getBlocksByFlavour('affine:image')[0]!.model;
+    for(const model of gfx.gfxElements) if('type' in model && model.type==='shape') gfx.surface!.updateElement(model.id,{xywh:'[500,500,100,100]'});
     gfx.doc.updateBlock(image,{xywh:'[60,40,80,80]'});
     const note=gfx.doc.getBlocksByFlavour('affine:note')[0]!.model;
     gfx.doc.updateBlock(note,{xywh:'[150,60,100,100]'});
     const shape=(xywh:string,color:string,rotate=0)=>gfx.surface!.addElement({type:'shape',xywh,shapeType:'rect',shapeStyle:'General',filled:true,fillColor:color,strokeWidth:0,rotate});
     // Edge-crossing landmarks are added above existing content and below the image DOM layer.
-    shape('[-20,0,240,10]','#ff0000');shape('[-20,150,240,30]','#ff0000');
+    shape('[-20,-20,240,30]','#ff0000');shape('[-20,150,240,30]','#ff0000');
     shape('[-20,10,30,140]','#0000ff');shape('[190,10,30,140]','#0000ff');
     const touching=shape('[200,20,20,20]','#00ffff');
     const outside=shape('[400,400,30,30]','#00ffff');
@@ -167,7 +176,28 @@ test('frame empty background and unavailable scopes are explained',async({page})
     const png=await pngDownload(page,1,transparent,'frame',0,[]);
     expect([png.readUInt32BE(16),png.readUInt32BE(20)]).toEqual([100,80]);
     const colors=await pixelCounts(page,png);expect(colors).toEqual({red:0,blue:0,green:0,magenta:0,dark:0});
+    const sample=await page.evaluate(async base64=>{
+      const image=new Image();image.src=`data:image/png;base64,${base64}`;await image.decode();
+      const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+      const ctx=canvas.getContext('2d')!;ctx.drawImage(image,0,0);return [...ctx.getImageData(50,40,1,1).data];
+    },png.toString('base64'));
+    expect(sample).toEqual(transparent?[0,0,0,0]:[255,255,255,255]);
   }
+});
+
+test('frame rejects oversized intermediate objects before allocation and offers explicit lower scale',async({page})=>{
+  await page.goto('/');await page.getByRole('button',{name:'Add sticky note',exact:true}).click();
+  await page.locator('affine-edgeless-root').evaluate(el=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    gfx.doc.updateBlock(gfx.doc.getBlocksByFlavour('affine:note')[0]!.model,{xywh:'[0,0,3000,1000]'});
+    const frame=gfx.doc.addBlock('affine:frame',{xywh:'[0,0,100,80]'},gfx.surface!.id);gfx.selection.set({elements:[frame],editing:false});
+  });
+  await page.getByRole('button',{name:'Export',exact:true}).click();await page.getByRole('radio',{name:'PNG image'}).check();
+  await page.locator('input[value="frame"]').check();await page.getByRole('radio',{name:'4×',exact:true}).check();
+  await expect(page.getByTestId('export-dimensions')).toHaveText('400 × 320 pixels');
+  await expect(page.getByRole('dialog').getByRole('button',{name:'Download',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Use 2×',exact:true}).click();
+  expect(await currentDialogDownload(page)).toEqual([200,160]);
 });
 
 test('whole board source scale preserves primitive and DOM detail at every scale', async ({ page }, testInfo) => {
