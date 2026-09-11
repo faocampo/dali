@@ -8,6 +8,7 @@ import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
 import { getCanvasRuntime } from './runtime';
 import { boardCatalogEntry } from '../boards/catalog';
 import { updateWorkspaceDocMeta } from './workspace';
+import type { ExportPlan, ExportScale } from './export-plan';
 import {
   renderBoardPresentation,
   type PresentationScope,
@@ -46,6 +47,8 @@ export type ExportFormat = (typeof EXPORT_FORMATS)[number]['id'];
 export type PresentationExportOptions = {
   scope: PresentationScope;
   transparent?: boolean;
+  scale?: ExportScale;
+  plan?: ExportPlan;
 };
 
 export type PresentationExportResult = {
@@ -146,6 +149,8 @@ export async function exportBoardFile(
   const render = await renderBoardPresentation({
     scope: options.scope,
     transparent: format === 'png' && options.transparent,
+    scale: options.scale,
+    plan: options.plan,
   });
   const title = safeFilename(catalog?.title ?? 'Untitled board');
   if (format === 'png') {

@@ -1,4 +1,4 @@
-import { CanvasRenderer, ExportManager } from '@blocksuite/affine/blocks/surface';
+import { CanvasRenderer, ExportManager, RoughCanvas } from '@blocksuite/affine/blocks/surface';
 import type { EditorHost } from '@blocksuite/affine/std';
 import {
   GfxControllerIdentifier,
@@ -10,12 +10,9 @@ import {
 } from '@blocksuite/affine/std/gfx';
 import { Bound } from '@blocksuite/global/gfx';
 
-export type PresentationScope = 'board' | 'visible' | 'selection' | 'frame';
-
-export type PresentationRenderOptions = {
-  scope: PresentationScope;
-  transparent?: boolean;
-};
+import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, type ExportOptions, type ExportPlan, type PresentationScope } from "./export-plan";
+export type { PresentationScope } from "./export-plan";
+export type PresentationRenderOptions = { scope: PresentationScope; transparent?: boolean; scale?: 1 | 2 | 4; plan?: ExportPlan };
 
 export type PresentationRender = {
   canvas: HTMLCanvasElement;
@@ -27,9 +24,6 @@ export type PresentationRender = {
 
 export type PresentationScopeAvailability = Record<PresentationScope, boolean>;
 
-const MAX_OUTPUT_SIDE = 16_384;
-const MAX_OUTPUT_PIXELS = 64_000_000;
-const EXPORT_PADDING = 50;
 
 function editorHost(): EditorHost {
   const host = document.querySelector('editor-host') as EditorHost | null;
@@ -102,115 +96,140 @@ function resolveScope(host: EditorHost, scope: PresentationScope) {
   return { models: withDescendants(models), bound };
 }
 
-function assertSafeCanvas(bound: Bound, dpr: number): void {
-  const width = Math.ceil((bound.w + EXPORT_PADDING * 2) * dpr);
-  const height = Math.ceil((bound.h + EXPORT_PADDING * 2) * dpr);
-  if (width > MAX_OUTPUT_SIDE || height > MAX_OUTPUT_SIDE || width * height > MAX_OUTPUT_PIXELS) {
-    throw new Error(
-      `This output would be ${width.toLocaleString()} × ${height.toLocaleString()} pixels. ` +
-      'Choose Visible area, a smaller selection, or a frame to keep the browser responsive.'
-    );
+function revision(host: EditorHost): string {
+  return JSON.stringify([host.store.id, host.store.spaceDoc.toJSON(), host.std.get(GfxControllerIdentifier).selection.selectedElements.map(m => m.id)]);
+}
+
+export function boardExportPlan(options: ExportOptions): ExportPlan {
+  const host = editorHost();
+  try {
+    const { models, bound } = resolveScope(host, options.scope);
+    // Native elementBound already includes rotated corners and connector labels.
+    // Include stroke caps/arrowheads in addition to those native geometry bounds.
+    const visual = models.map(model => {
+      const b = model.elementBound.clone();
+      const stroke = 'strokeWidth' in model && typeof model.strokeWidth === 'number' ? model.strokeWidth : 0;
+      const margin = 'type' in model && model.type === 'connector' ? Math.max(12, stroke * 4) : stroke / 2;
+      return new Bound(b.x - margin, b.y - margin, b.w + margin * 2, b.h + margin * 2);
+    });
+    const world = options.scope === 'board' || options.scope === 'selection'
+      ? visual.slice(1).reduce((a, b) => a.unite(b), visual[0]!) : bound;
+    return computeExportPlan(models.map(m => m.id), world, options, revision(host));
+  } catch (cause) {
+    const plan = computeExportPlan([], { x: 0, y: 0, w: 0, h: 0 }, options, revision(host));
+    return Object.freeze({ ...plan, error: cause instanceof Error ? cause.message : 'Refresh the export area and retry.' });
   }
 }
 
-function drawPaperGround(
-  canvas: HTMLCanvasElement,
-  host: EditorHost,
-  transparent: boolean,
-  dpr: number
-): void {
-  if (transparent) return;
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('The browser could not create the export canvas.');
-  const root = host.view.getBlock(host.store.root!.id) as HTMLElement | null;
-  const viewport = root?.querySelector('.affine-edgeless-viewport') ?? root;
-  const styles = window.getComputedStyle(viewport ?? document.documentElement);
-  const background = styles.getPropertyValue('--affine-background-primary-color').trim() || '#fbfaf7';
-  const grid = styles.getPropertyValue('--affine-edgeless-grid-color').trim() || '#d6d1c8';
-  const gap = 20 * dpr;
-  context.fillStyle = background;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = grid;
-  for (let y = gap / 2; y < canvas.height; y += gap) {
-    for (let x = gap / 2; x < canvas.width; x += gap) {
-      context.beginPath();
-      context.arc(x, y, Math.max(0.7, dpr), 0, Math.PI * 2);
-      context.fill();
-    }
-  }
+function bounded<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} took too long. Retry the export.`)), ms);
+    promise.then(value => { clearTimeout(timer); resolve(value); }, cause => { clearTimeout(timer); reject(cause); });
+  });
 }
 
-/**
- * Render canvas primitives and DOM blocks in the same layer order as the live
- * editor. The returned canvas is detached and has 50 CSS px of safe padding.
- */
-export async function renderBoardPresentation(
-  options: PresentationRenderOptions
-): Promise<PresentationRender> {
+// Pinned BlockSuite 0.22.4 internal seams. Public methods hardcode screen DPR.
+// Keep the native render functions; fail closed if the installed seam changes.
+type NativeRaster = {
+  _renderByBound(ctx: CanvasRenderingContext2D, matrix: DOMMatrix, rough: RoughCanvas, bound: Bound, elements: GfxPrimitiveElementModel[]): void;
+};
+type NativeDomRaster = {
+  _html2canvas(element: HTMLElement, options: {
+    scale: number; backgroundColor: null; logging: false; width: number; height: number;
+    onclone(document: Document, element: HTMLElement): Promise<void>;
+  }): Promise<HTMLCanvasElement>;
+};
+
+export async function renderBoardPresentation(options: PresentationRenderOptions): Promise<PresentationRender> {
   const startedAt = performance.now();
   const host = editorHost();
   const gfx = host.std.get(GfxControllerIdentifier);
-  const { models, bound } = resolveScope(host, options.scope);
-  const dpr = window.devicePixelRatio || 1;
-  assertSafeCanvas(bound, dpr);
-
-  const surface = gfx.surfaceComponent as { renderer?: unknown } | null;
-  if (!(surface?.renderer instanceof CanvasRenderer)) {
-    throw new Error('The canvas renderer is not ready for presentation export.');
-  }
-  const manager = host.std.get(ExportManager);
-  const width = Math.ceil((bound.w + EXPORT_PADDING * 2) * dpr);
-  const height = Math.ceil((bound.h + EXPORT_PADDING * 2) * dpr);
+  const plan = options.plan ?? boardExportPlan({ ...DEFAULT_EXPORT_OPTIONS, scope: options.scope, scale: options.scale ?? 1, background: options.transparent ? 'transparent' : 'white' });
+  if (!plan.valid) throw new Error(plan.error!);
+  const assertCurrent = () => {
+    if (!host.isConnected || editorHost() !== host || revision(host) !== plan.revision)
+      throw new Error('The board or selection changed. Refresh the preview and retry.');
+  };
+  assertCurrent();
+  await bounded(document.fonts.ready, 'Font loading');
+  const renderer = (gfx.surfaceComponent as { renderer?: CanvasRenderer }).renderer;
+  const native = renderer as unknown as NativeRaster;
+  const dom = host.std.get(ExportManager) as unknown as NativeDomRaster;
+  if (!(renderer instanceof CanvasRenderer) || typeof native._renderByBound !== 'function' || typeof dom._html2canvas !== 'function')
+    throw new Error('This editor version cannot render at the requested resolution.');
+  const { x, y, w, h } = plan.clipBounds;
+  const bound = new Bound(x, y, w, h);
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  drawPaperGround(canvas, host, !!options.transparent, dpr);
-
-  const included = new Set(models.map(model => model.id));
-  const root = host.view.getBlock(host.store.root!.id) as HTMLElement | null;
-  const container = root?.querySelector('.affine-block-children-container') as HTMLElement | null;
-  const previousBackground = container?.style.backgroundColor ?? '';
-  if (container) container.style.backgroundColor = 'transparent';
-
+  canvas.width = plan.pixelWidth;
+  canvas.height = plan.pixelHeight;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('The browser could not allocate the export. Choose a lower scale and retry.');
+  if (plan.options.background === 'white') {
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  const included = new Set(plan.includedIds);
   try {
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('The browser could not create the export canvas.');
     for (const layer of gfx.layer.layers) {
       const elements = layer.elements.filter(model => included.has(model.id));
       if (!elements.length) continue;
       if (layer.type === 'canvas') {
-        const layerCanvas = surface.renderer.getCanvasByBound(
-          bound,
-          elements as GfxPrimitiveElementModel[]
-        );
-        context.drawImage(
-          layerCanvas,
-          EXPORT_PADDING * dpr,
-          EXPORT_PADDING * dpr,
-          Math.ceil(bound.w * dpr),
-          Math.ceil(bound.h * dpr)
-        );
+        ctx.save();
+        const matrix = new DOMMatrix().scaleSelf(plan.scale);
+        ctx.setTransform(matrix);
+        native._renderByBound(ctx, matrix, new RoughCanvas(canvas), bound, elements as GfxPrimitiveElementModel[]);
         continue;
       }
-      const layerCanvas = await manager.edgelessToCanvas(
-        surface.renderer,
-        bound,
-        gfx,
-        elements as GfxBlockElementModel[],
-        []
-      );
-      if (!layerCanvas) throw new Error('A canvas layer could not be rendered.');
-      context.drawImage(layerCanvas, 0, 0, width, height);
+      for (const model of elements as GfxBlockElementModel[]) {
+        const [bx, by, bw, bh] = JSON.parse(model.xywh) as number[];
+        let source: CanvasImageSource;
+        let release = () => {};
+        if (model.flavour === 'affine:image') {
+          const sourceId = (model as GfxBlockElementModel & { props: { sourceId: string } }).props.sourceId;
+          const blob = sourceId && await bounded(host.store.blobSync.get(sourceId), 'Image loading');
+          if (!blob) throw new Error('An image is missing. Restore the image and retry.');
+          const url = URL.createObjectURL(blob);
+          const image = new Image(); image.src = url;
+          try { await bounded(image.decode(), 'Image decoding'); } catch { URL.revokeObjectURL(url); throw new Error('An image could not be decoded. Restore it and retry.'); }
+          source = image; release = () => URL.revokeObjectURL(url);
+        } else {
+          const element = host.view.getBlock(model.id) as HTMLElement | null;
+          if (!element) throw new Error('An object is still loading. Retry the export.');
+          // html2canvas copies custom-element computed styles before onclone;
+          // activate the source while cloning so descendants inherit visibility.
+          const previousVisibility = element.style.visibility;
+          element.style.visibility = 'visible';
+          try { source = await bounded(dom._html2canvas(element, {
+            scale: plan.scale, backgroundColor: null, logging: false, width: bw!, height: bh!,
+            onclone: async (_document, clone) => {
+              for (let node: HTMLElement | null = clone; node; node = node.parentElement) {
+                node.style.transform = 'none'; node.style.contentVisibility = 'visible';
+                // GfxViewportElement keeps offscreen blocks in layout as .block-idle.
+                node.classList.remove('block-idle'); node.style.visibility = 'visible';
+              }
+              clone.style.width = `${bw}px`; clone.style.height = `${bh}px`;
+              await _document.fonts.ready;
+            },
+          }), 'Object rendering'); } finally { element.style.visibility = previousVisibility; }
+          const raster = source as HTMLCanvasElement;
+          if (raster.width !== Math.floor(bw! * plan.scale) || raster.height !== Math.floor(bh! * plan.scale))
+            throw new Error('An object could not be rendered at the requested scale.');
+          release = () => { raster.width = 0; raster.height = 0; };
+        }
+        try {
+          ctx.save(); ctx.scale(plan.scale, plan.scale);
+          ctx.translate(bx! - x + bw! / 2, by! - y + bh! / 2);
+          ctx.rotate((model.rotate || 0) * Math.PI / 180);
+          ctx.drawImage(source, -bw! / 2, -bh! / 2, bw!, bh!); ctx.restore();
+        } finally { release(); }
+      }
+      assertCurrent();
     }
-  } finally {
-    if (container) container.style.backgroundColor = previousBackground;
+    assertCurrent();
+    // Verify origin-clean pixels before encoding, so taint remains an actionable error.
+    ctx.getImageData(0, 0, 1, 1);
+    return { canvas, contentBound: bound, objectCount: included.size, durationMs: performance.now() - startedAt, estimatedBytes: canvas.width * canvas.height * 4 };
+  } catch (cause) {
+    canvas.width = 0; canvas.height = 0;
+    throw cause;
   }
-
-  return {
-    canvas,
-    contentBound: bound,
-    objectCount: models.length,
-    durationMs: performance.now() - startedAt,
-    estimatedBytes: width * height * 4,
-  };
 }

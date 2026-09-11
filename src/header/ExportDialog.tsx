@@ -1,23 +1,28 @@
 /**
  * The Export dialog, and the follow-us prompt that comes after a download.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EXPORT_FORMATS, exportBoardFile, type ExportFormat } from '../canvas/export-board';
 import {
   presentationScopeAvailability,
+  boardExportPlan,
   type PresentationScope,
 } from '../canvas/presentation-export';
 import { APP_URL, FOLLOW_LINKS, SHARE_TARGETS } from './links';
+import { DEFAULT_EXPORT_OPTIONS, type ExportScale } from '../canvas/export-plan';
 
 export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [format, setFormat] = useState<ExportFormat>('board');
-  const [scope, setScope] = useState<PresentationScope>('visible');
+  const [scope, setScope] = useState<PresentationScope>('board');
+  const [scale, setScale] = useState<ExportScale>(1);
   const [transparent, setTransparent] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [availability] = useState(() => presentationScopeAvailability());
+  const [previewVersion, refreshPreview] = useState(0);
+  const plan = useMemo(() => boardExportPlan({ ...DEFAULT_EXPORT_OPTIONS, scope, scale, background: transparent ? 'transparent' : 'white' }), [scope, scale, transparent, previewVersion]);
   const downloadButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -28,16 +33,17 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     setError(null);
     setExporting(true);
     try {
-      await exportBoardFile(format, { scope, transparent });
+      await exportBoardFile(format, { scope, transparent, scale, plan: format === 'png' ? plan : undefined });
       // The follow prompt replaces this panel only once a download has really
       // happened, so a failed export cannot look like a success.
       setDownloaded(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
+      refreshPreview(value => value + 1);
     } finally {
       setExporting(false);
     }
-  }, [format, scope, transparent]);
+  }, [format, scope, transparent, scale, plan]);
 
   const download = useCallback(() => void performDownload(), [performDownload]);
 
@@ -134,12 +140,24 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         </Section>
       )}
 
+      {format === 'png' && <Section label="Resolution">
+        <div className="djai-row">
+          {([1, 2, 4] as const).map(value => <label className="djai-radio" key={value}>
+            <input type="radio" name="export-scale" checked={scale === value} disabled={exporting} onChange={() => setScale(value)} />
+            <span>{value}×</span>
+          </label>)}
+        </div>
+        <p data-testid="export-dimensions">{Number.isFinite(plan.pixelWidth) && Number.isFinite(plan.pixelHeight) ? `${plan.pixelWidth} × ${plan.pixelHeight} pixels` : 'Dimensions unavailable'}</p>
+        {plan.error && <p role="alert">{plan.error}</p>}
+        {plan.lowerScale && <button type="button" onClick={() => setScale(plan.lowerScale!)}>Use {plan.lowerScale}×</button>}
+      </Section>}
+
       <button
         ref={downloadButtonRef}
         type="button"
         className="djai-primary"
         onClick={download}
-        disabled={exporting}
+        disabled={exporting || (format === 'png' && !plan.valid)}
       >
         {exporting ? 'Preparing…' : 'Download'}
       </button>
@@ -180,8 +198,8 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
 function FollowPrompt({ onClose }: { onClose: () => void }) {
   return (
-    <Panel title="Downloaded" onClose={onClose}>
-      <p className="djai-note">Your board is saved. Come find us:</p>
+    <Panel title="Download started" onClose={onClose}>
+      <p className="djai-note">Your browser is downloading the file.</p>
       <div className="djai-row">
         {FOLLOW_LINKS.map((l) => (
           <a
