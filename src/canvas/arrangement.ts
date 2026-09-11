@@ -11,6 +11,7 @@ import {
 } from '@blocksuite/affine/std/gfx';
 import { Bound } from '@blocksuite/global/gfx';
 import { canvasModelKind, type CanvasItemKind } from './selection-summary';
+import { reconcileImageVisualEdits } from './image-visual-edits';
 
 export type LayerEntry = {
   id: string;
@@ -40,6 +41,7 @@ export function duplicateCanvasSelection(host: EditorHost): Promise<void> {
     if (!root) return;
     host.std.store.captureSync();
     await duplicate(root, [...host.std.get(GfxControllerIdentifier).selection.selectedElements]);
+    reconcileImageVisualEdits(host.std.store);
     host.std.store.captureSync();
   });
   duplicates.set(host, operation.catch(() => undefined));

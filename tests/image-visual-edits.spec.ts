@@ -68,3 +68,30 @@ test('crop edits preserve native movement and resize through brightness and rese
   const [x, y, w, h] = arranged as [number, number, number, number];
   closeBounds((await state(page)).images[0]!.bounds, [x - w / 9, y, w / 0.9, h]);
 });
+
+test('Duplicate gives edited images independent history and placement', async ({ page }) => {
+  await setup(page); await crop(page);
+  const original = (await state(page)).images[0]!;
+  await page.locator('.selection-inspector').getByRole('button', { name: 'Duplicate', exact: true }).click();
+  await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
+  await expect.poll(async () => (await state(page)).edits.length).toBe(2);
+  const copied = (await state(page)).images.find(image => image.id !== original.id)!;
+  const records = (await state(page)).edits;
+  expect(new Set(records.map(record => record.id)).size).toBe(2);
+  await brighten(page);
+  closeBounds((await state(page)).images.find(image => image.id === copied.id)!.bounds, copied.bounds);
+  expect((await state(page)).images.find(image => image.id === original.id)).toEqual(original);
+  await page.getByRole('button', { name: 'Reset edits', exact: true }).click();
+  const reset = await state(page);
+  expect(reset.edits).toHaveLength(1);
+  expect(reset.images.find(image => image.id === original.id)).toEqual(original);
+  const [x, y, w, h] = copied.bounds as [number, number, number, number];
+  closeBounds(reset.images.find(image => image.id === copied.id)!.bounds, [x - w / 9, y, w / 0.9, h]);
+  // Original reset history remains available after resetting its copy.
+  await page.locator('affine-edgeless-root').evaluate((el, id) => {
+    (el as HTMLElement & { gfx: GfxController }).gfx.selection.set({ elements: [id], editing: false });
+  }, original.id);
+  await expect(page.getByRole('button', { name: 'Reset edits', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Reset edits', exact: true }).click();
+  expect((await state(page)).edits).toHaveLength(0);
+});

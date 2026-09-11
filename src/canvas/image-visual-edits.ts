@@ -123,18 +123,50 @@ function getImage(store: Store, imageId: string): ImageBlockModel {
 }
 
 export function getImageVisualEdit(store: Store, imageId: string): ImageVisualEditModel | null {
-  const states = store
+  return store
     .getBlocksByFlavour(IMAGE_VISUAL_EDIT_FLAVOUR)
+    .map(block => block.model as ImageVisualEditModel)
+    .find(state => state.props.imageId === imageId) ?? null;
+}
+
+/** Native duplication and legacy snapshot imports can share pixels while
+ * assigning new image IDs. Copy their history before any owner's record changes.
+ * Lookup itself remains read-only; mutations always use an exact owner. */
+export function reconcileImageVisualEdits(store: Store): void {
+  if (store.readonly) return;
+  const states = store.getBlocksByFlavour(IMAGE_VISUAL_EDIT_FLAVOUR)
     .map(block => block.model as ImageVisualEditModel);
-  const exact = states.find(state => state.props.imageId === imageId);
-  if (exact) return exact;
-  const image = store.getBlock(imageId)?.model;
-  if (!image || image.flavour !== 'affine:image') return null;
-  const sourceId = (image as ImageBlockModel).props.sourceId;
-  return states.find(state => state.props.processedSourceId === sourceId) ?? null;
+  const owned = new Set(states.map(state => state.props.imageId));
+  store.transact(() => {
+    for (const { model } of store.getBlocksByFlavour('affine:image')) {
+      if (owned.has(model.id)) continue;
+      const image = model as ImageBlockModel;
+      const template = states.find(state => state.props.processedSourceId === image.props.sourceId);
+      if (!template) continue;
+      // Model props also expose reactive `$` signals; copy schema values only.
+      const props = template.props;
+      store.addBlock(IMAGE_VISUAL_EDIT_FLAVOUR, {
+        imageId: image.id,
+        sourceId: props.sourceId,
+        processedSourceId: props.processedSourceId,
+        brightness: props.brightness,
+        contrast: props.contrast,
+        cropLeft: props.cropLeft,
+        cropTop: props.cropTop,
+        cropRight: props.cropRight,
+        cropBottom: props.cropBottom,
+        basePixelWidth: props.basePixelWidth,
+        basePixelHeight: props.basePixelHeight,
+        baseSize: props.baseSize,
+        ...uncroppedGeometry(image, props),
+      }, store.root);
+      owned.add(image.id);
+    }
+  });
 }
 
 export function discardImageVisualEdit(store: Store, imageId: string): void {
+  reconcileImageVisualEdits(store);
   const state = getImageVisualEdit(store, imageId);
   if (state) store.deleteBlock(state);
 }
@@ -193,6 +225,7 @@ export function imageVisualSettings(
   store: Store,
   imageId: string
 ): ImageVisualSettings {
+  reconcileImageVisualEdits(store);
   const state = getImageVisualEdit(store, imageId);
   return state
     ? {
@@ -212,6 +245,7 @@ export async function applyImageVisualEdit(
   next: ImageVisualSettings
 ): Promise<void> {
   const image = getImage(store, imageId);
+  reconcileImageVisualEdits(store);
   const existing = getImageVisualEdit(store, imageId);
   const bound = image.elementBound;
   const baseSourceId = existing?.props.sourceId ?? image.props.sourceId;
@@ -314,6 +348,7 @@ export async function applyImageVisualEdit(
 
 export function resetImageVisualEdit(store: Store, imageId: string): void {
   const image = getImage(store, imageId);
+  reconcileImageVisualEdits(store);
   const state = getImageVisualEdit(store, imageId);
   if (!state) return;
   const { baseX, baseY, baseWidth, baseHeight } = uncroppedGeometry(image, state.props);
@@ -342,6 +377,7 @@ export async function replaceImageSource(store: Store, imageId: string, file: Fi
     const bound = image.elementBound;
     const sourceId = await store.blobSync.set(file);
     const height = bound.w * (bitmap.height / bitmap.width);
+    reconcileImageVisualEdits(store);
     const visual = getImageVisualEdit(store, imageId);
     store.captureSync();
     store.transact(() => {
