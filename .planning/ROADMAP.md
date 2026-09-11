@@ -44,7 +44,22 @@ All 42 v1 requirements are approved; the phase allocation and order below are us
   3. A user can import local images, including an exported Miro board and a screen capture, and arrange them alongside editable canvas content. (IMG-01)
   4. A user can export board content to an image that visibly preserves its text, shapes, connectors, and uploaded images. (IMG-02)
   5. A user can select a group of shapes and export an image containing only those selected shapes; unselected board content is excluded. (IMG-03)
-**Plans**: TBD
+**Plans**: 5 plans across 4 waves; planning verified.
+
+**Wave 1**
+- [ ] 01-01-PLAN.md — Incorporate and validate the local editor and storage skeleton.
+
+**Wave 2 (blocked on Wave 1)**
+- [ ] 01-02-PLAN.md — Canvas controls, primitive editing, and arrangement.
+- [ ] 01-04-PLAN.md — Whole-board PNG export, requested scale, and recovery.
+
+**Wave 3 (blocked on Plan 01-02)**
+- [ ] 01-03-PLAN.md — Local image picker, drop, and paste.
+
+**Wave 4 (blocked on Plans 01-03 and 01-04)**
+- [ ] 01-05-PLAN.md — Selected-object and frame PNG exports.
+
+Parallel browser checks and production builds share an exclusive execution slot; file ownership stays separate.
 **UI hint**: yes
 
 ### Phase 2: Daily Mind Maps
@@ -244,7 +259,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Editable Canvas and Image Portability | 0/TBD | Not started | - |
+| 1. Editable Canvas and Image Portability | 0/5 | Planned | - |
 | 2. Daily Mind Maps | 0/TBD | Not started | - |
 | 3. Okta and Board Access | 0/TBD | Not started | - |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
