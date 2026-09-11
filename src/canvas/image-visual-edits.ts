@@ -17,6 +17,7 @@ import {
   type ViewExtensionContext,
 } from '@blocksuite/affine/ext-loader';
 import { literal } from 'lit/static-html.js';
+import { Bound } from '@blocksuite/global/gfx';
 
 export const IMAGE_VISUAL_EDIT_FLAVOUR = 'djai:image-visual-edit';
 const MAX_EDIT_BYTES = 50 * 1024 * 1024;
@@ -171,6 +172,23 @@ export type ImageVisualSettings = Pick<
   'brightness' | 'contrast' | 'cropLeft' | 'cropTop' | 'cropRight' | 'cropBottom'
 >;
 
+/** Recover the original rectangle from the current native placement, including
+ * moves, resizes and rotations performed by BlockSuite itself. */
+function uncroppedGeometry(image: ImageBlockModel, state: ImageVisualEditProps) {
+  const bound = Bound.deserialize(image.xywh);
+  const baseWidth = bound.w / (1 - (state.cropLeft + state.cropRight) / 100);
+  const baseHeight = bound.h / (1 - (state.cropTop + state.cropBottom) / 100);
+  const localX = baseWidth * (state.cropLeft - state.cropRight) / 200;
+  const localY = baseHeight * (state.cropTop - state.cropBottom) / 200;
+  const angle = (image.props.rotate ?? 0) * Math.PI / 180;
+  return {
+    baseX: bound.x + bound.w / 2 - localX * Math.cos(angle) + localY * Math.sin(angle) - baseWidth / 2,
+    baseY: bound.y + bound.h / 2 - localX * Math.sin(angle) - localY * Math.cos(angle) - baseHeight / 2,
+    baseWidth,
+    baseHeight,
+  };
+}
+
 export function imageVisualSettings(
   store: Store,
   imageId: string
@@ -245,10 +263,9 @@ export async function applyImageVisualEdit(
     const output = await canvasBlob(canvas);
     const processedSourceId = await store.blobSync.set(output);
 
-    const baseX = existing?.props.baseX ?? bound.x;
-    const baseY = existing?.props.baseY ?? bound.y;
-    const baseWidth = existing?.props.baseWidth ?? bound.w;
-    const baseHeight = existing?.props.baseHeight ?? bound.h;
+    const { baseX, baseY, baseWidth, baseHeight } = existing
+      ? uncroppedGeometry(image, existing.props)
+      : { baseX: bound.x, baseY: bound.y, baseWidth: bound.w, baseHeight: bound.h };
     const width = baseWidth * (1 - left - right);
     const height = baseHeight * (1 - top - bottom);
     const localX = (baseWidth * (left - right)) / 2;
@@ -299,6 +316,7 @@ export function resetImageVisualEdit(store: Store, imageId: string): void {
   const image = getImage(store, imageId);
   const state = getImageVisualEdit(store, imageId);
   if (!state) return;
+  const { baseX, baseY, baseWidth, baseHeight } = uncroppedGeometry(image, state.props);
   store.captureSync();
   store.transact(() => {
     store.updateBlock(image, {
@@ -306,7 +324,7 @@ export function resetImageVisualEdit(store: Store, imageId: string): void {
       width: state.props.basePixelWidth,
       height: state.props.basePixelHeight,
       size: state.props.baseSize,
-      xywh: `[${state.props.baseX},${state.props.baseY},${state.props.baseWidth},${state.props.baseHeight}]`,
+      xywh: `[${baseX},${baseY},${baseWidth},${baseHeight}]`,
     });
     store.deleteBlock(state);
   });
@@ -357,18 +375,7 @@ export function updateImageGeometry(
   store.transact(() => {
     store.updateBlock(image, { xywh: `[${next.x},${next.y},${next.width},${next.height}]` });
     if (state) {
-      const horizontal = 1 - (state.props.cropLeft + state.props.cropRight) / 100;
-      const vertical = 1 - (state.props.cropTop + state.props.cropBottom) / 100;
-      const baseWidth = next.width / horizontal;
-      const baseHeight = next.height / vertical;
-      const localX = (baseWidth * (state.props.cropLeft - state.props.cropRight)) / 200;
-      const localY = (baseHeight * (state.props.cropTop - state.props.cropBottom)) / 200;
-      const angle = ((image.props.rotate ?? 0) * Math.PI) / 180;
-      const offsetX = localX * Math.cos(angle) - localY * Math.sin(angle);
-      const offsetY = localX * Math.sin(angle) + localY * Math.cos(angle);
-      const baseX = next.x + next.width / 2 - offsetX - baseWidth / 2;
-      const baseY = next.y + next.height / 2 - offsetY - baseHeight / 2;
-      store.updateBlock(state, { baseX, baseY, baseWidth, baseHeight });
+      store.updateBlock(state, uncroppedGeometry(image, state.props));
     }
   });
   store.captureSync();
