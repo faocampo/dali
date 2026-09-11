@@ -46,7 +46,7 @@ All 42 v1 requirements are approved; the phase allocation and order below are us
   4. A user can export board content to an image that visibly preserves its text, shapes, connectors, and uploaded images. (IMG-02)
   5. A user can select a group of shapes and export an image containing only those selected shapes; unselected board content is excluded. (IMG-03)
 
-**Plans**: 2/5 plans executed across 4 waves; planning verified.
+**Plans**: 3/5 plans executed across 4 waves; planning verified.
 
 **Wave 1**
 
@@ -55,7 +55,7 @@ All 42 v1 requirements are approved; the phase allocation and order below are us
 **Wave 2 (blocked on Wave 1)**
 
 - [x] 01-02-PLAN.md — Canvas controls, primitive editing, and arrangement.
-- [ ] 01-04-PLAN.md — Whole-board PNG export, requested scale, and recovery.
+- [x] 01-04-PLAN.md — Whole-board PNG export, requested scale, and recovery.
 
 **Wave 3 (blocked on Plan 01-02)**
 
@@ -289,7 +289,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Editable Canvas and Image Portability | 2/5 | In Progress|  |
+| 1. Editable Canvas and Image Portability | 3/5 | In Progress|  |
 | 2. Daily Mind Maps | 0/TBD | Not started | - |
 | 3. Okta and Board Access | 0/TBD | Not started | - |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
