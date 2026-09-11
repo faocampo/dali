@@ -21,7 +21,7 @@ Initial release includes the capabilities below. Delivery proceeds through small
 - [x] **CAN-01**: Users can pan and zoom an infinite canvas and create editable frames, sticky notes, formatted text, shapes, arrows, connectors, and freehand drawings.
 - [x] **CAN-02**: Users can select, move, resize, group, align, duplicate, layer, and style canvas objects.
 - [ ] **CAN-03**: Users can undo and redo their own canvas edits without undoing another participant's independent edits.
-- [ ] **IMG-01**: Users can import local images, including exported Miro boards and screen captures, and arrange them on the canvas.
+- [x] **IMG-01**: Users can import local images, including exported Miro boards and screen captures, and arrange them on the canvas.
 - [x] **IMG-02**: Users can export board content to an image that preserves the visible text, shapes, connectors, and uploaded images.
 - [ ] **IMG-03**: Users can select a group of shapes and export only the selected shapes as an image, excluding unselected board content.
 
@@ -132,7 +132,7 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 | CAN-01 | Phase 1 | Complete |
 | CAN-02 | Phase 1 | Complete |
 | CAN-03 | Phase 5 | Pending |
-| IMG-01 | Phase 1 | Pending |
+| IMG-01 | Phase 1 | Complete |
 | IMG-02 | Phase 1 | Complete |
 | IMG-03 | Phase 1 | Pending |
 | SAVE-01 | Phase 4 | Pending |
