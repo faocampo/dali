@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
+import type { ImageBlockModel } from '@blocksuite/affine/model';
 
 async function raster(page: Page, width = 200, height = 100) {
   const data = await page.evaluate(({ width, height }) => {
@@ -143,4 +144,58 @@ test('Replace preflights raster dimensions and preserves edited pixels on reject
   expect(await state(page)).toEqual(before);
   await input.setInputFiles(file);
   await expect.poll(async () => (await state(page)).edits.length).toBe(0);
+});
+
+test('Replace rejects a changed board after blob storage and permits retry', async ({ page }) => {
+  await setup(page); await crop(page);
+  const before = await state(page);
+  await page.locator('affine-edgeless-root').evaluate(el => {
+    const sync = (el as HTMLElement & { gfx: GfxController }).gfx.doc.blobSync;
+    const original = sync.set.bind(sync);
+    sync.set = (async (...args: unknown[]) => {
+      sync.set = original;
+      const id = await Reflect.apply(original, sync, args);
+      localStorage.setItem('djai-design.active-board', 'synthetic-other-board');
+      return id;
+    }) as typeof sync.set;
+  });
+  const file = await raster(page, 80, 160);
+  const input = page.locator('.selection-inspector input[type=file]');
+  await input.setInputFiles(file);
+  await expect(page.locator('.selection-inspector [role=alert]')).toContainText('board changed');
+  expect(await state(page)).toEqual(before);
+  await page.locator('affine-edgeless-root').evaluate(el => {
+    localStorage.setItem('djai-design.active-board', (el as HTMLElement & { gfx: GfxController }).gfx.doc.id);
+  });
+  await input.setInputFiles(file);
+  await expect.poll(async () => (await state(page)).edits.length).toBe(0);
+});
+
+test('Replace cannot mutate a disconnected board when blob storage finishes', async ({ page }) => {
+  await setup(page);
+  await page.locator('affine-edgeless-root').evaluate(el => {
+    const store = (el as HTMLElement & { gfx: GfxController }).gfx.doc;
+    const image = store.getBlocksByFlavour('affine:image')[0]!.model as ImageBlockModel;
+    const sync = store.blobSync;
+    const original = sync.set.bind(sync);
+    const hook = window as Window & { finishSyntheticReplacement?: () => void; syntheticSource?: () => unknown };
+    hook.syntheticSource = () => image.props.sourceId;
+    sync.set = (async (...args: unknown[]) => {
+      sync.set = original;
+      const id = await Reflect.apply(original, sync, args);
+      document.body.dataset.syntheticReplacement = 'pending';
+      await new Promise<void>(resolve => { hook.finishSyntheticReplacement = resolve; });
+      return id;
+    }) as typeof sync.set;
+  });
+  const source = await page.evaluate(() => (window as Window & { syntheticSource?: () => unknown }).syntheticSource!());
+  await page.locator('.selection-inspector input[type=file]').setInputFiles(await raster(page, 80, 160));
+  await expect(page.locator('body')).toHaveAttribute('data-synthetic-replacement', 'pending');
+  await page.locator('.djai-board-switcher').click();
+  await expect(page.locator('affine-edgeless-root')).toHaveCount(0);
+  await page.evaluate(async () => {
+    (window as Window & { finishSyntheticReplacement?: () => void }).finishSyntheticReplacement!();
+    await new Promise(resolve => setTimeout(resolve, 50));
+  });
+  expect(await page.evaluate(() => (window as Window & { syntheticSource?: () => unknown }).syntheticSource!())).toEqual(source);
 });

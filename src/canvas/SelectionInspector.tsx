@@ -121,7 +121,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     setEditingImage(true);
     setActionError(null);
     try {
-      await replaceImageSource(host.std.store, selection.key, file);
+      await replaceImageSource(host, selection.key, file);
       setImageRevision(value => value + 1);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : String(cause));

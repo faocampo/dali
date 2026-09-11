@@ -9,7 +9,7 @@ import {
   type ToSnapshotPayload,
 } from '@blocksuite/affine/store';
 import type { ImageBlockModel } from '@blocksuite/affine/model';
-import { BlockComponent, BlockViewExtension } from '@blocksuite/affine/std';
+import { BlockComponent, BlockViewExtension, type EditorHost } from '@blocksuite/affine/std';
 import {
   StoreExtensionProvider,
   type StoreExtensionContext,
@@ -18,7 +18,7 @@ import {
 } from '@blocksuite/affine/ext-loader';
 import { literal } from 'lit/static-html.js';
 import { Bound } from '@blocksuite/global/gfx';
-import { validateImage } from './image-input';
+import { assertImageInputCurrent, validateImage } from './image-input';
 
 export const IMAGE_VISUAL_EDIT_FLAVOUR = 'djai:image-visual-edit';
 const MAX_EDIT_BYTES = 50 * 1024 * 1024;
@@ -367,26 +367,42 @@ export function resetImageVisualEdit(store: Store, imageId: string): void {
   store.captureSync();
 }
 
-export async function replaceImageSource(store: Store, imageId: string, file: File): Promise<void> {
-    const dimensions = await validateImage(file);
-    const image = getImage(store, imageId);
-    const sourceId = await store.blobSync.set(file);
-    const bound = Bound.deserialize(image.xywh);
-    const height = bound.w * (dimensions.height / dimensions.width);
-    reconcileImageVisualEdits(store);
-    const visual = getImageVisualEdit(store, imageId);
-    store.captureSync();
-    store.transact(() => {
-      if (visual) store.deleteBlock(visual);
-      store.updateBlock(image, {
-        sourceId,
-        width: dimensions.width,
-        height: dimensions.height,
-        size: file.size,
-        xywh: `[${bound.x},${bound.y},${bound.w},${height}]`,
-      });
+export async function replaceImageSource(host: EditorHost, imageId: string, file: File): Promise<void> {
+  const store = host.std.store;
+  const boardId = store.id;
+  assertImageInputCurrent(host, boardId);
+  const image = getImage(store, imageId);
+  const previousSourceId = image.props.sourceId;
+  const assertCurrent = () => {
+    assertImageInputCurrent(host, boardId, () => host.std.store === store);
+    if (store.readonly || store.getBlock(imageId)?.model !== image || image.isLocked() ||
+        image.props.sourceId !== previousSourceId) {
+      throw new Error('The image changed. Select it again and retry replacement.');
+    }
+  };
+  assertCurrent();
+  const dimensions = await validateImage(file);
+  assertCurrent();
+  const sourceId = await store.blobSync.set(file);
+  // Blob storage can finish after navigation or a target change. The final
+  // check and model transaction deliberately have no asynchronous gap.
+  assertCurrent();
+  const bound = Bound.deserialize(image.xywh);
+  const height = bound.w * (dimensions.height / dimensions.width);
+  reconcileImageVisualEdits(store);
+  const visual = getImageVisualEdit(store, imageId);
+  store.captureSync();
+  store.transact(() => {
+    if (visual) store.deleteBlock(visual);
+    store.updateBlock(image, {
+      sourceId,
+      width: dimensions.width,
+      height: dimensions.height,
+      size: file.size,
+      xywh: `[${bound.x},${bound.y},${bound.w},${height}]`,
     });
-    store.captureSync();
+  });
+  store.captureSync();
 }
 
 export function updateImageGeometry(

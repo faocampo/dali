@@ -75,15 +75,18 @@ export interface ImageImportRequest {
 }
 export interface ImageImportResult { ids: string[]; errors: ImageImportError[] }
 
+export function assertImageInputCurrent(host: EditorHost, boardId: string, isCurrent: () => boolean = () => true): void {
+  if (!isCurrent() || !host.isConnected || host.std.store.id !== boardId ||
+      (getActiveBoardId() !== null && getActiveBoardId() !== boardId)) {
+    throw new ImageImportError('The board changed. Open the intended board and choose the image again.');
+  }
+}
+
 export async function importLocalImages(host: EditorHost, request: ImageImportRequest): Promise<ImageImportResult> {
   const { addImages } = await import('@blocksuite/affine/blocks/image');
   const { MAX_IMAGE_WIDTH } = await import('@blocksuite/affine/model');
   const result: ImageImportResult={ids:[],errors:[]};
-  const assertCurrent=()=> {
-    if(!request.isCurrent() || !host.isConnected || host.std.store.id !== request.boardId ||
-       (getActiveBoardId() !== null && getActiveBoardId() !== request.boardId))
-      throw new ImageImportError('The board changed. Open the intended board and choose the image again.');
-  };
+  const assertCurrent=()=>assertImageInputCurrent(host, request.boardId, request.isCurrent);
   // addImages awaits decode/blob storage internally. Guard its final synchronous
   // mutation, rather than checking only before an asynchronous native call.
   const store=new Proxy(host.std.store, {get(target,key) {
