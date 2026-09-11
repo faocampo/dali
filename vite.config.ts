@@ -2,6 +2,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
+import { existsSync } from 'node:fs';
+import { resolve, relative } from 'node:path';
 
 // SPIKE NOTE (BlockSuite 0.22):
 // @blocksuite/* publishes RAW TypeScript (package exports point at ./src/*.ts).
@@ -100,6 +102,20 @@ export default defineConfig(() => {
     ],
     esbuildOptions: {
       target: 'es2022',
+      // Vite 7 can inline BlockSuite's raw .css.ts modules in optimized JS,
+      // bypassing vanilla-extract's Vite transform. Leave those modules to
+      // the normal pipeline so CSS is evaluated at build time.
+      plugins: [{
+        name: 'blocksuite-vanilla-css',
+        setup(build) {
+          build.onResolve({ filter: /\.css(?:\.ts)?$/ }, (args) => {
+            if (!args.importer.includes('/node_modules/@blocksuite/')) return;
+            const file = resolve(args.resolveDir, args.path.endsWith('.ts') ? args.path : `${args.path}.ts`);
+            if (!existsSync(file)) return;
+            return { path: `/${relative(process.cwd(), file).replaceAll('\\', '/')}`, external: true };
+          });
+        },
+      }],
       // BlockSuite compiles with useDefineForClassFields: false, and depends on
       // it. E.g. global/src/di/provider.ts ServiceResolver does
       //   container = this.provider.container;

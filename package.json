@@ -32,11 +32,11 @@
     "@blocksuite/affine-gfx-group": "0.22.4",
     "@blocksuite/affine-widget-edgeless-selected-rect": "0.22.4",
     "@blocksuite/affine-widget-edgeless-zoom-toolbar": "0.22.4",
+    "@blocksuite/data-view": "0.22.4",
     "@blocksuite/store": "0.22.4",
     "@preact/signals-core": "^1.14.4",
     "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
-    "@blocksuite/data-view": "0.22.4",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
@@ -44,10 +44,10 @@
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@vanilla-extract/vite-plugin": "^4.0.19",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vanilla-extract/vite-plugin": "5.2.6",
+    "@vitejs/plugin-react": "5.2.0",
     "typescript": "^5.6.3",
-    "vite": "^5.4.11",
-    "vitest": "^2.1.8"
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
   }
 }
