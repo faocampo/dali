@@ -122,16 +122,27 @@ test('pointer-centered zoom and space or middle-button panning use native viewpo
   await expect.poll(async () => (await viewport()).center).not.toEqual(panned.center);
 });
 
-test('pasted HTML stays inert in native rich text', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+test('pasted HTML stays inert in native rich text', async ({ page, context, browserName }, testInfo) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
   await page.locator('affine-edgeless-note').dblclick();
-  await page.evaluate(async () => navigator.clipboard.write([new ClipboardItem({
-    'text/html': new Blob(['<b onclick="document.body.dataset.executed=1">Synthetic markup</b><script>document.body.dataset.executed=1</script>'], { type: 'text/html' }),
-    'text/plain': new Blob(['Synthetic markup'], { type: 'text/plain' }),
-  })]));
-  await page.keyboard.press('ControlOrMeta+v');
+  const html='<b onclick="document.body.dataset.executed=1">Synthetic markup</b><script>document.body.dataset.executed=1</script>';
+  if(browserName==='chromium') {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.evaluate(async html => navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], { type: 'text/html' }),
+      'text/plain': new Blob(['Synthetic markup'], { type: 'text/plain' }),
+    })]),html);
+    await page.keyboard.press('ControlOrMeta+v');
+    testInfo.annotations.push({type:'input-evidence',description:'Chromium browser Clipboard API write and native keyboard paste.'});
+  } else {
+    await page.locator('[contenteditable="true"]').last().evaluate((el,html)=>{
+      const data=new DataTransfer();data.setData('text/html',html);data.setData('text/plain','Synthetic markup');
+      const event=new ClipboardEvent('paste',{bubbles:true,composed:true,cancelable:true,clipboardData:data});
+      Object.defineProperty(event,'clipboardData',{value:data});el.dispatchEvent(event);
+    },html);
+    testInfo.annotations.push({type:'input-evidence',description:'Constructed paste event validates HTML routing and sanitization; OS clipboard integration remains unverified.'});
+  }
   await expect(page.locator('affine-edgeless-note')).toContainText('Synthetic markup');
   expect(await page.locator('body').getAttribute('data-executed')).toBeNull();
   await expect(page.locator('affine-edgeless-note [onclick], affine-edgeless-note script')).toHaveCount(0);
