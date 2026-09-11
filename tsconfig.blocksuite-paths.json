@@ -1,0 +1,497 @@
+{
+  "//": "GENERATED -- see scripts/gen-blocksuite-paths.mjs. BlockSuite 0.22 exports raw src/*.ts; these map *type* resolution onto their shipped dist/*.d.ts so skipLibCheck applies. Runtime resolution (Vite) is unaffected.",
+  "compilerOptions": {
+    "paths": {
+      "@blocksuite/affine": [
+        "./node_modules/@blocksuite/affine/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine/dist"
+      ],
+      "@blocksuite/affine/*": [
+        "./node_modules/@blocksuite/affine/dist/*"
+      ],
+      "@blocksuite/affine-block-attachment": [
+        "./node_modules/@blocksuite/affine-block-attachment/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-attachment/dist"
+      ],
+      "@blocksuite/affine-block-attachment/*": [
+        "./node_modules/@blocksuite/affine-block-attachment/dist/*"
+      ],
+      "@blocksuite/affine-block-bookmark": [
+        "./node_modules/@blocksuite/affine-block-bookmark/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-bookmark/dist"
+      ],
+      "@blocksuite/affine-block-bookmark/*": [
+        "./node_modules/@blocksuite/affine-block-bookmark/dist/*"
+      ],
+      "@blocksuite/affine-block-callout": [
+        "./node_modules/@blocksuite/affine-block-callout/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-callout/dist"
+      ],
+      "@blocksuite/affine-block-callout/*": [
+        "./node_modules/@blocksuite/affine-block-callout/dist/*"
+      ],
+      "@blocksuite/affine-block-code": [
+        "./node_modules/@blocksuite/affine-block-code/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-code/dist"
+      ],
+      "@blocksuite/affine-block-code/*": [
+        "./node_modules/@blocksuite/affine-block-code/dist/*"
+      ],
+      "@blocksuite/affine-block-data-view": [
+        "./node_modules/@blocksuite/affine-block-data-view/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-data-view/dist"
+      ],
+      "@blocksuite/affine-block-data-view/*": [
+        "./node_modules/@blocksuite/affine-block-data-view/dist/*"
+      ],
+      "@blocksuite/affine-block-database": [
+        "./node_modules/@blocksuite/affine-block-database/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-database/dist"
+      ],
+      "@blocksuite/affine-block-database/*": [
+        "./node_modules/@blocksuite/affine-block-database/dist/*"
+      ],
+      "@blocksuite/affine-block-divider": [
+        "./node_modules/@blocksuite/affine-block-divider/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-divider/dist"
+      ],
+      "@blocksuite/affine-block-divider/*": [
+        "./node_modules/@blocksuite/affine-block-divider/dist/*"
+      ],
+      "@blocksuite/affine-block-edgeless-text": [
+        "./node_modules/@blocksuite/affine-block-edgeless-text/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-edgeless-text/dist"
+      ],
+      "@blocksuite/affine-block-edgeless-text/*": [
+        "./node_modules/@blocksuite/affine-block-edgeless-text/dist/*"
+      ],
+      "@blocksuite/affine-block-embed": [
+        "./node_modules/@blocksuite/affine-block-embed/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-embed/dist"
+      ],
+      "@blocksuite/affine-block-embed/*": [
+        "./node_modules/@blocksuite/affine-block-embed/dist/*"
+      ],
+      "@blocksuite/affine-block-embed-doc": [
+        "./node_modules/@blocksuite/affine-block-embed-doc/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-embed-doc/dist"
+      ],
+      "@blocksuite/affine-block-embed-doc/*": [
+        "./node_modules/@blocksuite/affine-block-embed-doc/dist/*"
+      ],
+      "@blocksuite/affine-block-frame": [
+        "./node_modules/@blocksuite/affine-block-frame/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-frame/dist"
+      ],
+      "@blocksuite/affine-block-frame/*": [
+        "./node_modules/@blocksuite/affine-block-frame/dist/*"
+      ],
+      "@blocksuite/affine-block-image": [
+        "./node_modules/@blocksuite/affine-block-image/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-image/dist"
+      ],
+      "@blocksuite/affine-block-image/*": [
+        "./node_modules/@blocksuite/affine-block-image/dist/*"
+      ],
+      "@blocksuite/affine-block-latex": [
+        "./node_modules/@blocksuite/affine-block-latex/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-latex/dist"
+      ],
+      "@blocksuite/affine-block-latex/*": [
+        "./node_modules/@blocksuite/affine-block-latex/dist/*"
+      ],
+      "@blocksuite/affine-block-list": [
+        "./node_modules/@blocksuite/affine-block-list/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-list/dist"
+      ],
+      "@blocksuite/affine-block-list/*": [
+        "./node_modules/@blocksuite/affine-block-list/dist/*"
+      ],
+      "@blocksuite/affine-block-note": [
+        "./node_modules/@blocksuite/affine-block-note/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-note/dist"
+      ],
+      "@blocksuite/affine-block-note/*": [
+        "./node_modules/@blocksuite/affine-block-note/dist/*"
+      ],
+      "@blocksuite/affine-block-paragraph": [
+        "./node_modules/@blocksuite/affine-block-paragraph/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-paragraph/dist"
+      ],
+      "@blocksuite/affine-block-paragraph/*": [
+        "./node_modules/@blocksuite/affine-block-paragraph/dist/*"
+      ],
+      "@blocksuite/affine-block-root": [
+        "./node_modules/@blocksuite/affine-block-root/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-root/dist"
+      ],
+      "@blocksuite/affine-block-root/*": [
+        "./node_modules/@blocksuite/affine-block-root/dist/*"
+      ],
+      "@blocksuite/affine-block-surface": [
+        "./node_modules/@blocksuite/affine-block-surface/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-surface/dist"
+      ],
+      "@blocksuite/affine-block-surface/*": [
+        "./node_modules/@blocksuite/affine-block-surface/dist/*"
+      ],
+      "@blocksuite/affine-block-surface-ref": [
+        "./node_modules/@blocksuite/affine-block-surface-ref/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-surface-ref/dist"
+      ],
+      "@blocksuite/affine-block-surface-ref/*": [
+        "./node_modules/@blocksuite/affine-block-surface-ref/dist/*"
+      ],
+      "@blocksuite/affine-block-table": [
+        "./node_modules/@blocksuite/affine-block-table/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-block-table/dist"
+      ],
+      "@blocksuite/affine-block-table/*": [
+        "./node_modules/@blocksuite/affine-block-table/dist/*"
+      ],
+      "@blocksuite/affine-components": [
+        "./node_modules/@blocksuite/affine-components/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-components/dist"
+      ],
+      "@blocksuite/affine-components/*": [
+        "./node_modules/@blocksuite/affine-components/dist/*"
+      ],
+      "@blocksuite/affine-ext-loader": [
+        "./node_modules/@blocksuite/affine-ext-loader/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-ext-loader/dist"
+      ],
+      "@blocksuite/affine-ext-loader/*": [
+        "./node_modules/@blocksuite/affine-ext-loader/dist/*"
+      ],
+      "@blocksuite/affine-foundation": [
+        "./node_modules/@blocksuite/affine-foundation/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-foundation/dist"
+      ],
+      "@blocksuite/affine-foundation/*": [
+        "./node_modules/@blocksuite/affine-foundation/dist/*"
+      ],
+      "@blocksuite/affine-fragment-adapter-panel": [
+        "./node_modules/@blocksuite/affine-fragment-adapter-panel/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-fragment-adapter-panel/dist"
+      ],
+      "@blocksuite/affine-fragment-adapter-panel/*": [
+        "./node_modules/@blocksuite/affine-fragment-adapter-panel/dist/*"
+      ],
+      "@blocksuite/affine-fragment-doc-title": [
+        "./node_modules/@blocksuite/affine-fragment-doc-title/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-fragment-doc-title/dist"
+      ],
+      "@blocksuite/affine-fragment-doc-title/*": [
+        "./node_modules/@blocksuite/affine-fragment-doc-title/dist/*"
+      ],
+      "@blocksuite/affine-fragment-frame-panel": [
+        "./node_modules/@blocksuite/affine-fragment-frame-panel/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-fragment-frame-panel/dist"
+      ],
+      "@blocksuite/affine-fragment-frame-panel/*": [
+        "./node_modules/@blocksuite/affine-fragment-frame-panel/dist/*"
+      ],
+      "@blocksuite/affine-fragment-outline": [
+        "./node_modules/@blocksuite/affine-fragment-outline/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-fragment-outline/dist"
+      ],
+      "@blocksuite/affine-fragment-outline/*": [
+        "./node_modules/@blocksuite/affine-fragment-outline/dist/*"
+      ],
+      "@blocksuite/affine-gfx-brush": [
+        "./node_modules/@blocksuite/affine-gfx-brush/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-brush/dist"
+      ],
+      "@blocksuite/affine-gfx-brush/*": [
+        "./node_modules/@blocksuite/affine-gfx-brush/dist/*"
+      ],
+      "@blocksuite/affine-gfx-connector": [
+        "./node_modules/@blocksuite/affine-gfx-connector/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-connector/dist"
+      ],
+      "@blocksuite/affine-gfx-connector/*": [
+        "./node_modules/@blocksuite/affine-gfx-connector/dist/*"
+      ],
+      "@blocksuite/affine-gfx-group": [
+        "./node_modules/@blocksuite/affine-gfx-group/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-group/dist"
+      ],
+      "@blocksuite/affine-gfx-group/*": [
+        "./node_modules/@blocksuite/affine-gfx-group/dist/*"
+      ],
+      "@blocksuite/affine-gfx-link": [
+        "./node_modules/@blocksuite/affine-gfx-link/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-link/dist"
+      ],
+      "@blocksuite/affine-gfx-link/*": [
+        "./node_modules/@blocksuite/affine-gfx-link/dist/*"
+      ],
+      "@blocksuite/affine-gfx-mindmap": [
+        "./node_modules/@blocksuite/affine-gfx-mindmap/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-mindmap/dist"
+      ],
+      "@blocksuite/affine-gfx-mindmap/*": [
+        "./node_modules/@blocksuite/affine-gfx-mindmap/dist/*"
+      ],
+      "@blocksuite/affine-gfx-note": [
+        "./node_modules/@blocksuite/affine-gfx-note/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-note/dist"
+      ],
+      "@blocksuite/affine-gfx-note/*": [
+        "./node_modules/@blocksuite/affine-gfx-note/dist/*"
+      ],
+      "@blocksuite/affine-gfx-pointer": [
+        "./node_modules/@blocksuite/affine-gfx-pointer/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-pointer/dist"
+      ],
+      "@blocksuite/affine-gfx-pointer/*": [
+        "./node_modules/@blocksuite/affine-gfx-pointer/dist/*"
+      ],
+      "@blocksuite/affine-gfx-shape": [
+        "./node_modules/@blocksuite/affine-gfx-shape/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-shape/dist"
+      ],
+      "@blocksuite/affine-gfx-shape/*": [
+        "./node_modules/@blocksuite/affine-gfx-shape/dist/*"
+      ],
+      "@blocksuite/affine-gfx-template": [
+        "./node_modules/@blocksuite/affine-gfx-template/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-template/dist"
+      ],
+      "@blocksuite/affine-gfx-template/*": [
+        "./node_modules/@blocksuite/affine-gfx-template/dist/*"
+      ],
+      "@blocksuite/affine-gfx-text": [
+        "./node_modules/@blocksuite/affine-gfx-text/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-text/dist"
+      ],
+      "@blocksuite/affine-gfx-text/*": [
+        "./node_modules/@blocksuite/affine-gfx-text/dist/*"
+      ],
+      "@blocksuite/affine-gfx-turbo-renderer": [
+        "./node_modules/@blocksuite/affine-gfx-turbo-renderer/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-gfx-turbo-renderer/dist"
+      ],
+      "@blocksuite/affine-gfx-turbo-renderer/*": [
+        "./node_modules/@blocksuite/affine-gfx-turbo-renderer/dist/*"
+      ],
+      "@blocksuite/affine-inline-footnote": [
+        "./node_modules/@blocksuite/affine-inline-footnote/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-inline-footnote/dist"
+      ],
+      "@blocksuite/affine-inline-footnote/*": [
+        "./node_modules/@blocksuite/affine-inline-footnote/dist/*"
+      ],
+      "@blocksuite/affine-inline-latex": [
+        "./node_modules/@blocksuite/affine-inline-latex/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-inline-latex/dist"
+      ],
+      "@blocksuite/affine-inline-latex/*": [
+        "./node_modules/@blocksuite/affine-inline-latex/dist/*"
+      ],
+      "@blocksuite/affine-inline-link": [
+        "./node_modules/@blocksuite/affine-inline-link/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-inline-link/dist"
+      ],
+      "@blocksuite/affine-inline-link/*": [
+        "./node_modules/@blocksuite/affine-inline-link/dist/*"
+      ],
+      "@blocksuite/affine-inline-mention": [
+        "./node_modules/@blocksuite/affine-inline-mention/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-inline-mention/dist"
+      ],
+      "@blocksuite/affine-inline-mention/*": [
+        "./node_modules/@blocksuite/affine-inline-mention/dist/*"
+      ],
+      "@blocksuite/affine-inline-preset": [
+        "./node_modules/@blocksuite/affine-inline-preset/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-inline-preset/dist"
+      ],
+      "@blocksuite/affine-inline-preset/*": [
+        "./node_modules/@blocksuite/affine-inline-preset/dist/*"
+      ],
+      "@blocksuite/affine-inline-reference": [
+        "./node_modules/@blocksuite/affine-inline-reference/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-inline-reference/dist"
+      ],
+      "@blocksuite/affine-inline-reference/*": [
+        "./node_modules/@blocksuite/affine-inline-reference/dist/*"
+      ],
+      "@blocksuite/affine-model": [
+        "./node_modules/@blocksuite/affine-model/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-model/dist"
+      ],
+      "@blocksuite/affine-model/*": [
+        "./node_modules/@blocksuite/affine-model/dist/*"
+      ],
+      "@blocksuite/affine-rich-text": [
+        "./node_modules/@blocksuite/affine-rich-text/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-rich-text/dist"
+      ],
+      "@blocksuite/affine-rich-text/*": [
+        "./node_modules/@blocksuite/affine-rich-text/dist/*"
+      ],
+      "@blocksuite/affine-shared": [
+        "./node_modules/@blocksuite/affine-shared/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-shared/dist"
+      ],
+      "@blocksuite/affine-shared/*": [
+        "./node_modules/@blocksuite/affine-shared/dist/*"
+      ],
+      "@blocksuite/affine-widget-drag-handle": [
+        "./node_modules/@blocksuite/affine-widget-drag-handle/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-drag-handle/dist"
+      ],
+      "@blocksuite/affine-widget-drag-handle/*": [
+        "./node_modules/@blocksuite/affine-widget-drag-handle/dist/*"
+      ],
+      "@blocksuite/affine-widget-edgeless-auto-connect": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-auto-connect/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-edgeless-auto-connect/dist"
+      ],
+      "@blocksuite/affine-widget-edgeless-auto-connect/*": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-auto-connect/dist/*"
+      ],
+      "@blocksuite/affine-widget-edgeless-dragging-area": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-dragging-area/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-edgeless-dragging-area/dist"
+      ],
+      "@blocksuite/affine-widget-edgeless-dragging-area/*": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-dragging-area/dist/*"
+      ],
+      "@blocksuite/affine-widget-edgeless-selected-rect": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-selected-rect/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-edgeless-selected-rect/dist"
+      ],
+      "@blocksuite/affine-widget-edgeless-selected-rect/*": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-selected-rect/dist/*"
+      ],
+      "@blocksuite/affine-widget-edgeless-toolbar": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-toolbar/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-edgeless-toolbar/dist"
+      ],
+      "@blocksuite/affine-widget-edgeless-toolbar/*": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-toolbar/dist/*"
+      ],
+      "@blocksuite/affine-widget-edgeless-zoom-toolbar": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-zoom-toolbar/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-edgeless-zoom-toolbar/dist"
+      ],
+      "@blocksuite/affine-widget-edgeless-zoom-toolbar/*": [
+        "./node_modules/@blocksuite/affine-widget-edgeless-zoom-toolbar/dist/*"
+      ],
+      "@blocksuite/affine-widget-frame-title": [
+        "./node_modules/@blocksuite/affine-widget-frame-title/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-frame-title/dist"
+      ],
+      "@blocksuite/affine-widget-frame-title/*": [
+        "./node_modules/@blocksuite/affine-widget-frame-title/dist/*"
+      ],
+      "@blocksuite/affine-widget-keyboard-toolbar": [
+        "./node_modules/@blocksuite/affine-widget-keyboard-toolbar/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-keyboard-toolbar/dist"
+      ],
+      "@blocksuite/affine-widget-keyboard-toolbar/*": [
+        "./node_modules/@blocksuite/affine-widget-keyboard-toolbar/dist/*"
+      ],
+      "@blocksuite/affine-widget-linked-doc": [
+        "./node_modules/@blocksuite/affine-widget-linked-doc/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-linked-doc/dist"
+      ],
+      "@blocksuite/affine-widget-linked-doc/*": [
+        "./node_modules/@blocksuite/affine-widget-linked-doc/dist/*"
+      ],
+      "@blocksuite/affine-widget-note-slicer": [
+        "./node_modules/@blocksuite/affine-widget-note-slicer/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-note-slicer/dist"
+      ],
+      "@blocksuite/affine-widget-note-slicer/*": [
+        "./node_modules/@blocksuite/affine-widget-note-slicer/dist/*"
+      ],
+      "@blocksuite/affine-widget-page-dragging-area": [
+        "./node_modules/@blocksuite/affine-widget-page-dragging-area/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-page-dragging-area/dist"
+      ],
+      "@blocksuite/affine-widget-page-dragging-area/*": [
+        "./node_modules/@blocksuite/affine-widget-page-dragging-area/dist/*"
+      ],
+      "@blocksuite/affine-widget-remote-selection": [
+        "./node_modules/@blocksuite/affine-widget-remote-selection/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-remote-selection/dist"
+      ],
+      "@blocksuite/affine-widget-remote-selection/*": [
+        "./node_modules/@blocksuite/affine-widget-remote-selection/dist/*"
+      ],
+      "@blocksuite/affine-widget-scroll-anchoring": [
+        "./node_modules/@blocksuite/affine-widget-scroll-anchoring/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-scroll-anchoring/dist"
+      ],
+      "@blocksuite/affine-widget-scroll-anchoring/*": [
+        "./node_modules/@blocksuite/affine-widget-scroll-anchoring/dist/*"
+      ],
+      "@blocksuite/affine-widget-slash-menu": [
+        "./node_modules/@blocksuite/affine-widget-slash-menu/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-slash-menu/dist"
+      ],
+      "@blocksuite/affine-widget-slash-menu/*": [
+        "./node_modules/@blocksuite/affine-widget-slash-menu/dist/*"
+      ],
+      "@blocksuite/affine-widget-toolbar": [
+        "./node_modules/@blocksuite/affine-widget-toolbar/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-toolbar/dist"
+      ],
+      "@blocksuite/affine-widget-toolbar/*": [
+        "./node_modules/@blocksuite/affine-widget-toolbar/dist/*"
+      ],
+      "@blocksuite/affine-widget-viewport-overlay": [
+        "./node_modules/@blocksuite/affine-widget-viewport-overlay/dist/index.d.ts",
+        "./node_modules/@blocksuite/affine-widget-viewport-overlay/dist"
+      ],
+      "@blocksuite/affine-widget-viewport-overlay/*": [
+        "./node_modules/@blocksuite/affine-widget-viewport-overlay/dist/*"
+      ],
+      "@blocksuite/data-view": [
+        "./node_modules/@blocksuite/data-view/dist/index.d.ts",
+        "./node_modules/@blocksuite/data-view/dist"
+      ],
+      "@blocksuite/data-view/*": [
+        "./node_modules/@blocksuite/data-view/dist/*"
+      ],
+      "@blocksuite/global": [
+        "./node_modules/@blocksuite/global/dist/index.d.ts",
+        "./node_modules/@blocksuite/global/dist"
+      ],
+      "@blocksuite/global/*": [
+        "./node_modules/@blocksuite/global/dist/*"
+      ],
+      "@blocksuite/icons": [
+        "./node_modules/@blocksuite/icons/dist/index.d.ts",
+        "./node_modules/@blocksuite/icons/dist"
+      ],
+      "@blocksuite/icons/*": [
+        "./node_modules/@blocksuite/icons/dist/*"
+      ],
+      "@blocksuite/std": [
+        "./node_modules/@blocksuite/std/dist/index.d.ts",
+        "./node_modules/@blocksuite/std/dist"
+      ],
+      "@blocksuite/std/*": [
+        "./node_modules/@blocksuite/std/dist/*"
+      ],
+      "@blocksuite/store": [
+        "./node_modules/@blocksuite/store/dist/index.d.ts",
+        "./node_modules/@blocksuite/store/dist"
+      ],
+      "@blocksuite/store/*": [
+        "./node_modules/@blocksuite/store/dist/*"
+      ],
+      "@blocksuite/sync": [
+        "./node_modules/@blocksuite/sync/dist/index.d.ts",
+        "./node_modules/@blocksuite/sync/dist"
+      ],
+      "@blocksuite/sync/*": [
+        "./node_modules/@blocksuite/sync/dist/*"
+      ]
+    }
+  }
+}

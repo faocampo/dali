@@ -1,0 +1,53 @@
+{
+  "name": "djai-canvas-community",
+  "version": "0.1.0",
+  "description": "Open-source, local-first infinite canvas and storyboard planner for visual thinking and film pre-production.",
+  "keywords": [
+    "infinite-canvas",
+    "whiteboard",
+    "storyboard",
+    "storyboard-planner",
+    "film-pre-production",
+    "shot-planning",
+    "mood-board",
+    "visual-planning",
+    "local-first",
+    "self-hosted",
+    "react",
+    "typescript",
+    "blocksuite"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@blocksuite/affine": "0.22.4",
+    "@blocksuite/affine-gfx-group": "0.22.4",
+    "@blocksuite/affine-widget-edgeless-selected-rect": "0.22.4",
+    "@blocksuite/affine-widget-edgeless-zoom-toolbar": "0.22.4",
+    "@blocksuite/store": "0.22.4",
+    "@preact/signals-core": "^1.14.4",
+    "pdf-lib": "^1.17.1",
+    "react": "^18.3.1",
+    "@blocksuite/data-view": "0.22.4",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vanilla-extract/vite-plugin": "^4.0.19",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}
