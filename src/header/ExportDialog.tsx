@@ -85,6 +85,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               name="export-format"
               value={f.id}
               checked={format === f.id}
+              disabled={exporting}
               onChange={() => setFormat(f.id)}
             />
             <span>
@@ -109,7 +110,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
                 name="export-scope"
                 value={id}
                 checked={scope === id}
-                disabled={!availability[id]}
+                disabled={exporting || !availability[id]}
                 onChange={() => setScope(id)}
               />
               <span>
@@ -123,11 +124,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               <input
                 type="checkbox"
                 checked={transparent}
+                disabled={exporting}
                 onChange={event => setTransparent(event.target.checked)}
               />
               <span>
                 <strong>Transparent background</strong>
-                <em>Keeps transparent pixels in the exported PNG.</em>
+                <em>Use alpha outside objects. Turn off for a white background.</em>
               </span>
             </label>
           )}

@@ -24,9 +24,9 @@ export function computeExportPlan(
   const { x, y, w, h } = worldBounds;
   let error: string | null = null;
   if (!includedIds.length) error = 'Add an object to this area before exporting.';
-  else if (![x, y, w, h, options.padding].every(Number.isFinite) || w <= 0 || h <= 0 || options.padding < 0)
+  else if (![x, y, w, h, options.padding, x + w, y + h].every(value => Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER) || w <= 0 || h <= 0 || options.padding < 0)
     error = 'The export area has invalid dimensions. Adjust the objects and retry.';
-  else if (![1, 2, 4].includes(options.scale) || options.format !== 'png' || !['white', 'transparent'].includes(options.background))
+  else if (![1, 2, 4].includes(options.scale) || options.format !== 'png' || !['board','visible','selection','frame'].includes(options.scope) || !['white', 'transparent'].includes(options.background))
     error = 'Choose a supported export option.';
   const clipBounds = Object.freeze({ x: x - options.padding, y: y - options.padding, w: w + options.padding * 2, h: h + options.padding * 2 });
   const dimensions = (scale: number) => [Math.ceil(clipBounds.w * scale), Math.ceil(clipBounds.h * scale)];

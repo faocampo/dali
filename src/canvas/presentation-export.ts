@@ -197,19 +197,27 @@ export async function renderBoardPresentation(options: PresentationRenderOptions
           // html2canvas copies custom-element computed styles before onclone;
           // activate the source while cloning so descendants inherit visibility.
           const previousVisibility = element.style.visibility;
+          let cloneFrame: Element | null = null;
+          let finished = false;
           element.style.visibility = 'visible';
           try { source = await bounded(dom._html2canvas(element, {
             scale: plan.scale, backgroundColor: null, logging: false, width: bw!, height: bh!,
             onclone: async (_document, clone) => {
+              cloneFrame = _document.defaultView?.frameElement ?? null;
+              if (finished) { cloneFrame?.remove(); throw new Error('Object rendering expired. Retry the export.'); }
               for (let node: HTMLElement | null = clone; node; node = node.parentElement) {
                 node.style.transform = 'none'; node.style.contentVisibility = 'visible';
                 // GfxViewportElement keeps offscreen blocks in layout as .block-idle.
                 node.classList.remove('block-idle'); node.style.visibility = 'visible';
               }
               clone.style.width = `${bw}px`; clone.style.height = `${bh}px`;
-              await _document.fonts.ready;
+              await bounded(_document.fonts.ready, 'Font loading');
             },
-          }), 'Object rendering'); } finally { element.style.visibility = previousVisibility; }
+          }), 'Object rendering'); } finally {
+            finished = true;
+            (cloneFrame as Element | null)?.remove();
+            element.style.visibility = previousVisibility;
+          }
           const raster = source as HTMLCanvasElement;
           if (raster.width !== Math.floor(bw! * plan.scale) || raster.height !== Math.floor(bh! * plan.scale))
             throw new Error('An object could not be rendered at the requested scale.');

@@ -80,7 +80,11 @@ function downloadBlob(blob: Blob, filename: string): void {
 }
 
 async function canvasBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+  const blob = await new Promise<Blob | null>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('PNG encoding took too long. Choose a lower scale and retry.')), 10_000);
+    try { canvas.toBlob(blob => { clearTimeout(timer); resolve(blob); }, 'image/png'); }
+    catch { clearTimeout(timer); reject(new Error('The browser could not encode these pixels. Check the images and retry.')); }
+  });
   if (!blob) throw new Error('The browser could not encode this canvas as PNG.');
   return blob;
 }
@@ -152,27 +156,29 @@ export async function exportBoardFile(
     scale: options.scale,
     plan: options.plan,
   });
-  const title = safeFilename(catalog?.title ?? 'Untitled board');
-  if (format === 'png') {
-    downloadBlob(await canvasBlob(render.canvas), `${title}.png`);
+  try {
+    const title = safeFilename(catalog?.title ?? 'Untitled board');
+    if (format === 'png') {
+      downloadBlob(await canvasBlob(render.canvas), `${title}.png`);
+      return {
+        format,
+        width: render.canvas.width,
+        height: render.canvas.height,
+        pages: 1,
+        durationMs: render.durationMs,
+        estimatedBytes: render.estimatedBytes,
+      };
+    }
+
+    const pdf = await canvasPdf(render.canvas);
+    downloadBlob(pdf.blob, `${title}.pdf`);
     return {
       format,
       width: render.canvas.width,
       height: render.canvas.height,
-      pages: 1,
+      pages: pdf.pages,
       durationMs: render.durationMs,
       estimatedBytes: render.estimatedBytes,
     };
-  }
-
-  const pdf = await canvasPdf(render.canvas);
-  downloadBlob(pdf.blob, `${title}.pdf`);
-  return {
-    format,
-    width: render.canvas.width,
-    height: render.canvas.height,
-    pages: pdf.pages,
-    durationMs: render.durationMs,
-    estimatedBytes: render.estimatedBytes,
-  };
+  } finally { render.canvas.width = 0; render.canvas.height = 0; }
 }

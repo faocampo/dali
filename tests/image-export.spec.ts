@@ -172,3 +172,105 @@ for (const dpr of [1,2]) {
     });
   });
 }
+
+async function currentDialogDownload(page: Page) {
+  const pending=page.waitForEvent('download');
+  await page.getByRole('dialog').getByRole('button',{name:'Download',exact:true}).click();
+  const download=await pending;
+  expect(await download.failure()).toBeNull();
+  const parts:Buffer[]=[];
+  for await(const chunk of (await download.createReadStream())!)parts.push(Buffer.from(chunk));
+  const png=Buffer.concat(parts);
+  expect(png.subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a');
+  const decoded=await page.evaluate(async base64=>{
+    const image=new Image();image.src=`data:image/png;base64,${base64}`;await image.decode();
+    return [image.naturalWidth,image.naturalHeight];
+  },png.toString('base64'));
+  expect(decoded).toEqual([png.readUInt32BE(16),png.readUInt32BE(20)]);
+  return decoded;
+}
+
+test('limits reject empty and oversized output and require explicit lower scale',async({page})=>{
+  await page.goto('/');
+  await page.getByRole('button',{name:'Export',exact:true}).click();
+  await page.getByRole('radio',{name:'PNG image'}).check();
+  await expect(page.getByRole('dialog').getByRole('button',{name:'Download',exact:true})).toBeDisabled();
+  await expect(page.getByRole('alert')).toContainText('nothing');
+  await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+  await page.locator('affine-edgeless-root').evaluate(el=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    gfx.surface!.addElement({type:'shape',xywh:'[0,0,3000,1000]',shapeType:'rect',shapeStyle:'General',filled:true,fillColor:'#ff0000',strokeWidth:1});
+  });
+  await page.getByRole('button',{name:'Export',exact:true}).click();
+  await page.getByRole('radio',{name:'PNG image'}).check();
+  await page.getByRole('radio',{name:'4×',exact:true}).check();
+  await expect(page.getByRole('radio',{name:'4×',exact:true})).toBeChecked();
+  await expect(page.getByRole('dialog').getByRole('button',{name:'Download',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Use 2×',exact:true}).click();
+  await expect(page.getByRole('radio',{name:'2×',exact:true})).toBeChecked();
+  const dimensions=await currentDialogDownload(page);
+  expect(dimensions).toEqual([6002,2002]);
+});
+
+test('limits bounded allocation probes encode the conservative two-layer budget',async({page,browser},testInfo)=>{
+  await page.goto('/');
+  const probes=await page.evaluate(async()=>{
+    const results=[];
+    for(const [w,h] of [[1024,1024],[2048,2048],[4096,4096],[8192,2048]]) {
+      const layers=[document.createElement('canvas'),document.createElement('canvas')];
+      try {
+        for(const canvas of layers){canvas.width=w!;canvas.height=h!;const ctx=canvas.getContext('2d')!;ctx.fillStyle='#12ab34';ctx.fillRect(0,0,w!,h!);}
+        layers[0]!.getContext('2d')!.drawImage(layers[1]!,0,0);
+        const blob=await new Promise<Blob|null>(resolve=>layers[0]!.toBlob(resolve,'image/png'));
+        if(!blob)throw new Error('Probe encoding failed');
+        const image=await createImageBitmap(blob);
+        results.push({width:image.width,height:image.height,bytes:blob.size,peakLayerBytes:w!*h!*8});image.close();
+      } finally {for(const canvas of layers){canvas.width=0;canvas.height=0;}}
+    }
+    return results;
+  });
+  expect(probes).toHaveLength(4);
+  const evidence={browser:browser.version(),probes,policy:'8192 maximum side, 16777216 maximum pixels; conservative tested working budget, not exhaustive browser maximum'};
+  writeFileSync(testInfo.outputPath('allocation-probes.json'),JSON.stringify(evidence));
+});
+
+for(const fault of ['encoder-null','encoder-throw','tainted','missing-blob','stale','font-timeout','image-timeout'] as const) {
+  test(`recovery ${fault} retains controls and downloads decoded pixels on retry`,async({page})=>{
+    await mixedBoard(page);
+    await page.getByRole('button',{name:'Export',exact:true}).click();
+    await page.getByRole('radio',{name:'PNG image'}).check();
+    await page.locator('affine-edgeless-root').evaluate((el,kind)=>{
+      const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+      const state=window as typeof window & {restoreExportFault?:()=>void};
+      if(kind==='encoder-null'||kind==='encoder-throw'){
+        const original=HTMLCanvasElement.prototype.toBlob;
+        HTMLCanvasElement.prototype.toBlob=function(callback){if(kind==='encoder-throw')throw new DOMException('Synthetic origin-clean encoding failure','SecurityError');callback(null);};
+        state.restoreExportFault=()=>{HTMLCanvasElement.prototype.toBlob=original;};
+      }else if(kind==='tainted'){
+        const original=CanvasRenderingContext2D.prototype.getImageData;
+        CanvasRenderingContext2D.prototype.getImageData=function(...args:Parameters<typeof original>){if(args[2]===1&&args[3]===1)throw new DOMException('Synthetic origin-clean pixel failure','SecurityError');return original.apply(this,args);};
+        state.restoreExportFault=()=>{CanvasRenderingContext2D.prototype.getImageData=original;};
+      }else if(kind==='missing-blob'||kind==='image-timeout'){
+        const sync=gfx.doc.blobSync;const original=sync.get;
+        sync.get=kind==='missing-blob'?async()=>null:()=>new Promise(()=>{});
+        state.restoreExportFault=()=>{sync.get=original;};
+      }else if(kind==='font-timeout'){
+        Object.defineProperty(document.fonts,'ready',{configurable:true,value:new Promise(()=>{})});
+        state.restoreExportFault=()=>{delete (document.fonts as unknown as {ready?:unknown}).ready;};
+      }else{
+        const note=gfx.doc.getBlocksByFlavour('affine:note')[0]!.model;
+        gfx.doc.updateBlock(note,{xywh:'[301,0,260,260]'});
+        state.restoreExportFault=()=>{};
+      }
+    },fault);
+    let downloads=0;page.on('download',()=>downloads++);
+    const button=page.getByRole('dialog').getByRole('button',{name:'Download',exact:true});
+    await button.click();
+    await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+    await expect(button).toBeEnabled();
+    expect(downloads).toBe(0);
+    await page.evaluate(()=>{(window as typeof window & {restoreExportFault:()=>void}).restoreExportFault();});
+    await currentDialogDownload(page);
+    expect(downloads).toBe(1);
+  });
+}
