@@ -23,7 +23,7 @@ Initial release includes the capabilities below. Delivery proceeds through small
 - [ ] **CAN-03**: Users can undo and redo their own canvas edits without undoing another participant's independent edits.
 - [x] **IMG-01**: Users can import local images, including exported Miro boards and screen captures, and arrange them on the canvas.
 - [x] **IMG-02**: Users can export board content to an image that preserves the visible text, shapes, connectors, and uploaded images.
-- [ ] **IMG-03**: Users can select a group of shapes and export only the selected shapes as an image, excluding unselected board content.
+- [x] **IMG-03**: Users can select a group of shapes and export only the selected shapes as an image, excluding unselected board content.
 
 ### Persistence and collaboration
 
@@ -134,7 +134,7 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 | CAN-03 | Phase 5 | Pending |
 | IMG-01 | Phase 1 | Complete |
 | IMG-02 | Phase 1 | Complete |
-| IMG-03 | Phase 1 | Pending |
+| IMG-03 | Phase 1 | Complete |
 | SAVE-01 | Phase 4 | Pending |
 | SAVE-02 | Phase 4 | Pending |
 | COL-01 | Phase 5 | Pending |
