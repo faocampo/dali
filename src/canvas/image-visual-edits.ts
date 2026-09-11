@@ -18,6 +18,7 @@ import {
 } from '@blocksuite/affine/ext-loader';
 import { literal } from 'lit/static-html.js';
 import { Bound } from '@blocksuite/global/gfx';
+import { validateImage } from './image-input';
 
 export const IMAGE_VISUAL_EDIT_FLAVOUR = 'djai:image-visual-edit';
 const MAX_EDIT_BYTES = 50 * 1024 * 1024;
@@ -367,16 +368,11 @@ export function resetImageVisualEdit(store: Store, imageId: string): void {
 }
 
 export async function replaceImageSource(store: Store, imageId: string, file: File): Promise<void> {
-  if (!file.type.startsWith('image/')) throw new Error('Choose an image file.');
-  if (file.size > MAX_EDIT_BYTES) throw new Error('This image exceeds the 50 MB editing limit.');
-  const bitmap = await createImageBitmap(file);
-  try {
-    assertSafeEdit(bitmap, file.size);
-    if (!bitmap.width || !bitmap.height) throw new Error('That image has no usable pixels.');
+    const dimensions = await validateImage(file);
     const image = getImage(store, imageId);
     const sourceId = await store.blobSync.set(file);
     const bound = Bound.deserialize(image.xywh);
-    const height = bound.w * (bitmap.height / bitmap.width);
+    const height = bound.w * (dimensions.height / dimensions.width);
     reconcileImageVisualEdits(store);
     const visual = getImageVisualEdit(store, imageId);
     store.captureSync();
@@ -384,16 +380,13 @@ export async function replaceImageSource(store: Store, imageId: string, file: Fi
       if (visual) store.deleteBlock(visual);
       store.updateBlock(image, {
         sourceId,
-        width: bitmap.width,
-        height: bitmap.height,
+        width: dimensions.width,
+        height: dimensions.height,
         size: file.size,
         xywh: `[${bound.x},${bound.y},${bound.w},${height}]`,
       });
     });
     store.captureSync();
-  } finally {
-    bitmap.close();
-  }
 }
 
 export function updateImageGeometry(

@@ -120,3 +120,27 @@ test('Duplicate gives edited images independent history and placement', async ({
   await page.getByRole('button', { name: 'Reset edits', exact: true }).click();
   expect((await state(page)).edits).toHaveLength(0);
 });
+
+test('Replace preflights raster dimensions and preserves edited pixels on rejection', async ({ page }) => {
+  await setup(page); await crop(page);
+  const before = await state(page);
+  const file = await raster(page);
+  const huge = Buffer.from(file.buffer); huge.writeUInt32BE(100000, 16);
+  await page.evaluate(() => {
+    const original = HTMLImageElement.prototype.decode;
+    HTMLImageElement.prototype.decode = function () {
+      document.body.dataset.syntheticDecodeCalls = String(Number(document.body.dataset.syntheticDecodeCalls ?? 0) + 1);
+      return original.call(this);
+    };
+  });
+  const input = page.locator('.selection-inspector input[type=file]');
+  await input.setInputFiles({ ...file, buffer: huge });
+  await expect(page.locator('.selection-inspector [role=alert]')).toContainText('8192');
+  expect(await page.locator('body').getAttribute('data-synthetic-decode-calls')).toBeNull();
+  expect(await state(page)).toEqual(before);
+  await input.setInputFiles({ name: 'synthetic.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg/>') });
+  await expect(page.locator('.selection-inspector [role=alert]')).toContainText('PNG or JPEG');
+  expect(await state(page)).toEqual(before);
+  await input.setInputFiles(file);
+  await expect.poll(async () => (await state(page)).edits.length).toBe(0);
+});

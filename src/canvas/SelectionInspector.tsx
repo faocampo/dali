@@ -229,7 +229,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
           <input
             ref={replaceRef}
             type="file"
-            accept="image/*"
+            accept="image/png,image/jpeg"
             onChange={event => void replaceImage(event)}
             hidden
             style={{ display: 'none' }}
@@ -262,7 +262,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
       <input
         ref={replaceRef}
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg"
         onChange={event => void replaceImage(event)}
         hidden
         style={{ display: 'none' }}

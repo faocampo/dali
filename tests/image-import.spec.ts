@@ -149,6 +149,23 @@ test('drop uses client coordinates once and recovers from active content',async(
   expect(bounds[1]!+bounds[3]!/2).toBeCloseTo(target[1]!,0);
 });
 
+test('plain-text SVG paste is rejected before native image decoding and permits raster retry', async ({ page }) => {
+  await page.goto('/'); await page.getByRole('button', { name: 'Insert image', exact: true }).waitFor();
+  const prevented = await page.locator('affine-edgeless-root').evaluate(el => {
+    const data = new DataTransfer();
+    data.setData('text/plain', '<svg xmlns="http://www.w3.org/2000/svg" width="100000" height="100000"><rect width="100000" height="100000"/></svg>');
+    const event = new ClipboardEvent('paste', { bubbles: true, composed: true, cancelable: true, clipboardData: data });
+    Object.defineProperty(event, 'clipboardData', { value: data });
+    el.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(prevented).toBe(true);
+  await expect(page.getByTestId('image-import-error')).toContainText('PNG or JPEG');
+  expect(await images(page)).toHaveLength(0);
+  await transfer(page, 'paste', await raster(page));
+  await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
+});
+
 test('image input rejects size budgets and stale or failed storage then retries',async({page})=>{
   await page.goto('/');await page.getByRole('button',{name:'Insert image',exact:true}).waitFor();
   const input=page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]');

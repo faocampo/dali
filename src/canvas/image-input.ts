@@ -37,7 +37,8 @@ export function rasterDimensions(bytes: Uint8Array, mime: string): [number, numb
   throw invalid();
 }
 
-export async function validateImage(file: File, signal?: AbortSignal): Promise<void> {
+export async function validateImage(file: File, signal?: AbortSignal): Promise<{ width: number; height: number }> {
+  if (file.type !== 'image/png' && file.type !== 'image/jpeg') throw invalid();
   if (file.size > IMAGE_LIMITS.bytes) throw new ImageImportError('Use an image smaller than 16 MiB and try again.');
   const dimensions=rasterDimensions(new Uint8Array(await file.arrayBuffer()),file.type);
   validateDimensions(...dimensions);
@@ -54,6 +55,7 @@ export async function validateImage(file: File, signal?: AbortSignal): Promise<v
       else signal?.addEventListener('abort',cancel,{once:true});
     })]);
     validateDimensions(image.naturalWidth,image.naturalHeight);
+    return { width: image.naturalWidth, height: image.naturalHeight };
   } catch (cause) {
     throw cause instanceof ImageImportError ? cause : invalid();
   } finally {
@@ -111,8 +113,8 @@ export async function importLocalImages(host: EditorHost, request: ImageImportRe
   return result;
 }
 
-/** Native 0.22.4 listens on host drop and document bubble paste. Capture only
- * image files here; native text and serialized object clipboard paths retain ownership. */
+/** Native 0.22.4 also turns a plain-text SVG document into an image. Route that
+ * case through the raster policy while retaining ordinary text/object paste. */
 export function installImageInputs(host: EditorHost, insert: (files:File[],source:ImageImportRequest['source'],target:[number,number])=>void) {
   const images=(data:DataTransfer|null)=>[...(data?.files ?? [])].filter(file=>file.type.startsWith('image/'));
   const onPaste=(event:ClipboardEvent)=>{
@@ -121,6 +123,15 @@ export function installImageInputs(host: EditorHost, insert: (files:File[],sourc
     if(target instanceof Element && target.closest('input,textarea,[role="dialog"]')) return;
     if(target!==document.body && target!==document.documentElement && !event.composedPath().includes(host)) return;
     const files=images(event.clipboardData);
+    if (!files.length) {
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      if (/<svg[\s>]/.test(text)) {
+        const svg = new DOMParser().parseFromString(text, 'image/svg+xml').documentElement;
+        if (svg.tagName === 'svg' && svg.hasAttribute('xmlns')) {
+          files.push(new File([text], 'pasted-image.svg', { type: 'image/svg+xml' }));
+        }
+      }
+    }
     if(!files.length) return;
     event.preventDefault();event.stopImmediatePropagation();
     // The viewport service is already installed on the native root.
