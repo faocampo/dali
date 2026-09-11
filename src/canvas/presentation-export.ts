@@ -10,7 +10,7 @@ import {
 } from '@blocksuite/affine/std/gfx';
 import { Bound } from '@blocksuite/global/gfx';
 
-import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, type ExportOptions, type ExportPlan, type PresentationScope } from "./export-plan";
+import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, selectionIds, type ExportOptions, type ExportPlan, type PresentationScope } from "./export-plan";
 export type { PresentationScope } from "./export-plan";
 export type PresentationRenderOptions = { scope: PresentationScope; transparent?: boolean; scale?: 1 | 2 | 4; plan?: ExportPlan };
 
@@ -58,6 +58,7 @@ function unitedBound(models: readonly GfxModel[]): Bound {
 function withDescendants(models: readonly GfxModel[]): GfxModel[] {
   const result = new Map<string, GfxModel>();
   const add = (model: GfxModel) => {
+    if (result.has(model.id)) return;
     result.set(model.id, model);
     if (isGfxGroupCompatibleModel(model)) model.descendantElements.forEach(add);
   };
@@ -78,7 +79,10 @@ function resolveScope(host: EditorHost, scope: PresentationScope) {
   if (scope === 'selection') {
     const selected = gfx.selection.selectedElements;
     if (!selected.length) throw new Error('Select one or more objects before exporting the selection.');
-    const models = withDescendants(selected);
+    const layers = gfx.layer.layers.flatMap<GfxModel>(layer => layer.elements);
+    const ordered = [...new Map([...layers, ...withDescendants(layers)].map(model => [model.id, model])).values()];
+    const ids = new Set(selectionIds(ordered.map(model => ({id: model.id, children: isGfxGroupCompatibleModel(model) ? model.descendantElements.map(child => child.id) : []})), selected.map(model => model.id)));
+    const models = ordered.filter(model => ids.has(model.id));
     return { models, bound: unitedBound(models) };
   }
 

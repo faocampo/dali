@@ -15,6 +15,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [format, setFormat] = useState<ExportFormat>('board');
   const [scope, setScope] = useState<PresentationScope>('board');
   const [scale, setScale] = useState<ExportScale>(1);
+  const [padding, setPadding] = useState('0');
   const [transparent, setTransparent] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -22,7 +23,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [exporting, setExporting] = useState(false);
   const [availability] = useState(() => presentationScopeAvailability());
   const [previewVersion, refreshPreview] = useState(0);
-  const plan = useMemo(() => boardExportPlan({ ...DEFAULT_EXPORT_OPTIONS, scope, scale, background: transparent ? 'transparent' : 'white' }), [scope, scale, transparent, previewVersion]);
+  const plan = useMemo(() => boardExportPlan({ ...DEFAULT_EXPORT_OPTIONS, scope, scale, padding: scope === 'selection' ? (padding.trim() ? Number(padding) : NaN) : 0, background: transparent ? 'transparent' : 'white' }), [scope, scale, padding, transparent, previewVersion]);
   const downloadButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -115,7 +116,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
               />
               <span>
                 <strong>{label}</strong>
-                <em>{availability[id] ? hint : `${hint} Not available now.`}</em>
+                <em>{availability[id] ? hint : id === 'selection' ? 'Select one or more objects before opening Export.' : 'Select exactly one frame before opening Export.'}</em>
               </span>
             </label>
           ))}
@@ -143,13 +144,18 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       )}
 
       {format === 'png' && <Section label="Resolution">
+        {scope === 'selection' && <label>
+          Selection padding
+          <input aria-label="Selection padding" type="number" min="0" max="256" step="1" value={padding} disabled={exporting} onChange={event => setPadding(event.target.value)} />
+          <span>World units on each side (0–256).</span>
+        </label>}
         <div className="djai-row">
           {([1, 2, 4] as const).map(value => <label className="djai-radio" key={value}>
             <input type="radio" name="export-scale" checked={scale === value} disabled={exporting} onChange={() => setScale(value)} />
             <span>{value}×</span>
           </label>)}
         </div>
-        <p data-testid="export-dimensions">{Number.isFinite(plan.pixelWidth) && Number.isFinite(plan.pixelHeight) ? `${plan.pixelWidth} × ${plan.pixelHeight} pixels` : 'Dimensions unavailable'}</p>
+        <p data-testid="export-dimensions" data-export-ids={JSON.stringify(plan.includedIds)}>{Number.isFinite(plan.pixelWidth) && Number.isFinite(plan.pixelHeight) ? `${plan.pixelWidth} × ${plan.pixelHeight} pixels` : 'Dimensions unavailable'}</p>
         {plan.error && <p role="alert">{plan.error}</p>}
         {plan.lowerScale && <button type="button" onClick={() => setScale(plan.lowerScale!)}>Use {plan.lowerScale}×</button>}
       </Section>}

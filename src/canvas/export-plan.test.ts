@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, EXPORT_LIMITS, type ExportBounds } from './export-plan';
+import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, EXPORT_LIMITS, selectionIds, type ExportBounds } from './export-plan';
 
 const bounds = { x: -20.25, y: 0, w: 100.25, h: 50.5 };
 describe('selection padding', () => {
+  it('keeps exact recursive identity and native order, including only explicitly selected or grouped connectors', () => {
+    const nodes=[{id:'a',children:[]},{id:'b',children:[]},{id:'link',children:[]},{id:'inside-link',children:[]},{id:'inner',children:['a','inside-link']},{id:'outer',children:['inner','b']},{id:'overlap',children:[]}];
+    expect(selectionIds(nodes,['outer','a'])).toEqual(['a','b','inside-link','inner','outer']);
+    expect(selectionIds(nodes,['a','outer'])).toEqual(selectionIds(nodes,['outer','a']));
+    expect(selectionIds(nodes,['b','a'])).toEqual(['a','b']);
+    expect(selectionIds(nodes,['link'])).toEqual(['link']);
+  });
   it.each([-1, 0.5, 257, NaN, Infinity])('rejects invalid padding %s', padding => {
     expect(computeExportPlan(['selected'], bounds, {...DEFAULT_EXPORT_OPTIONS, scope:'selection', padding}).valid).toBe(false);
   });

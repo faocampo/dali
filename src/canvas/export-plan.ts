@@ -17,6 +17,19 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = Object.freeze({
   format: 'png', scope: 'board', scale: 1, background: 'white', padding: 0,
 });
 
+/** Expand identity membership, then preserve renderer order independently of selection order. */
+export function selectionIds(ordered: readonly {id: string; children: readonly string[]}[], selected: readonly string[]): string[] {
+  const nodes = new Map(ordered.map(node => [node.id, node]));
+  const included = new Set<string>();
+  const add = (id: string) => {
+    if (included.has(id) || !nodes.has(id)) return;
+    included.add(id);
+    nodes.get(id)!.children.forEach(add);
+  };
+  selected.forEach(add);
+  return ordered.filter(node => included.has(node.id)).map(node => node.id);
+}
+
 export function computeExportPlan(
   includedIds: readonly string[], worldBounds: ExportBounds, options: ExportOptions,
   revision = '',
@@ -24,8 +37,10 @@ export function computeExportPlan(
   const { x, y, w, h } = worldBounds;
   let error: string | null = null;
   if (!includedIds.length) error = 'Add an object to this area before exporting.';
-  else if (![x, y, w, h, options.padding, x + w, y + h].every(value => Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER) || w <= 0 || h <= 0 || options.padding < 0)
+  else if (![x, y, w, h, options.padding, x + w, y + h].every(value => Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER) || w <= 0 || h <= 0)
     error = 'The export area has invalid dimensions. Adjust the objects and retry.';
+  else if (!Number.isInteger(options.padding) || options.padding < 0 || options.padding > 256)
+    error = 'Choose a whole-number padding from 0 to 256.';
   else if (![1, 2, 4].includes(options.scale) || options.format !== 'png' || !['board','visible','selection','frame'].includes(options.scope) || !['white', 'transparent'].includes(options.background))
     error = 'Choose a supported export option.';
   const clipBounds = Object.freeze({ x: x - options.padding, y: y - options.padding, w: w + options.padding * 2, h: h + options.padding * 2 });

@@ -3,11 +3,12 @@ import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { writeFileSync } from 'node:fs';
 
-async function pngDownload(page: Page, scale: 1 | 2 | 4, transparent = true, scope = 'board', padding = 0) {
+async function pngDownload(page: Page, scale: 1 | 2 | 4, transparent = true, scope = 'board', padding = 0, expectedIds?: string[]) {
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByRole('radio', { name: 'PNG image' }).check();
   await page.locator(`input[name="export-scope"][value="${scope}"]`).check();
   if(scope==='selection') await page.getByLabel('Selection padding').fill(String(padding));
+  if(expectedIds) expect(JSON.parse((await page.getByTestId('export-dimensions').getAttribute('data-export-ids'))!)).toEqual(expectedIds);
   await page.getByRole('radio', { name: `${scale}×`, exact: true }).check();
   await page.getByRole('checkbox', { name: 'Transparent background' }).setChecked(transparent);
   const preview = await page.getByTestId('export-dimensions').textContent();
@@ -64,17 +65,36 @@ test('selection nested groups exclude overlapping landmarks and support padding 
     const outer=gfx.surface!.addElement({type:'group',children:{[inner]:true,[blue]:true},title:''});
     const excluded=shape('[20,20,160,60]','#00ff00');
     gfx.selection.set({elements:[outer],editing:false});
-    return {red,blue,inner,outer,excluded};
+    const expected=gfx.layer.layers.flatMap<{id:string}>(layer=>layer.elements).filter(m=>[red,blue,inner,outer].includes(m.id)).map(m=>m.id);
+    return {red,blue,inner,outer,excluded,expected};
   });
   for(const scale of [1,2,4] as const) for(const padding of [0,16]) {
-    const png=await pngDownload(page,scale,true,'selection',padding);
+    const png=await pngDownload(page,scale,true,'selection',padding,ids.expected);
     expect([png.readUInt32BE(16),png.readUInt32BE(20)]).toEqual([(200+padding*2)*scale,(100+padding*2)*scale]);
     const colors=await pixelCounts(page,png);
     expect(colors.red).toBeGreaterThan(9000*scale*scale);
     expect(colors.blue).toBeGreaterThan(9000*scale*scale);
     expect(colors.green).toBe(0);
   }
-  expect(new Set(Object.values(ids)).size).toBe(5);
+  expect(new Set([ids.red,ids.blue,ids.inner,ids.outer,ids.excluded]).size).toBe(5);
+});
+
+test('selection connector membership excludes endpoints and endpoint-only selection excludes the connector',async({page})=>{
+  await page.goto('/');
+  const ids=await page.locator('affine-edgeless-root').evaluate(el=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    const a=gfx.surface!.addElement({type:'shape',xywh:'[0,0,50,50]',shapeType:'rect',shapeStyle:'General',filled:true,fillColor:'#ff0000',strokeWidth:0});
+    const b=gfx.surface!.addElement({type:'shape',xywh:'[200,0,50,50]',shapeType:'rect',shapeStyle:'General',filled:true,fillColor:'#0000ff',strokeWidth:0});
+    const link=gfx.surface!.addElement({type:'connector',source:{id:a,position:[1,0.5]},target:{id:b,position:[0,0.5]},mode:0,stroke:'#00ff00',strokeWidth:3,text:'Link',labelDisplay:true,labelXYWH:[95,10,60,24]});
+    gfx.selection.set({elements:[link],editing:false});return {a,b,link};
+  });
+  let colors=await pixelCounts(page,await pngDownload(page,2,true,'selection',0,[ids.link]));
+  expect(colors.red).toBe(0);expect(colors.blue).toBe(0);expect(colors.green).toBeGreaterThan(200);
+  for(const elements of [[ids.a,ids.b],[ids.b,ids.a]]) {
+    await page.locator('affine-edgeless-root').evaluate((el,elements)=>{(el as HTMLElement & {gfx:GfxController}).gfx.selection.set({elements,editing:false});},elements);
+    colors=await pixelCounts(page,await pngDownload(page,1,true,'selection',0,[ids.a,ids.b]));
+    expect(colors.red).toBeGreaterThan(2000);expect(colors.blue).toBeGreaterThan(2000);expect(colors.green).toBe(0);
+  }
 });
 
 async function pixelCounts(page:Page,png:Buffer) {
