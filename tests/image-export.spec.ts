@@ -112,6 +112,64 @@ async function pixelCounts(page:Page,png:Buffer) {
   },png.toString('base64'));
 }
 
+test('frame workflow clips all four edges and preserves picker-imported image pixels',async({page})=>{
+  await mixedBoard(page);
+  const ids=await page.locator('affine-edgeless-root').evaluate(el=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    const image=gfx.doc.getBlocksByFlavour('affine:image')[0]!.model;
+    gfx.doc.updateBlock(image,{xywh:'[60,40,80,80]'});
+    const note=gfx.doc.getBlocksByFlavour('affine:note')[0]!.model;
+    gfx.doc.updateBlock(note,{xywh:'[150,60,100,100]'});
+    const shape=(xywh:string,color:string,rotate=0)=>gfx.surface!.addElement({type:'shape',xywh,shapeType:'rect',shapeStyle:'General',filled:true,fillColor:color,strokeWidth:0,rotate});
+    // Edge-crossing landmarks are added above existing content and below the image DOM layer.
+    shape('[-20,0,240,10]','#ff0000');shape('[-20,150,240,30]','#ff0000');
+    shape('[-20,10,30,140]','#0000ff');shape('[190,10,30,140]','#0000ff');
+    const touching=shape('[200,20,20,20]','#00ffff');
+    const outside=shape('[400,400,30,30]','#00ffff');
+    const rotated=shape('[20,60,20,20]','#800080',45);
+    const group=gfx.surface!.addElement({type:'group',children:{[rotated]:true,[outside]:true},title:''});
+    const frame=gfx.doc.addBlock('affine:frame',{xywh:'[0,0,200,160]'},gfx.surface!.id);
+    gfx.selection.set({elements:[frame],editing:false});
+    return {frame,touching,outside,image:image.id,group};
+  });
+  for(const scale of [1,2,4] as const) {
+    const png=await pngDownload(page,scale,true,'frame');
+    expect([png.readUInt32BE(16),png.readUInt32BE(20)]).toEqual([200*scale,160*scale]);
+    const counts=await pixelCounts(page,png);
+    expect(counts.green).toBeGreaterThan(4000*scale*scale);expect(counts.magenta).toBeGreaterThan(1400*scale*scale);
+    const edges=await page.evaluate(async base64=>{
+      const image=new Image();image.src=`data:image/png;base64,${base64}`;await image.decode();
+      const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+      const ctx=canvas.getContext('2d')!;ctx.drawImage(image,0,0);
+      return [[canvas.width/2,0],[canvas.width/2,canvas.height-1],[0,canvas.height/2],[canvas.width-1,20*canvas.height/160]].map(([x,y])=>[...ctx.getImageData(x!,y!,1,1).data]);
+    },png.toString('base64'));
+    expect(edges).toEqual([[255,0,0,255],[255,0,0,255],[0,0,255,255],[0,0,255,255]]);
+  }
+  await page.getByRole('button',{name:'Export',exact:true}).click();
+  await page.getByRole('radio',{name:'PNG image'}).check();
+  await page.locator('input[value="frame"]').check();
+  const membership=JSON.parse((await page.getByTestId('export-dimensions').getAttribute('data-export-ids'))!) as string[];
+  expect(membership).toContain(ids.image);expect(membership).not.toContain(ids.frame);
+  expect(membership).not.toContain(ids.touching);expect(membership).not.toContain(ids.outside);
+  await expect(page.getByLabel('Selection padding')).toHaveCount(0);
+});
+
+test('frame empty background and unavailable scopes are explained',async({page})=>{
+  await page.goto('/');
+  await page.getByRole('button',{name:'Export',exact:true}).click();await page.getByRole('radio',{name:'PNG image'}).check();
+  await expect(page.locator('input[value="selection"]')).toBeDisabled();await expect(page.locator('input[value="frame"]')).toBeDisabled();
+  await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+  await page.locator('affine-edgeless-root').evaluate(el=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    const frame=gfx.doc.addBlock('affine:frame',{xywh:'[0,0,100,80]'},gfx.surface!.id);gfx.selection.set({elements:[frame],editing:false});
+  });
+  for(const transparent of [false,true]) {
+    const png=await pngDownload(page,1,transparent,'frame',0,[]);
+    expect([png.readUInt32BE(16),png.readUInt32BE(20)]).toEqual([100,80]);
+    const colors=await pixelCounts(page,png);expect(colors).toEqual({red:0,blue:0,green:0,magenta:0,dark:0});
+  }
+});
+
 test('whole board source scale preserves primitive and DOM detail at every scale', async ({ page }, testInfo) => {
   await mixedBoard(page);
   const downloads: string[] = [];

@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, EXPORT_LIMITS, selectionIds, type ExportBounds } from './export-plan';
 
 const bounds = { x: -20.25, y: 0, w: 100.25, h: 50.5 };
+describe('frame boundaries',()=>{
+  it('exports an empty valid frame and rejects frame padding',()=>{
+    expect(computeExportPlan([],bounds,{...DEFAULT_EXPORT_OPTIONS,scope:'frame'}).valid).toBe(true);
+    expect(computeExportPlan(['a'],bounds,{...DEFAULT_EXPORT_OPTIONS,scope:'frame',padding:16}).valid).toBe(false);
+  });
+});
 describe('selection padding', () => {
   it('keeps exact recursive identity and native order, including only explicitly selected or grouped connectors', () => {
     const nodes=[{id:'a',children:[]},{id:'b',children:[]},{id:'link',children:[]},{id:'inside-link',children:[]},{id:'inner',children:['a','inside-link']},{id:'outer',children:['inner','b']},{id:'overlap',children:[]}];
