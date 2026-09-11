@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { addImages } from '@blocksuite/affine/blocks/image';
-import { MAX_IMAGE_WIDTH } from '@blocksuite/affine/model';
+import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
+import { importLocalImages } from './image-input';
 import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
 import type { EditorHost } from '@blocksuite/affine/std';
 import type { Store } from '@blocksuite/affine/store';
@@ -90,6 +90,9 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   const store = host.std.store;
   const [history, setHistory] = useState({ canUndo: false, canRedo: false });
   const [actionError, setActionError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const alive = useRef(true);
+  useEffect(() => { alive.current=true; return () => { alive.current=false; }; }, [host]);
   useEffect(() => installArrangementShortcuts(host, cause => {
     setActionError(cause instanceof Error ? cause.message : 'The canvas action failed.');
   }), [host]);
@@ -111,16 +114,10 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
       // otherwise, so the second insert would silently do nothing.
       event.target.value = '';
       if (files.length === 0) return;
-      // With no `point`, addImages places the image at the viewport centre in
-      // model coordinates -- the right target for a click carrying no cursor
-      // position.
-      try {
-        await addImages(host.std, files, { maxWidth: MAX_IMAGE_WIDTH });
-      } catch {
-        // The reporting blob source has already moved the header to Save
-        // failed. Keep the mounted board usable so its recovery actions remain
-        // available instead of turning an event rejection into a page crash.
-      }
+      const {x,y}=host.std.get(GfxControllerIdentifier).viewport.center;
+      const result=await importLocalImages(host,{files,source:'picker',boardId:host.std.store.id,
+        target:[x,y],isCurrent:()=>alive.current});
+      if(alive.current) setImageError(result.errors.length ? result.errors.map((error,i)=>`Image ${i+1}: ${error.message}`).join(' ') : null);
     },
     [host]
   );
@@ -200,6 +197,9 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
     >
       <EdgelessToolbarDragHandle host={host} />
       {actionError && <p role="alert">{actionError}</p>}
+      {imageError && <div role="alert" data-testid="image-import-error">
+        <p>{imageError}</p><button type="button" onClick={()=>inputRef.current?.click()}>Choose another image</button>
+      </div>}
       <ControlButton label="Insert image" onClick={() => inputRef.current?.click()}>
         <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
         <circle cx="8.75" cy="9.5" r="1.6" fill="currentColor" />
