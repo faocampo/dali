@@ -34,7 +34,8 @@ All 42 v1 requirements are approved; the phase allocation and order below are us
 
 ### Phase 1: Editable Canvas and Image Portability
 
-**Goal**: Users can compose and arrange editable canvas content, incorporate reference images, and take useful image exports away from the board.
+**Goal**: As a canvas user, I want to compose editable content with reference images and export it, so that I can develop and share visual plans.
+**Approved outcome:** Users can compose and arrange editable canvas content, incorporate reference images, and take useful image exports away from the board.
 **Mode:** mvp
 **Depends on**: Nothing (first phase)
 **Requirements**: CAN-01, CAN-02, IMG-01, IMG-02, IMG-03
@@ -289,7 +290,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Editable Canvas and Image Portability | 5/5 | In Progress|  |
+| 1. Editable Canvas and Image Portability | 5/5 | Verification pending | - |
 | 2. Daily Mind Maps | 0/TBD | Not started | - |
 | 3. Okta and Board Access | 0/TBD | Not started | - |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |

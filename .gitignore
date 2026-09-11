@@ -17,3 +17,6 @@ dist/
 .planning/research/.cache/
 playwright-report/
 test-results/
+
+# Local workflow runtime artifacts
+.gsd/
