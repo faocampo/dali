@@ -41,4 +41,6 @@ Effort, the default threshold value, coordinate behavior under zoom, and alignme
 
 ## Notes
 
-Captured from the written request; the referenced screenshot was unavailable. Activation and implementation planning occur after the trigger is met.
+The supplied visual reference shows numeric horizontal and vertical spacing labels, measurement lines with endpoint markers, and dashed alignment guides around the selected object and surrounding objects. Use these as interaction references during planning.
+
+The reference image remains outside the repository; only this organization-neutral behavior description is retained. Activation and implementation planning occur after the trigger is met.
