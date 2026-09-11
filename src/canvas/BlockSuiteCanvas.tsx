@@ -14,6 +14,7 @@ import { SelectionInspector } from './SelectionInspector';
 import { LayersInspector } from './LayersInspector';
 import { deferBoardRemoval, requestBoardOpen, setActiveBoardId } from '../boards/preferences';
 import { FrameBorderOverlay } from './FrameBorderOverlay';
+import { installArrangementShortcuts } from './arrangement';
 
 export default function BlockSuiteCanvas() {
   const ref = useRef<HTMLDivElement>(null);
@@ -82,24 +83,16 @@ export default function BlockSuiteCanvas() {
   );
 }
 
-/**
- * Our floating controls: the things BlockSuite's edgeless chrome does not offer.
- *
- * Deliberately small. Zoom is left to BlockSuite's own zoom toolbar, which is
- * good as-is; this covers only the gaps -- an image entry (its toolbar has
- * none) and undo/redo (keyboard-only otherwise, and the shortcut is not
- * discoverable). It is a separate cluster rather than an entry registered into
- * BlockSuite's toolbar because that widget exposes no public extension point.
- *
- * This is the permanent left creation and board-action rail. BlockSuite keeps
- * its own object-tool palette at the bottom; this panel contains the product
- * actions that BlockSuite does not expose through a public extension point.
- */
+/** Accessible left rail backed by native drawing tools and board actions. */
 function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const store = host.std.store;
   const [history, setHistory] = useState({ canUndo: false, canRedo: false });
+  const [actionError, setActionError] = useState<string | null>(null);
+  useEffect(() => installArrangementShortcuts(host, cause => {
+    setActionError(cause instanceof Error ? cause.message : 'The canvas action failed.');
+  }), [host]);
 
   useEffect(() => {
     const sync = () =>
@@ -206,6 +199,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
       }}
     >
       <EdgelessToolbarDragHandle host={host} />
+      {actionError && <p role="alert">{actionError}</p>}
       <ControlButton label="Insert image" onClick={() => inputRef.current?.click()}>
         <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
         <circle cx="8.75" cy="9.5" r="1.6" fill="currentColor" />

@@ -21,7 +21,10 @@ async function drag(page: Page, x: number, y: number, dx: number, dy: number) {
 
 test('native drawing tools create editable shapes, frames, arrows and freehand', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Shape', exact: true }).click();
+  await page.getByRole('button', { name: 'Frame', exact: true }).click();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Shape', exact: true })).toBeFocused();
+  await page.keyboard.press('Space');
   await drag(page, 240, 180, 160, 100);
   await expect.poll(async () => (await models(page)).filter(m => m.type === 'shape').length).toBe(1);
   await page.mouse.dblclick(320, 230);

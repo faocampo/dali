@@ -1,7 +1,13 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ImageBlockModel } from '@blocksuite/affine/model';
 import type { EditorHost } from '@blocksuite/affine/std';
-import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
+import { GfxControllerIdentifier, type GfxModel } from '@blocksuite/affine/std/gfx';
+import {
+  alignCanvasSelection, canvasSelectionEditable, duplicateCanvasSelection,
+  groupCanvasSelection, ungroupCanvasSelection, selectedLayerCanGroup,
+  selectedLayerCanUngroup, reorderCanvasLayer, setCanvasLayerLocked,
+  type AlignmentAction,
+} from './arrangement';
 import {
   summarizeCanvasSelection,
   type CanvasSelectionSummary,
@@ -15,14 +21,7 @@ import {
   updateImageGeometry,
 } from './image-visual-edits';
 
-/**
- * The approved right-side inspector shell.
- *
- * Milestone 9 intentionally contains no pretend editing controls. Feature
- * milestones add real controls only after their data operations are proven.
- * BlockSuite's existing element toolbar remains the small contextual toolbar
- * beside the selection.
- */
+/** Contextual arrangement and image controls alongside native style controls. */
 export function SelectionInspector({ host }: { host: EditorHost }) {
   const [selection, setSelection] = useState<CanvasSelectionSummary | null>(null);
   const [closedForSelection, setClosedForSelection] = useState<string | null>(null);
@@ -380,12 +379,29 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
 
             {actionError && <p className="djai-error" role="alert">{actionError}</p>}
             </Fragment>
-          ) : (
-            <p className="selection-inspector__note">
-              Detailed controls appear here when their editing milestone is complete.
-              The canvas toolbar beside your selection remains available.
-            </p>
-          )}
+          ) : null}
+          <section>
+            <h3>Arrange</h3>
+            <div className="layers-action-grid">
+              <button disabled={!canvasSelectionEditable(host)} title="Duplicate (⌘/Ctrl+D)"
+                onClick={() => void duplicateCanvasSelection(host).catch(cause => setActionError(String(cause)))}>Duplicate</button>
+              <button disabled={!selectedLayerCanGroup(host)} title="Group (⌘/Ctrl+G)"
+                onClick={() => groupCanvasSelection(host)}>Group</button>
+              <button disabled={!selectedLayerCanUngroup(host)} title="Ungroup (⌘/Ctrl+Shift+G)"
+                onClick={() => ungroupCanvasSelection(host)}>Ungroup</button>
+              {(['left', 'center-x', 'right', 'top', 'center-y', 'bottom', 'distribute-x', 'distribute-y'] as AlignmentAction[]).map(action =>
+                <button key={action} disabled={!canvasSelectionEditable(host) || selection.count < (action.startsWith('distribute') ? 3 : 2)}
+                  onClick={() => alignCanvasSelection(host, action)}>{`Align ${action}`}</button>)}
+              {(['front', 'back'] as const).map(direction => <button key={direction}
+                disabled={selection.count !== 1 || !canvasSelectionEditable(host)}
+                onClick={() => reorderCanvasLayer(host, selection.key, direction)}>{`To ${direction}`}</button>)}
+              {selection.count === 1 && <button onClick={() => {
+                const model = host.std.get(GfxControllerIdentifier).getElementById<GfxModel>(selection.key);
+                if (model) setCanvasLayerLocked(host, model.id, !model.isLockedBySelf());
+                setImageRevision(value => value + 1);
+              }}>{host.std.get(GfxControllerIdentifier).getElementById<GfxModel>(selection.key)?.isLockedBySelf() ? 'Unlock object' : 'Lock object'}</button>}
+            </div>
+          </section>
         </div>
       </aside>
     </Fragment>
