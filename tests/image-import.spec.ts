@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
+import { createHash } from 'node:crypto';
 
 async function images(page: Page) {
   return page.locator('affine-edgeless-root').evaluate(async el=>{
@@ -8,7 +9,8 @@ async function images(page: Page) {
     return Promise.all(gfx.doc.getBlocksByFlavour('affine:image').map(async ({model})=>{
       const m=model as typeof model & {xywh:string;props:{sourceId:string}};
       const blob=await gfx.doc.blobSync.get(m.props.sourceId);
-      return {id:m.id,bounds:JSON.parse(m.xywh) as number[],bytes:blob?.size ?? 0};
+      const hash=blob ? [...new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))].map(n=>n.toString(16).padStart(2,'0')).join('') : '';
+      return {id:m.id,bounds:JSON.parse(m.xywh) as number[],bytes:blob?.size ?? 0,hash};
     }));
   });
 }
@@ -43,6 +45,7 @@ test('picker centers proportional images, supports repeated selection and persis
   const first=(await images(page))[0]!;
   expect(first.bounds[2]!/first.bounds[3]!).toBeCloseTo(2,4);
   expect(first.bytes).toBe(file.buffer.length);
+  expect(first.hash).toBe(createHash('sha256').update(file.buffer).digest('hex'));
   const center=await page.locator('affine-edgeless-root').evaluate(el=>(el as HTMLElement & {gfx:GfxController}).gfx.viewport.center);
   expect(first.bounds[0]!+first.bounds[2]!/2).toBeCloseTo(center.x,0);
   expect(first.bounds[1]!+first.bounds[3]!/2).toBeCloseTo(center.y,0);
@@ -69,12 +72,48 @@ test('picker centers proportional images, supports repeated selection and persis
   expect((await images(page))[2]!.bounds[2]!/(await images(page))[2]!.bounds[3]!).toBeCloseTo(0.5,4);
 });
 
+test('leaving the board during decode cancels insertion',async({page})=>{
+  await page.goto('/');await page.getByRole('button',{name:'Insert image',exact:true}).waitFor();
+  const file=await raster(page);
+  await page.locator('affine-edgeless-root').evaluate(el=>{
+    const store=(el as HTMLElement & {gfx:GfxController}).gfx.doc;
+    const original=HTMLImageElement.prototype.decode;
+    HTMLImageElement.prototype.decode=function(){
+      HTMLImageElement.prototype.decode=original;
+      document.body.dataset.syntheticDecode='pending';
+      return new Promise<void>(()=>{});
+    };
+    (window as Window & {syntheticImageCount?:()=>number}).syntheticImageCount=()=>store.getBlocksByFlavour('affine:image').length;
+  });
+  await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles(file);
+  await expect(page.locator('body')).toHaveAttribute('data-synthetic-decode','pending');
+  await page.locator('.djai-board-switcher').click();
+  await expect(page.locator('affine-edgeless-root')).toHaveCount(0);
+  expect(await page.evaluate(()=>(window as Window & {syntheticImageCount?:()=>number}).syntheticImageCount!())).toBe(0);
+});
+
+test('multiple picker files preserve per-file results and sequential offsets',async({page})=>{
+  await page.goto('/');
+  const file=await raster(page);
+  await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles([
+    file,{...file,name:'synthetic-corrupt.png',buffer:Buffer.from('invalid')},file,
+  ]);
+  await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
+  await expect(page.getByTestId('image-import-error')).toContainText('Image 2:');
+  const imported=await images(page);
+  expect(imported[1]!.bounds[0]!-imported[0]!.bounds[0]!).toBe(64);
+  expect(imported[1]!.bounds[1]!-imported[0]!.bounds[1]!).toBe(64);
+});
+
 async function transfer(page: Page, type: 'drop'|'paste', file: Awaited<ReturnType<typeof raster>>) {
   return page.locator('affine-edgeless-root').evaluate((el,{type,file})=>{
     const data=new DataTransfer();
     data.items.add(new File([Uint8Array.from(atob(file.base64),c=>c.charCodeAt(0))],file.name,{type:file.mimeType}));
     const event=type==='drop' ? new DragEvent('drop',{bubbles:true,cancelable:true,composed:true,dataTransfer:data,clientX:700,clientY:400}) :
       new ClipboardEvent('paste',{bubbles:true,cancelable:true,composed:true,clipboardData:data});
+    // Firefox discards constructor clipboard data for untrusted events.
+    // This explicitly tests event routing, not operating-system integration.
+    if(type==='paste') Object.defineProperty(event,'clipboardData',{value:data});
     el.dispatchEvent(event); return event.defaultPrevented;
   },{type,file:{name:file.name,mimeType:file.mimeType,base64:file.buffer.toString('base64')}});
 }
@@ -155,11 +194,19 @@ test('clipboard keeps rich text paste and imports a bitmap once',async({page,con
   } else {
     await page.locator('[contenteditable="true"]').last().evaluate(el=>{
       const data=new DataTransfer();data.setData('text/plain','Synthetic clipboard text');
-      el.dispatchEvent(new ClipboardEvent('paste',{bubbles:true,composed:true,cancelable:true,clipboardData:data}));
+      const event=new ClipboardEvent('paste',{bubbles:true,composed:true,cancelable:true,clipboardData:data});
+      Object.defineProperty(event,'clipboardData',{value:data});el.dispatchEvent(event);
     });
   }
   await expect(page.locator('affine-edgeless-note')).toContainText('Synthetic clipboard text');
-  await page.keyboard.press('Escape');await page.mouse.click(1000,650);
+  await page.keyboard.press('Escape');
+  if(browserName==='chromium') {
+    await page.locator('affine-edgeless-note').click();
+    await page.keyboard.press('ControlOrMeta+c');
+    await page.mouse.click(1000,650);await page.keyboard.press('ControlOrMeta+v');
+    await expect(page.locator('affine-edgeless-note')).toHaveCount(2);
+  }
+  await page.mouse.click(1000,650);
   const file=await raster(page);
   if(browserName==='chromium') {
     await page.evaluate(async base64=>{

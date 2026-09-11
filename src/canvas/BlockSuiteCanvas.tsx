@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
-import { importLocalImages } from './image-input';
+import { importLocalImages, installImageInputs, type ImageImportRequest } from './image-input';
 import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
 import type { EditorHost } from '@blocksuite/affine/std';
 import type { Store } from '@blocksuite/affine/store';
@@ -92,7 +92,21 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   const [actionError, setActionError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const alive = useRef(true);
-  useEffect(() => { alive.current=true; return () => { alive.current=false; }; }, [host]);
+  const imageQueue = useRef(Promise.resolve());
+  const imageAbort = useRef(new AbortController());
+  useEffect(() => {
+    alive.current=true; imageAbort.current=new AbortController();
+    return () => { alive.current=false; imageAbort.current.abort(); };
+  }, [host]);
+  const importImages=useCallback((files:File[],source:ImageImportRequest['source'],target:[number,number])=>{
+    const boardId=host.std.store.id;
+    const signal=imageAbort.current.signal;
+    imageQueue.current=imageQueue.current.then(async()=>{
+      const result=await importLocalImages(host,{files,source,boardId,target,signal,isCurrent:()=>alive.current && !signal.aborted});
+      if(alive.current) setImageError(result.errors.length ? result.errors.map(error=>error.message).join(' ') : null);
+    }).catch(()=>{ if(alive.current) setImageError('The image could not be imported. Choose a PNG or JPEG and try again.'); });
+  },[host]);
+  useEffect(()=>installImageInputs(host,importImages),[host,importImages]);
   useEffect(() => installArrangementShortcuts(host, cause => {
     setActionError(cause instanceof Error ? cause.message : 'The canvas action failed.');
   }), [host]);
@@ -108,18 +122,16 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   }, [store]);
 
   const onFiles = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
+    (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = [...(event.target.files ?? [])];
       // Clear first: picking the SAME file twice fires no change event
       // otherwise, so the second insert would silently do nothing.
       event.target.value = '';
       if (files.length === 0) return;
       const {x,y}=host.std.get(GfxControllerIdentifier).viewport.center;
-      const result=await importLocalImages(host,{files,source:'picker',boardId:host.std.store.id,
-        target:[x,y],isCurrent:()=>alive.current});
-      if(alive.current) setImageError(result.errors.length ? result.errors.map((error,i)=>`Image ${i+1}: ${error.message}`).join(' ') : null);
+      importImages(files,'picker',[x,y]);
     },
-    [host]
+    [host,importImages]
   );
 
   const onExport = useCallback(async () => {
@@ -197,7 +209,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
     >
       <EdgelessToolbarDragHandle host={host} />
       {actionError && <p role="alert">{actionError}</p>}
-      {imageError && <div role="alert" data-testid="image-import-error">
+      {imageError && <div role="alert" data-testid="image-import-error" style={{width:240,maxWidth:'calc(100vw - 64px)',whiteSpace:'normal'}}>
         <p>{imageError}</p><button type="button" onClick={()=>inputRef.current?.click()}>Choose another image</button>
       </div>}
       <ControlButton label="Insert image" onClick={() => inputRef.current?.click()}>

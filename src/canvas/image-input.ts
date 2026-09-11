@@ -1,4 +1,5 @@
 import type { EditorHost } from '@blocksuite/affine/std';
+import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { getActiveBoardId } from '../boards/preferences';
 
 export const IMAGE_LIMITS = { bytes: 16 * 1024 * 1024, pixels: 16_000_000, dimension: 8192 };
@@ -36,19 +37,28 @@ export function rasterDimensions(bytes: Uint8Array, mime: string): [number, numb
   throw invalid();
 }
 
-export async function validateImage(file: File): Promise<void> {
+export async function validateImage(file: File, signal?: AbortSignal): Promise<void> {
   if (file.size > IMAGE_LIMITS.bytes) throw new ImageImportError('Use an image smaller than 16 MiB and try again.');
   const dimensions=rasterDimensions(new Uint8Array(await file.arrayBuffer()),file.type);
   validateDimensions(...dimensions);
   const url=URL.createObjectURL(file);
   const image=new Image();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel: (()=>void) | undefined;
   try {
     image.src=url;
-    await image.decode();
+    await Promise.race([image.decode(),new Promise<never>((_,reject)=>{
+      cancel=()=>reject(new ImageImportError('The image import was cancelled. Choose the image again.'));
+      timer=setTimeout(()=>reject(invalid()),15_000);
+      if(signal?.aborted) cancel();
+      else signal?.addEventListener('abort',cancel,{once:true});
+    })]);
     validateDimensions(image.naturalWidth,image.naturalHeight);
   } catch (cause) {
     throw cause instanceof ImageImportError ? cause : invalid();
   } finally {
+    clearTimeout(timer);
+    if(cancel) signal?.removeEventListener('abort',cancel);
     image.src=''; URL.revokeObjectURL(url);
   }
 }
@@ -59,6 +69,7 @@ export interface ImageImportRequest {
   boardId: string;
   target: [number, number];
   isCurrent: () => boolean;
+  signal?: AbortSignal;
 }
 export interface ImageImportResult { ids: string[]; errors: ImageImportError[] }
 
@@ -87,14 +98,55 @@ export async function importLocalImages(host: EditorHost, request: ImageImportRe
   }});
   for(const [index,file] of request.files.entries()) {
     try {
-      assertCurrent(); await validateImage(file); assertCurrent();
+      assertCurrent(); await validateImage(file,request.signal); assertCurrent();
       const ids=await addImages(std,[file],{maxWidth:MAX_IMAGE_WIDTH,
         point:[request.target[0]+index*32,request.target[1]+index*32],shouldTransformPoint:false});
       if(!ids.length) throw new ImageImportError('The image could not be inserted. Choose a smaller PNG or JPEG and try again.');
       result.ids.push(...ids);
     } catch(cause) {
-      result.errors.push(cause instanceof ImageImportError ? cause : new ImageImportError('The image could not be saved. Retry after local storage is available.'));
+      const message=cause instanceof ImageImportError ? cause.message : 'The image could not be saved. Retry after local storage is available.';
+      result.errors.push(new ImageImportError(`Image ${index+1}: ${message}`));
     }
   }
   return result;
+}
+
+/** Native 0.22.4 listens on host drop and document bubble paste. Capture only
+ * image files here; native text and serialized object clipboard paths retain ownership. */
+export function installImageInputs(host: EditorHost, insert: (files:File[],source:ImageImportRequest['source'],target:[number,number])=>void) {
+  const images=(data:DataTransfer|null)=>[...(data?.files ?? [])].filter(file=>file.type.startsWith('image/'));
+  const onPaste=(event:ClipboardEvent)=>{
+    if(!host.isConnected) return;
+    const target=event.composedPath()[0];
+    if(target instanceof Element && target.closest('input,textarea,[role="dialog"]')) return;
+    if(target!==document.body && target!==document.documentElement && !event.composedPath().includes(host)) return;
+    const files=images(event.clipboardData);
+    if(!files.length) return;
+    event.preventDefault();event.stopImmediatePropagation();
+    // The viewport service is already installed on the native root.
+    const root=host.querySelector<HTMLElement & {gfx:GfxController}>('affine-edgeless-root');
+    if(!root) return;
+    const {x,y}=root.gfx.viewport.center;
+    insert(files,'paste',[x,y]);
+  };
+  const onDrop=(event:DragEvent)=>{
+    const files=images(event.dataTransfer);
+    if(!files.length) return;
+    event.preventDefault();event.stopImmediatePropagation();
+    const root=host.querySelector<HTMLElement & {gfx:GfxController}>('affine-edgeless-root');
+    if(!root) return;
+    const viewport=root.gfx.viewport;
+    insert(files,'drop',viewport.toModelCoord(...viewport.toViewCoordFromClientCoord([event.clientX,event.clientY])));
+  };
+  const onDragOver=(event:DragEvent)=>{
+    if([...(event.dataTransfer?.items ?? [])].some(item=>item.kind==='file' && item.type.startsWith('image/'))) event.preventDefault();
+  };
+  host.addEventListener('drop',onDrop,true);
+  host.addEventListener('dragover',onDragOver,true);
+  document.addEventListener('paste',onPaste,true);
+  return ()=>{
+    host.removeEventListener('drop',onDrop,true);
+    host.removeEventListener('dragover',onDragOver,true);
+    document.removeEventListener('paste',onPaste,true);
+  };
 }
