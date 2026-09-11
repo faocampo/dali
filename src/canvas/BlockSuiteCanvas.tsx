@@ -74,7 +74,6 @@ export default function BlockSuiteCanvas() {
   return (
     <div ref={ref} style={{ position: 'absolute', inset: 0 }}>
       {host && <BoardControls host={host} onOpenLayers={() => setLayersOpen(true)} />}
-      {host && <EdgelessToolbarDragHandle />}
       {host && <FrameBorderOverlay host={host} />}
       {host && (layersOpen
         ? <LayersInspector host={host} onClose={() => setLayersOpen(false)} />
@@ -185,23 +184,28 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   return (
     <div
       data-testid="board-action-menu"
+      role="toolbar"
+      aria-label="Drawing and board tools"
       className="board-action-panel"
       style={{
         position: 'absolute',
         left: '1rem',
-        top: '5.25rem',
+        top: '24px',
         zIndex: 10,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '0.25rem',
-        padding: '0.25rem',
+        gap: '8px',
+        padding: '8px',
+        maxHeight: 'calc(100% - 80px)',
+        overflowY: 'auto',
         borderRadius: 'var(--board-radius)',
         border: '1px solid var(--board-line)',
         background: 'var(--board-surface)',
         boxShadow: 'var(--board-shadow)',
       }}
     >
+      <EdgelessToolbarDragHandle host={host} />
       <ControlButton label="Insert image" onClick={() => inputRef.current?.click()}>
         <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
         <circle cx="8.75" cy="9.5" r="1.6" fill="currentColor" />

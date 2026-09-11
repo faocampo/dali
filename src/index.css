@@ -168,8 +168,25 @@ body {
  * be.
  */
 affine-edgeless-root .widgets-container > edgeless-toolbar-widget {
+  display: none;
   pointer-events: none;
 }
+
+.canvas-tool-button {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 24px;
+}
+.canvas-tool-button[aria-pressed='true'] { background: #eee7ff; color: #6040a0; }
+.board-action-panel button:focus-visible { outline: 2px solid #6040a0; outline-offset: 2px; }
 
 /* Keep the contextual toolbar and its More menu above editor overlays. */
 affine-edgeless-root .widgets-container > affine-toolbar-widget {
