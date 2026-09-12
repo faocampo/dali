@@ -160,11 +160,14 @@ function installModel(host: EditorHost, map: MindmapElementModel) {
   let active = true;
   let arranging = false;
   let style = map.style;
+  let direction = map.layoutType;
   const original = { layout: map.layout, setLayoutMethod: map.setLayoutMethod,
-    requestLayout: map.requestLayout, toggleCollapse: map.toggleCollapse };
+    requestLayout: map.requestLayout, toggleCollapse: map.toggleCollapse, buildTree: map.buildTree };
   const nativeLayout = map.layout.bind(map);
   const nativeSetLayout = map.setLayoutMethod.bind(map);
   const nativeCollapse = map.toggleCollapse.bind(map);
+  const nativeBuildTree = map.buildTree.bind(map);
+  map.buildTree = () => { nativeBuildTree(); direction = map.layoutType; };
   const children = map.children;
   const nativeChildSet = children.set;
   // Native watchLayoutType rewrites child records even during history replay.
@@ -172,8 +175,11 @@ function installModel(host: EditorHost, map: MindmapElementModel) {
   // so they cannot create an extra redo item or erase restored collapse fields.
   children.set = (id, detail) => {
     if (host.store.history.undoManager.undoing || host.store.history.undoManager.redoing) return detail;
-    nativeChildSet.call(children, id, detail);
-    return detail;
+    // The upstream Layout toolbar reaches the native direction watcher directly.
+    // During its rebuild retain all existing child metadata, including collapsed.
+    const value = map.layoutType !== direction ? { ...children.get(id), ...detail } : detail;
+    nativeChildSet.call(children, id, value);
+    return value;
   };
   const writable = () => active && host.isConnected && !host.store.readonly &&
     !host.store.history.undoManager.undoing && !host.store.history.undoManager.redoing &&

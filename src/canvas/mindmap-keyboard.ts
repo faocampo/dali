@@ -15,8 +15,10 @@ export function installMindmapShortcuts(host: EditorHost, onError: (error: unkno
     event.stopImmediatePropagation();
     if (prevent) event.preventDefault();
   };
-  const start = () => { composing = true; endingComposition = false; };
-  const end = () => { composing = false; endingComposition = true; };
+  const inTopicEditor = (event: CompositionEvent) => event.composedPath().some(target =>
+    target instanceof HTMLElement && target.matches('edgeless-shape-text-editor') && host.contains(target));
+  const start = (event: CompositionEvent) => { if (inTopicEditor(event)) { composing = true; endingComposition = false; } };
+  const end = (event: CompositionEvent) => { if (inTopicEditor(event)) { composing = false; endingComposition = true; } };
   const up = (event: KeyboardEvent) => { held.delete(event.key); if (event.key === 'Enter') endingComposition = false; };
   const reset = () => { held.clear(); composing = false; endingComposition = false; };
   const key = (event: KeyboardEvent) => {
