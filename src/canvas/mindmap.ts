@@ -8,6 +8,55 @@ import { validateMindmapState } from './mindmap-state';
 
 export const MINDMAP_CREATION_ERROR = 'The mind map could not be added. Try Add mind map again.';
 export const MINDMAP_EDIT_ERROR = 'This change could not be applied. Your previous topic is still available. Try again.';
+export const MINDMAP_LAYOUT_ERROR = 'The mind map could not be arranged. Try Arrange mind map again.';
+
+/** Capture native fields without cloning rich text or introducing an override schema. */
+function changeMindmap(host: EditorHost, action: (map: MindmapElementModel, shape: ShapeElementModel) => void) {
+  const selected = selectedMindmapTopic(host);
+  if (!selected || selected.gfx.selection.editing || selected.shape.hidden) throw new Error(MINDMAP_EDIT_ERROR);
+  const { map, shape } = selected;
+  assertMutableMap(host, map);
+  const details = [...map.children].map(([id, detail]) => [id, { ...detail }] as const);
+  const fields = [...map.children.keys()].map(id => {
+    const node = map.surface.getElementById(id) as ShapeElementModel;
+    return { node, values: new Map(node.yMap.entries()) };
+  });
+  const layout = map.layoutType;
+  const style = map.style;
+  host.store.captureSync();
+  try {
+    let failure: unknown;
+    host.store.transact(() => { try { action(map, shape); } catch (cause) { failure = cause; } });
+    if (failure) throw failure;
+    // Direction's native watcher flushes at transaction completion and rebuilds
+    // first-level records. Restore every original detail before geometric layout.
+    host.store.transact(() => {
+      try {
+        for (const [id, detail] of details) map.children.set(id, detail);
+        map.buildTree();
+        map.layout();
+      } catch (cause) { failure = cause; }
+    });
+    if (failure) throw failure;
+  } catch (cause) {
+    host.store.transact(() => { map.layoutType = layout; map.style = style; });
+    host.store.transact(() => {
+      for (const [id, detail] of details) map.children.set(id, detail);
+      for (const { node, values } of fields) {
+        for (const key of [...node.yMap.keys()]) if (!values.has(key)) node.yMap.delete(key);
+        for (const [key, value] of values) if (node.yMap.get(key) !== value) node.yMap.set(key, value);
+      }
+      map.buildTree();
+    });
+    throw cause;
+  } finally { host.store.captureSync(); }
+}
+
+export function arrangeMindmap(host: EditorHost) { changeMindmap(host, () => {}); }
+export function setMindmapLayout(host: EditorHost, direction: LayoutType) {
+  if (![LayoutType.RIGHT, LayoutType.LEFT, LayoutType.BALANCE].includes(direction)) throw new Error(MINDMAP_LAYOUT_ERROR);
+  changeMindmap(host, map => { map.layoutType = direction; });
+}
 
 export function readMindmapState(map: MindmapElementModel) {
   return validateMindmapState([...map.children].map(([id, detail]) => {

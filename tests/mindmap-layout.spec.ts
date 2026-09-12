@@ -51,7 +51,12 @@ function assertGeometry(state: Awaited<ReturnType<typeof geometry>>, before: Awa
       expect(dx > 0 && dy > 0, 'visible sibling bounds must not overlap').toBe(false);
     }
   }
-  for (const edge of state.edges) expect(state.nodes.find(n => n.id === edge.target)?.parent).toBe(edge.source);
+  for (const edge of state.edges) {
+    if (edge.target) expect(state.nodes.find(n => n.id === edge.target)?.parent).toBe(edge.source);
+    // Native collapsed badges have a short line from the collapsed topic to a
+    // free coordinate, not a topic endpoint.
+    else expect(state.nodes.find(n => n.id === edge.source)?.collapsed).toBe(true);
+  }
 }
 
 for (const size of [7, 50]) test(`@02-05-01 ${size} topics retain anchor collapse and selection in all directions`, async ({ page }) => {
@@ -91,6 +96,8 @@ test('@02-05-01 multiline edit add delete and history use measured native geomet
   await page.keyboard.insertText('Measured long topic '.repeat(10));
   await page.keyboard.press('Shift+Enter');
   await page.keyboard.insertText('X'.repeat(120));
+  await page.keyboard.press('Shift+Enter');
+  await page.keyboard.insertText('Third measured line');
   await page.keyboard.press('Enter');
   const grown = await geometry(page);
   assertGeometry(grown, initial);

@@ -165,13 +165,29 @@ function installModel(host: EditorHost, map: MindmapElementModel) {
   const nativeLayout = map.layout.bind(map);
   const nativeSetLayout = map.setLayoutMethod.bind(map);
   const nativeCollapse = map.toggleCollapse.bind(map);
+  const children = map.children;
+  const nativeChildSet = children.set;
+  // Native watchLayoutType rewrites child records even during history replay.
+  // Yjs replays its own items directly; suppress only these observer-side writes
+  // so they cannot create an extra redo item or erase restored collapse fields.
+  children.set = (id, detail) => {
+    if (host.store.history.undoManager.undoing || host.store.history.undoManager.redoing) return detail;
+    nativeChildSet.call(children, id, detail);
+    return detail;
+  };
   const writable = () => active && host.isConnected && !host.store.readonly &&
+    !host.store.history.undoManager.undoing && !host.store.history.undoManager.redoing &&
     map.surface.getElementById(map.id) === map && !map.isLocked();
 
   map.layout = (tree = map.tree, options = {}) => {
     if (!writable() || arranging || !tree?.element) return;
     const nodes = shapes(map);
     if (nodes.some(node => node.isLocked())) return;
+    const state = nativeMindmapState(map);
+    if ([...state.depth.values()].some(depth => depth > 128)) throw new Error('The mind map is too deep to arrange.');
+    const fields = nodes.map(node => ({ node, values: new Map(node.yMap.entries()) }));
+    const anchor = { x: map.tree.element.x, y: map.tree.element.y };
+    const previousStyle = style;
     const typography = nodes.map(node => ({ node, fontSize: node.fontSize, fontWeight: node.fontWeight, color: node.color }));
     arranging = true;
     try {
@@ -185,6 +201,17 @@ function installModel(host: EditorHost, map: MindmapElementModel) {
         fitContent(node);
       }
       nativeLayout(tree, { ...options, applyStyle: false, stashed: false });
+      const dx = anchor.x - map.tree.element.x;
+      const dy = anchor.y - map.tree.element.y;
+      if (dx || dy) for (const node of nodes) node.xywh = `[${node.x + dx},${node.y + dy},${node.w},${node.h}]`;
+      shapes(map);
+    } catch (cause) {
+      for (const { node, values } of fields) {
+        for (const key of [...node.yMap.keys()]) if (!values.has(key)) node.yMap.delete(key);
+        for (const [key, value] of values) if (node.yMap.get(key) !== value) node.yMap.set(key, value);
+      }
+      style = previousStyle;
+      throw cause;
     } finally { arranging = false; }
   };
   // The native view supplies this delegate on creation and on subsequent remounts.
@@ -218,6 +245,7 @@ function installModel(host: EditorHost, map: MindmapElementModel) {
   };
   return () => {
     active = false;
+    children.set = nativeChildSet;
     Object.assign(map, original);
   };
 }
