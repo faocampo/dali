@@ -82,7 +82,7 @@ Parallel browser checks and production builds share an exclusive execution slot;
   3. The visible mind-map layout adapts automatically when the user changes nodes or expands and collapses branches. (MIND-03)
   4. A user can format node text and style branches while continuing to edit the mind map as a hierarchy. (MIND-04)
 
-**Plans**: 2/6 plans executed in 6 sequential waves
+**Plans**: 3/6 plans executed in 6 sequential waves
 
 Plans:
 **Wave 1**
@@ -95,7 +95,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-03-PLAN.md — Keyboard hierarchy editing and preserved nested branch collapse.
+- [x] 02-03-PLAN.md — Keyboard hierarchy editing and preserved nested branch collapse.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -318,7 +318,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
-| 2. Daily Mind Maps | 2/6 | In Progress|  |
+| 2. Daily Mind Maps | 3/6 | In Progress|  |
 | 3. Okta and Board Access | 0/TBD | Not started | - |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
