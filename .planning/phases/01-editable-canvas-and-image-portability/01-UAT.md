@@ -3,24 +3,25 @@ status: testing
 phase: 01-editable-canvas-and-image-portability
 source: [01-VERIFICATION.md]
 started: 2026-09-11
-updated: 2026-09-11
+updated: 2026-09-12
 ---
 
 # Phase 1 Remaining Acceptance Checks
 
 ## Current Test
 
-number: 1
-name: Native file-manager drag and picker cancellation
+number: 2
+name: Firefox and WebKit OS clipboard
 expected: |
-  Drag a synthetic PNG after panning and zooming: exactly one proportional image appears at the drop point without navigating away. Cancel the native picker: no object is added; reopen it and import successfully.
+  Copy a synthetic raster image using the OS clipboard and paste into each browser canvas. Exactly one proportional editable image appears near the viewport center.
 awaiting: user response
 
 ## Tests
 
 ### 1. Native file-manager drag and picker cancellation
 expected: One correctly placed editable image; cancellation leaves the board unchanged and the next import works.
-result: [pending]
+result: [pass]
+evidence: User approved image import on 2026-09-12 after manual testing. This records feature acceptance; individual native steps were not separately reported.
 
 ### 2. Firefox and WebKit OS clipboard
 expected: Copy a synthetic raster image using the OS clipboard and paste into each browser canvas. Exactly one proportional editable image appears near the viewport center.
@@ -34,12 +35,12 @@ evidence: Approved 15-commit anonymization verified; user clarified that remaini
 ## Summary
 
 total: 3
-passed: 1
+passed: 2
 issues: 0
-pending: 2
+pending: 1
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-Two native OS-input checks remain. The authorship concern is resolved. See [01-VERIFICATION.md](01-VERIFICATION.md) and [01-SECURITY.md](01-SECURITY.md).
+Image import is user-approved. Browser-specific native clipboard confirmation remains. The authorship concern is resolved. See [01-VERIFICATION.md](01-VERIFICATION.md) and [01-SECURITY.md](01-SECURITY.md).
