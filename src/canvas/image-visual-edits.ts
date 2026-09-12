@@ -207,7 +207,7 @@ export type ImageVisualSettings = Pick<
 
 /** Recover the original rectangle from the current native placement, including
  * moves, resizes and rotations performed by BlockSuite itself. */
-function uncroppedGeometry(image: ImageBlockModel, state: ImageVisualEditProps) {
+export function uncroppedGeometry(image: ImageBlockModel, state: ImageVisualEditProps) {
   const bound = Bound.deserialize(image.xywh);
   const baseWidth = bound.w / (1 - (state.cropLeft + state.cropRight) / 100);
   const baseHeight = bound.h / (1 - (state.cropTop + state.cropBottom) / 100);
@@ -243,12 +243,14 @@ export function imageVisualSettings(
 export async function applyImageVisualEdit(
   store: Store,
   imageId: string,
-  next: ImageVisualSettings
+  next: ImageVisualSettings,
+  isCurrent: () => boolean = () => true
 ): Promise<void> {
   const image = getImage(store, imageId);
   reconcileImageVisualEdits(store);
   const existing = getImageVisualEdit(store, imageId);
-  const baseSourceId = existing?.props.sourceId ?? image.props.sourceId;
+  const initialSourceId = image.props.sourceId;
+  const baseSourceId = existing?.props.sourceId ?? initialSourceId;
   if (!baseSourceId) throw new Error('The selected image has no local source.');
   const base = await store.blobSync.get(baseSourceId);
   if (!base) throw new Error('The original image bytes are unavailable.');
@@ -256,11 +258,11 @@ export async function applyImageVisualEdit(
   const bitmap = await createImageBitmap(base);
   try {
     assertSafeEdit(bitmap, base.size);
-    const left = clamp(next.cropLeft, 0, 45) / 100;
-    const top = clamp(next.cropTop, 0, 45) / 100;
-    const right = clamp(next.cropRight, 0, 45) / 100;
-    const bottom = clamp(next.cropBottom, 0, 45) / 100;
-    if (left + right >= 0.95 || top + bottom >= 0.95) {
+    const left = clamp(next.cropLeft, 0, 95) / 100;
+    const top = clamp(next.cropTop, 0, 95) / 100;
+    const right = clamp(next.cropRight, 0, 95) / 100;
+    const bottom = clamp(next.cropBottom, 0, 95) / 100;
+    if (left + right > 0.95 || top + bottom > 0.95) {
       throw new Error('Crop must leave part of the image visible.');
     }
     const sourceX = Math.round(bitmap.width * left);
@@ -295,7 +297,9 @@ export async function applyImageVisualEdit(
       context.putImageData(pixels, 0, 0);
     }
     const output = await canvasBlob(canvas);
+    if (!isCurrent() || store.getBlock(imageId)?.model !== image || image.props.sourceId !== initialSourceId) return;
     const processedSourceId = await store.blobSync.set(output);
+    if (!isCurrent() || store.getBlock(imageId)?.model !== image || image.props.sourceId !== initialSourceId) return;
 
     const bound = Bound.deserialize(image.xywh);
     const { baseX, baseY, baseWidth, baseHeight } = existing

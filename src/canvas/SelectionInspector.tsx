@@ -1,14 +1,10 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ImageBlockModel } from '@blocksuite/affine/model';
 import type { EditorHost } from '@blocksuite/affine/std';
-import { GfxControllerIdentifier, type GfxModel } from '@blocksuite/affine/std/gfx';
+import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { Bound } from '@blocksuite/global/gfx';
-import {
-  alignCanvasSelection, canvasSelectionEditable, duplicateCanvasSelection,
-  groupCanvasSelection, ungroupCanvasSelection, selectedLayerCanGroup,
-  selectedLayerCanUngroup, reorderCanvasLayer, setCanvasLayerLocked,
-  type AlignmentAction,
-} from './arrangement';
+import { ObjectContextMenu } from './ObjectContextMenu';
+import { ImageCropOverlay } from './ImageCropOverlay';
 import {
   summarizeCanvasSelection,
   type CanvasSelectionSummary,
@@ -42,6 +38,9 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     cropBottom: 0,
   });
   const [quickPosition, setQuickPosition] = useState<{ left: number; top: number } | null>(null);
+  const visualGeneration = useRef(0);
+  const visualPending = useRef(false);
+  const visualTimer = useRef<ReturnType<typeof setTimeout>>();
   const replaceRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -68,6 +67,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
 
   useEffect(() => {
     setActionError(null);
+    setEditingImage(false);
     setCropOpen(false);
   }, [selection?.key]);
 
@@ -83,7 +83,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
       height: String(bound.h),
     });
     setRatio(bound.h > 0 ? bound.w / bound.h : 1);
-    setVisualDraft(imageVisualSettings(host.std.store, selection.key));
+    if (!visualPending.current) setVisualDraft(imageVisualSettings(host.std.store, selection.key));
   }, [host, selection?.key, selection?.kind, imageRevision]);
 
   useEffect(() => {
@@ -130,23 +130,44 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     }
   };
 
-  const applyVisual = async () => {
-    if (!selection || selection.kind !== 'image' || editingImage) return;
+  useEffect(() => () => {
+    visualGeneration.current++;
+    visualPending.current = false;
+    clearTimeout(visualTimer.current);
+  }, [host, selection?.key]);
+
+  const applyVisual = async (next = visualDraft, generation = ++visualGeneration.current) => {
+    if (!selection || selection.kind !== 'image') return;
+    const current = () => generation === visualGeneration.current && host.isConnected;
+    visualPending.current = true;
     setEditingImage(true);
     setActionError(null);
     try {
-      await applyImageVisualEdit(host.std.store, selection.key, visualDraft);
-      setImageRevision(value => value + 1);
-      setCropOpen(false);
+      await applyImageVisualEdit(host.std.store, selection.key, next, current);
+      if (current()) setCropOpen(false);
     } catch (cause) {
-      setActionError(cause instanceof Error ? cause.message : String(cause));
+      if (current()) setActionError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setEditingImage(false);
+      if (current()) {
+        visualPending.current = false;
+        setEditingImage(false);
+        setImageRevision(value => value + 1);
+      }
     }
   };
 
+  const adjustLive = (field: 'brightness' | 'contrast', value: number) => {
+    const next = {...visualDraft, [field]: value};
+    setVisualDraft(next);
+    visualPending.current = true;
+    const generation = ++visualGeneration.current;
+    clearTimeout(visualTimer.current);
+    visualTimer.current = setTimeout(() => void applyVisual(next, generation), 60);
+  };
+
   const resetVisual = () => {
-    if (!selection || selection.kind !== 'image' || editingImage) return;
+    if (!selection || selection.kind !== 'image') return;
+    visualGeneration.current++; visualPending.current = false; clearTimeout(visualTimer.current); setEditingImage(false);
     resetImageVisualEdit(host.std.store, selection.key);
     setImageRevision(value => value + 1);
     setActionError(null);
@@ -215,6 +236,8 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (event.target instanceof Element && event.target.closest('.object-context-menu')) return;
+      if (cropOpen) { event.preventDefault(); event.stopPropagation(); visualGeneration.current++; visualPending.current=false; setEditingImage(false); setCropOpen(false); return; }
       // While the inspector is open, Escape belongs to the inspector. Capture
       // it before the editor so closing this panel does not also clear the
       // selection or change the active tool underneath it.
@@ -225,18 +248,18 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
 
     document.addEventListener('keydown', closeOnEscape, true);
     return () => document.removeEventListener('keydown', closeOnEscape, true);
-  }, [open, selection?.key]);
+  }, [open, selection?.key, cropOpen]);
 
   if (!selection) return null;
 
-  const imageActions = selection.kind === 'image' && quickPosition && (
+  const imageActions = !cropOpen && selection.kind === 'image' && quickPosition && (
     <div
       className="image-quick-actions"
       data-testid="image-quick-actions"
       style={quickPosition}
       onPointerDown={event => event.stopPropagation()}
     >
-      <button type="button" onClick={() => setCropOpen(value => !value)} disabled={editingImage}>
+      <button type="button" onClick={() => { setClosedForSelection(null); setCropOpen(true); }} disabled={editingImage}>
         Crop
       </button>
       <button type="button" onClick={() => replaceRef.current?.click()} disabled={editingImage}>
@@ -248,7 +271,10 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
   if (!open) {
     return (
       <Fragment>
-        {imageActions}
+        <ObjectContextMenu host={host} selection={selection} />
+      {cropOpen && selection.kind === 'image' && <ImageCropOverlay key={selection.key} host={host} imageId={selection.key} busy={editingImage}
+        onApply={next=>void applyVisual(next)} onCancel={()=>{visualGeneration.current++;visualPending.current=false;setEditingImage(false);setCropOpen(false);}} />}
+      {imageActions}
         {selection.kind === 'image' && (
           <input
             ref={replaceRef}
@@ -275,6 +301,9 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
 
   return (
     <Fragment>
+      <ObjectContextMenu host={host} selection={selection} />
+      {cropOpen && selection.kind === 'image' && <ImageCropOverlay key={selection.key} host={host} imageId={selection.key} busy={editingImage}
+        onApply={next=>void applyVisual(next)} onCancel={()=>{visualGeneration.current++;visualPending.current=false;setEditingImage(false);setCropOpen(false);}} />}
       {imageActions}
       <aside
         className="selection-inspector"
@@ -321,36 +350,13 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
             <section className="image-edit-actions">
               <h3>Image</h3>
               <div className="selection-inspector__button-row">
-                <button type="button" className="djai-ghost" disabled={editingImage} onClick={() => setCropOpen(value => !value)}>
+                <button type="button" className="djai-ghost" disabled={editingImage} onClick={() => { setClosedForSelection(null); setCropOpen(true); }}>
                   Crop
                 </button>
                 <button type="button" className="djai-ghost" disabled={editingImage} onClick={() => replaceRef.current?.click()}>
                   Replace
                 </button>
               </div>
-              {cropOpen && (
-                <div className="image-crop-grid" data-testid="image-crop-controls">
-                  {(['cropLeft', 'cropTop', 'cropRight', 'cropBottom'] as const).map(field => (
-                    <label key={field}>
-                      <span>{field.replace('crop', '')}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="45"
-                        value={visualDraft[field]}
-                        onChange={event => setVisualDraft(current => ({
-                          ...current,
-                          [field]: Number(event.target.value),
-                        }))}
-                      />
-                      <span>%</span>
-                    </label>
-                  ))}
-                  <button type="button" className="djai-primary" onClick={() => void applyVisual()} disabled={editingImage}>
-                    {editingImage ? 'Applying…' : 'Apply crop'}
-                  </button>
-                </div>
-              )}
             </section>
 
             <section className="image-transform-control">
@@ -387,49 +393,22 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
                     min="-100"
                     max="100"
                     value={visualDraft[field]}
-                    onChange={event => setVisualDraft(current => ({
-                      ...current,
-                      [field]: Number(event.target.value),
-                    }))}
+                    disabled={cropOpen}
+                    onChange={event => adjustLive(field, Number(event.target.value))}
                   />
                   <output>{visualDraft[field]}</output>
                 </label>
               ))}
               <div className="selection-inspector__button-row">
-                <button type="button" className="djai-primary" onClick={() => void applyVisual()} disabled={editingImage}>
-                  {editingImage ? 'Applying…' : 'Apply adjustments'}
-                </button>
-                {visualState && (
-                  <button type="button" className="djai-ghost" disabled={editingImage} onClick={resetVisual}>Reset edits</button>
-                )}
+                <button type="button" className="djai-ghost" disabled={!visualState && !visualPending.current} onClick={resetVisual}>Reset edits</button>
+                {editingImage && <span role="status">Saving changes…</span>}
               </div>
             </section>
 
             {actionError && <p className="djai-error" role="alert">{actionError}</p>}
             </Fragment>
           ) : null}
-          <section>
-            <h3>Arrange</h3>
-            <div className="layers-action-grid">
-              <button disabled={!canvasSelectionEditable(host)} title="Duplicate (⌘/Ctrl+D)"
-                onClick={() => void duplicateCanvasSelection(host).catch(cause => setActionError(String(cause)))}>Duplicate</button>
-              <button disabled={!selectedLayerCanGroup(host)} title="Group (⌘/Ctrl+G)"
-                onClick={() => groupCanvasSelection(host)}>Group</button>
-              <button disabled={!selectedLayerCanUngroup(host)} title="Ungroup (⌘/Ctrl+Shift+G)"
-                onClick={() => ungroupCanvasSelection(host)}>Ungroup</button>
-              {(['left', 'center-x', 'right', 'top', 'center-y', 'bottom', 'distribute-x', 'distribute-y'] as AlignmentAction[]).map(action =>
-                <button key={action} disabled={!canvasSelectionEditable(host) || selection.count < (action.startsWith('distribute') ? 3 : 2)}
-                  onClick={() => alignCanvasSelection(host, action)}>{`Align ${action}`}</button>)}
-              {(['front', 'back'] as const).map(direction => <button key={direction}
-                disabled={selection.count !== 1 || !canvasSelectionEditable(host)}
-                onClick={() => reorderCanvasLayer(host, selection.key, direction)}>{`To ${direction}`}</button>)}
-              {selection.count === 1 && <button onClick={() => {
-                const model = host.std.get(GfxControllerIdentifier).getElementById<GfxModel>(selection.key);
-                if (model) setCanvasLayerLocked(host, model.id, !model.isLockedBySelf());
-                setImageRevision(value => value + 1);
-              }}>{host.std.get(GfxControllerIdentifier).getElementById<GfxModel>(selection.key)?.isLockedBySelf() ? 'Unlock object' : 'Lock object'}</button>}
-            </div>
-          </section>
+
         </div>
       </aside>
     </Fragment>

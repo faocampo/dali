@@ -39,15 +39,16 @@ async function state(page: Page) {
 
 async function crop(page: Page) {
   await page.locator('.selection-inspector').getByRole('button', { name: 'Crop', exact: true }).click();
-  await page.getByTestId('image-crop-controls').getByLabel('Left').fill('10');
+  await page.getByRole('button', {name:'Crop left',exact:true}).press('Shift+ArrowRight');
   await page.getByRole('button', { name: 'Apply crop', exact: true }).click();
+  await expect(page.getByTestId('image-crop-controls')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Reset edits', exact: true })).toBeEnabled();
 }
 
 async function brighten(page: Page) {
   await page.locator('.image-slider').filter({ hasText: 'Brightness' }).locator('input').fill('20');
-  await page.getByRole('button', { name: 'Apply adjustments', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Apply adjustments', exact: true })).toBeEnabled();
+  await expect.poll(async () => (await state(page)).edits.some(e => (e as {brightness?:number}).brightness === 20)).toBe(true);
+  await expect(page.getByText('Saving changes…', {exact:true})).toHaveCount(0);
 }
 
 function closeBounds(actual: number[], expected: number[]) {
@@ -98,7 +99,8 @@ for (const angle of [90, 37]) test(`rotated ${angle} degree image keeps native g
 test('Duplicate gives edited images independent history and placement', async ({ page }) => {
   await setup(page); await crop(page);
   const original = (await state(page)).images[0]!;
-  await page.locator('.selection-inspector').getByRole('button', { name: 'Duplicate', exact: true }).click();
+  await page.getByRole('button',{name:'Object actions',exact:true}).click();
+  await page.getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
   await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
   await expect.poll(async () => (await state(page)).edits.length).toBe(2);
   const copied = (await state(page)).images.find(image => image.id !== original.id)!;
@@ -198,4 +200,39 @@ test('Replace cannot mutate a disconnected board when blob storage finishes', as
     await new Promise(resolve => setTimeout(resolve, 50));
   });
   expect(await page.evaluate(() => (window as Window & { syntheticSource?: () => unknown }).syntheticSource!())).toEqual(source);
+});
+
+test('visual crop handles resize the crop, cancel leaves pixels unchanged, and reopening permits expansion', async ({page}) => {
+  await setup(page);
+  const before = await state(page);
+  await page.locator('.selection-inspector').getByRole('button',{name:'Crop',exact:true}).click();
+  const source = await page.locator('.image-crop-source').boundingBox();
+  const handle = await page.getByRole('button',{name:'Crop left',exact:true}).boundingBox();
+  await page.mouse.move(handle!.x + handle!.width / 2 + 2, handle!.y + handle!.height / 2);
+  await page.mouse.down(); await page.mouse.move(handle!.x + handle!.width / 2 + source!.width * 0.2, handle!.y + handle!.height / 2, {steps:8}); await page.mouse.up();
+  await expect.poll(async () => parseFloat(await page.locator('.image-crop-window').evaluate(el => (el as HTMLElement).style.left))).toBeGreaterThan(10);
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  expect(await state(page)).toEqual(before);
+  await crop(page);
+  const cropped = await state(page);
+  expect(cropped.images[0]!.bounds[2]).toBeLessThan(before.images[0]!.bounds[2]!);
+  await page.locator('.selection-inspector').getByRole('button',{name:'Crop',exact:true}).click();
+  await page.getByRole('button',{name:'Crop left',exact:true}).press('Shift+ArrowLeft');
+  await page.getByRole('button',{name:'Apply crop',exact:true}).click();
+  await expect.poll(async () => (await state(page)).images[0]!.bounds[2]).toBeCloseTo(before.images[0]!.bounds[2]!,4);
+});
+
+test('live slider changes persist the newest value and reset cancels pending work', async ({page}) => {
+  await setup(page);
+  const brightness=page.getByRole('slider',{name:'Brightness',exact:true});
+  await brightness.fill('10'); await brightness.fill('35'); await brightness.fill('-20');
+  await expect.poll(async () => ((await state(page)).edits[0] as {brightness?:number}|undefined)?.brightness).toBe(-20);
+  await brightness.fill('80');
+  await page.getByRole('button',{name:'Reset edits',exact:true}).click();
+  await expect.poll(async () => (await state(page)).edits.length).toBe(0);
+  await expect(brightness).toHaveValue('0');
+  await page.waitForTimeout(150);
+  expect((await state(page)).edits).toHaveLength(0);
+  await page.reload();
+  expect((await state(page)).edits).toHaveLength(0);
 });
