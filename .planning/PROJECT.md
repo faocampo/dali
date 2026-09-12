@@ -12,7 +12,12 @@ Product and engineering teams can collaboratively turn ideas into clear product 
 
 ### Validated
 
-None yet for Dali. The upstream project documents existing single-user canvas features; these have not been runtime-validated in this project.
+- ✓ CAN-01: Infinite canvas with editable frames, sticky notes, formatted text, shapes, connectors, arrows, and freehand — Phase 1.
+- ✓ CAN-02: Selection, movement, resizing, grouping, alignment, duplication, layering, and styling — Phase 1.
+- ✓ IMG-01: Local reference-image import and arrangement, visual crop, live adjustments, and source-size restoration — Phase 1.
+- ✓ IMG-02 / IMG-03: PNG export for whole boards, frames, and selected objects, with explicit resolution and background controls — Phase 1.
+
+Evidence: [Phase 1 verification](phases/01-editable-canvas-and-image-portability/01-VERIFICATION.md) (regression results and user acceptance).
 
 ### Active
 
@@ -37,8 +42,7 @@ These are the agreed capabilities to scope into requirements and phases, rather 
 
 #### Canvas and product design
 
-- [ ] Users work with frames, sticky notes, formatted text, uploaded images, shapes, icons, arrows, and connectors on an infinite canvas.
-- [ ] Users arrange, group, align, resize, and style objects to produce readable boards.
+- [ ] Expand the icon palette for product and technical diagrams. Core editable primitives shipped in Phase 1.
 - [ ] Expanded diagram palettes support product flows, UML-style sequence diagrams, swimlanes, and C4-style system diagrams.
 - [ ] Users create mockups on the canvas and discuss imported screenshots alongside them.
 - [ ] Users create and reuse product-ideation and design-sprint templates with frames, notes, structured layouts, and images.
@@ -59,11 +63,6 @@ These are the agreed capabilities to scope into requirements and phases, rather 
 - [ ] Gantt views show task rows against a navigable calendar axis, with labeled and colored bars.
 - [ ] Roadmap and Gantt templates are available independently of project-management integrations.
 
-#### Portability
-
-- [ ] Users start with new boards and import exported images of existing Miro boards as references.
-- [ ] Users export canvas content to images; exact formats, resolution controls, and frame-specific export behavior remain to be specified.
-- [ ] Users can select a group of shapes and export only that selection as an image.
 
 ### Deferred to Later Iterations
 
@@ -91,7 +90,7 @@ These are the agreed capabilities to scope into requirements and phases, rather 
 - The inspected upstream [package.json](https://github.com/DJAI-Academy/djai-open-canvas/blob/27f8bb97b10984e04e48d7650d954d0a7ecd212c/package.json) (dependencies and verification commands) identifies React, TypeScript, Vite, and BlockSuite 0.22.4. This is a preliminary inspection, not an architecture or runtime validation.
 - Upstream describes a client-only application. Shared persistence, identity, authorization, and real-time collaboration require design and implementation work.
 - Dali's existing [LICENSE](../LICENSE) (repository license) is MIT. Upstream also declares MIT; preserve applicable attribution when incorporating source.
-- The source has not yet been incorporated into Dali. Its extension points, collaboration primitives, and compatibility need investigation before implementation decisions.
+- The upstream source is incorporated with attribution. Phase 1 validates the local editing and image workflow; collaboration extension points remain for later phases.
 
 ### Daily workflows
 
@@ -125,7 +124,7 @@ Keep the repository and its entire publishable history organization-neutral. Nev
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Build Dali by extending DJAI Open Canvas | Reuse an existing single-user canvas foundation | Pending implementation |
+| Build Dali by extending DJAI Open Canvas | Reuse an existing single-user canvas foundation | Validated in Phase 1 |
 | Use the defined product workflows to scope the Miro replacement | Prioritize daily diagramming and product-development needs | Confirmed direction |
 | Deploy on operator-managed infrastructure with Okta SSO | Matches the requested internal deployment and identity model | Confirmed direction |
 | Provide per-board owner/editor/viewer access and a board-library home | Support private and shared work with explicit access | Confirmed direction |
@@ -169,4 +168,4 @@ After each milestone:
 4. Update context with actual usage and feedback.
 
 ---
-*Last updated: 2026-09-11 after initial project definition.*
+*Last updated: 2026-09-12 after Phase 1 acceptance.*

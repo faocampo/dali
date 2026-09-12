@@ -10,10 +10,16 @@ threats_closed: 17
 threats_open: 0
 ---
 
-> Current disposition (2026-09-11): The approved 15-commit metadata rewrite is complete and verified. The user clarified that personal Git authorship is permitted. The authorship-based publication concern below is resolved; historical audit wording is retained for traceability. Private organizational information remains prohibited. See [01-HISTORY-REMEDIATION.md](01-HISTORY-REMEDIATION.md). Native OS-input acceptance remains pending.
+> Current disposition (2026-09-11): The approved 15-commit metadata rewrite is complete and verified. The user clarified that personal Git authorship is permitted. The authorship-based publication concern below is resolved; historical audit wording is retained for traceability. Private organizational information remains prohibited. See [01-HISTORY-REMEDIATION.md](01-HISTORY-REMEDIATION.md). Image import and copy/paste feature acceptance is recorded in 01-UAT.md.
 
 
 # Phase 1 Security Audit
+
+## Closure refresh — 2026-09-12
+
+The plan-authored 17-threat register remains closed at ASVS level 1. Source inspection and current regression coverage retain input size/decode limits, stale-operation guards, source preservation, export allocation limits, and selected-object isolation. All 256 browser cases passed. The original independent audit follows as historical evidence; its authorship blocker was resolved by the approved remediation and clarified privacy boundary.
+
+## Historical independent audit
 
 Independent source and regression-assertion review closed 15 of 17 registered threats. Two high-severity entries share one remaining publication-history cause. Runtime fixes were independently rechecked; reported browser results were not rerun by the security auditor.
 

@@ -6,7 +6,7 @@
     {
       "number": "1",
       "name": "Editable Canvas and Image Portability",
-      "status": "in_progress"
+      "status": "complete"
     },
     {
       "number": "2",
@@ -71,8 +71,8 @@
   ],
   "next": {
     "command": "/gsd:progress --next",
-    "label": "Advance to the next step",
-    "reason": "Phase 1 of 13 · 0% · executing"
+    "label": "Advance to the next step (plan phase 2)",
+    "reason": "Phase 2 of 13 — needs a plan"
   },
-  "updated_at": "2026-09-11T19:57:21.021Z"
+  "updated_at": "2026-09-12T20:48:46.369Z"
 }

@@ -16,7 +16,7 @@ All 42 v1 requirements are approved; the phase allocation and order below are us
 
 **Phase Numbering:** Integer phases are planned milestone work. Decimal phases are reserved for later insertions and execute between the surrounding integers.
 
-- [ ] **Phase 1: Editable Canvas and Image Portability** - Compose boards, import reference images, and export board content or selected shapes.
+- [x] **Phase 1: Editable Canvas and Image Portability** - Compose boards, import reference images, and export board content or selected shapes. (completed 2026-09-12)
 - [ ] **Phase 2: Daily Mind Maps** - Create styled hierarchical mind maps with keyboard input, branch collapse, and automatic layout.
 - [ ] **Phase 3: Okta and Board Access** - Sign in, discover authorized boards, and manage owner/editor/viewer access.
 - [ ] **Phase 4: Durable Boards and Recovery** - Reopen saved work across browsers and service restarts, and deploy, back up, and restore it.
@@ -290,7 +290,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Editable Canvas and Image Portability | 5/5 | Verification pending | - |
+| 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
 | 2. Daily Mind Maps | 0/TBD | Not started | - |
 | 3. Okta and Board Access | 0/TBD | Not started | - |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |

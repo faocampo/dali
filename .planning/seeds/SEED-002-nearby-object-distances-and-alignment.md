@@ -1,6 +1,6 @@
 ---
 id: SEED-002
-status: dormant
+status: surfaced
 planted: 2026-09-11
 planted_during: Phase 1 — Editable Canvas and Image Portability
 trigger_when: After Phase 1 is accepted and complete
@@ -44,3 +44,5 @@ Effort, the default threshold value, coordinate behavior under zoom, and alignme
 The supplied visual reference shows numeric horizontal and vertical spacing labels, measurement lines with endpoint markers, and dashed alignment guides around the selected object and surrounding objects. Use these as interaction references during planning.
 
 The reference image remains outside the repository; only this organization-neutral behavior description is retained. Activation and implementation planning occur after the trigger is met.
+
+**Surfaced:** 2026-09-12 after Phase 1 acceptance. Implementation scope and placement in the roadmap await planning.

@@ -120,7 +120,7 @@ All deliverables must be organization-neutral. Keep real organizational informat
 
 ## Traceability
 
-The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential MVP capabilities and success criteria). Requirement implementation remains pending.
+The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential MVP capabilities and success criteria). Five Phase 1 requirements are complete; later-phase requirements remain pending.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -170,7 +170,7 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 **Coverage:**
 
 - v1 requirements: 42
-- Mapped to phases: 42 (proposed allocation; roadmap approval pending)
+- Mapped to phases: 42 (approved allocation)
 - Unmapped: 0
 - Duplicate phase assignments: 0
 

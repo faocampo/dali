@@ -2,14 +2,14 @@
 phase: "01"
 slug: "editable-canvas-and-image-portability"
 status: validated
-nyquist_compliant: false
+nyquist_compliant: true
 wave_0_complete: true
 created: "2026-09-11"
 ---
 
 # Phase 1 — Validation Strategy
 
-Execution contract derived from [01-RESEARCH.md](01-RESEARCH.md) (pinned implementation findings and validation architecture). Automated execution and independent verification evidence are recorded below; native OS-input checks remain pending.
+Execution contract derived from [01-RESEARCH.md](01-RESEARCH.md) (pinned implementation findings and validation architecture). Automated execution and independent verification evidence are recorded below; feature-level manual acceptance is recorded in 01-UAT.md.
 
 ## Test Infrastructure
 
@@ -76,17 +76,17 @@ Automate this smoke where the available desktop tools permit; otherwise flag the
 
 ## Validation Sign-Off
 
-- [ ] Every final task has automated verification or an explicit setup dependency.
-- [ ] No three consecutive tasks lack an automated check.
-- [ ] Test setup covers every referenced new suite.
-- [ ] No watch-mode flags.
-- [ ] Feedback timing measured.
-- [ ] All requirements and D-01 through D-15 have execution evidence.
-- [ ] Set `nyquist_compliant: true` only after validation.
+- [x] Every final task has automated verification or an explicit setup dependency.
+- [x] No three consecutive tasks lack an automated check.
+- [x] Test setup covers every referenced new suite.
+- [x] No watch-mode flags.
+- [x] Feedback timing measured.
+- [x] All requirements and D-01 through D-15 have execution evidence.
+- [x] Set `nyquist_compliant: true` only after validation.
 
-**Validation result:** Partial. All ten task rows have passing automated evidence; native OS integration remains pending. No simulated manual approval.
+**Validation result:** Passed for phase acceptance. All ten task rows have automated checks; all four UAT checks have user approval. Individual native OS steps were not separately reported; retain that evidence limit.
 
-## Validation Audit 2026-09-11
+## Historical Validation Audit 2026-09-11
 
 - Full pre-review regression: 51 unit tests; 202/204 browser cases passed, with two clipboard fixture failures corrected and all four affected project reruns passing (204 composed cases).
 - Five review/security fixes: 64 focused browser cases across four projects, 14 focused input unit cases, typecheck and build passed.
@@ -101,3 +101,15 @@ Automate this smoke where the available desktop tools permit; otherwise flag the
 | Remaining OS-input check groups | 2 |
 
 See [01-VERIFICATION.md](01-VERIFICATION.md) (independent evidence and limitations) and [01-UAT.md](01-UAT.md) (remaining acceptance checks).
+
+## Closure refresh 2026-09-12
+
+Typecheck and production build passed; 51 unit tests and all 256 browser cases passed. All ten task rows have runnable automated coverage, with no watch-mode commands or missing suites. All five requirements and 15 decisions have execution evidence. UAT records 4 user-approved checks; browser-specific OS actions were not individually reported. Earlier pending statements above record the original audit. See 01-VERIFICATION.md for current acceptance and evidence limits.
+
+| Closure metric | Count |
+|---|---|
+| Automated coverage gaps | 0 |
+| User-approved UAT checks | 4 |
+| Pending feature acceptance checks | 0 |
+
+Full browser feedback time: 6.9 minutes; unit suite: 1.09 seconds. Historical RED-test process deviation remains recorded in WINDOWS.md.

@@ -1,6 +1,6 @@
 ---
 id: SEED-001
-status: dormant
+status: surfaced
 planted: 2026-09-11
 planted_during: Phase 1 — Editable Canvas and Image Portability
 trigger_when: After Phase 1 is accepted and complete
@@ -21,7 +21,7 @@ Support precise positioning and alignment while composing canvas content.
 
 **Trigger:** After Phase 1 is accepted and complete.
 
-Phase 1 currently awaits acceptance checks. Revisit this seed when planning follow-up work after that gate. GSD also surfaces matching seeds during `$gsd-new-milestone`.
+Phase 1 acceptance is complete. This seed is surfaced for follow-up planning. GSD also surfaces matching seeds during `$gsd-new-milestone`.
 
 ## Scope Estimate
 
@@ -41,3 +41,5 @@ Effort and detailed interaction behavior remain to be determined during planning
 ## Notes
 
 Captured as a follow-up seed. Activation and implementation planning occur after the trigger is met.
+
+**Surfaced:** 2026-09-12 after Phase 1 acceptance. Implementation scope and placement in the roadmap await planning.

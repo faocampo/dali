@@ -1,36 +1,17 @@
 ---
 phase: 01-editable-canvas-and-image-portability
-verified: 2026-09-11T20:25:48Z
-status: human_needed
-score: 28/29 must-haves verified
-behavior_unverified: 1
+verified: 2026-09-12T20:49:11.234568+00:00
+status: passed
+score: 29/29 must-haves verified through automated evidence and user acceptance
+behavior_unverified: 0
 overrides_applied: 0
 decision_coverage:
   honored: 15
   total: 15
   not_honored: []
-unverified_prohibitions:
-  - statement: Repository content and publishable history must not contain private organizational or operator information or real screenshots.
-    assessment: Publication remains blocked pending separately authorized history review and remediation; functional tests do not resolve this gate.
-    flag: unverified-prohibition — human review recommended
-  - statement: Export must not silently change the selected resolution or imply complete output after content is omitted.
-    assessment: Independently observed scale-consent, missing-asset, encoder-failure and decoded-pixel tests support this constraint. The PLAN entry remains unresolved and has no verification tier; this is a non-authoritative judgment flag, not missing automated product evidence or a request to repeat these tests manually.
-    flag: unverified-prohibition — human review recommended
-behavior_unverified_items:
-  - truth: Picker, drop and clipboard paste each insert a supported local image exactly once as a native editable canvas object.
-    test: Drag a synthetic PNG from the native file manager; paste a copied bitmap in Firefox and WebKit; cancel the native image picker.
-    expected: Each completed import creates one proportional image in the intended location; cancellation creates none and the next valid import succeeds.
-    why_human: HTML file-input delivery, constructed drag events and constructed Firefox/WebKit clipboard events do not exercise native OS integration. Chromium Clipboard API plus keyboard paste was independently observed passing.
-human_verification:
-  - test: Drag a synthetic PNG from the native file manager after panning and zooming, then cancel and reopen the native image picker.
-    expected: One image appears at the drop point without navigation; picker cancellation changes no objects and a subsequent valid choice works.
-    why_human: Native file-manager drag and native picker cancellation lack executed OS evidence.
-  - test: In Firefox and WebKit, copy a synthetic raster image through the OS clipboard and paste into the canvas.
-    expected: Exactly one image appears near the viewport center, preserves its aspect ratio and remains editable.
-    why_human: Those engine tests construct clipboard events; Chromium browser Clipboard API and keyboard paste already passed.
-  - test: Resolve the public-history review and record the disposition of the two unresolved PLAN prohibition entries.
-    expected: Publication stays blocked until authorized history remediation and review finish; the export entry records the existing automated evidence without requiring redundant product UAT.
-    why_human: Publication authority and unresolved judgment metadata are separate from functional canvas behavior.
+unverified_prohibitions: []
+behavior_unverified_items: []
+human_verification: []
 covered_files:
   - .planning/REQUIREMENTS.md
   - .planning/ROADMAP.md
@@ -47,7 +28,13 @@ covered_files:
   - .planning/phases/01-editable-canvas-and-image-portability/01-05-SUMMARY.md
   - .planning/phases/01-editable-canvas-and-image-portability/01-CONTEXT.md
   - .planning/phases/01-editable-canvas-and-image-portability/01-FIXES.md
+  - .planning/phases/01-editable-canvas-and-image-portability/01-HISTORY-REMEDIATION.md
+  - .planning/phases/01-editable-canvas-and-image-portability/01-IMAGE-INTERACTION-FOLLOWUP.md
+  - .planning/phases/01-editable-canvas-and-image-portability/01-IMAGE-SIZE-FOLLOWUP.md
   - .planning/phases/01-editable-canvas-and-image-portability/01-REVIEW-FIX.md
+  - .planning/phases/01-editable-canvas-and-image-portability/01-SECURITY.md
+  - .planning/phases/01-editable-canvas-and-image-portability/01-STICKY-SHADOW-FOLLOWUP.md
+  - .planning/phases/01-editable-canvas-and-image-portability/01-UAT.md
   - .planning/phases/01-editable-canvas-and-image-portability/01-VALIDATION.md
   - AGENTS.md
   - LICENSE
@@ -67,7 +54,9 @@ covered_files:
   - src/canvas/BlockSuiteCanvas.tsx
   - src/canvas/EdgelessToolbarDragHandle.tsx
   - src/canvas/FrameBorderOverlay.tsx
+  - src/canvas/ImageCropOverlay.tsx
   - src/canvas/LayersInspector.tsx
+  - src/canvas/ObjectContextMenu.tsx
   - src/canvas/SelectionInspector.tsx
   - src/canvas/arrangement.ts
   - src/canvas/blocksuite-editor.ts
@@ -102,14 +91,38 @@ covered_files:
   - tests/image-export.spec.ts
   - tests/image-import.spec.ts
   - tests/image-visual-edits.spec.ts
+  - tests/sticky-shadow.spec.ts
   - tsconfig.blocksuite-paths.json
   - tsconfig.json
   - vite.config.ts
-covered_digest: "v1:sha256:2124dadbf853059f5b426bf27bfff30644f830d6192199ad2c7123f4e5354eb2"
+covered_digest: "v1:sha256:7f40dfd3358cba0b9543dca02dd388cba7f7e94bf05589d81886f528550d4a70"
 ---
 
-> Current disposition (2026-09-11): The approved 15-commit metadata rewrite is complete and verified. The user clarified that personal Git authorship is permitted. The authorship-based publication concern below is resolved; historical audit wording is retained for traceability. Private organizational information remains prohibited. See [01-HISTORY-REMEDIATION.md](01-HISTORY-REMEDIATION.md). Native OS-input acceptance remains pending.
+# Phase 1 verification refresh — 2026-09-12
 
+**Disposition:** Passed for phase acceptance. All five requirements (CAN-01, CAN-02, IMG-01, IMG-02, IMG-03) and 15 approved decisions are covered. The 29 merged truths combine automated evidence and user acceptance.
+
+This refresh checks the implementation through `0691b56`, including source-size restoration, visual crop handles, live brightness/contrast with reset, contextual arrangement actions, and sticky-note shadows. It combines the original independent audit below with current source inspection, the full regression run, and all four user-approved UAT checks. It is an orchestrator refresh; the independent audit remains dated below.
+
+## Current validation
+
+- TypeScript static checking: passed.
+- Unit tests: 51 passed.
+- Full Playwright suite: 256 passed across development Chromium and production Chromium, Firefox, and WebKit; production build completed during this run.
+- UAT: 4 passed, 0 pending, 0 issues. See [01-UAT.md](01-UAT.md) (recorded user acceptance).
+- Source inspection confirmed asynchronous edit generation guards, preserved source pixels for crop expansion, keyboard and pointer crop controls, contextual arrangement controls, and five sticky shadow variables. Current browser coverage exercises those changes and reload persistence.
+- Security review: existing 17/17 threat disposition is retained, with current regression coverage for input limits, stale edits, inert pasted markup, export failures, and selected-content isolation. See [01-SECURITY.md](01-SECURITY.md) (security audit and remediation disposition).
+- History concern: the approved metadata remediation and personal-authorship clarification resolve the recorded concern; see [01-HISTORY-REMEDIATION.md](01-HISTORY-REMEDIATION.md) (reviewed remediation evidence). Publication was not performed.
+
+## Evidence limits and retained follow-ups
+
+The user approved image import and copy/paste as complete use cases. Individual native file-manager, picker-cancellation, and browser-specific OS clipboard steps were not separately reported. These approvals close feature UAT; they do not establish independently observed native integration on every browser. Automated engine coverage and simulated event routing remain distinguished from OS evidence.
+
+The original non-blocking UI observations and inherited absence of an intentional RED commit remain historical findings. The latter is retained in the defect ledger as a process deviation. Future identity, durable service persistence, and collaboration requirements remain allocated to their approved phases.
+
+## Historical independent audit — 2026-09-11
+
+The following snapshot records the original audit before the follow-up fixes and UAT approvals. Its pending statements describe that earlier state; the current disposition above supersedes them.
 
 # Phase 1: Editable Canvas and Image Portability Verification
 
