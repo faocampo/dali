@@ -19,12 +19,12 @@ test('@02-01-01 native map creation, keyboard hierarchy, reload and PNG', async 
   await page.keyboard.press('Enter');
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
   await page.keyboard.press('Tab');
-  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New node');
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
   await page.keyboard.insertText('Synthetic child');
   await page.keyboard.press('Enter');
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
   await page.keyboard.press('Enter');
-  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New node');
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
   await page.keyboard.insertText('Synthetic sibling');
   await page.keyboard.press('Enter');
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);

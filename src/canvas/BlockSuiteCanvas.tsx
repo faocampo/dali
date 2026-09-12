@@ -10,6 +10,8 @@ import { insertSticky } from './sticky';
 import { insertText } from './text';
 import { insertMindmap } from './mindmap';
 import { installMindmapCompatibility } from './mindmap-compatibility';
+import { installMindmapShortcuts } from './mindmap-keyboard';
+import { MindMapInspector } from './MindMapInspector';
 import { widenResizeHandles } from './resize-affordance';
 import { EdgelessToolbarDragHandle } from './EdgelessToolbarDragHandle';
 import { SelectionInspector } from './SelectionInspector';
@@ -81,6 +83,7 @@ export default function BlockSuiteCanvas() {
     <div ref={ref} style={{ position: 'absolute', inset: 0 }}>
       {host && <BoardControls host={host} onOpenLayers={() => setLayersOpen(true)} />}
       {host && <FrameBorderOverlay host={host} />}
+      {host && <MindMapInspector host={host} />}
       {host && (layersOpen
         ? <LayersInspector host={host} onClose={() => setLayersOpen(false)} />
         : <SelectionInspector host={host} />)}
@@ -114,6 +117,9 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   useEffect(()=>installImageInputs(host,importImages),[host,importImages]);
   useEffect(() => installArrangementShortcuts(host, cause => {
     setActionError(cause instanceof Error ? cause.message : 'The canvas action failed.');
+  }), [host]);
+  useEffect(() => installMindmapShortcuts(host, () => {
+    setActionError('This change could not be applied. Your previous topic is still available. Try again.');
   }), [host]);
 
   useEffect(() => {

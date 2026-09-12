@@ -58,8 +58,10 @@ test('@02-03-01 Tab exits editing, Escape exits selection, Shift+Tab reaches chr
 test('@02-03-01 composition and terminating Enter preserve inline text and create zero topics', async ({ page }) => {
   await seed(page);
   const input = page.locator('edgeless-shape-text-editor [contenteditable="true"]');
-  await input.dispatchEvent('compositionstart');
   await page.keyboard.insertText('Synthetic composed text');
+  // Constructed composition events prove routing over retained real inline text.
+  // Native OS composition text production remains a separately documented check.
+  await input.dispatchEvent('compositionstart');
   await input.dispatchEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, composed: true });
   await input.dispatchEvent('compositionend');
   await input.dispatchEvent('keydown', { key: 'Enter', bubbles: true, composed: true });
@@ -68,3 +70,39 @@ test('@02-03-01 composition and terminating Enter preserve inline text and creat
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(1);
   expect((await nodes(page))[0]!.text).toBe('Synthetic composed text');
 });
+
+test('@02-03-01 held keys, external shadow input and context focus create no extra topics', async ({ page }) => {
+  await seed(page); await page.keyboard.press('Enter');
+  await page.keyboard.down('Tab'); await page.keyboard.down('Tab'); await page.keyboard.up('Tab');
+  await expect.poll(async () => (await nodes(page)).length).toBe(2);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Add sibling', exact: true }).focus();
+  await page.keyboard.press('Tab');
+  expect(await nodes(page)).toHaveLength(2);
+  await page.evaluate(() => {
+    const box = document.createElement('div'); document.body.append(box);
+    const shadow = box.attachShadow({ mode: 'open' });
+    const input = document.createElement('input'); shadow.append(input); input.focus();
+  });
+  await page.keyboard.press('Enter'); await page.keyboard.press('Tab');
+  expect(await nodes(page)).toHaveLength(2);
+});
+
+for (const guard of ['readonly', 'locked', 'multiple', 'detached'] as const) {
+  test(`@02-03-01 ${guard} selection cannot create a topic`, async ({ page }) => {
+    await seed(page); await page.keyboard.press('Enter');
+    const unchanged = await page.locator('affine-edgeless-root').evaluate((el, guard) => {
+      const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+      const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;
+      if (guard === 'readonly') gfx.doc.readonly = true;
+      if (guard === 'locked') map.tree.element.lock();
+      if (guard === 'multiple') gfx.selection.set({ elements: [map.id, map.tree.id], editing: false });
+      if (guard === 'detached') el.closest('editor-host')!.remove();
+      const before = JSON.stringify(gfx.doc.spaceDoc.toJSON());
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'Tab', bubbles: true }));
+      return before === JSON.stringify(gfx.doc.spaceDoc.toJSON());
+    }, guard);
+    expect(unchanged).toBe(true);
+  });
+}
