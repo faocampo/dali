@@ -1,5 +1,5 @@
 import { EdgelessCRUDIdentifier } from '@blocksuite/affine/blocks/surface';
-import { mountShapeTextEditor } from '@blocksuite/affine/gfx/shape';
+import { fitContent, mountShapeTextEditor } from '@blocksuite/affine/gfx/shape';
 import { LayoutType, MindmapStyle, MindmapElementModel, ShapeElementModel } from '@blocksuite/affine/model';
 import type { BlockComponent, EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
@@ -26,6 +26,8 @@ export function insertMindmap(host: EditorHost): string {
     const nodeId = map.addNode(null, undefined, 'after', { text: 'Central topic', xywh: `[${x - 80},${y - 25},160,50]` });
     const node = gfx.surface.getElementById(nodeId);
     if (!(node instanceof ShapeElementModel)) throw new Error(MINDMAP_CREATION_ERROR);
+    fitContent(node);
+    node.xywh = `[${x - node.w / 2},${y - node.h / 2},${node.w},${node.h}]`;
     mountShapeTextEditor(node, root);
     std.store.captureSync();
     return map.id;

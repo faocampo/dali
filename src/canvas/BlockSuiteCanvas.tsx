@@ -9,6 +9,7 @@ import { getCanvasRuntime } from './runtime';
 import { insertSticky } from './sticky';
 import { insertText } from './text';
 import { insertMindmap } from './mindmap';
+import { installMindmapCompatibility } from './mindmap-compatibility';
 import { widenResizeHandles } from './resize-affordance';
 import { EdgelessToolbarDragHandle } from './EdgelessToolbarDragHandle';
 import { SelectionInspector } from './SelectionInspector';
@@ -41,6 +42,7 @@ export default function BlockSuiteCanvas() {
     if (!el) return;
 
     let handle: EdgelessEditorHandle | null = null;
+    let disposeMindmaps: (() => void) | undefined;
     let cancelled = false;
 
     mountEdgelessEditor(el)
@@ -53,6 +55,7 @@ export default function BlockSuiteCanvas() {
           return;
         }
         handle = h;
+        disposeMindmaps = installMindmapCompatibility(h.host);
         setHost(h.host);
       })
       .catch((cause: unknown) => {
@@ -64,6 +67,7 @@ export default function BlockSuiteCanvas() {
 
     return () => {
       cancelled = true;
+      disposeMindmaps?.();
       handle?.destroy();
       // The host is about to be torn down; leaving it in state would let the
       // picker act on a detached editor.
@@ -200,7 +204,8 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
         alignItems: 'center',
         gap: '8px',
         padding: '8px',
-        maxHeight: 'calc(100% - 80px)',
+        maxHeight: 'calc(100dvh - 128px)',
+        boxSizing: 'border-box',
         overflowY: 'auto',
         borderRadius: 'var(--board-radius)',
         border: '1px solid var(--board-line)',

@@ -7,6 +7,14 @@ test('@02-01-01 native map creation, keyboard hierarchy, reload and PNG', async 
   await expect(page.getByRole('button', { name: 'Add mind map', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
+  const offset = await page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;
+    const root = map.tree.element;
+    return [root.x + root.w / 2 - gfx.viewport.center.x, root.y + root.h / 2 - gfx.viewport.center.y];
+  });
+  expect(Math.abs(offset[0]!)).toBeLessThan(2);
+  expect(Math.abs(offset[1]!)).toBeLessThan(2);
   await page.keyboard.insertText('Synthetic central topic');
   await page.keyboard.press('Enter');
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
