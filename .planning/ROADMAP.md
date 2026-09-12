@@ -82,7 +82,7 @@ Parallel browser checks and production builds share an exclusive execution slot;
   3. The visible mind-map layout adapts automatically when the user changes nodes or expands and collapses branches. (MIND-03)
   4. A user can format node text and style branches while continuing to edit the mind map as a hierarchy. (MIND-04)
 
-**Plans**: 4/6 plans executed in 6 sequential waves
+**Plans**: 5/6 plans executed in 6 sequential waves
 
 Plans:
 **Wave 1**
@@ -103,7 +103,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 02-05-PLAN.md — Automatic anchored layout, persistent formatting and accessible controls.
+- [x] 02-05-PLAN.md — Automatic anchored layout, persistent formatting and accessible controls.
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -318,7 +318,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
-| 2. Daily Mind Maps | 4/6 | In Progress|  |
+| 2. Daily Mind Maps | 5/6 | In Progress|  |
 | 3. Okta and Board Access | 0/TBD | Not started | - |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
