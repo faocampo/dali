@@ -10,11 +10,7 @@ updated: 2026-09-12
 
 ## Current Test
 
-number: 2
-name: Firefox and WebKit OS clipboard
-expected: |
-  Copy a synthetic raster image using the OS clipboard and paste into each browser canvas. Exactly one proportional editable image appears near the viewport center.
-awaiting: user response
+Image import and clipboard acceptance are complete. Sticky-note shadows are fixed and regression-tested; phase verification refresh remains.
 
 ## Tests
 
@@ -25,7 +21,8 @@ evidence: User approved image import on 2026-09-12 after manual testing. This re
 
 ### 2. Firefox and WebKit OS clipboard
 expected: Copy a synthetic raster image using the OS clipboard and paste into each browser canvas. Exactly one proportional editable image appears near the viewport center.
-result: [pending]
+result: [pass]
+evidence: User approved the copy-and-paste use case after manual testing. Browser-specific steps were not individually reported.
 
 ### 3. Publication-history remediation
 expected: Resolve the author-metadata concern under the user-approved privacy boundary.
@@ -35,12 +32,12 @@ evidence: Approved 15-commit anonymization verified; user clarified that remaini
 ## Summary
 
 total: 3
-passed: 2
+passed: 3
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-Image import is user-approved. Browser-specific native clipboard confirmation remains. The authorship concern is resolved. See [01-VERIFICATION.md](01-VERIFICATION.md) and [01-SECURITY.md](01-SECURITY.md).
+Image import and copy/paste are user-approved. The reported sticky-note shadow rendering issue is fixed; see 01-STICKY-SHADOW-FOLLOWUP.md. The authorship concern is resolved. See [01-VERIFICATION.md](01-VERIFICATION.md) and [01-SECURITY.md](01-SECURITY.md).

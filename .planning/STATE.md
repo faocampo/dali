@@ -3,7 +3,7 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Editable Canvas and Image Portability
 status: human_needed
-stopped_at: Phase 1 implemented and verified; native OS checks pending; authorship concern resolved
+stopped_at: Phase 1 implemented and verified; manual image checks approved; sticky-note shadows fixed; phase verification refresh pending
 last_updated: "2026-09-11T19:57:21.786Z"
 last_activity: 2026-09-11
 last_activity_desc: All Phase 1 plans executed; phase verification remains.
@@ -23,7 +23,7 @@ progress:
 See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-11).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
-**Current focus:** Image import is user-approved; complete the remaining Firefox/WebKit native clipboard confirmation.
+**Current focus:** Image import and copy/paste are user-approved; sticky-note shadows are fixed and regression-tested; refresh phase verification.
 
 ## Current Position
 
@@ -89,7 +89,7 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 ### Blockers/Concerns
 
 - Upstream capabilities and proposed technology combinations have source-level research only; runtime, real Okta, deployment, recovery, and collaboration remain unverified.
-- Automated Phase 1 evidence covers dependencies, native APIs, export bounds and fidelity. Image import was approved by the user on 2026-09-12; browser-specific native clipboard evidence remains pending; approved metadata remediation is complete.
+- Automated Phase 1 evidence covers dependencies, native APIs, export bounds and fidelity. Image import was approved by the user on 2026-09-12; copy/paste is also user-approved; approved metadata remediation is complete.
 
 ## Deferred Items
 
@@ -103,7 +103,7 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 Last session: 2026-09-11T19:57:21.765Z
 Stopped at: Completed 01-05-PLAN.md
 Resume file: None
-Next action: Image import is user-approved; complete the remaining Firefox/WebKit native clipboard confirmation.
+Next action: Image import and copy/paste are user-approved; sticky-note shadows are fixed and regression-tested; refresh phase verification.
 
 ## Phase 1 verification outcome
 
