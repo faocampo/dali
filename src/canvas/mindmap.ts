@@ -58,6 +58,19 @@ export function setMindmapLayout(host: EditorHost, direction: LayoutType) {
   changeMindmap(host, map => { map.layoutType = direction; });
 }
 
+export function setMindmapStyle(host: EditorHost, style: MindmapStyle) {
+  if (![MindmapStyle.ONE, MindmapStyle.TWO, MindmapStyle.THREE, MindmapStyle.FOUR].includes(style)) throw new Error(MINDMAP_EDIT_ERROR);
+  changeMindmap(host, map => { map.style = style; });
+}
+
+export function formatMindmapTopic(host: EditorHost, text: { fontSize?: number; fontWeight?: string; color?: string }) {
+  if (Object.keys(text).some(key => !['fontSize', 'fontWeight', 'color'].includes(key)) ||
+    (text.fontSize !== undefined && (!Number.isFinite(text.fontSize) || text.fontSize < 8 || text.fontSize > 96)) ||
+    (text.fontWeight !== undefined && !['400', '600', '700'].includes(text.fontWeight)) ||
+    (text.color !== undefined && !/^#[0-9a-f]{6}$/i.test(text.color))) throw new Error(MINDMAP_EDIT_ERROR);
+  changeMindmap(host, (_map, shape) => { Object.assign(shape, text); });
+}
+
 export function readMindmapState(map: MindmapElementModel) {
   return validateMindmapState([...map.children].map(([id, detail]) => {
     const shape = map.surface.getElementById(id);

@@ -27,7 +27,14 @@ async function state(page: Page) {
         const s = map.getNode(id)!.element as ShapeElementModel;
         return { id, ...detail, hidden: s.hidden, text: s.text?.toString(), delta: s.text?.toDelta(),
           fontSize: s.fontSize, fontWeight: s.fontWeight, color: s.color, width: s.w, height: s.h };
-      }), branches: [...map.connectors.values()].filter(c => c.target.id).map(c => ({ color: c.stroke, width: c.strokeWidth, mode: c.mode })) };
+      }), presentation: [...map.children.keys()].map(id => {
+        const s = map.getNode(id)!.element as ShapeElementModel;
+        return [s.fillColor, s.strokeColor, s.fontFamily, s.padding];
+      }), branches: [...map.connectors.values()].filter(c => c.target.id).map(c => {
+        const node = map.getNode(c.target.id!)!;
+        const expected = map.styleGetter.getNodeStyle(node, map.getPath(node)).connector;
+        return { actual: [c.stroke, c.strokeWidth, c.mode], expected: [expected.stroke, expected.strokeWidth, expected.mode] };
+      }) };
     });
   });
 }
@@ -55,7 +62,11 @@ test('@02-05-02 selected typography survives four branch presets collapse direct
       const old = before.nodes.find(n => n.id === other.id)!;
       expect([other.fontSize, other.fontWeight, other.color]).toEqual([old.fontSize, old.fontWeight, old.color]);
     }
-    expect(map.branches.length).toBeGreaterThan(0); palettes.add(JSON.stringify(map.branches));
+    expect(map.branches.length).toBeGreaterThan(0);
+    for (const branch of map.branches) expect(branch.actual).toEqual(branch.expected);
+    // Native ONE and FOUR share their first branch colors/widths; their shapes,
+    // padding and families distinguish the full native presets.
+    palettes.add(JSON.stringify([map.branches, map.presentation]));
   }
   expect(palettes.size).toBe(4);
   await page.getByRole('button', { name: 'Collapse branch', exact: true }).click();

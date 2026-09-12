@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
-import { addMindmapChild, addMindmapSibling, arrangeMindmap, setMindmapLayout, installMindmapHierarchy, MINDMAP_EDIT_ERROR, MINDMAP_LAYOUT_ERROR, selectedMindmapTopic, toggleMindmapBranch } from './mindmap';
+import { addMindmapChild, addMindmapSibling, arrangeMindmap, formatMindmapTopic, setMindmapStyle, setMindmapLayout, installMindmapHierarchy, MINDMAP_EDIT_ERROR, MINDMAP_LAYOUT_ERROR, selectedMindmapTopic, toggleMindmapBranch } from './mindmap';
 
 export function MindMapInspector({ host }: { host: EditorHost }) {
   const [, update] = useState(0);
@@ -43,6 +43,21 @@ export function MindMapInspector({ host }: { host: EditorHost }) {
         disabled={disabled} aria-pressed={topic.map.layoutType === value}
         onClick={() => run(host => setMindmapLayout(host, value), MINDMAP_LAYOUT_ERROR)}>{label}</button>)}
       <button disabled={disabled} onClick={() => run(arrangeMindmap, MINDMAP_LAYOUT_ERROR)}>Arrange mind map</button>
+    </div>
+    <fieldset disabled={disabled}>
+      <legend>Topic text</legend>
+      <label>Font size <input key={`${topic.shape.id}-${topic.shape.fontSize}`} type="number" min="8" max="96"
+        defaultValue={topic.shape.fontSize} onBlur={event => run(host => formatMindmapTopic(host, { fontSize: Number(event.target.value) }))} /></label>
+      <label>Font weight <select value={topic.shape.fontWeight}
+        onChange={event => run(host => formatMindmapTopic(host, { fontWeight: event.target.value }))}>
+        <option value="400">Regular</option><option value="600">Semibold</option><option value="700">Bold</option>
+      </select></label>
+      <label>Text color <input type="color" value={typeof topic.shape.color === 'string' && /^#[0-9a-f]{6}$/i.test(topic.shape.color) ? topic.shape.color : '#000000'}
+        onChange={event => run(host => formatMindmapTopic(host, { color: event.target.value }))} /></label>
+    </fieldset>
+    <div role="group" aria-label="Mind-map style">
+      {[1, 2, 3, 4].map(style => <button key={style} disabled={disabled} aria-pressed={topic.map.style === style}
+        onClick={() => run(host => setMindmapStyle(host, style))}>Style {style}</button>)}
     </div>
     {!parent && <p id="mindmap-root-hint">The central topic has no sibling. Enter adds a child.</p>}
     <p>Enter finishes editing. Shift+Enter adds a line. Esc returns to topic selection.</p>
