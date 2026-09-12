@@ -1,6 +1,6 @@
 import { EdgelessCRUDIdentifier, updateXYWH } from '@blocksuite/affine-block-surface';
 import { createGroupFromSelectedCommand, ungroupCommand } from '@blocksuite/affine-gfx-group';
-import { GroupElementModel } from '@blocksuite/affine/model';
+import { GroupElementModel, LayoutType } from '@blocksuite/affine/model';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { duplicate } from '@blocksuite/affine/blocks/root';
 import {
@@ -10,7 +10,7 @@ import {
   type ReorderingDirection,
 } from '@blocksuite/affine/std/gfx';
 import { Bound } from '@blocksuite/global/gfx';
-import { canvasModelKind, type CanvasItemKind } from './selection-summary';
+import { canvasModelKind, canvasModelVisible, mindmapArrangementReason, mindmapOwner, nativeMindmapState, type CanvasItemKind } from './selection-summary';
 import { reconcileImageVisualEdits } from './image-visual-edits';
 import { nativeCopySourcesValid, withNativeCopySources } from './mindmap-compatibility';
 
@@ -25,13 +25,22 @@ export type LayerEntry = {
 };
 
 function protectedModel(model: GfxModel): boolean {
+  const map = mindmapOwner(model);
+  if (map) {
+    try {
+      const state = nativeMindmapState(map);
+      if ([...state.depth.values()].some(depth => depth > 128)) return true;
+      if (map.isLocked() || [...state.byId.keys()].some(id => map.surface.getElementById(id)!.isLocked())) return true;
+    } catch { return true; }
+  }
   return model.isLocked() || (isGfxGroupCompatibleModel(model) && model.childElements.some(protectedModel));
 }
 
 export function canvasSelectionEditable(host: EditorHost): boolean {
   const gfx = host.std.get(GfxControllerIdentifier);
   return host.isConnected && !host.std.store.readonly && !gfx.selection.editing &&
-    gfx.selection.selectedElements.length > 0 && !gfx.selection.selectedElements.some(protectedModel);
+    gfx.selection.selectedElements.length > 0 && !gfx.selection.selectedElements.some(model => protectedModel(model) || !canvasModelVisible(model)) &&
+    !(gfx.selection.selectedElements.length > 1 && mindmapArrangementReason(gfx.selection.selectedElements));
 }
 
 const duplicates = new WeakMap<EditorHost, Promise<void>>();
@@ -60,6 +69,18 @@ export function installArrangementShortcuts(host: EditorHost, onError: (error: u
     if (editing) return;
     const gfx = host.std.get(GfxControllerIdentifier);
     if (gfx.selection.editing) return;
+    // WebKit still maps Backspace to history navigation; native canvas deletion
+    // handles the key but does not cancel that browser default.
+    if (event.key === 'Backspace' && gfx.selection.selectedElements.length) event.preventDefault();
+    const topic = gfx.selection.selectedElements.length === 1 ? gfx.selection.selectedElements[0] : undefined;
+    const map = topic && mindmapOwner(topic);
+    if (topic && map && topic.id !== map.id && map.children.get(topic.id)?.collapsed) {
+      const direction = map.getLayoutDir(topic.id);
+      if ((event.key === 'ArrowLeft' && direction === LayoutType.LEFT) ||
+          (event.key === 'ArrowRight' && direction !== LayoutType.LEFT)) {
+        event.preventDefault(); event.stopImmediatePropagation(); return;
+      }
+    }
     const modifier = /Mac|iPhone|iPad/.test(navigator.platform) ? event.metaKey : event.ctrlKey;
     if ((['Delete', 'Backspace'].includes(event.key) || (modifier && event.key.toLowerCase() === 'g')) &&
       gfx.selection.selectedElements.some(protectedModel)) {
@@ -70,6 +91,9 @@ export function installArrangementShortcuts(host: EditorHost, onError: (error: u
     if (!modifier || event.altKey) return;
     const key = event.key.toLowerCase();
     if (key !== 'd' && key !== 'g') return;
+    if (key === 'g' && mindmapArrangementReason(gfx.selection.selectedElements)) {
+      event.preventDefault(); event.stopImmediatePropagation(); return;
+    }
     if (!canvasSelectionEditable(host)) return;
     if (key === 'g' && !(event.shiftKey ? selectedLayerCanUngroup(host) : selectedLayerCanGroup(host))) return;
     event.preventDefault();
@@ -113,6 +137,7 @@ export function canvasLayerEntries(host: EditorHost): LayerEntry[] {
   const result: LayerEntry[] = [];
 
   const visit = (model: GfxModel, depth: number) => {
+    if (!canvasModelVisible(model)) return;
     const kind = modelKind(model);
     const count = (counts.get(kind) ?? 0) + 1;
     counts.set(kind, count);
@@ -144,6 +169,7 @@ function modelById(host: EditorHost, id: string): GfxModel {
 }
 
 export function selectCanvasLayer(host: EditorHost, id: string): void {
+  if (!host.isConnected || !canvasModelVisible(modelById(host, id))) return;
   host.std.get(GfxControllerIdentifier).selection.set({ elements: [id], editing: false });
 }
 
@@ -207,6 +233,7 @@ function writeBound(host: EditorHost, model: GfxModel, bound: Bound): void {
 export function alignCanvasSelection(host: EditorHost, action: AlignmentAction): void {
   if (!canvasSelectionEditable(host)) return;
   const gfx = host.std.get(GfxControllerIdentifier);
+  if (mindmapArrangementReason(gfx.selection.selectedElements)) return;
   // Native document order resolves equal coordinates, regardless of selection order.
   const models = gfx.gfxElements.filter(model => gfx.selection.selectedElements.includes(model));
   const minimum = action.startsWith('distribute') ? 3 : 2;
@@ -275,7 +302,7 @@ export function selectedLayerIds(host: EditorHost): string[] {
 
 export function selectedLayerCanGroup(host: EditorHost): boolean {
   const selected = host.std.get(GfxControllerIdentifier).selection.selectedElements;
-  return canvasSelectionEditable(host) && selected.length >= 2 && selected.every(model => model.group === selected[0]!.group);
+  return canvasSelectionEditable(host) && !mindmapArrangementReason(selected) && selected.length >= 2 && selected.every(model => model.group === selected[0]!.group);
 }
 
 export function selectedLayerCanUngroup(host: EditorHost): boolean {

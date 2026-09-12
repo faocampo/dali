@@ -4,6 +4,7 @@ import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import {
   alignCanvasSelection,
   canvasLayerEntries,
+  canvasSelectionEditable,
   groupCanvasSelection,
   reorderCanvasLayer,
   selectCanvasLayer,
@@ -15,6 +16,7 @@ import {
   type AlignmentAction,
   type LayerEntry,
 } from './arrangement';
+import { mindmapArrangementReason } from './selection-summary';
 
 export function LayersInspector({ host, onClose }: { host: EditorHost; onClose: () => void }) {
   const [entries, setEntries] = useState<LayerEntry[]>([]);
@@ -64,8 +66,9 @@ export function LayersInspector({ host, onClose }: { host: EditorHost; onClose: 
 
   const selectedId = selected.length === 1 ? selected[0] : null;
   const selectedEntry = selectedId ? entries.find(entry => entry.id === selectedId) : null;
-  const canAlign = selected.length >= 2;
-  const canDistribute = selected.length >= 3;
+  const hierarchyReason = mindmapArrangementReason(host.std.get(GfxControllerIdentifier).selection.selectedElements);
+  const canAlign = canvasSelectionEditable(host) && !hierarchyReason && selected.length >= 2;
+  const canDistribute = canAlign && selected.length >= 3;
 
   const align = (action: AlignmentAction) => run(() => alignCanvasSelection(host, action));
 
@@ -106,6 +109,7 @@ export function LayersInspector({ host, onClose }: { host: EditorHost; onClose: 
 
         <section className="layers-actions">
           <h3>Structure</h3>
+          {hierarchyReason && <p className="selection-inspector__note">{hierarchyReason}</p>}
           <div className="selection-inspector__button-row">
             <button className="djai-ghost" disabled={!selectedLayerCanGroup(host)} onClick={() => run(() => groupCanvasSelection(host))}>Group</button>
             <button className="djai-ghost" disabled={!selectedLayerCanUngroup(host)} onClick={() => run(() => ungroupCanvasSelection(host))}>Ungroup</button>

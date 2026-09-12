@@ -5,6 +5,8 @@ import { MindmapElementModel, ShapeElementModel } from '@blocksuite/affine/model
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, isGfxGroupCompatibleModel, type GfxModel } from '@blocksuite/affine/std/gfx';
 import type { Store } from '@blocksuite/affine/store';
+import { createGroupCommand, createGroupFromSelectedCommand, ungroupCommand } from '@blocksuite/affine-gfx-group';
+import { canvasModelVisible, mindmapArrangementReason, mindmapOwner, nativeMindmapState } from './selection-summary';
 
 const MAX_COPY_ELEMENTS = 10_000;
 const copySources = new WeakMap<EditorHost, () => boolean>();
@@ -88,9 +90,19 @@ function installCopyBoundary(host: EditorHost): () => void {
   const nativeExec = manager.exec;
   const crud = host.std.get(EdgelessCRUDIdentifier);
   const nativeAdd = crud.addElement;
+  const nativeRemove = crud.removeElement;
+  let removing = false;
   let active = true;
   const current = () => active && host.isConnected && host.store === store && !store.readonly && (copySources.get(host)?.() ?? true);
   manager.exec = ((command, input) => {
+    if ((command as unknown) === createGroupCommand) {
+      const gfx = host.std.get(GfxControllerIdentifier);
+      const models = ((input as { elements: (string | GfxModel)[] }).elements ?? []).map(value =>
+        typeof value === 'string' ? gfx.getElementById<GfxModel>(value) : value).filter((model): model is GfxModel => !!model);
+      if (!nativeCopySourcesValid(host, models, store) || mindmapArrangementReason(models)) return [false, { std: host.std }];
+    }
+    if (((command as unknown) === createGroupFromSelectedCommand || (command as unknown) === ungroupCommand) &&
+        mindmapArrangementReason(host.std.get(GfxControllerIdentifier).selection.selectedElements)) return [false, { std: host.std }];
     if ((command as unknown) === createElementsFromClipboardDataCommand) {
       try {
         if (!current()) return [false, { std: host.std }];
@@ -103,7 +115,22 @@ function installCopyBoundary(host: EditorHost): () => void {
     if (!current()) throw new Error('The copy destination is no longer editable.');
     return nativeAdd.apply(crud, args);
   }) as typeof crud.addElement;
-  return () => { active = false; manager.exec = nativeExec; crud.addElement = nativeAdd; copySources.delete(host); };
+  crud.removeElement = value => {
+    if (removing) { nativeRemove.call(crud, value); return; }
+    const model = typeof value === 'string' ? crud.getElementById(value) : value;
+    if (!model || !current() || !nativeCopySourcesValid(host, [model], store)) return;
+    const map = mindmapOwner(model);
+    if (map) {
+      try {
+        const state = nativeMindmapState(map);
+        if ([...state.byId.keys()].some(id => map.surface.getElementById(id)!.isLocked()) ||
+            [...state.depth.values()].some(depth => depth > 128)) return;
+      } catch { return; }
+    }
+    removing = true;
+    try { nativeRemove.call(crud, value); } finally { removing = false; }
+  };
+  return () => { active = false; manager.exec = nativeExec; crud.addElement = nativeAdd; crud.removeElement = nativeRemove; copySources.delete(host); };
 }
 
 /** Validate native membership before any adapter writes; no secondary tree schema. */
@@ -197,8 +224,46 @@ function installModel(host: EditorHost, map: MindmapElementModel) {
 
 /** Scope all adapters to the mounted document; disposal invalidates retained callbacks. */
 export function installMindmapCompatibility(host: EditorHost): () => void {
-  const surface = host.std.get(GfxControllerIdentifier).surface;
+  const gfx = host.std.get(GfxControllerIdentifier);
+  const surface = gfx.surface;
   if (!surface) return () => {};
+  const nativeSearch = gfx.grid.search;
+  gfx.grid.search = ((...args: Parameters<typeof nativeSearch>) => {
+    const candidates = nativeSearch.apply(gfx.grid, args);
+    const visible = [...candidates].filter(model => canvasModelVisible(model as GfxModel));
+    // The pinned runtime returns arrays; some exported declarations expose Set.
+    // Preserve the actual native container contract for all grid consumers.
+    return Array.isArray(candidates) ? visible : new Set(visible);
+  }) as typeof nativeSearch;
+  const nativeSet = gfx.selection.set;
+  let selecting = false;
+  const visibleIds = (ids: string[]) => [...new Set(ids.flatMap(id => {
+    const model = gfx.getElementById<GfxModel>(id);
+    if (!model) return [];
+    if (canvasModelVisible(model)) return [id];
+    const map = mindmapOwner(model);
+    if (!map) return [];
+    try { const ancestor = nativeMindmapState(map).hiddenAncestor.get(id); return ancestor ? [ancestor] : []; }
+    catch { return []; }
+  }))];
+  gfx.selection.set = selection => {
+    if (Array.isArray(selection)) {
+      nativeSet.call(gfx.selection, selection);
+      return;
+    }
+    nativeSet.call(gfx.selection, { ...selection, elements: visibleIds(selection.elements) });
+  };
+  const syncSelection = () => {
+    if (selecting) return;
+    const before = gfx.selection.selectedElements.map(model => model.id);
+    const after = visibleIds(before);
+    if (before.join('|') !== after.join('|')) {
+      selecting = true;
+      try { gfx.selection.set({ elements: after, editing: false }); } finally { selecting = false; }
+    }
+  };
+  const selectionChanged = gfx.selection.slots.updated.subscribe(syncSelection);
+  const visibilityChanged = surface.elementUpdated.subscribe(({ props }) => { if ('hidden' in props) syncSelection(); });
   const disposeCopyBoundary = installCopyBoundary(host);
   const disposers = new Map<string, () => void>();
   const attach = (id: string) => {
@@ -209,6 +274,9 @@ export function installMindmapCompatibility(host: EditorHost): () => void {
   const added = surface.elementAdded.subscribe(({ id }) => attach(id));
   const removed = surface.elementRemoved.subscribe(({ id }) => { disposers.get(id)?.(); disposers.delete(id); });
   return () => {
+    gfx.grid.search = nativeSearch;
+    gfx.selection.set = nativeSet;
+    selectionChanged.unsubscribe(); visibilityChanged.unsubscribe();
     disposeCopyBoundary();
     added.unsubscribe(); removed.unsubscribe();
     disposers.forEach(dispose => dispose()); disposers.clear();

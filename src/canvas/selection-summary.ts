@@ -1,4 +1,34 @@
 import { isPrimitiveModel, type GfxModel } from '@blocksuite/affine/std/gfx';
+import type { MindmapElementModel } from '@blocksuite/affine/model';
+import { validateMindmapState } from './mindmap-state';
+
+export function mindmapOwner(model: GfxModel): MindmapElementModel | null {
+  const candidate = isPrimitiveModel(model) && model.type === 'mindmap' ? model : model.group;
+  return candidate && isPrimitiveModel(candidate) && candidate.type === 'mindmap' ? candidate as MindmapElementModel : null;
+}
+
+export function nativeMindmapState(map: MindmapElementModel) {
+  return validateMindmapState([...map.children].map(([id, detail]) => {
+    const model = map.surface.getElementById(id);
+    if (!model) throw new Error('The mind map has invalid topic membership.');
+    return { id, ...detail, bounds: model.elementBound.toXYWH() };
+  }));
+}
+
+export function canvasModelVisible(model: GfxModel): boolean {
+  if (isPrimitiveModel(model) && model.hidden) return false;
+  const map = mindmapOwner(model);
+  // Native local collapse badges are not document topics.
+  if (!map || map.id === model.id || !map.children.has(model.id)) return true;
+  try { return nativeMindmapState(map).visible.has(model.id); } catch { return false; }
+}
+
+export function mindmapArrangementReason(elements: readonly GfxModel[]): string | null {
+  return elements.some(model => {
+    const map = mindmapOwner(model);
+    return map && map.id !== model.id;
+  }) ? 'Select the whole mind map to group or align it.' : null;
+}
 
 export type CanvasSelectionSummary = {
   key: string;
@@ -75,6 +105,7 @@ export function canvasModelKind(element: GfxModel): CanvasItemKind {
 export function summarizeCanvasSelection(
   elements: readonly GfxModel[]
 ): CanvasSelectionSummary | null {
+  elements = elements.filter(canvasModelVisible);
   if (elements.length === 0) return null;
 
   const ids = elements.map((element) => element.id).sort();
