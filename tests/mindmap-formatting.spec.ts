@@ -70,14 +70,16 @@ test('@02-05-02 selected typography survives four branch presets collapse direct
   }
   expect(palettes.size).toBe(4);
   await page.getByRole('button', { name: 'Collapse branch', exact: true }).click();
-  await page.getByRole('button', { name: 'Left', exact: true }).click();
+  await page.getByRole('group', { name: 'Mind-map layout', exact: true }).getByRole('button', { name: 'Left', exact: true }).click();
   await page.getByRole('button', { name: 'Style 2', exact: true }).click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   expect((await state(page))[0]!.nodes.find(n => n.id === ids.a)).toMatchObject({ collapsed: true, fontSize: 31, fontWeight: '700', color: '#234567' });
   await page.getByRole('button', { name: 'Add child', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
-  await page.keyboard.insertText('A later edit'); await page.keyboard.press('Enter');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('A later edit'); await page.keyboard.press('Enter');
+  await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
   await page.locator('affine-edgeless-root').evaluate((el, id) => {
     (el as HTMLElement & { gfx: GfxController }).gfx.selection.set({ elements: [id], editing: false });
   }, ids.map);
@@ -101,7 +103,7 @@ for (const text of ['', 'Cafe\u0301 👩🏽‍💻 家族 日本語 العرب�
     const original = (await state(page))[0]!.nodes.find(n => n.id === ids.a)!;
     await format(page);
     await page.getByRole('button', { name: 'Style 4', exact: true }).click();
-    await page.getByRole('button', { name: 'Balanced', exact: true }).click();
+    await page.getByRole('group', { name: 'Mind-map layout', exact: true }).getByRole('button', { name: 'Balanced', exact: true }).click();
     const actual = (await state(page))[0]!.nodes.find(n => n.id === ids.a)!;
     expect(actual.text).toBe(text); expect(actual.delta).toEqual(original.delta);
     expect(actual.width).toBeGreaterThan(0); expect(actual.height).toBeGreaterThan(0);
@@ -130,4 +132,15 @@ test('@02-05-02 absent multi unrelated readonly and locked selections cannot for
     gfx.doc.readonly = true; gfx.selection.set({ elements: [id], editing: false });
   }, ids.root);
   await expect(page.getByRole('spinbutton', { name: 'Font size' })).toBeDisabled();
+});
+
+test('@02-05-02 external color-field composition cannot consume a topic Enter', async ({ page }) => {
+  await seed(page);
+  const color = page.getByLabel('Text color', { exact: true });
+  await color.dispatchEvent('compositionstart'); await color.dispatchEvent('compositionend');
+  await page.getByRole('button', { name: 'Add child', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0, { timeout: 2000 });
+  expect((await state(page))[0]!.nodes).toHaveLength(5);
 });

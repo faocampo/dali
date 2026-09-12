@@ -28,7 +28,8 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
       const control = controls.nth(i);
       await control.scrollIntoViewIfNeeded();
       const box = await control.boundingBox();
-      expect(box!.width).toBeGreaterThanOrEqual(44 * scale); expect(box!.height).toBeGreaterThanOrEqual(44 * scale);
+      expect(Number(box!.width.toFixed(3))).toBeGreaterThanOrEqual(44 * scale);
+      expect(Number(box!.height.toFixed(3))).toBeGreaterThanOrEqual(44 * scale);
     }
     const size = page.getByRole('spinbutton', { name: 'Font size', exact: true });
     await size.focus(); await expect(size).toBeFocused();
@@ -59,12 +60,19 @@ test('@02-05-03 empty loading populated partial and long-text states retain usab
   expect(await page.evaluate(() => (window as unknown as { mindmapLoadingEvidence: unknown }).mindmapLoadingEvidence)).toEqual({ opening: true, mutationAvailable: false });
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
-  await page.keyboard.press('Backspace'); await page.keyboard.press('Enter');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Backspace');
+  await expect.poll(() => page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;
+    return String((map.tree.element as unknown as { text: unknown }).text);
+  }), { timeout: 3000 }).toBe('');
+  await page.keyboard.press('Enter');
   await expect(page.getByText('Topic: Empty topic', { exact: true })).toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'Font size' })).toBeEnabled();
   await page.getByRole('button', { name: 'Add child', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
-  await page.keyboard.insertText('A long accessible topic '.repeat(12)); await page.keyboard.press('Enter');
+  await page.keyboard.type('A long accessible topic '.repeat(12)); await page.keyboard.press('Enter');
   await expect(page.getByRole('status').filter({ hasText: 'Level 1. Parent: Empty topic.' })).toBeVisible();
   await expect(page.getByText('Start a mind map', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
@@ -103,7 +111,7 @@ test('@02-05-03 live counts readonly controls error retry and zoomed-out canvas'
 test('@02-05-03 rendered panel text controls and keyboard focus have measurable contrast', async ({ page }) => {
   await create(page);
   const panel = page.getByRole('region', { name: 'Mind-map topic', exact: true });
-  await page.getByRole('button', { name: 'Right', exact: true }).focus();
+  await page.getByRole('group', { name: 'Mind-map layout', exact: true }).getByRole('button', { name: 'Right', exact: true }).focus();
   const colors = await panel.evaluate(el => {
     const style = getComputedStyle(el);
     const button = el.querySelector('button[aria-pressed="true"]')!;

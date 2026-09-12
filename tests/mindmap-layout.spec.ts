@@ -62,11 +62,11 @@ function assertGeometry(state: Awaited<ReturnType<typeof geometry>>, before: Awa
 for (const size of [7, 50]) test(`@02-05-01 ${size} topics retain anchor collapse and selection in all directions`, async ({ page }) => {
   const ids = await seedLayout(page, size);
   const initial = await geometry(page);
-  await expect(page.getByRole('button', { name: 'Left', exact: true })).toBeVisible({ timeout: 2000 });
+  await expect(page.getByRole('group', { name: 'Mind-map layout', exact: true }).getByRole('button', { name: 'Left', exact: true })).toBeVisible({ timeout: 2000 });
   await page.getByRole('button', { name: 'Collapse branch', exact: true }).click();
   for (const direction of ['Left', 'Balanced', 'Right']) {
-    await page.getByRole('button', { name: direction, exact: true }).click();
-    await expect(page.getByRole('button', { name: direction, exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('group', { name: 'Mind-map layout', exact: true }).getByRole('button', { name: direction, exact: true }).click();
+    await expect(page.getByRole('group', { name: 'Mind-map layout', exact: true }).getByRole('button', { name: direction, exact: true })).toHaveAttribute('aria-pressed', 'true');
     const next = await geometry(page);
     assertGeometry(next, initial);
     expect(next.nodes.find(n => n.id === ids.a)?.collapsed).toBe(true);
@@ -93,12 +93,14 @@ test('@02-05-01 multiline edit add delete and history use measured native geomet
   const initial = await geometry(page);
   await page.getByRole('button', { name: 'Add child', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
-  await page.keyboard.insertText('Measured long topic '.repeat(10));
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('Measured long topic '.repeat(10));
   await page.keyboard.press('Shift+Enter');
-  await page.keyboard.insertText('X'.repeat(120));
+  await page.keyboard.type('X'.repeat(120));
   await page.keyboard.press('Shift+Enter');
-  await page.keyboard.insertText('Third measured line');
+  await page.keyboard.type('Third measured line');
   await page.keyboard.press('Enter');
+  await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
   const grown = await geometry(page);
   assertGeometry(grown, initial);
   expect(grown.nodes).toHaveLength(8);
@@ -110,7 +112,7 @@ test('@02-05-01 multiline edit add delete and history use measured native geomet
     (el as HTMLElement & { gfx: GfxController }).gfx.selection.set({ elements: [id], editing: false });
   }, ids.a);
   const before = await geometry(page);
-  await page.getByRole('button', { name: 'Left', exact: true }).click();
+  await page.getByRole('group', { name: 'Mind-map layout', exact: true }).getByRole('button', { name: 'Left', exact: true }).click();
   const left = await geometry(page);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect.poll(async () => (await geometry(page)).nodes).toEqual(before.nodes);
@@ -138,4 +140,25 @@ test('@02-05-01 partial native failure restores geometry and retry retains ident
   await page.getByRole('button', { name: 'Arrange mind map', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
   expect((await geometry(page)).nodes).toEqual(before.nodes);
+});
+
+test('@02-05-01 upstream Layout toolbar preserves collapsed records and one-action history', async ({ page }) => {
+  const ids = await seedLayout(page);
+  await page.getByRole('button', { name: 'Collapse branch', exact: true }).click();
+  await page.locator('affine-edgeless-root').evaluate((el, id) => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    gfx.selection.set({ elements: [id], editing: false }); gfx.doc.captureSync();
+  }, ids.map);
+  const before = await geometry(page);
+  await page.getByRole('button', { name: 'Layout', exact: true }).click();
+  await page.locator('editor-icon-button[aria-label="Left"]').click();
+  const left = await geometry(page);
+  expect(left.layout).toBe(1);
+  expect(left.nodes.find(n => n.id === ids.a)?.collapsed).toBe(true);
+  expect(left.nodes.filter(n => n.parent === ids.a).every(n => n.hidden)).toBe(true);
+  assertGeometry(left, before);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(async () => (await geometry(page)).nodes).toEqual(before.nodes);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect.poll(async () => (await geometry(page)).nodes).toEqual(left.nodes);
 });
