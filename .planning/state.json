@@ -70,9 +70,9 @@
     }
   ],
   "next": {
-    "command": "/gsd:progress --next",
-    "label": "Advance to the next step (plan phase 2)",
-    "reason": "Phase 2 of 13 — needs a plan"
+    "command": "/gsd-execute-phase 2",
+    "label": "Execute Phase 2 \u2014 Daily Mind Maps",
+    "reason": "6 checked plans ready; implementation has not started"
   },
-  "updated_at": "2026-09-12T20:48:46.369Z"
+  "updated_at": "2026-09-12T21:37:12.584Z"
 }
