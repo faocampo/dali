@@ -31,7 +31,9 @@ test('@02-03-01 child sibling root Enter and context controls create one intende
   await page.keyboard.press('Enter');
   await expect.poll(async () => (await nodes(page)).length).toBe(2);
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
-  await page.keyboard.insertText('First child'); await page.keyboard.press('Enter');
+  // Actual key events model ordinary typing. Firefox insertText synthesizes
+  // composition, whose terminating Enter intentionally stays in text mode.
+  await page.keyboard.type('First child'); await page.keyboard.press('Enter');
   await page.keyboard.press('Enter');
   await expect.poll(async () => (await nodes(page)).length).toBe(3);
   await page.keyboard.press('Enter');
@@ -106,3 +108,20 @@ for (const guard of ['readonly', 'locked', 'multiple', 'detached'] as const) {
     expect(unchanged).toBe(true);
   });
 }
+
+test('@02-03-01 Shift+Enter retains multiline text and reload installs one handler', async ({ page }) => {
+  await seed(page); await page.keyboard.insertText('First line');
+  await page.keyboard.press('Shift+Enter'); await page.keyboard.insertText('Second line');
+  await page.keyboard.press('Escape');
+  expect((await nodes(page))[0]!.text).toBe('First line\nSecond line');
+  await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Add mind map', exact: true })).toBeVisible();
+  await page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;
+    gfx.selection.set({ elements: [map.tree.id], editing: false });
+  });
+  await page.keyboard.press('Tab');
+  await expect.poll(async () => (await nodes(page)).length).toBe(2);
+});
