@@ -8,6 +8,7 @@ import { mountEdgelessEditor, type EdgelessEditorHandle } from './blocksuite-edi
 import { getCanvasRuntime } from './runtime';
 import { insertSticky } from './sticky';
 import { insertText } from './text';
+import { insertMindmap } from './mindmap';
 import { widenResizeHandles } from './resize-affordance';
 import { EdgelessToolbarDragHandle } from './EdgelessToolbarDragHandle';
 import { SelectionInspector } from './SelectionInspector';
@@ -250,6 +251,13 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
         />
       </ControlButton>
 
+      <ControlButton label="Add mind map" disabled={store.readonly || !host.isConnected} onClick={() => {
+        try { insertMindmap(host); setActionError(null); }
+        catch (cause) { setActionError((cause as Error).message); }
+      }}>
+        <path d="M3 9h6v6H3zM16 3h5v5h-5zM16 16h5v5h-5zM9 12h4V5.5h3M13 12v6.5h3" stroke="currentColor" strokeWidth="1.6" />
+      </ControlButton>
+
       <ControlButton label="Layers" onClick={onOpenLayers}>
         <path d="m12 4 8 4-8 4-8-4 8-4Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
         <path d="m4 12 8 4 8-4M4 16l8 4 8-4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
@@ -386,8 +394,9 @@ function ControlButton({
       style={{
         display: 'grid',
         placeContent: 'center',
-        width: '2rem',
-        height: '2rem',
+        width: label === 'Add mind map' ? '44px' : '2rem',
+        height: label === 'Add mind map' ? '44px' : '2rem',
+        flexShrink: 0,
         borderRadius: '8px',
         border: 'none',
         background: 'transparent',

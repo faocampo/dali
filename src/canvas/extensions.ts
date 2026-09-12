@@ -43,6 +43,8 @@ import { ConnectorStoreExtension } from '@blocksuite/affine/gfx/connector/store'
 import { ConnectorViewExtension } from '@blocksuite/affine/gfx/connector/view';
 import { GroupStoreExtension } from '@blocksuite/affine/gfx/group/store';
 import { GroupViewExtension } from '@blocksuite/affine/gfx/group/view';
+import { MindmapStoreExtension } from '@blocksuite/affine/gfx/mindmap/store';
+import { MindmapViewExtension } from '@blocksuite/affine/gfx/mindmap/view';
 import { TextStoreExtension } from '@blocksuite/affine/gfx/text/store';
 import { TextViewExtension } from '@blocksuite/affine/gfx/text/view';
 import { NoteViewExtension as GfxNoteViewExtension } from '@blocksuite/affine/gfx/note/view';
@@ -101,6 +103,7 @@ export const storeExtensions = [
   BrushStoreExtension,
   ConnectorStoreExtension,
   GroupStoreExtension,
+  MindmapStoreExtension,
   TextStoreExtension,
   InlinePresetStoreExtension,
   InlineLatexStoreExtension,
@@ -127,6 +130,7 @@ export const viewExtensions = [
   BrushViewExtension,
   ConnectorViewExtension,
   GroupViewExtension,
+  MindmapViewExtension,
   TextViewExtension,
   GfxNoteViewExtension,
   InlinePresetViewExtension,
