@@ -10,7 +10,11 @@ updated: 2026-09-12
 
 ## Current Test
 
-Image import and clipboard acceptance are complete. Sticky-note shadows are fixed and regression-tested; phase verification refresh remains.
+number: 4
+name: Sticky-note shadow fix
+expected: |
+  Select a sticky note, open its style menu, and choose different Shadow presets. The shadow changes visibly on the canvas; No shadow removes it. Reloading preserves the selected shadow.
+awaiting: user response
 
 ## Tests
 
@@ -29,12 +33,17 @@ expected: Resolve the author-metadata concern under the user-approved privacy bo
 result: [pass]
 evidence: Approved 15-commit anonymization verified; user clarified that remaining personal authorship is permitted. See 01-HISTORY-REMEDIATION.md.
 
+### 4. Sticky-note shadow fix
+expected: Shadow presets visibly change the sticky note on the canvas, No shadow removes the effect, and the selected style survives reloading.
+result: [pending]
+evidence: Automated regression checks passed in development Chromium and production Chromium, Firefox, and WebKit. Awaiting user confirmation of the reported visual issue.
+
 ## Summary
 
-total: 3
+total: 4
 passed: 3
 issues: 0
-pending: 0
+pending: 1
 skipped: 0
 blocked: 0
 
