@@ -239,3 +239,26 @@ test('clipboard keeps rich text paste and imports a bitmap once',async({page,con
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
   expect((await images(page))[0]!.bytes).toBeGreaterThan(0);
 });
+
+test('restores a reduced image to source resolution without changing bytes or center', async ({page}) => {
+  await page.goto('/');
+  const file = await raster(page, 'image/png', 1040, 640);
+  await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles(file);
+  await expect(page.locator('affine-edgeless-image img')).toBeVisible();
+  await page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & {gfx:GfxController}).gfx;
+    const model = gfx.doc.getBlocksByFlavour('affine:image')[0]!.model;
+    gfx.doc.updateBlock(model, {xywh: '[10,20,80,49.2307692308]', width:80, height:49.2307692308});
+  });
+  const before = (await images(page))[0]!;
+  await page.getByRole('button', {name:'Restore original size',exact:true}).click();
+  await expect.poll(async () => (await images(page))[0]!.bounds[2]).toBe(1040);
+  const after = (await images(page))[0]!;
+  expect(after.bounds[3]).toBe(640);
+  expect(after.bounds[0]! + 520).toBeCloseTo(before.bounds[0]! + 40, 4);
+  expect(after.bounds[1]! + 320).toBeCloseTo(before.bounds[1]! + before.bounds[3]! / 2, 4);
+  expect(after.hash).toBe(before.hash);
+  expect(after.hash).toBe(createHash('sha256').update(file.buffer).digest('hex'));
+  await page.getByRole('button', {name:'Undo',exact:true}).click();
+  await expect.poll(async () => (await images(page))[0]!.bounds).toEqual(before.bounds);
+});

@@ -184,6 +184,30 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     }
   };
 
+  const restoreOriginalSize = () => {
+    if (selection?.kind !== 'image' || editingImage) return;
+    try {
+      const block = host.view.getBlock(selection.key);
+      const image = block?.querySelector<HTMLImageElement>('img.drag-target');
+      if (!image?.naturalWidth || !image.naturalHeight) {
+        throw new Error('Wait for the image to load, then try again.');
+      }
+      const model = host.std.store.getBlock(selection.key)?.model as ImageBlockModel | undefined;
+      if (!model) return;
+      const bound = Bound.deserialize(model.xywh);
+      updateImageGeometry(host.std.store, selection.key, {
+        x: bound.x + (bound.w - image.naturalWidth) / 2,
+        y: bound.y + (bound.h - image.naturalHeight) / 2,
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      });
+      setImageRevision(value => value + 1);
+      setActionError(null);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : String(cause));
+    }
+  };
+
   const open = !!selection && closedForSelection !== selection.key;
 
   useEffect(() => {
@@ -348,6 +372,9 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
                 Lock aspect ratio
               </label>
                 <button type="button" className="djai-ghost" disabled={editingImage} onClick={applyGeometry}>Apply position &amp; size</button>
+              <button type="button" className="djai-ghost" disabled={editingImage}
+                onClick={restoreOriginalSize}>Restore original size</button>
+              <p className="djai-muted">Use original pixel dimensions at 100% canvas zoom.</p>
             </section>
 
             <section className="image-adjustment-control">
