@@ -81,6 +81,7 @@ export default function BlockSuiteCanvas() {
 
   return (
     <div ref={ref} style={{ position: 'absolute', inset: 0 }}>
+      {!host && <p role="status" className="mindmap-opening">Opening board…</p>}
       {host && <BoardControls host={host} onOpenLayers={() => setLayersOpen(true)} />}
       {host && <FrameBorderOverlay host={host} />}
       {host && <MindMapInspector host={host} />}

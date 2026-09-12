@@ -43,9 +43,20 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 }
 
 test('@02-05-03 empty loading populated partial and long-text states retain usable guidance', async ({ page }) => {
+  await page.addInitScript(() => {
+    const evidence = { opening: false, mutationAvailable: false };
+    Object.assign(window, { mindmapLoadingEvidence: evidence });
+    new MutationObserver(() => {
+      if ([...document.querySelectorAll('[role="status"]')].some(el => el.textContent === 'Opening board…')) {
+        evidence.opening = true;
+        evidence.mutationAvailable ||= [...document.querySelectorAll('button')].some(el => el.getAttribute('aria-label') === 'Add mind map' && !el.disabled);
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
   await page.goto('/');
   await expect(page.getByText('Start a mind map', { exact: true })).toBeVisible({ timeout: 2000 });
   await expect(page.getByText('Add a mind map, then name the central topic. Select a topic and press Tab to add a child or Enter to add a sibling.', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { mindmapLoadingEvidence: unknown }).mindmapLoadingEvidence)).toEqual({ opening: true, mutationAvailable: false });
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
   await page.keyboard.press('Backspace'); await page.keyboard.press('Enter');

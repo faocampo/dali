@@ -1,36 +1,67 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
-import { addMindmapChild, addMindmapSibling, arrangeMindmap, formatMindmapTopic, setMindmapStyle, setMindmapLayout, installMindmapHierarchy, MINDMAP_EDIT_ERROR, MINDMAP_LAYOUT_ERROR, selectedMindmapTopic, toggleMindmapBranch } from './mindmap';
+import { addMindmapChild, addMindmapSibling, arrangeMindmap, formatMindmapTopic, readMindmapState, setMindmapStyle, setMindmapLayout, installMindmapHierarchy, MINDMAP_EDIT_ERROR, MINDMAP_LAYOUT_ERROR, selectedMindmapTopic, toggleMindmapBranch } from './mindmap';
 
 export function MindMapInspector({ host }: { host: EditorHost }) {
   const [, update] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const panel = useRef<HTMLElement>(null);
   useEffect(() => installMindmapHierarchy(host, () => setError(MINDMAP_EDIT_ERROR), message => {
     setAnnouncement(message); update(value => value + 1);
   }), [host]);
   useEffect(() => {
     const sync = () => update(value => value + 1);
-    const selection = host.std.get(GfxControllerIdentifier).selection.slots.updated.subscribe(sync);
+    const gfx = host.std.get(GfxControllerIdentifier);
+    const selection = gfx.selection.slots.updated.subscribe(() => { setDismissed(null); sync(); });
     const history = host.store.history.onUpdated.subscribe(sync);
-    return () => { selection.unsubscribe(); history.unsubscribe(); };
+    const readonlyChanged = host.store.readonly$.subscribe(sync);
+    const changed = gfx.surface?.elementUpdated.subscribe(sync);
+    const added = gfx.surface?.elementAdded.subscribe(sync);
+    const removed = gfx.surface?.elementRemoved.subscribe(sync);
+    return () => { selection.unsubscribe(); history.unsubscribe(); readonlyChanged(); changed?.unsubscribe(); added?.unsubscribe(); removed?.unsubscribe(); };
   }, [host]);
   const topic = selectedMindmapTopic(host);
+  const editing = topic?.gfx.selection.editing ?? false;
+  useLayoutEffect(() => {
+    if (!editing || !topic || !panel.current) return;
+    const bound = topic.gfx.viewport.toViewBound(topic.shape.elementBound);
+    const hostRect = host.getBoundingClientRect();
+    const controls = panel.current.getBoundingClientRect();
+    // Keep the native text editor clear of chrome at its existing canvas zoom.
+    const bottom = bound.maxY + hostRect.top;
+    if (bottom > controls.top - 8) {
+      topic.gfx.viewport.setCenter(topic.gfx.viewport.center.x,
+        topic.gfx.viewport.center.y + (bottom - controls.top + 16) / topic.gfx.viewport.zoom);
+    }
+  }, [editing, topic?.shape.id, topic?.shape.xywh]);
+  const empty = host.std.get(GfxControllerIdentifier).surface?.elementModels.length === 0;
+  if (!topic && empty) return <aside className="mindmap-empty" aria-label="Mind-map guidance">
+    <h2>Start a mind map</h2>
+    <p>Add a mind map, then name the central topic. Select a topic and press Tab to add a child or Enter to add a sibling.</p>
+  </aside>;
   if (!topic || topic.shape.hidden) return null;
+  if (dismissed === topic.shape.id) return null;
   const parent = topic.map.children.get(topic.shape.id)?.parent;
   const count = [...topic.map.children.values()].filter(detail => detail.parent === topic.shape.id).length;
   const collapsed = topic.map.children.get(topic.shape.id)?.collapsed ?? false;
   const disabled = host.store.readonly || topic.map.isLocked() || topic.shape.isLocked() || topic.gfx.selection.editing;
+  let level = 0;
+  try { level = readMindmapState(topic.map).depth.get(topic.shape.id) ?? 0; } catch { /* Commands expose the actionable malformed-state error. */ }
+  const parentText = parent ? topic.map.getNode(parent)?.element : undefined;
+  const parentLabel = parentText && 'text' in parentText ? String(parentText.text ?? '') || 'Empty topic' : 'Central topic';
   const run = (action: (host: EditorHost) => unknown, message = MINDMAP_EDIT_ERROR) => {
     try { action(host); setError(null); update(value => value + 1); } catch { setError(message); }
   };
-  return <section aria-label="Mind-map topic" onPointerDown={event => event.stopPropagation()}
-    style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 12,
-      maxWidth: 'calc(100vw - 96px)', maxHeight: '40vh', overflow: 'auto', padding: 8, borderRadius: 8,
-      background: 'var(--board-surface)', color: 'var(--board-ink)', boxShadow: 'var(--board-shadow)', fontSize: 12 }}>
+  return <section ref={panel} className="mindmap-panel" data-editing={editing} aria-label="Mind-map topic" onPointerDown={event => event.stopPropagation()}>
+    <header><h2>Mind map</h2><button aria-label="Close mind-map controls" onClick={() => {
+      setDismissed(topic.shape.id); host.tabIndex = -1; host.focus({ preventScroll: true });
+    }}>Close</button></header>
     <div role="status">Topic: {topic.shape.text?.toString() || 'Empty topic'}</div>
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div role="status" className="mindmap-context">Level {level}. {parent ? `Parent: ${parentLabel}.` : 'Central topic.'}</div>
+    <div className="mindmap-actions">
       <button style={{ minHeight: 44 }} disabled={disabled} onClick={() => run(addMindmapChild)}>Add child</button>
       <button style={{ minHeight: 44 }} disabled={disabled || !parent} aria-describedby={!parent ? 'mindmap-root-hint' : undefined}
         onClick={() => run(addMindmapSibling)}>Add sibling</button>
@@ -38,7 +69,7 @@ export function MindMapInspector({ host }: { host: EditorHost }) {
         aria-label={collapsed ? `Expand branch: ${count} direct ${count === 1 ? 'branch' : 'branches'} hidden` : 'Collapse branch'}
         onClick={() => run(toggleMindmapBranch)}>{collapsed ? `Expand branch (${count})` : 'Collapse branch'}</button>}
     </div>
-    <div role="group" aria-label="Mind-map layout">
+    <div className="mindmap-actions" role="group" aria-label="Mind-map layout">
       {(['Right', 'Left', 'Balanced'] as const).map((label, value) => <button key={label}
         disabled={disabled} aria-pressed={topic.map.layoutType === value}
         onClick={() => run(host => setMindmapLayout(host, value), MINDMAP_LAYOUT_ERROR)}>{label}</button>)}
@@ -55,7 +86,7 @@ export function MindMapInspector({ host }: { host: EditorHost }) {
       <label>Text color <input type="color" value={typeof topic.shape.color === 'string' && /^#[0-9a-f]{6}$/i.test(topic.shape.color) ? topic.shape.color : '#000000'}
         onChange={event => run(host => formatMindmapTopic(host, { color: event.target.value }))} /></label>
     </fieldset>
-    <div role="group" aria-label="Mind-map style">
+    <div className="mindmap-actions" role="group" aria-label="Mind-map style">
       {[1, 2, 3, 4].map(style => <button key={style} disabled={disabled} aria-pressed={topic.map.style === style}
         onClick={() => run(host => setMindmapStyle(host, style))}>Style {style}</button>)}
     </div>
