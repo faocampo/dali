@@ -1,6 +1,7 @@
 import { replaceIdMiddleware } from '@blocksuite/affine/shared/adapters';
 import type { Store } from '@blocksuite/affine/store';
 import { getCanvasRuntime, initializeBlankBoard } from '../canvas/runtime';
+import { validateMindmapDocument } from '../canvas/mindmap-compatibility';
 import { forgetPersistedDoc, updateWorkspaceDocMeta } from '../canvas/workspace';
 import { requestBoardOpen, setActiveBoardId } from './preferences';
 import {
@@ -156,6 +157,7 @@ export async function duplicateLocalBoard(id: string): Promise<string> {
   const source = sourceDoc.getStore();
   const catalog = reconcileBoardCatalog(workspace.meta.docMetas);
   source.load();
+  validateMindmapDocument(source);
   const transformer = source.getTransformer([replaceIdMiddleware(workspace.idGenerator)]);
   const snapshot = transformer.docToSnapshot(source);
   if (!snapshot) throw new Error('The board could not be copied.');

@@ -97,6 +97,17 @@ for (const route of ['duplicate', 'clipboard'] as const) test(`@02-02-01 ${route
   const beforeReload = await state(page);
   await page.reload();
   await expect.poll(() => state(page)).toEqual(beforeReload);
+  if (route === 'duplicate') {
+    await page.locator('affine-edgeless-root').evaluate((el, id) => {
+      const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+      gfx.selection.set({ elements: [id], editing: false });
+    }, ids.map);
+    await page.keyboard.press('ControlOrMeta+d');
+    await expect.poll(async () => (await state(page)).maps.length).toBe(3);
+    const maps = (await state(page)).maps;
+    expect(new Set(maps.flatMap(m => m.nodes.map(n => n.id))).size).toBe(21);
+    expect(maps.find(m => m.id === ids.map)).toEqual(source);
+  }
 });
 
 test('@02-02-01 board copy retains document-local IDs and independent typography', async ({ page }) => {
@@ -117,6 +128,10 @@ test('@02-02-01 board copy retains document-local IDs and independent typography
   });
   await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
   const changed = await state(page);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(async () => (await state(page)).maps[0]!.nodes.find(n => !n.parent)!.fontSize).toBe(29);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect.poll(() => state(page)).toEqual(changed);
   await page.reload(); await expect.poll(() => state(page)).toEqual(changed);
   await page.getByRole('button', { name: 'Untitled board copy', exact: true }).click();
   await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
@@ -150,7 +165,7 @@ for (const defect of ['orphan', 'cycle', 'duplicate', 'nonfinite'] as const) tes
     const host = el.closest('editor-host') as EditorHost;
     const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;
     const snapshot = [...map.children.keys()].map(id => gfx.surface!.getElementById(id)!.serialize());
-    const data = map.serialize();
+    const data = structuredClone(map.serialize());
     const child = map.tree.children[0]!.id;
     if (defect === 'orphan') data.children[child]!.parent = 'missing-synthetic-parent';
     if (defect === 'cycle') data.children[map.tree.id]!.parent = child;
@@ -176,4 +191,24 @@ test('@02-02-01 native topic copy produces an independent shape and ordinary dup
   await page.keyboard.press('ControlOrMeta+d');
   await expect.poll(async () => (await state(page)).elements.length).toBe(before.elements.length + 2);
   expect((await state(page)).maps).toEqual(before.maps);
+});
+
+test('@02-02-01 source lock immediately before native conversion prevents mutation', async ({ page }) => {
+  await seed(page);
+  const before = await state(page);
+  await page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    const host = el.closest('editor-host') as EditorHost;
+    const nativeExec = host.std.command.exec;
+    host.std.command.exec = ((...args: Parameters<typeof nativeExec>) => {
+      if (args[1] && 'elementsRawData' in args[1]) {
+        const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;
+        map.tree.children[0]!.element.lock();
+      }
+      return nativeExec(...args);
+    }) as typeof nativeExec;
+  });
+  await page.keyboard.press('ControlOrMeta+d');
+  await page.waitForTimeout(100);
+  expect(await state(page)).toEqual(before);
 });

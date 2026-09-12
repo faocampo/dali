@@ -12,6 +12,7 @@ import {
 import { Bound } from '@blocksuite/global/gfx';
 import { canvasModelKind, type CanvasItemKind } from './selection-summary';
 import { reconcileImageVisualEdits } from './image-visual-edits';
+import { nativeCopySourcesValid, withNativeCopySources } from './mindmap-compatibility';
 
 export type LayerEntry = {
   id: string;
@@ -35,12 +36,15 @@ export function canvasSelectionEditable(host: EditorHost): boolean {
 
 const duplicates = new WeakMap<EditorHost, Promise<void>>();
 export function duplicateCanvasSelection(host: EditorHost): Promise<void> {
+  if (!canvasSelectionEditable(host)) return Promise.resolve();
+  const source = [...host.std.get(GfxControllerIdentifier).selection.selectedElements];
+  const store = host.store;
   const operation = (duplicates.get(host) ?? Promise.resolve()).then(async () => {
-    if (!canvasSelectionEditable(host)) return;
+    if (!nativeCopySourcesValid(host, source, store)) return;
     const root = host.std.view.getBlock(host.std.store.root!.id);
     if (!root) return;
     host.std.store.captureSync();
-    await duplicate(root, [...host.std.get(GfxControllerIdentifier).selection.selectedElements]);
+    await withNativeCopySources(host, source, () => duplicate(root, source));
     reconcileImageVisualEdits(host.std.store);
     host.std.store.captureSync();
   });
