@@ -178,3 +178,23 @@ for(const selection of ['single','subtree','map','mixed'] as const) test(`@02-06
   await page.getByRole('checkbox',{name:'Transparent background'}).check();
   const decoded=await pixels(page,await download(page));expect(decoded.all.opaque).toBeGreaterThan(20);expect(decoded.all.magenta).toBe(0);
 });
+
+test('@02-06-03 collapsed export hint reflects selected scope and settings decode faithfully',async({page})=>{
+  const ids=await seed(page);
+  await preview(page,'selection');
+  await expect(page.getByText('Only visible topics are exported. Expand branches to include their hidden topics.',{exact:true})).toBeVisible();
+  await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+  await page.locator('affine-edgeless-root').evaluate((el,id)=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;gfx.selection.set({elements:[id],editing:false});
+  },ids.sibling);
+  for(const scale of [1,2,4])for(const transparent of [false,true]){
+    await preview(page,'selection');
+    await expect(page.getByText('Only visible topics are exported. Expand branches to include their hidden topics.',{exact:true})).toHaveCount(0);
+    await page.getByLabel('Selection padding').fill('16');
+    await page.getByRole('radio',{name:`${scale}×`,exact:true}).check();await page.getByRole('checkbox',{name:'Transparent background'}).setChecked(transparent);
+    const expected=(await page.getByTestId('export-dimensions').textContent())!;
+    const png=await download(page);const decoded=await pixels(page,png);expect(expected).toContain(`${decoded.width} × ${decoded.height}`);
+    const corner=await page.evaluate(async base64=>{const i=new Image();i.src=`data:image/png;base64,${base64}`;await i.decode();const c=document.createElement('canvas');c.width=i.width;c.height=i.height;const ctx=c.getContext('2d')!;ctx.drawImage(i,0,0);return [...ctx.getImageData(0,0,1,1).data];},png.toString('base64'));
+    expect(corner).toEqual(transparent?[0,0,0,0]:[255,255,255,255]);
+  }
+});
