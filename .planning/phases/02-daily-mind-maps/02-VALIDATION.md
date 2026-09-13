@@ -117,19 +117,29 @@ Source discovery is complete for the installed native contracts; their runtime h
 
 ## Spec-less Edge Probe Ledger
 
-The deterministic probe supplied six entries. Four have explicit planned predicates copied into plan must_haves.truths; two remain flagged unresolved classification assumptions. Planning coverage is distinct from executed verification. No item was dismissed or silently resolved.
+The deterministic probe supplied six entries. Four have explicit planned predicates copied into plan must_haves.truths; two required a phase-review classification decision. Planning coverage is distinct from executed verification. No item was dismissed or silently resolved.
 
 | Requirement / category | Probe outcome in plan | Explicit predicate / owner |
 |---|---|---|
 | MIND-01 / idempotency | resolved; verification explicit; automated evidence passed | One gesture yields one topic; held keys/listener remount create no extras; two deliberate invocations create independent maps. 02-01/02 truths and 02-03-01. |
 | MIND-01 / concurrency | resolved; verification explicit; automated evidence passed | Local interrupted/stale/readonly/locked commands make zero writes; serialized deliberate commands stay distinct. 02-03 truths and 02-01-02, 02-02-01, 02-03-01. Multi-user MIND-05 stays Phase 5. |
-| MIND-02 / unclassified | unresolved; flagged | Original marker: unclassified — review manually. Retained in 02-03 must_haves.flagged_assumptions; useful nested-content/history tests are independently explicit. |
-| MIND-03 / unclassified | unresolved; flagged | Original marker: unclassified — review manually. Retained in 02-05 must_haves.flagged_assumptions; useful geometry/root/lifecycle tests are independently explicit. |
+| MIND-02 / unclassified | manually classified: state preservation and reversibility; COVERED | Reviewed requirement semantics: collapse may change visibility and layout but must retain descendant identity, parent/order, text, style and nested collapse flags. Exact snapshot, repeated toggle, failure rollback, Undo/Redo, copy and reload assertions cover this predicate in collapse/compatibility/copy suites. |
+| MIND-03 / unclassified | manually classified: geometry and lifecycle; COVERED | Reviewed requirement semantics: add/delete/edit/collapse/direction changes produce finite measured layout, retained parent edges and stable root; stale callbacks cannot mutate a disposed map. The 7/50-topic layout, fault/retry, native toolbar and compatibility lifecycle tests exercise these predicates. |
 | MIND-04 / empty | resolved; verification explicit; automated evidence passed | No selection disables formatting; empty text and one-root/many-topic maps remain valid. 02-05 truths and 02-05-02. |
 | MIND-04 / encoding | resolved; verification explicit; automated evidence passed | Exact native text sequence preserved for emoji, combining marks, CJK/RTL; fitting uses measured geometry, no forced normalization. 02-05 truths and 02-05-02. |
 
-Count reconciliation: 6 supplied = 4 explicit planned predicates + 2 flagged unresolved assumptions. The unclassified entries remain a phase-review responsibility; explicit tests must not be reported as closing the classifier's unknowns automatically.
+Count reconciliation: 6 supplied = 4 explicit planning predicates + 2 explicit phase-review classifications above. Original unclassified markers remain in the immutable plans for provenance. Classification uses approved requirement semantics and reviewed test assertions; it adds no new capability or waiver.
 
 ## Prohibition Recall
 
 Recall examined unintended duplication/flattening, lost hidden content, overwritten formatting, altered text encoding, trapped focus, unbounded traversal, stale mutation, misleading export scope, hidden/sibling pixel inclusion and non-generic evidence. Routine correctness belongs to the explicit task oracles. Injection/export privacy are security canon and route to the plan threat models and GSD security verification. Public evidence privacy is already an explicit repository constraint. The precision pass yields zero additional bespoke values prohibitions; no fabricated prohibition check descriptors or extra product restrictions are introduced.
+
+## Final Nyquist audit — 2026-09-13
+
+Inline orchestrator audit matched all twelve task tags and all four requirement IDs to implemented behavioral tests. COVERED: MIND-01, MIND-02, MIND-03, MIND-04. No missing automated target found. Final aggregate: 604/604 browser cases across dev, production Chromium, Firefox and WebKit; 67/67 unit cases; typecheck/build passed. Prior-phase export regressions separately passed 23 unit and 18 browser cases. See 02-06-SUMMARY.md for execution evidence and test-harness adaptations.
+
+Native Firefox/WebKit OS clipboard use remains manual: copy a map with nested collapsed branches, paste, edit the copy and confirm source independence. Chromium uses the real clipboard in automation; other engines use the native serialized payload route. Real browser 200% magnification and native OS IME remain manual as listed above. Nyquist compliance describes automated coverage; final human acceptance remains pending.
+
+Post-review correction `a5c6f8d`: 68/68 copy cases across four projects passed after three new malformed-paste regressions failed before the fix. The correction uses canonical hierarchy validation before conversion; all 67 unit cases, typecheck and build passed again. The prior 604-case aggregate is retained with its original revision scope.
+
+Post-review UI correction `a05b94d`: 36/36 accessibility cases across four projects and 25/25 production canvas/image/keyboard regressions passed. Typecheck and production build passed. Synthetic desktop and narrow renders confirm topic/panel clearance, a single inspector and separate action controls. See 02-UI-REVIEW.md for the 22/24 audit and advisory copy/color observations.
