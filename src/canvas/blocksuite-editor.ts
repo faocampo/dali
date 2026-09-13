@@ -15,6 +15,7 @@ import {
 import { ViewExtensionManager } from '@blocksuite/affine/ext-loader';
 import { BlockStdScope } from '@blocksuite/affine/std';
 import type { EditorHost } from '@blocksuite/affine/std';
+import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { signal } from '@preact/signals-core';
 import { viewExtensions } from './extensions';
 import { getCanvasRuntime } from './runtime';
@@ -97,12 +98,33 @@ export async function mountEdgelessEditor(
   // drags and double-clicks continue to select, move and edit objects.
   await host.updateComplete;
 
+  // Pinned BlockSuite 0.22.4 caches the host rectangle on a one-second poll.
+  // Header/font/layout changes can move the host between polls, displacing
+  // drawing and hit testing. Refresh before its bubbling pointer controllers.
+  const pointer = (std.event as unknown as { _pointerControl?: { _updateRect?: () => void } })._pointerControl;
+  if (typeof pointer?._updateRect !== 'function') {
+    viewport.remove();
+    throw new Error('This editor version cannot synchronize canvas pointer coordinates.');
+  }
+  const gfxViewport = std.get(GfxControllerIdentifier).viewport;
+  const refreshPointerRect = () => {
+    pointer._updateRect!();
+    // Selection/resize paths convert client coordinates through the separate
+    // viewport origin. ResizeObserver does not observe position-only changes.
+    const rect = viewport.getBoundingClientRect();
+    if (gfxViewport.left !== rect.left || gfxViewport.top !== rect.top)
+      gfxViewport.setRect(rect.left, rect.top, rect.width, rect.height);
+  };
+  const pointerEvents = ['pointerdown','pointermove','pointerup','wheel'] as const;
+  pointerEvents.forEach(name => host.addEventListener(name, refreshPointerRect, true));
+
   let destroyed = false;
   return {
     host,
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
+      pointerEvents.forEach(name => host.removeEventListener(name, refreshPointerRect, true));
       viewport.removeEventListener('mousedown', preventMiddleMouseDefault, true);
       viewport.removeEventListener('auxclick', preventMiddleMouseDefault, true);
       // Removing the viewport disconnects <editor-host>, and
