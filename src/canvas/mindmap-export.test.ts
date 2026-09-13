@@ -21,4 +21,11 @@ describe('immutable visible export authorization', () => {
     expect(() => mindmapExportSnapshot('map', [...topics,{...topics[1]!,id:'orphan',parent:'missing'}])).toThrow('invalid');
     expect(() => mindmapExportSnapshot('map', [{...topics[0]!,bounds:[NaN,0,1,1]}])).toThrow('invalid');
   });
+  it('authorizes only selected visible endpoints with no implicit descendants', () => {
+    const one=mindmapExportSnapshot('map',topics,new Set(['branch','hidden']));
+    expect(one.topicIds).toEqual(['branch']);expect(one.edges).toEqual([]);
+    const pair=mindmapExportSnapshot('map',topics,new Set(['root','branch']));
+    expect(pair.topicIds).toEqual(['root','branch']);expect(pair.edges).toEqual([{source:'root',target:'branch'}]);
+    expect(mindmapExportSnapshot('map',topics,new Set(['sibling'])).collapsed).toBe(false);
+  });
 });

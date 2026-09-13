@@ -155,3 +155,26 @@ test('@02-06-02 selected parent and child include their native edge and exclude 
   expect(decoded.regions[0]!.opaque).toBeGreaterThan(20);
   expect(decoded.all.magenta).toBe(0);
 });
+
+for(const selection of ['single','subtree','map','mixed'] as const) test(`@02-06-02 ${selection} membership keeps exact visible identity order`,async({page})=>{
+  const ids=await seed(page);
+  const expected=await page.locator('affine-edgeless-root').evaluate((el,{ids,selection})=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;const map=gfx.surface!.getElementById(ids.map) as MindmapElementModel;
+    const visible=[...map.children.keys()].filter(id=>{let p=map.children.get(id)?.parent;while(p){if(map.children.get(p)?.collapsed)return false;p=map.children.get(p)?.parent;}return true;});
+    let selected=selection==='single'?[ids.branch]:selection==='subtree'?[ids.sibling,...map.getNode(ids.sibling)!.children.map(n=>n.id)]:[ids.map];
+    let authorized=selection==='map'||selection==='mixed'?visible:[...selected];
+    if(selection==='mixed'){
+      const shape=gfx.surface!.addElement({type:'shape',xywh:'[-400,0,80,40]',filled:true,fillColor:'#ff0000'});
+      const connector=gfx.surface!.addElement({type:'connector',source:{position:[-400,60]},target:{position:[-300,80]},stroke:'#ff0000',strokeWidth:2});
+      const group=gfx.surface!.addElement({type:'group',children:{[shape]:true},title:''});
+      selected=[...selected,group,connector];authorized=[...authorized,group,shape,connector];
+    }
+    gfx.selection.set({elements:selected,editing:false});
+    return gfx.layer.layers.flatMap<{id:string}>(layer=>layer.elements).filter(m=>authorized.includes(m.id)).map(m=>m.id);
+  },{ids,selection});
+  const dimensions=await preview(page,'selection');
+  expect(JSON.parse((await dimensions.getAttribute('data-export-ids'))!)).toEqual(expected);
+  expect(new Set(expected).size).toBe(expected.length);
+  await page.getByRole('checkbox',{name:'Transparent background'}).check();
+  const decoded=await pixels(page,await download(page));expect(decoded.all.opaque).toBeGreaterThan(20);expect(decoded.all.magenta).toBe(0);
+});

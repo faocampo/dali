@@ -129,7 +129,7 @@ function nativeEdges(map: MindmapElementModel, snapshot: MindmapExportSnapshot) 
 
 function visibleScope(host: EditorHost, scope: PresentationScope) {
   const resolved = resolveScope(host, scope);
-  const maps = resolved.models.filter((model): model is MindmapElementModel => model instanceof MindmapElementModel);
+  const maps = host.std.get(GfxControllerIdentifier).surface!.elementModels.filter((model): model is MindmapElementModel => model instanceof MindmapElementModel);
   const hidden = new Set<string>();
   const snapshots: MindmapExportSnapshot[] = [];
   const edgeBounds: Bound[] = [];
@@ -205,7 +205,8 @@ export function boardExportPlan(options: ExportOptions): ExportPlan {
     const { models, bound, snapshots, edgeBounds } = visibleScope(host, options.scope);
     // Native elementBound already includes rotated corners and connector labels.
     // Include stroke caps/arrowheads in addition to those native geometry bounds.
-    const visual = [...models.map(visualBound), ...edgeBounds];
+    const visual = [...models.filter(model => !isGfxGroupCompatibleModel(model) ||
+      !model.descendantElements.some(child => child instanceof MindmapElementModel)).map(visualBound), ...edgeBounds];
     const world = options.scope === 'board' || options.scope === 'selection'
       ? visual.slice(1).reduce((a, b) => a.unite(b), visual[0]!) : bound;
     const intermediates = models.filter(model => !isPrimitiveModel(model) && model.flavour !== 'affine:image').map(model => Bound.deserialize(model.xywh));
