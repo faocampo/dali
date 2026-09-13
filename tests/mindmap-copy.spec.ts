@@ -158,10 +158,12 @@ for (const invalidation of ['readonly', 'locked', 'removed', 'detached'] as cons
   expect(unchanged).toBe(true);
 });
 
-for (const defect of ['orphan', 'cycle', 'duplicate', 'nonfinite'] as const) test(`@02-02-01 malformed ${defect} clipboard hierarchy inserts nothing`, async ({ page, context, browserName, expectErrors },testInfo) => {
+for (const defect of ['orphan', 'cycle', 'duplicate', 'nonfinite', 'empty-order', 'duplicate-order', 'excessive-depth'] as const) test(`@02-02-01 malformed ${defect} clipboard hierarchy inserts nothing`, async ({ page, context, browserName, expectErrors },testInfo) => {
   await prepareClipboard(page,context,browserName,testInfo,expectErrors);
   await seed(page);
   const before = await state(page);
+  const documentBefore = await page.locator('affine-edgeless-root').evaluate(el =>
+    JSON.stringify((el as HTMLElement & { gfx: GfxController }).gfx.doc.spaceDoc.toJSON()));
   await page.locator('affine-edgeless-root').evaluate(async (el, defect) => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     const host = el.closest('editor-host') as EditorHost;
@@ -173,11 +175,25 @@ for (const defect of ['orphan', 'cycle', 'duplicate', 'nonfinite'] as const) tes
     if (defect === 'cycle') data.children[map.tree.id]!.parent = child;
     if (defect === 'duplicate') snapshot.push(structuredClone(snapshot[0]!));
     if (defect === 'nonfinite') Object.assign(snapshot[0]!, { xywh: '[0,0,1e400,50]' });
+    if (defect === 'empty-order') data.children[map.tree.id]!.index = '';
+    if (defect === 'duplicate-order') data.children[map.tree.children[1]!.id]!.index = data.children[child]!.index;
+    if (defect === 'excessive-depth') {
+      const template = structuredClone(snapshot[0]!);
+      snapshot.length = 0;
+      data.children = {};
+      for (let depth = 0; depth < 130; depth++) {
+        const id = `synthetic-depth-${depth}`;
+        snapshot.push({ ...structuredClone(template), id });
+        data.children[id] = { index: 'a0', ...(depth ? { parent: `synthetic-depth-${depth - 1}` } : {}) };
+      }
+    }
     await host.std.clipboard.writeToClipboard(async items => ({ ...items, 'blocksuite/surface': JSON.stringify({ snapshot: [...snapshot, data], blobs: {} }) }));
   }, defect);
   await pasteClipboard(page,browserName);
   await page.waitForTimeout(150);
   expect(await state(page)).toEqual(before);
+  expect(await page.locator('affine-edgeless-root').evaluate(el =>
+    JSON.stringify((el as HTMLElement & { gfx: GfxController }).gfx.doc.spaceDoc.toJSON()))).toBe(documentBefore);
 });
 
 test('@02-02-01 native topic copy produces an independent shape and ordinary duplicate remains available', async ({ page }) => {

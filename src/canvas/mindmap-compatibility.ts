@@ -7,6 +7,7 @@ import { GfxControllerIdentifier, isGfxGroupCompatibleModel, type GfxModel } fro
 import type { Store } from '@blocksuite/affine/store';
 import { createGroupCommand, createGroupFromSelectedCommand, ungroupCommand } from '@blocksuite/affine-gfx-group';
 import { canvasModelVisible, mindmapArrangementReason, mindmapOwner, nativeMindmapState } from './selection-summary';
+import { validateMindmapState } from './mindmap-state';
 
 const MAX_COPY_ELEMENTS = 10_000;
 const copySources = new WeakMap<EditorHost, () => boolean>();
@@ -31,25 +32,18 @@ export function validateMindmapCopyData(values: readonly unknown[]): void {
     const entries = Object.entries(record.children) as [string, { parent?: string; index: string; collapsed?: boolean }][];
     if (!entries.length || entries.length > MAX_COPY_ELEMENTS) throw new Error('The copied mind map has invalid topic count.');
     const details = new Map(entries);
-    let roots = 0;
     for (const [id, detail] of entries) {
       if (claimed.has(id) || byId.get(id)?.type !== 'shape' || !detail || typeof detail.index !== 'string' ||
           (detail.collapsed !== undefined && typeof detail.collapsed !== 'boolean') ||
           (detail.parent !== undefined && (typeof detail.parent !== 'string' || !details.has(detail.parent)))) throw new Error('The copied mind map has invalid topic details.');
       claimed.add(id);
-      if (detail.parent === undefined) roots++;
     }
-    if (roots !== 1) throw new Error('The copied mind map must contain one central topic.');
-    const complete = new Set<string>();
-    for (const [start] of entries) {
-      const path = new Set<string>();
-      let id: string | undefined = start;
-      while (id !== undefined && !complete.has(id)) {
-        if (path.has(id)) throw new Error('The copied mind map contains a cycle.');
-        path.add(id); id = details.get(id)!.parent;
-      }
-      path.forEach(id => complete.add(id));
-    }
+    // Authorize the same hierarchy that editing, visibility and export consume,
+    // before native conversion can persist any topic or recursively build a tree.
+    const state = validateMindmapState(entries.map(([id, detail]) => ({
+      ...detail, id, bounds: JSON.parse(byId.get(id)!.xywh as string) as number[],
+    })));
+    if ([...state.depth.values()].some(depth => depth > 128)) throw new Error('The copied mind map is too deeply nested.');
   }
 }
 
