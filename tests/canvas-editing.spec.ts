@@ -27,7 +27,16 @@ test('native drawing tools create editable shapes, frames, arrows and freehand',
   await page.keyboard.press('Space');
   await drag(page, 240, 180, 160, 100);
   await expect.poll(async () => (await models(page)).filter(m => m.type === 'shape').length).toBe(1);
-  await page.mouse.dblclick(320, 230);
+  const shapeCenter=await page.locator('affine-edgeless-root').evaluate(el=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    const shape=gfx.gfxElements.find(m=>'type' in m&&m.type==='shape')!;
+    const b=shape.elementBound;const [x,y]=gfx.viewport.toViewCoord(b.x+b.w/2,b.y+b.h/2);
+    const rect=el.getBoundingClientRect();return {x:x+rect.x,y:y+rect.y};
+  });
+  expect(shapeCenter.x).toBeCloseTo(320,0);
+  expect(shapeCenter.y).toBeCloseTo(230,0);
+  await page.mouse.dblclick(shapeCenter.x, shapeCenter.y);
+  await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(1);
   await page.keyboard.insertText('Synthetic shape');
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await models(page)).find(m => m.type === 'shape')?.text).toBe('Synthetic shape');
@@ -39,7 +48,7 @@ test('native drawing tools create editable shapes, frames, arrows and freehand',
   await drag(page, 450, 470, 170, -30);
   await expect.poll(async () => (await models(page)).map(m => m.type).sort()).toEqual(['affine:frame', 'brush', 'connector', 'shape']);
   await page.getByRole('button', { name: 'Select', exact: true }).click();
-  await page.mouse.click(320, 230);
+  await page.mouse.click(shapeCenter.x, shapeCenter.y);
   await expect(page.getByRole('button', { name: 'Switch shape type', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
   const before = await models(page);
