@@ -10,7 +10,7 @@ import {
   type AlignmentAction,
 } from './arrangement';
 
-export function ObjectContextMenu({host,selection}: {host:EditorHost;selection:CanvasSelectionSummary}) {
+export function ObjectContextMenu({host,selection,placement}: {host:EditorHost;selection:CanvasSelectionSummary;placement?:'top'}) {
   const [point,setPoint]=useState<{left:number;top:number}|null>(null);
   const [actionError,setActionError]=useState<string|null>(null);
   const [,setImageRevision]=useState(0);
@@ -41,7 +41,7 @@ export function ObjectContextMenu({host,selection}: {host:EditorHost;selection:C
     return()=>document.removeEventListener('pointerdown',outside,true);
   },[point]);
   return <>
-    <button ref={trigger} className="object-actions-trigger djai-ghost" aria-haspopup="menu" aria-expanded={!!point}
+    <button ref={trigger} className="object-actions-trigger djai-ghost" data-placement={placement} aria-haspopup="menu" aria-expanded={!!point}
       onPointerDown={e=>e.stopPropagation()} onClick={e=>{const r=e.currentTarget.getBoundingClientRect();if(point)setPoint(null);else openAt(r.left,r.bottom+8);}}>Object actions</button>
     {point&&createPortal(<div ref={ref} className="object-context-menu" data-testid="object-context-menu" role="menu" aria-label="Object actions" style={point}
       onPointerDown={e=>e.stopPropagation()} onKeyDown={e=>{

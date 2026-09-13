@@ -26,13 +26,17 @@ export function MindMapInspector({ host }: { host: EditorHost }) {
   const topic = selectedMindmapTopic(host);
   const editing = topic?.gfx.selection.editing ?? false;
   useLayoutEffect(() => {
-    if (!editing || !topic || !panel.current) return;
+    if (!topic || !panel.current) return;
     const bound = topic.gfx.viewport.toViewBound(topic.shape.elementBound);
     const hostRect = host.getBoundingClientRect();
     const controls = panel.current.getBoundingClientRect();
-    // Keep the native text editor clear of chrome at its existing canvas zoom.
+    // Keep both editing and committed selection clear when the panel expands.
+    // Pan only when the actual topic and panel rectangles intersect.
+    const left = bound.x + hostRect.left;
+    const top = bound.y + hostRect.top;
     const bottom = bound.maxY + hostRect.top;
-    if (bottom > controls.top - 8) {
+    if (bound.maxX + hostRect.left > controls.left - 8 && left < controls.right + 8 &&
+        bottom > controls.top - 8 && top < controls.bottom + 8) {
       topic.gfx.viewport.setCenter(topic.gfx.viewport.center.x,
         topic.gfx.viewport.center.y + (bottom - controls.top + 16) / topic.gfx.viewport.zoom);
     }

@@ -10,6 +10,48 @@ async function create(page: Page) {
   await page.keyboard.press('Enter');
 }
 
+async function expectTopicClear(page: Page) {
+  await expect.poll(() => page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    const topic = gfx.selection.selectedElements[0]!;
+    const bound = gfx.viewport.toViewBound(topic.elementBound);
+    const host = el.closest('editor-host')!.getBoundingClientRect();
+    const controls = document.querySelector('.mindmap-panel')!.getBoundingClientRect();
+    const left = bound.x + host.x, top = bound.y + host.y;
+    return left + bound.w + 8 <= controls.left || left >= controls.right + 8 ||
+      top + bound.h + 8 <= controls.top || top >= controls.bottom + 8;
+  })).toBe(true);
+}
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test(`@02-ui-review committed topic stays clear of one contextual inspector at ${viewport.width}px`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await create(page);
+    await expectTopicClear(page);
+    await page.getByRole('button', { name: 'Add child', exact: true }).click();
+    await page.keyboard.type('Synthetic review topic');
+    await page.keyboard.press('Enter');
+    const panel = page.getByRole('region', { name: 'Mind-map topic', exact: true });
+    await expect(panel).toBeVisible();
+    await expectTopicClear(page);
+    await expect(page.getByTestId('selection-inspector')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Object actions', exact: true })).toBeVisible();
+    const weight = page.getByRole('combobox', { name: 'Font weight', exact: true });
+    await weight.scrollIntoViewIfNeeded();
+    const weightBox = (await weight.boundingBox())!;
+    const actionsBox = (await page.getByRole('button', { name: 'Object actions', exact: true }).boundingBox())!;
+    expect(actionsBox.x + actionsBox.width <= weightBox.x || actionsBox.x >= weightBox.x + weightBox.width ||
+      actionsBox.y + actionsBox.height <= weightBox.y || actionsBox.y >= weightBox.y + weightBox.height).toBe(true);
+    await page.locator('affine-edgeless-root').evaluate(el => {
+      const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+      const id = gfx.surface!.addElement({ type: 'shape', xywh: '[10,10,100,80]' });
+      gfx.selection.set({ elements: [id], editing: false });
+    });
+    await expect(page.getByTestId('selection-inspector')).toBeVisible();
+    await expect(panel).toHaveCount(0);
+  });
+}
+
 for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
   for (const scale of [1, 2]) test(`@02-05-03 responsive focus targets ${viewport.width}px CSS zoom ${scale}x`, async ({ page }) => {
     await page.setViewportSize(viewport);

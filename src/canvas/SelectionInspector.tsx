@@ -7,6 +7,7 @@ import { ObjectContextMenu } from './ObjectContextMenu';
 import { ImageCropOverlay } from './ImageCropOverlay';
 import {
   summarizeCanvasSelection,
+  mindmapOwner,
   type CanvasSelectionSummary,
 } from './selection-summary';
 import {
@@ -229,7 +230,11 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     }
   };
 
-  const open = !!selection && closedForSelection !== selection.key;
+  const nativeSelection = host.std.get(GfxControllerIdentifier).selection.selectedElements;
+  const topic = nativeSelection.length === 1 ? nativeSelection[0] : undefined;
+  const map = topic && mindmapOwner(topic);
+  const singleMindmapTopic = !!topic && !!map && topic.id !== map.id;
+  const open = !!selection && !singleMindmapTopic && closedForSelection !== selection.key;
 
   useEffect(() => {
     if (!open) return;
@@ -251,6 +256,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
   }, [open, selection?.key, cropOpen]);
 
   if (!selection) return null;
+  if (singleMindmapTopic) return <ObjectContextMenu host={host} selection={selection} placement="top" />;
 
   const imageActions = !cropOpen && selection.kind === 'image' && quickPosition && (
     <div

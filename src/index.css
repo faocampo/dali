@@ -1526,6 +1526,7 @@ djai-image-visual-edit {
 .image-crop-toolbar { position:absolute; display:flex; align-items:center; gap:8px; padding:8px; border-radius:8px; background:white; box-shadow:0 4px 16px rgb(0 0 0 / 16%); font-size:12px; max-width:calc(100% - 24px); flex-wrap:wrap; }
 .dali-cropping affine-edgeless-selected-rect, .dali-cropping edgeless-selected-rect { visibility:hidden !important; }
 .object-actions-trigger { position:absolute; left:76px; bottom:62px; z-index:100; }
+.object-actions-trigger[data-placement="top"] { left:auto; bottom:auto; right:8px; top:8px; min-height:44px; }
 .object-context-menu { position:fixed; z-index:250; width:232px; max-height:calc(100vh - 16px); overflow:auto; padding:8px; border-radius:8px; background:white; box-shadow:0 4px 20px rgb(0 0 0 / 18%); }
 .object-context-menu .layers-action-grid { display:flex; flex-direction:column; gap:2px; }
 .object-context-menu button { text-align:left; border:0; background:transparent; padding:7px 10px; border-radius:4px; }
