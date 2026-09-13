@@ -33,6 +33,34 @@ async function preview(page: Page, scope = 'board') {
   return page.getByTestId('export-dimensions');
 }
 
+async function download(page: Page) {
+  const pending = page.waitForEvent('download');
+  await page.getByRole('dialog').getByRole('button', {name:'Download',exact:true}).click();
+  const file = await pending;
+  expect(await file.failure()).toBeNull();
+  const chunks: Buffer[] = [];
+  for await (const chunk of (await file.createReadStream())!) chunks.push(Buffer.from(chunk));
+  const png = Buffer.concat(chunks);
+  expect(png.subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a');
+  await page.getByRole('dialog').getByRole('button', {name:'Close',exact:true}).click();
+  return png;
+}
+
+async function pixels(page: Page, png: Buffer, regions: number[][] = []) {
+  return page.evaluate(async ({base64,regions}) => {
+    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
+    const canvas = document.createElement('canvas'); canvas.width=image.width;canvas.height=image.height;
+    const ctx=canvas.getContext('2d')!;ctx.drawImage(image,0,0);
+    const count=(rect:number[])=>{
+      const p=ctx.getImageData(rect[0]!,rect[1]!,rect[2]!,rect[3]!).data;
+      let opaque=0,magenta=0,dark=0;
+      for(let i=0;i<p.length;i+=4)if(p[i+3]!>128){opaque++;if(p[i]!>240&&p[i+1]!<20&&p[i+2]!>240)magenta++;if(p[i]!<100&&p[i+1]!<100&&p[i+2]!<100)dark++;}
+      return {opaque,magenta,dark};
+    };
+    return {width:image.width,height:image.height,all:count([0,0,image.width,image.height]),regions:regions.map(count)};
+  }, {base64:png.toString('base64'),regions});
+}
+
 test('@02-06-01 hidden distant topics are excluded before board bounds and allocations', async ({ page }) => {
   const ids = await seed(page);
   const before = await page.locator('editor-host').evaluate((host: any) => JSON.stringify(host.store.spaceDoc.toJSON()));
@@ -42,4 +70,68 @@ test('@02-06-01 hidden distant topics are excluded before board bounds and alloc
   expect(members).toContain(ids.branch);
   await expect(page.getByRole('dialog').getByRole('button', { name: 'Download', exact: true })).toBeEnabled();
   expect(await page.locator('editor-host').evaluate((host: any) => JSON.stringify(host.store.spaceDoc.toJSON()))).toBe(before);
+});
+
+test('@02-06-01 board PNG contains native branch pixels without collapsed tails and preserves state', async ({page}, testInfo) => {
+  const ids=await seed(page);
+  const geometry=await page.locator('affine-edgeless-root').evaluate((el,ids)=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    const map=gfx.surface!.getElementById(ids.map) as MindmapElementModel;
+    const visible=[...map.children.keys()].filter(id=>{
+      let parent=map.children.get(id)?.parent;
+      while(parent){if(map.children.get(parent)?.collapsed)return false;parent=map.children.get(parent)?.parent;}
+      return true;
+    }).map(id=>map.getNode(id)!.element);
+    visible.forEach(s=>gfx.surface!.updateElement(s.id,{strokeWidth:0}));
+    const x=Math.min(...visible.map(s=>s.elementBound.x)),y=Math.min(...visible.map(s=>s.elementBound.y));
+    const root=map.getNode(ids.root)!.element, branch=map.getNode(ids.branch)!.element;
+    return {x,y,w:Math.max(...visible.map(s=>s.elementBound.maxX))-x,h:Math.max(...visible.map(s=>s.elementBound.maxY))-y,
+      gap:[root.elementBound.maxX-x+5,Math.min(root.y,branch.y)-y,branch.x-root.elementBound.maxX-10,Math.max(root.h,branch.y+branch.h-root.y)],
+      tail:[branch.elementBound.maxX-x+1,branch.y+branch.h/2-y-2,5,4],doc:JSON.stringify(gfx.doc.spaceDoc.toJSON())};
+  },ids);
+  await preview(page);await page.getByRole('checkbox',{name:'Transparent background'}).check();
+  const png=await download(page);const decoded=await pixels(page,png,[geometry.gap,geometry.tail]);
+  expect([decoded.width,decoded.height]).toEqual([Math.ceil(geometry.w),Math.ceil(geometry.h)]);
+  expect(decoded.all.magenta).toBe(0);expect(decoded.all.dark).toBeGreaterThan(20);
+  expect(decoded.regions[0]!.opaque).toBeGreaterThan(20);expect(decoded.regions[1]!.opaque).toBe(0);
+  expect(await page.locator('editor-host').evaluate((host:any)=>JSON.stringify(host.store.spaceDoc.toJSON()))).toBe(geometry.doc);
+  await testInfo.attach('synthetic-visible-map.png',{body:png,contentType:'image/png'});
+});
+
+test('@02-06-01 frame crops visible map and crossing content at every edge', async ({page})=>{
+  await seed(page);
+  await page.locator('affine-edgeless-root').evaluate(el=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    const shape=(xywh:string,color:string)=>gfx.surface!.addElement({type:'shape',xywh,shapeType:'rect',shapeStyle:'General',filled:true,fillColor:color,strokeWidth:0});
+    shape('[-20,-20,240,30]','#ff0000');shape('[-20,150,240,30]','#ff0000');
+    shape('[-20,10,30,140]','#0000ff');shape('[190,10,30,140]','#0000ff');
+    const frame=gfx.doc.addBlock('affine:frame',{xywh:'[0,0,200,160]'},gfx.surface!.id);gfx.selection.set({elements:[frame],editing:false});
+  });
+  for(const scale of [1,2,4]) {
+    await preview(page,'frame');await page.getByRole('radio',{name:`${scale}×`,exact:true}).check();
+    const png=await download(page);const result=await pixels(page,png);
+    expect([result.width,result.height]).toEqual([200*scale,160*scale]);
+    expect(result.all.magenta).toBe(0);
+    const edges=await page.evaluate(async({base64,scale})=>{
+      const image=new Image();image.src=`data:image/png;base64,${base64}`;await image.decode();const c=document.createElement('canvas');c.width=image.width;c.height=image.height;const ctx=c.getContext('2d')!;ctx.drawImage(image,0,0);
+      return [[100*scale,0],[100*scale,160*scale-1],[0,80*scale],[200*scale-1,20*scale]].map(([x,y])=>[...ctx.getImageData(x!,y!,1,1).data]);
+    },{base64:png.toString('base64'),scale});
+    expect(edges).toEqual([[255,0,0,255],[255,0,0,255],[0,0,255,255],[0,0,255,255]]);
+  }
+});
+
+test('@02-06-01 frame includes crossing branch when both topic boxes are outside', async ({page})=>{
+  const ids=await seed(page);
+  await page.locator('affine-edgeless-root').evaluate((el,ids)=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;const map=gfx.surface!.getElementById(ids.map) as MindmapElementModel;
+    const root=map.getNode(ids.root)!.element,branch=map.getNode(ids.branch)!.element;
+    const x=root.elementBound.maxX+10,w=branch.x-x-10;
+    const y=Math.min(root.y,branch.y)-10,h=Math.max(root.y+root.h,branch.y+branch.h)-y+10;
+    const frame=gfx.doc.addBlock('affine:frame',{xywh:JSON.stringify([x,y,w,h])},gfx.surface!.id);gfx.selection.set({elements:[frame],editing:false});
+  },ids);
+  const dimensions=await preview(page,'frame');
+  const members=JSON.parse((await dimensions.getAttribute('data-export-ids'))!);
+  expect(members).not.toContain(ids.root);expect(members).not.toContain(ids.branch);
+  await page.getByRole('checkbox',{name:'Transparent background'}).check();
+  const decoded=await pixels(page,await download(page));expect(decoded.all.opaque).toBeGreaterThan(20);
 });

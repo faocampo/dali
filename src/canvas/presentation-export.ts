@@ -10,7 +10,9 @@ import {
 } from '@blocksuite/affine/std/gfx';
 import { Bound } from '@blocksuite/global/gfx';
 import { getBezierParameters, getBezierTangent } from '@blocksuite/global/gfx';
-import { ConnectorElementModel } from '@blocksuite/affine/model';
+import { ConnectorElementModel, MindmapElementModel, type LocalConnectorElementModel } from '@blocksuite/affine/model';
+import { connector as renderConnector, ConnectorPathGenerator } from '@blocksuite/affine/gfx/connector';
+import { mindmapExportSnapshot, type MindmapExportSnapshot } from './mindmap-export';
 
 import { computeExportPlan, DEFAULT_EXPORT_OPTIONS, selectionIds, positiveIntersection, type ExportOptions, type ExportPlan, type PresentationScope } from "./export-plan";
 export type { PresentationScope } from "./export-plan";
@@ -25,6 +27,10 @@ export type PresentationRender = {
 };
 
 export type PresentationScopeAvailability = Record<PresentationScope, boolean>;
+const mapSnapshots = new WeakMap<ExportPlan, readonly MindmapExportSnapshot[]>();
+export function exportHasCollapsedTopics(plan: ExportPlan): boolean {
+  return mapSnapshots.get(plan)?.some(map => map.collapsed) ?? false;
+}
 
 
 function editorHost(): EditorHost {
@@ -68,7 +74,7 @@ function withDescendants(models: readonly GfxModel[]): GfxModel[] {
   return [...result.values()];
 }
 
-function visualBound(model: GfxModel): Bound {
+function visualBound(model: GfxModel | LocalConnectorElementModel): Bound {
   const b = model.elementBound.clone();
   const stroke = 'strokeWidth' in model && typeof model.strokeWidth === 'number' ? model.strokeWidth : 0;
   const margin = stroke / 2;
@@ -101,6 +107,55 @@ function visualBound(model: GfxModel): Bound {
   // Native rough paths can perturb the nominal geometry.
   if(model.rough) return new Bound(result.x-stroke,result.y-stroke,result.w+stroke*2,result.h+stroke*2);
   return result;
+}
+
+function nativeEdges(map: MindmapElementModel, snapshot: MindmapExportSnapshot) {
+  if (typeof map.getConnectors !== 'function' || typeof renderConnector !== 'function' || typeof ConnectorPathGenerator.updatePath !== 'function')
+    throw new Error('This editor version cannot export mind-map branches. Refresh and retry.');
+  const allowed = new Set(snapshot.edges.map(edge => JSON.stringify([edge.source, edge.target])));
+  const result: LocalConnectorElementModel[] = [];
+  for (const id of new Set(snapshot.edges.map(edge => edge.source))) {
+    const node = map.getNode(id);
+    if (!node) throw new Error('The mind map changed. Refresh the preview and retry.');
+    for (const {connector, outdated} of [...(map.getConnectors(node) ?? [])].reverse()) {
+      if (!connector.source.id || !connector.target.id || !allowed.has(JSON.stringify([connector.source.id, connector.target.id]))) continue;
+      if (outdated) ConnectorPathGenerator.updatePath(connector, null, id => map.surface.getElementById(id) ?? map.surface.store.getModelById(id) as GfxModel);
+      result.push(connector);
+    }
+  }
+  if (result.length !== allowed.size) throw new Error('Mind-map branches are still loading. Refresh the preview and retry.');
+  return result;
+}
+
+function visibleScope(host: EditorHost, scope: PresentationScope) {
+  const resolved = resolveScope(host, scope);
+  const maps = resolved.models.filter((model): model is MindmapElementModel => model instanceof MindmapElementModel);
+  const hidden = new Set<string>();
+  const snapshots: MindmapExportSnapshot[] = [];
+  const edgeBounds: Bound[] = [];
+  for (const map of maps) {
+    const topics = [...map.children].map(([id, detail]) => {
+      const model = map.surface.getElementById(id);
+      if (!model) throw new Error('The mind map has invalid topic membership.');
+      return {id, ...detail, bounds: model.elementBound.toXYWH()};
+    });
+    const all = mindmapExportSnapshot(map.id, topics);
+    const visible = new Set(all.topicIds);
+    topics.forEach(topic => { if (!visible.has(topic.id)) hidden.add(topic.id); });
+    const included = new Set(resolved.models.filter(model => visible.has(model.id) &&
+      (scope !== 'frame' && scope !== 'visible' || positiveIntersection(visualBound(model), resolved.bound))).map(model => model.id));
+    let snapshot = mindmapExportSnapshot(map.id, topics, included);
+    if (scope === 'frame' || scope === 'visible') {
+      const crossing = new Set(nativeEdges(map, all).filter(edge => positiveIntersection(visualBound(edge), resolved.bound))
+        .map(edge => JSON.stringify([edge.source.id,edge.target.id])));
+      snapshot = Object.freeze({...snapshot, edges:Object.freeze(all.edges.filter(edge => crossing.has(JSON.stringify([edge.source,edge.target]))))});
+    }
+    snapshots.push(snapshot);
+    nativeEdges(map, snapshot).forEach(edge => edgeBounds.push(visualBound(edge)));
+  }
+  const models = resolved.models.filter(model => !(model instanceof MindmapElementModel) && !hidden.has(model.id) &&
+    (!isPrimitiveModel(model) || !model.hidden));
+  return { ...resolved, models, snapshots, edgeBounds };
 }
 
 function resolveScope(host: EditorHost, scope: PresentationScope) {
@@ -147,14 +202,16 @@ function revision(host: EditorHost): string {
 export function boardExportPlan(options: ExportOptions): ExportPlan {
   const host = editorHost();
   try {
-    const { models, bound } = resolveScope(host, options.scope);
+    const { models, bound, snapshots, edgeBounds } = visibleScope(host, options.scope);
     // Native elementBound already includes rotated corners and connector labels.
     // Include stroke caps/arrowheads in addition to those native geometry bounds.
-    const visual = models.map(visualBound);
+    const visual = [...models.map(visualBound), ...edgeBounds];
     const world = options.scope === 'board' || options.scope === 'selection'
       ? visual.slice(1).reduce((a, b) => a.unite(b), visual[0]!) : bound;
     const intermediates = models.filter(model => !isPrimitiveModel(model) && model.flavour !== 'affine:image').map(model => Bound.deserialize(model.xywh));
-    return computeExportPlan(models.map(m => m.id), world, options, revision(host), intermediates);
+    const plan = computeExportPlan(models.map(m => m.id), world, options, revision(host), intermediates);
+    mapSnapshots.set(plan, Object.freeze(snapshots));
+    return plan;
   } catch (cause) {
     const plan = computeExportPlan([], { x: 0, y: 0, w: 0, h: 0 }, options, revision(host));
     return Object.freeze({ ...plan, error: cause instanceof Error ? cause.message : 'Refresh the export area and retry.' });
@@ -211,20 +268,31 @@ export async function renderBoardPresentation(options: PresentationRenderOptions
   // fractional final edge transparent instead of painting beyond world extent.
   ctx.beginPath(); ctx.rect(0,0,w*plan.scale,h*plan.scale); ctx.clip();
   const included = new Set(plan.includedIds);
+  const snapshots = new Map((mapSnapshots.get(plan) ?? []).map(snapshot => [snapshot.mapId, snapshot]));
   try {
     for (const layer of gfx.layer.layers) {
       // Group IDs remain in the scope; their native renderer paints selection
       // outlines/title handles rather than document content.
-      const elements = layer.elements.filter(model => included.has(model.id) && !('type' in model && model.type === 'group'));
+      const elements = layer.elements.filter(model => (included.has(model.id) || snapshots.has(model.id)) && !('type' in model && model.type === 'group'));
       if (!elements.length) continue;
       if (layer.type === 'canvas') {
-        ctx.save();
         // Native culling ignores stroke/arrow extents. Widen only its search
         // rectangle, compensating the matrix so the output crop stays exact.
         const renderBound = elements.reduce((area,model)=>area.unite(model.elementBound),bound.clone());
         const matrix = new DOMMatrix().scaleSelf(plan.scale).translateSelf(renderBound.x-x,renderBound.y-y);
-        ctx.setTransform(matrix);
-        native._renderByBound(ctx, matrix, new RoughCanvas(canvas), renderBound, elements as GfxPrimitiveElementModel[]);
+        for (const element of elements) {
+          ctx.save();
+          if (element instanceof MindmapElementModel) {
+            for (const edge of nativeEdges(element, snapshots.get(element.id)!)) {
+              ctx.globalAlpha = edge.opacity * element.opacity;
+              renderConnector(edge, ctx, new DOMMatrix().scaleSelf(plan.scale).translateSelf(edge.x-x, edge.y-y), renderer, new RoughCanvas(canvas), bound);
+            }
+          } else {
+            ctx.setTransform(matrix);
+            native._renderByBound(ctx, matrix, new RoughCanvas(canvas), renderBound, [element] as GfxPrimitiveElementModel[]);
+          }
+          ctx.restore();
+        }
         continue;
       }
       for (const model of elements as GfxBlockElementModel[]) {
