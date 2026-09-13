@@ -1,4 +1,5 @@
 # Phase 2 Deferred Verification Items
 
-- Plan 02-06: `tests/mindmap-copy.spec.ts:135` reloads immediately after successful in-memory Redo without waiting for Saved locally. Extra plan 02-05 production regression failed there; unchanged isolated rerun passed. Preserve all content assertions while adding legitimate persistence readiness.
-- Plan 02-06: `tests/canvas-editing.spec.ts:33` expected `Synthetic shape` and received empty after coordinate double-click at line 30 and immediate insertText at line 31. Failed in the extra 38-case production run and again isolated. Diagnose editor readiness and source behavior before changing assertions. No mind map exists in this case; source cause remains unestablished.
+- Resolved in 02-06 (`fb59597`): board-copy Redo waits for Saved locally before reload; all exact durable-copy assertions pass in the 604-case gate.
+- Resolved in 02-06 (`7e79f9f`): the ordinary shape failure came from a 66px stale native pointer/viewport origin after header layout. Both origins refresh before input; the regression asserts requested drawing position, measured editing position, exact Synthetic shape text and reload. All four projects pass.
+- Remaining native OS input and magnification evidence is recorded in WINDOWS.md and 02-06-SUMMARY.md for phase verification.

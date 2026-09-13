@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 3
+open_count: 4
 waived_count: 1
 fixed_count: 0
-total_count: 4
-last_updated: 2026-09-12T23:48:17.294Z
+total_count: 5
+last_updated: 2026-09-13T00:37:09.126Z
 ---
 
 # Broken Windows Ledger
@@ -19,6 +19,7 @@ last_updated: 2026-09-12T23:48:17.294Z
 | 2 | 01 | unrun-verify | tests/image-import.spec.ts |  | File-manager OS drag and Firefox/WebKit OS clipboard integration remain unverified; browser DataTransfer and constructed ClipboardEvent routing are covered. | waived | User approved image import and copy/paste feature UAT. Individual native OS steps were not separately reported; acceptance and evidence limits are retained in 01-UAT.md. | 2026-09-11T19:32:09.374Z | 2026-09-12T20:47:14.821Z |
 | 3 | 02 | unrun-verify | tests/mindmap-accessibility.spec.ts |  | Real 200 percent browser zoom remains for phase verification; desktop and narrow CSS zoom at 100 and 200 percent are automated separately. | open |  | 2026-09-12T23:48:17.167Z |  |
 | 4 | 02 | unrun-verify | tests/mindmap-keyboard.spec.ts |  | Native OS IME text production remains for phase verification; constructed composition events verify topic routing and external-field isolation. | open |  | 2026-09-12T23:48:17.294Z |  |
+| 5 | 02 | unrun-verify | tests/clipboard-route.ts |  | Firefox and WebKit native OS clipboard integration remains unverified; native serialized payload routing is simulated, while Chromium uses the real clipboard. | open |  | 2026-09-13T00:37:09.126Z |  |
 
 ````json
 [
@@ -68,6 +69,18 @@ last_updated: 2026-09-12T23:48:17.294Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-12T23:48:17.294Z",
+    "resolved_at": null
+  },
+  {
+    "id": 5,
+    "kind": "unrun-verify",
+    "phase": "02",
+    "file": "tests/clipboard-route.ts",
+    "line": null,
+    "description": "Firefox and WebKit native OS clipboard integration remains unverified; native serialized payload routing is simulated, while Chromium uses the real clipboard.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-13T00:37:09.126Z",
     "resolved_at": null
   }
 ]
