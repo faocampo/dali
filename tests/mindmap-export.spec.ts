@@ -135,3 +135,23 @@ test('@02-06-01 frame includes crossing branch when both topic boxes are outside
   await page.getByRole('checkbox',{name:'Transparent background'}).check();
   const decoded=await pixels(page,await download(page));expect(decoded.all.opaque).toBeGreaterThan(20);
 });
+
+test('@02-06-02 selected parent and child include their native edge and exclude overlapping siblings', async ({page})=>{
+  const ids=await seed(page);
+  const region=await page.locator('affine-edgeless-root').evaluate((el,ids)=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;const map=gfx.surface!.getElementById(ids.map) as MindmapElementModel;
+    const root=map.getNode(ids.root)!.element,branch=map.getNode(ids.branch)!.element;
+    for(const shape of [root,branch])gfx.surface!.updateElement(shape.id,{strokeWidth:0});
+    const x=Math.min(root.x,branch.x),y=Math.min(root.y,branch.y);
+    gfx.surface!.updateElement(ids.sibling,{xywh:root.xywh,fillColor:'#ff00ff',filled:true});
+    gfx.surface!.addElement({type:'shape',xywh:branch.xywh,filled:true,fillColor:'#ff00ff'});
+    gfx.selection.set({elements:[ids.root,ids.branch],editing:false});
+    return [root.elementBound.maxX-x+5,0,branch.x-root.elementBound.maxX-10,Math.max(root.y+root.h,branch.y+branch.h)-y];
+  },ids);
+  const dimensions=await preview(page,'selection');
+  expect(new Set(JSON.parse((await dimensions.getAttribute('data-export-ids'))!))).toEqual(new Set([ids.root,ids.branch]));
+  await page.getByRole('checkbox',{name:'Transparent background'}).check();
+  const decoded=await pixels(page,await download(page),[region]);
+  expect(decoded.regions[0]!.opaque).toBeGreaterThan(20);
+  expect(decoded.all.magenta).toBe(0);
+});
