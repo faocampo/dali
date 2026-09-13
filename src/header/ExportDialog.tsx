@@ -6,6 +6,7 @@ import { EXPORT_FORMATS, exportBoardFile, type ExportFormat } from '../canvas/ex
 import {
   presentationScopeAvailability,
   boardExportPlan,
+  exportHasCollapsedTopics,
   type PresentationScope,
 } from '../canvas/presentation-export';
 import { APP_URL, FOLLOW_LINKS, SHARE_TARGETS } from './links';
@@ -156,6 +157,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
           </label>)}
         </div>
         <p data-testid="export-dimensions" data-export-ids={JSON.stringify(plan.includedIds)}>{Number.isFinite(plan.pixelWidth) && Number.isFinite(plan.pixelHeight) ? `${plan.pixelWidth} × ${plan.pixelHeight} pixels` : 'Dimensions unavailable'}</p>
+        {exportHasCollapsedTopics(plan) && <p className="djai-note">Only visible topics are exported. Expand branches to include their hidden topics.</p>}
         {plan.error && <p role="alert">{plan.error}</p>}
         {plan.lowerScale && <button type="button" onClick={() => setScale(plan.lowerScale!)}>Use {plan.lowerScale}×</button>}
       </Section>}

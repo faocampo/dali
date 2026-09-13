@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures';
+import { prepareClipboard, pasteClipboard } from './clipboard-route';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { MindmapElementModel, ShapeElementModel } from '@blocksuite/affine/model';
@@ -112,8 +113,8 @@ test('@02-01-02 disposed map callbacks make zero document writes', async ({ page
   expect(unchanged).toBe(true);
 });
 
-test('@02-01-02 native duplicate and clipboard preserve complete child details', async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+test('@02-01-02 native duplicate and clipboard preserve complete child details', async ({ page, context, browserName, expectErrors },testInfo) => {
+  await prepareClipboard(page,context,browserName,testInfo,expectErrors);
   const ids = await seed(page);
   const original = await snapshot(page);
   const selectMap = () => page.locator('affine-edgeless-root').evaluate((el, id) => {
@@ -144,7 +145,7 @@ test('@02-01-02 native duplicate and clipboard preserve complete child details',
       throw cause;
     }
   })).toBe(true);
-  await page.keyboard.press('ControlOrMeta+v');
+  await pasteClipboard(page,browserName);
   await expect.poll(async () => (await copies()).length).toBe(3);
   for (const copy of (await copies()).filter(map => map.id !== ids.map)) {
     expect(copy.nodes).toHaveLength(7);

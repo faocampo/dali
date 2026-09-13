@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { MindmapElementModel } from '@blocksuite/affine/model';
+import { writeFileSync } from 'node:fs';
 
 async function seed(page: Page) {
   await page.goto('/');
@@ -96,6 +97,7 @@ test('@02-06-01 board PNG contains native branch pixels without collapsed tails 
   expect(decoded.regions[0]!.opaque).toBeGreaterThan(20);expect(decoded.regions[1]!.opaque).toBe(0);
   expect(await page.locator('editor-host').evaluate((host:any)=>JSON.stringify(host.store.spaceDoc.toJSON()))).toBe(geometry.doc);
   await testInfo.attach('synthetic-visible-map.png',{body:png,contentType:'image/png'});
+  writeFileSync(testInfo.outputPath('synthetic-visible-map.png'),png);
 });
 
 test('@02-06-01 frame crops visible map and crossing content at every edge', async ({page})=>{
@@ -197,4 +199,30 @@ test('@02-06-03 collapsed export hint reflects selected scope and settings decod
     const corner=await page.evaluate(async base64=>{const i=new Image();i.src=`data:image/png;base64,${base64}`;await i.decode();const c=document.createElement('canvas');c.width=i.width;c.height=i.height;const ctx=c.getContext('2d')!;ctx.drawImage(i,0,0);return [...ctx.getImageData(0,0,1,1).data];},png.toString('base64'));
     expect(corner).toEqual(transparent?[0,0,0,0]:[255,255,255,255]);
   }
+});
+
+test('@02-06-03 stale map edits reject download and explicit retry uses current content',async({page})=>{
+  const ids=await seed(page);await preview(page,'selection');
+  await page.locator('affine-edgeless-root').evaluate((el,id)=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;gfx.surface!.updateElement(id,{fontSize:32});
+  },ids.root);
+  let downloads=0;page.on('download',()=>downloads++);
+  await page.getByRole('dialog').getByRole('button',{name:'Download',exact:true}).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('changed');expect(downloads).toBe(0);
+  const decoded=await pixels(page,await download(page));expect(decoded.all.opaque).toBeGreaterThan(20);expect(downloads).toBe(1);
+});
+
+test('@02-06-03 visible oversized content blocks allocation and requires explicit lower scale',async({page})=>{
+  await seed(page);await page.getByRole('button',{name:'Add sticky note',exact:true}).click();await page.keyboard.press('Escape');
+  await page.locator('affine-edgeless-root').evaluate(el=>{
+    const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
+    gfx.doc.updateBlock(gfx.doc.getBlocksByFlavour('affine:note')[0]!.model,{xywh:'[0,0,3000,1000]'});
+    const frame=gfx.doc.addBlock('affine:frame',{xywh:'[0,0,100,80]'},gfx.surface!.id);gfx.selection.set({elements:[frame],editing:false});
+  });
+  await preview(page,'frame');await page.getByRole('radio',{name:'4×',exact:true}).check();
+  let downloads=0;page.on('download',()=>downloads++);
+  await expect(page.getByRole('dialog').getByRole('button',{name:'Download',exact:true})).toBeDisabled();
+  await expect(page.getByRole('radio',{name:'4×',exact:true})).toBeChecked();expect(downloads).toBe(0);
+  await page.getByRole('button',{name:'Use 2×',exact:true}).click();
+  const png=await download(page);const decoded=await pixels(page,png);expect([decoded.width,decoded.height]).toEqual([200,160]);expect(downloads).toBe(1);
 });

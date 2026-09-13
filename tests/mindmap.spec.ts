@@ -15,17 +15,20 @@ test('@02-01-01 native map creation, keyboard hierarchy, reload and PNG', async 
   });
   expect(Math.abs(offset[0]!)).toBeLessThan(2);
   expect(Math.abs(offset[1]!)).toBeLessThan(2);
-  await page.keyboard.insertText('Synthetic central topic');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('Synthetic central topic');
   await page.keyboard.press('Enter');
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
-  await page.keyboard.insertText('Synthetic child');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('Synthetic child');
   await page.keyboard.press('Enter');
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
   await page.keyboard.press('Enter');
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
-  await page.keyboard.insertText('Synthetic sibling');
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.type('Synthetic sibling');
   await page.keyboard.press('Enter');
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
   const read = () => page.locator('affine-edgeless-root').evaluate(el => {

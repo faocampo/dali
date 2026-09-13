@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures';
+import { prepareClipboard, pasteClipboard } from './clipboard-route';
 import type { Page } from '@playwright/test';
 import type { EditorHost } from '@blocksuite/affine/std';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -8,7 +9,7 @@ async function seed(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
-  await page.keyboard.insertText('Synthetic source');
+  await page.keyboard.type('Synthetic source');
   await page.keyboard.press('Enter');
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
   return page.locator('affine-edgeless-root').evaluate(el => {
@@ -56,8 +57,8 @@ test('@02-02-01 queued duplicate captures intended source selection at invocatio
   expect((await state(page)).maps[1]!.nodes).toHaveLength(7);
 });
 
-for (const route of ['duplicate', 'clipboard'] as const) test(`@02-02-01 ${route} retains nested details, typography, Undo and independent edits`, async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+for (const route of ['duplicate', 'clipboard'] as const) test(`@02-02-01 ${route} retains nested details, typography, Undo and independent edits`, async ({ page, context, browserName, expectErrors },testInfo) => {
+  await prepareClipboard(page,context,browserName,testInfo,route==='clipboard'?expectErrors:[]);
   const ids = await seed(page);
   const source = (await state(page)).maps[0]!;
   if (route === 'duplicate') await page.keyboard.press('ControlOrMeta+d');
@@ -68,7 +69,7 @@ for (const route of ['duplicate', 'clipboard'] as const) test(`@02-02-01 ${route
       try { const items = await navigator.clipboard.read(); const html = items.find(i => i.types.includes('text/html')); return !!html && (await (await html.getType('text/html')).text()).includes('data-blocksuite'); }
       catch (cause) { if ((cause as Error).name === 'InvalidStateError') return false; throw cause; }
     })).toBe(true);
-    await page.keyboard.press('ControlOrMeta+v');
+    await pasteClipboard(page,browserName);
   }
   await expect.poll(async () => (await state(page)).maps.length).toBe(2);
   const copy = (await state(page)).maps.find(m => m.id !== ids.map)!;
@@ -132,6 +133,7 @@ test('@02-02-01 board copy retains document-local IDs and independent typography
   await expect.poll(async () => (await state(page)).maps[0]!.nodes.find(n => !n.parent)!.fontSize).toBe(29);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect.poll(() => state(page)).toEqual(changed);
+  await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
   await page.reload(); await expect.poll(() => state(page)).toEqual(changed);
   await page.getByRole('button', { name: 'Untitled board copy', exact: true }).click();
   await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
@@ -156,8 +158,8 @@ for (const invalidation of ['readonly', 'locked', 'removed', 'detached'] as cons
   expect(unchanged).toBe(true);
 });
 
-for (const defect of ['orphan', 'cycle', 'duplicate', 'nonfinite'] as const) test(`@02-02-01 malformed ${defect} clipboard hierarchy inserts nothing`, async ({ page, context }) => {
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+for (const defect of ['orphan', 'cycle', 'duplicate', 'nonfinite'] as const) test(`@02-02-01 malformed ${defect} clipboard hierarchy inserts nothing`, async ({ page, context, browserName, expectErrors },testInfo) => {
+  await prepareClipboard(page,context,browserName,testInfo,expectErrors);
   await seed(page);
   const before = await state(page);
   await page.locator('affine-edgeless-root').evaluate(async (el, defect) => {
@@ -173,7 +175,7 @@ for (const defect of ['orphan', 'cycle', 'duplicate', 'nonfinite'] as const) tes
     if (defect === 'nonfinite') Object.assign(snapshot[0]!, { xywh: '[0,0,1e400,50]' });
     await host.std.clipboard.writeToClipboard(async items => ({ ...items, 'blocksuite/surface': JSON.stringify({ snapshot: [...snapshot, data], blobs: {} }) }));
   }, defect);
-  await page.keyboard.press('ControlOrMeta+v');
+  await pasteClipboard(page,browserName);
   await page.waitForTimeout(150);
   expect(await state(page)).toEqual(before);
 });
