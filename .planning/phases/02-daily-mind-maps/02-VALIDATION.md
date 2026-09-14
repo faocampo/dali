@@ -154,3 +154,10 @@ Post-review UI correction `a05b94d`: 36/36 accessibility cases across four proje
 ## Plan 02-08 — native More submenu
 
 The final affected matrix passed 204/204 cases across four browser projects, with 67/67 units, typecheck and build passing. `object-actions-submenu.spec.ts` verifies native More nesting, submenu placement, keyboard return/reopen, Properties and single/two-object alignment visibility. Existing arrangement tests validate all eight alignment/distribution operations; Properties, image, keyboard and accessibility suites validate preserved behavior. The earlier 392-case result remains tied to plan 02-07. See 02-08-SUMMARY.md for this correction's evidence.
+
+
+## Plan 02-09 — behavior correction validation
+
+Implementation `5bb1e4c3c3781d6cb36ba4d6766357dc1aff94ad`. The 572-case matrix passed 571 cases and exposed one reload-hydration race in the workflow fixture. After waiting for a single hydrated editor, the workflow passed 4/4 projects (development Chromium and production Chromium, Firefox and WebKit). All 572 distinct matrix scenarios therefore have passing evidence; the original run is not represented as a clean sweep. Typecheck, production build and 67/67 unit tests passed.
+
+Coverage includes typography on selected-node Enter/Tab, branch duplication through native/custom/keyboard routes, branch paste, source isolation and reload, malformed/locked/stale conversion, rollback preserving intervening edits, and context/native unlock after deselection. The multiline fixture correction separately passed 4/4 projects. See 02-09-SUMMARY.md for RED/GREEN and review provenance. UAT remains pending.

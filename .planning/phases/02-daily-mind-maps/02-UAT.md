@@ -3,7 +3,7 @@ status: testing
 phase: 02-daily-mind-maps
 source: [02-VERIFICATION.md]
 started: 2026-09-13T01:50:13Z
-updated: 2026-09-14T18:20:59+00:00
+updated: 2026-09-14T21:51:41+00:00
 ---
 
 # Phase 2 — Native interaction acceptance
@@ -12,12 +12,13 @@ Use a synthetic board. Record browser/OS and the actual input method where relev
 
 ## Current Test
 
-number: 2
-name: Actual browser zoom at 200 percent
+number: 5
+name: Mind-map typography, branch copying and unlocking
 expected: |
-  Set browser zoom to 200 percent. Create/edit a mind-map topic and open
-  More → Object actions → Properties. Controls remain reachable, the selected
-  topic stays visible, and Tab/Shift+Tab/Escape move focus predictably.
+  Format a selected topic, then press Enter: the new node retains typography.
+  Duplicate a branch: it remains a sibling branch with its descendants.
+  Copy a branch and paste beneath a selected topic: hierarchy and styles remain.
+  Lock, deselect, then right-click and unlock a node; editing works again.
 awaiting: user response
 
 ## Tests
@@ -43,12 +44,18 @@ expected: With an actual OS IME, commit and cancel a composition candidate in a 
 result: [pending]
 notes: Separated from the approved keyboard/UI test because native composition environment was not reported.
 
+### 5. Mind-map typography, branch copying and unlocking
+expected: The current focused test above preserves native node behavior and permits unlocking.
+result: [pending]
+reported: Enter changes typography, duplicate/paste becomes free objects, and a locked node cannot be unlocked.
+gap_ids: [G-02-2, G-02-3, G-02-4]
+
 ## Summary
 
-total: 4
+total: 5
 passed: 1
 issues: 0
-pending: 3
+pending: 4
 skipped: 0
 blocked: 0
 
@@ -68,3 +75,11 @@ Keyboard actions are reported working. The presentation correction is user-appro
 ## Follow-up menu correction
 
 User requested Object actions as a submenu of the native More menu and alignment entries only for multi-selection. Plan 02-08 captures this correction. The user approved Properties, menu placement and alignment visibility on 2026-09-14.
+
+## New reported behavior gaps
+
+- G-02-2 — Pressing Enter on a selected node changes formatting without an explicit formatting action. Implemented in 02-09; user retest pending.
+- G-02-3 — Node duplication and clipboard paste produce ordinary free objects. User approved whole-branch copying, sibling duplication and paste beneath the selected node. Implemented in 02-09; user retest pending.
+- G-02-4 — Locked node cannot be unlocked after deselection. Implemented in 02-09; user retest pending.
+
+Actual 200% browser zoom remains unconfirmed; these reported defects require focused retest before proceeding.

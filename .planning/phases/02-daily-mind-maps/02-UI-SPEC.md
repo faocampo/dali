@@ -222,3 +222,9 @@ Fixtures use synthetic topics such as Release plan, Research, Design, and Review
 ## UAT amendment — 2026-09-14
 
 The user replaces automatic topic formatting with explicit **Properties** from the topic context menu. Creation, selection and Tab child creation keep Properties closed. The pane opens from the right and shares the existing SelectionInspector visual shell, header, typography and section spacing. Closing it or entering topic text editing keeps it closed until another explicit Properties request. This amendment supersedes conflicting earlier automatic-panel and bottom-panel proposals. Keyboard hierarchy actions remain unchanged.
+
+## User-directed native node behavior — 2026-09-14
+
+- Enter/Tab topic creation continues the selected node's text typography. Independent new-map creation keeps its own defaults.
+- A selected node is a branch root for copying, including all descendants and collapsed state. Duplicate creates a sibling branch. Paste attaches beneath the selected topic. A root duplicate or paste without a selected topic creates an independent mind map. This supersedes the earlier isolated-shape copy behavior.
+- A locked topic remains reachable through right-click after deselection. Unlock resolves the actual locking node or ancestor and preserves normal lock protection until explicitly unlocked.

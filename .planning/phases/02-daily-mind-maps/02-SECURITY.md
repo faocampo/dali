@@ -21,7 +21,7 @@ Audited implementation revisions: `e52dab1`, with copy-boundary remediation `a5c
 
 ## Threat register
 
-The seven plans contain 23 rows and 21 distinct IDs. T-02-05 and T-02-06 are reused across plans for different components; plan-qualified rows preserve all original obligations.
+The register contains 25 plan-qualified rows and 23 distinct IDs across the nine implementation/correction plans. T-02-05 and T-02-06 are reused across plans for different components; plan-qualified rows preserve all original obligations.
 
 | Plan / ID | Category | Component | Severity | Disposition | Status | Source and test evidence |
 |---|---|---|---|---|---|---|
@@ -69,3 +69,13 @@ Post-audit adversarial review found inconsistent empty/duplicate sibling order v
 Inline source audit and reused executor source review found the mitigation wired. This adds a local UI boundary; prior threat dispositions remain unchanged.
 
 Plan 02-08 carries forward T-02-23: the native More adapter dispatches to the current host, the React submenu captures selection identities and dismisses on changes/removal, and Properties checks current connected host/selection before activation. Existing mutation guards remain authoritative. The native extension introduces no external service or data-storage boundary. Read-only source review found no concrete blocker; focused stale-selection/removal/detached-host tests remain in the affected suite.
+
+
+## Plan 02-09 behavior correction audit — 2026-09-14
+
+| Plan / ID | Category | Component | Severity | Disposition | Status | Source and test evidence |
+|---|---|---|---|---|---|---|
+| 02-09 / T-02-24 | Tampering | Branch conversion and rollback | high | mitigate | CLOSED | mindmap-node-copy.ts validates topology/depth, tracks operation-owned creations, rechecks source/destination revisions and restores only after its own attachment. mindmap-node-copy.spec.ts tests malformed payloads, locked destination, independent copies and preservation of unrelated/intervening edits after conversion failure. |
+| 02-09 / T-02-25 | Tampering | Lock and unlock targets | medium | mitigate | CLOSED | ObjectContextMenu checks current connected host, captured selection identity and visibility; arrangement.ts resolves effective lock owner; the native override retains readonly/current-host guards. mindmap-lock.spec.ts covers stale retained actions and both lock/unlock routes after deselection. |
+
+Orchestrator and reused-executor review corrected intermediate rollback and stale-selection findings. Final validation provenance is recorded in 02-09-SUMMARY.md. Authentication and multi-user authorization remain allocated to later phases.

@@ -86,3 +86,11 @@ The editing-state finding is closed: entering text editing clears open state, re
 ## Native More submenu review — 2026-09-14
 
 Read-only review of plan 02-08 found no concrete blocker. The native ToolbarModuleExtension uses ActionPlacement.More; subscriptions and host listeners dispose on teardown. Selection changes/removal dismiss the submenu and Properties retains current-host/selection guards. Escape/ArrowLeft restores the invoking entry; ArrowRight opens the submenu. Alignment entries require multiple selected objects and distribution retains its three-object guard. A reused executor performed this scoped review; runtime results are recorded separately in 02-08-SUMMARY.md.
+
+## Plan 02-09 behavior review — 2026-09-14
+
+Typography now inherits native text presentation at addTopic; existing text-entry/commit routing remains intact. Lock review found a retained-menu selection race; the handler now checks current host, captured selection identity and effective visibility. Context access is mounted independently of selection and the locked-toolbar override resolves the actual lock owner.
+
+Branch-copy review found an unsafe global before/after deletion set and potential restoration of intervening destination edits. The converter now tracks only operation-owned primitive creations, checks source/destination revisions across the conversion promise, and restores a destination snapshot only after its own synchronous attachment began. The fault test preserves an unrelated shape and intervening text edit on rejection. Native duplicate supplies pasteCenter; normal clipboard paste does not, so matching pasted IDs alone never select duplicate behavior. Transient branch metadata is stripped before persistence.
+
+These are scoped orchestrator and reused-executor reviews; a fresh independent auditor is not claimed. Final execution results are in 02-09-SUMMARY.md.

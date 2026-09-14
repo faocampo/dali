@@ -136,3 +136,8 @@ Final 392/392 mind-map cases and 40/40 ordinary/keyboard regressions pass, toget
 ## Native More correction — 2026-09-14
 
 Object actions now appears as a styled submenu entry in the native selection More menu. The standalone canvas trigger is removed; single selections omit alignment entries. A synthetic desktop capture was inspected and submenu geometry/keyboard behavior and narrow toolbar reachability passed in the 204-case browser matrix. The sidebar interaction remains explicit. See 02-08-SUMMARY.md; prior scores and native magnification limitations retain their historical scope.
+
+
+## Mind-map behavior correction — 2026-09-14
+
+Plan 02-09 retains the explicit Properties sidebar and native More submenu. New topics continue the selected typography. Locked topics remain reachable by right-click after deselection; context and native Unlock actions resolve the actual lock owner. No new visual score is inferred. The focused behavior retest and earlier native magnification/IME/clipboard checks remain in 02-UAT.md. Final automated evidence is recorded in 02-09-SUMMARY.md.

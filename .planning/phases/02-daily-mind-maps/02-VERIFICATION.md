@@ -1,6 +1,6 @@
 ---
 phase: 02-daily-mind-maps
-verified: 2026-09-14T17:21:45+00:00
+verified: 2026-09-14T21:51:41+00:00
 status: human_needed
 score: 29/31 plan truths verified; 2 native interaction checks pending
 covered_files:
@@ -21,6 +21,8 @@ covered_files:
   - .planning/phases/02-daily-mind-maps/02-07-SUMMARY.md
   - .planning/phases/02-daily-mind-maps/02-08-PLAN.md
   - .planning/phases/02-daily-mind-maps/02-08-SUMMARY.md
+  - .planning/phases/02-daily-mind-maps/02-09-PLAN.md
+  - .planning/phases/02-daily-mind-maps/02-09-SUMMARY.md
   - .planning/phases/02-daily-mind-maps/02-UI-SPEC.md
   - src/boards/operations.ts
   - src/canvas/BlockSuiteCanvas.tsx
@@ -38,6 +40,7 @@ covered_files:
   - src/canvas/mindmap-keyboard.ts
   - src/canvas/mindmap-state.test.ts
   - src/canvas/mindmap-state.ts
+  - src/canvas/mindmap-node-copy.ts
   - src/canvas/mindmap.ts
   - src/canvas/presentation-export.ts
   - src/canvas/selection-summary.ts
@@ -54,6 +57,9 @@ covered_files:
   - tests/mindmap-collapse.spec.ts
   - tests/mindmap-compatibility.spec.ts
   - tests/mindmap-copy.spec.ts
+  - tests/mindmap-edit-format.spec.ts
+  - tests/mindmap-lock.spec.ts
+  - tests/mindmap-node-copy.spec.ts
   - tests/mindmap-export.spec.ts
   - tests/mindmap-formatting.spec.ts
   - tests/mindmap-keyboard.spec.ts
@@ -64,10 +70,13 @@ covered_files:
   - tests/mindmap-workflow.spec.ts
   - tests/mindmap.spec.ts
   - vite.config.ts
-covered_digest: "v1:sha256:45180db475c73669004dc475229719b7c8e07387f0e3ad5c27a88710e67b3bfb"
+covered_digest: "v1:sha256:0ce076d0d0870044ac2ad0819446577b6a0514fc94550fba17e00ceb4e32bac7"
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
+  - test: Mind-map behavior retest
+    expected: Selected-node Enter preserves typography, copies remain branches, and locked topics can be unlocked after deselection.
+    why_human: User-reported gaps are corrected with automated evidence; user acceptance is pending.
   - test: Keyboard mind-map editing and native IME
     expected: Native composition commit and cancel preserve intended text without accidental topic creation.
     why_human: Constructed composition events exercise routing; actual OS input remains untested.
@@ -83,9 +92,9 @@ human_verification:
 
 Goal: Users can develop and reorganize readable mind maps through rapid keyboard editing and automatic hierarchical layout.
 
-Status: **human_needed**. All eight plans are implemented; native More submenu and Properties corrections await user retest. The four requirement capabilities have automated evidence; final acceptance remains open for the three native interaction checks in 02-UAT.md. Phase 3 remains pending.
+Status: **human_needed**. All nine plans are implemented. More submenu and Properties are user-approved; typography, branch-copy and unlock corrections await focused retest. The four requirement capabilities have automated evidence; final acceptance remains open for the three native interaction checks and the behavior retest in 02-UAT.md. Phase 3 remains pending.
 
-Verified implementation HEAD: `cc7fd89fa6680728e43bc1d147227e9754869404`.
+Verified implementation HEAD: `5bb1e4c3c3781d6cb36ba4d6766357dc1aff94ad`.
 
 Method: Inline orchestrator goal-backward verification using the GSD verifier role and report contract. The session agent limit prevented a fresh verifier dispatch; no independent typed-verifier run is claimed. Source, wiring, actual test assertions and execution logs were inspected. Code/UI reviewers reused executor threads with the independence limits stated in their reports.
 
@@ -194,3 +203,10 @@ The executable checklist is 02-UAT.md. Requirements remain unchecked and Phase 2
 ## Plan 02-08 correction verification
 
 Native ToolbarModuleExtension → More → Object actions → current-host menu event is registered through extensions.ts. The standalone trigger is removed. Alignment entries require selection.count > 1 and existing guards remain. Properties, right-click access and keyboard focus persist. Current correction evidence: 204/204 affected browser cases, 67/67 units, typecheck and build passed; see 02-08-SUMMARY.md. Earlier broader suite counts retain their recorded revisions. Phase acceptance remains human_needed.
+
+
+## Plan 02-09 correction verification
+
+The 572-case matrix passed 571 cases and exposed one reload-hydration race in the workflow fixture. After waiting for a single hydrated editor, the workflow passed 4/4 projects (development Chromium and production Chromium, Firefox and WebKit). All 572 distinct matrix scenarios therefore have passing evidence; the original run is not represented as a clean sweep. Typecheck, production build and 67/67 unit tests passed.
+
+Native addTopic inherits presentation; clipboard/duplicate conversion preserves topology with fresh identities and operation-owned rollback. ObjectContextMenu stays mounted after deselection and both unlock routes resolve the effective lock owner. The original 31-truth score retains its historical scope; the corrective plan has behavior-specific test evidence and pending user retest. See 02-09-SUMMARY.md.
