@@ -1,3 +1,4 @@
+import { openMindmapProperties } from "./mindmap-properties";
 import {test,expect} from './fixtures';
 import type {Page} from '@playwright/test';
 import type {GfxController} from '@blocksuite/affine/std/gfx';
@@ -33,10 +34,13 @@ test('@02-06-03 daily workflow retains formatted collapsed independent maps besi
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({name:'synthetic-workflow.png',mimeType:'image/png',buffer:Buffer.from(image,'base64')});
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
   await page.getByRole('button',{name:'Add mind map',exact:true}).click();await typeTopic(page,'Daily plan');
+  await openMindmapProperties(page);
   await page.getByRole('button',{name:'Add child',exact:true}).click();await typeTopic(page,'Research');
+  await openMindmapProperties(page);
   await page.getByRole('button',{name:'Add child',exact:true}).click();
   await page.keyboard.press('ControlOrMeta+a');await page.keyboard.type('Evidence');await page.keyboard.press('Shift+Enter');await page.keyboard.type('Next line');await page.keyboard.press('Enter');
   await expect(page.locator('edgeless-shape-text-editor')).toHaveCount(0);
+  await openMindmapProperties(page);
   await page.getByLabel('Font size',{exact:true}).fill('31');await page.getByLabel('Font size',{exact:true}).press('Tab');
   await page.getByRole('combobox',{name:'Font weight',exact:true}).selectOption('700');
   await page.getByLabel('Text color',{exact:true}).fill('#234567');
@@ -52,6 +56,7 @@ test('@02-06-03 daily workflow retains formatted collapsed independent maps besi
   expect(copy.nodes.map(n=>n.text).sort()).toEqual(source.nodes.map(n=>n.text).sort());
   expect(copy.nodes.every(n=>!source.nodes.some(s=>s.id===n.id))).toBe(true);
   await selectLayer(page,copy.nodes.find(n=>!n.parent)!.id);
+  await openMindmapProperties(page);
   await page.getByLabel('Font size',{exact:true}).fill('40');await page.getByLabel('Font size',{exact:true}).press('Tab');
   expect((await maps(page)).find(m=>m.id===source.id)).toEqual(source);
   await page.getByRole('button',{name:'Saved locally',exact:true}).waitFor();const saved=await maps(page);

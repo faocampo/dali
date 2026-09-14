@@ -29,7 +29,12 @@ export function installMindmapShortcuts(host: EditorHost, onError: (error: unkno
     const editor = path.find(target => target instanceof HTMLElement && target.matches('edgeless-shape-text-editor')) as HTMLElement | undefined;
     const external = path.some(target => target instanceof HTMLElement && !editor &&
       (target.isContentEditable || target.matches('input,textarea,select,button,[role="dialog"],[role="menu"],[role="textbox"]')));
-    if (external) { event.stopPropagation(); return; }
+    if (external) {
+      // Portalled menus own their Escape/activation keys and never bubble
+      // through the native canvas host.
+      if (path.some(target => target instanceof HTMLElement && target.matches('[role="menu"],.mindmap-panel') && !host.contains(target))) return;
+      event.stopPropagation(); return;
+    }
     const inCanvas = path.includes(host) || event.target === doc.body;
     if (!inCanvas) return;
     if (composing || event.isComposing || (endingComposition && event.key === 'Enter')) { stop(event, false); return; }

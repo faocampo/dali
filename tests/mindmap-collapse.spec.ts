@@ -1,3 +1,4 @@
+import { openMindmapProperties } from "./mindmap-properties";
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -8,6 +9,7 @@ async function seed(page: Page) {
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
   await page.keyboard.press('Enter');
+  await openMindmapProperties(page);
   return page.locator('affine-edgeless-root').evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;

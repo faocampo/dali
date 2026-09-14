@@ -1,3 +1,4 @@
+import { openMindmapProperties } from "./mindmap-properties";
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -41,6 +42,7 @@ test('@02-03-01 child sibling root Enter and context controls create one intende
   expect(before[1]!.parent).toBe(before[0]!.id);
   expect(before[2]!.parent).toBe(before[0]!.id);
   expect(before[2]!.index > before[1]!.index).toBe(true);
+  await openMindmapProperties(page);
   await page.getByRole('button', { name: 'Add child', exact: true }).click();
   await expect.poll(async () => (await nodes(page)).length).toBe(4);
   expect((await nodes(page))[3]!.parent).toBe(before[2]!.id);
@@ -78,6 +80,7 @@ test('@02-03-01 held keys, external shadow input and context focus create no ext
   await page.keyboard.down('Tab'); await page.keyboard.down('Tab'); await page.keyboard.up('Tab');
   await expect.poll(async () => (await nodes(page)).length).toBe(2);
   await page.keyboard.press('Escape');
+  await openMindmapProperties(page);
   await page.getByRole('button', { name: 'Add sibling', exact: true }).focus();
   await page.keyboard.press('Tab');
   expect(await nodes(page)).toHaveLength(2);

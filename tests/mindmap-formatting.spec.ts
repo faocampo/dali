@@ -1,3 +1,4 @@
+import { openMindmapProperties } from "./mindmap-properties";
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -8,6 +9,7 @@ async function seed(page: Page, text = 'Research') {
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
   await page.keyboard.press('Enter');
+  await openMindmapProperties(page);
   return page.locator('affine-edgeless-root').evaluate((el, text) => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;
@@ -126,6 +128,7 @@ test('@02-05-02 absent multi unrelated readonly and locked selections cannot for
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     gfx.surface!.getElementById(id)!.lock(); gfx.selection.set({ elements: [id], editing: false });
   }, ids.a);
+  await openMindmapProperties(page);
   await expect(page.getByRole('spinbutton', { name: 'Font size' })).toBeDisabled();
   await page.locator('affine-edgeless-root').evaluate((el, id) => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;

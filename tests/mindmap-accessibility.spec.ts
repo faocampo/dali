@@ -1,3 +1,4 @@
+import { openMindmapProperties } from "./mindmap-properties";
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -8,6 +9,7 @@ async function create(page: Page) {
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
   await page.keyboard.press('Enter');
+  await openMindmapProperties(page);
 }
 
 async function expectTopicClear(page: Page) {
@@ -18,8 +20,9 @@ async function expectTopicClear(page: Page) {
     const host = el.closest('editor-host')!.getBoundingClientRect();
     const controls = document.querySelector('.mindmap-panel')!.getBoundingClientRect();
     const left = bound.x + host.x, top = bound.y + host.y;
-    return left + bound.w + 8 <= controls.left || left >= controls.right + 8 ||
+    const separate = left + bound.w + 8 <= controls.left || left >= controls.right + 8 ||
       top + bound.h + 8 <= controls.top || top >= controls.bottom + 8;
+    return separate && left >= 8 && top >= 8 && left + bound.w <= innerWidth - 8 && top + bound.h <= innerHeight - 8;
   })).toBe(true);
 }
 
@@ -31,6 +34,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await page.getByRole('button', { name: 'Add child', exact: true }).click();
     await page.keyboard.type('Synthetic review topic');
     await page.keyboard.press('Enter');
+    await openMindmapProperties(page);
     const panel = page.getByRole('region', { name: 'Mind-map topic', exact: true });
     await expect(panel).toBeVisible();
     await expectTopicClear(page);
@@ -110,11 +114,13 @@ test('@02-05-03 empty loading populated partial and long-text states retain usab
     return String((map.tree.element as unknown as { text: unknown }).text);
   }), { timeout: 3000 }).toBe('');
   await page.keyboard.press('Enter');
-  await expect(page.getByText('Topic: Empty topic', { exact: true })).toBeVisible();
+  await openMindmapProperties(page);
+  await expect(page.getByText('Topic: Empty topic', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('spinbutton', { name: 'Font size' })).toBeEnabled();
   await page.getByRole('button', { name: 'Add child', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
   await page.keyboard.type('A long accessible topic '.repeat(12)); await page.keyboard.press('Enter');
+  await openMindmapProperties(page);
   await expect(page.getByRole('status').filter({ hasText: 'Level 1. Parent: Empty topic.' })).toBeVisible();
   await expect(page.getByText('Start a mind map', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();

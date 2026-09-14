@@ -10,13 +10,21 @@ import {
   type AlignmentAction,
 } from './arrangement';
 
-export function ObjectContextMenu({host,selection,placement}: {host:EditorHost;selection:CanvasSelectionSummary;placement?:'top'}) {
+export function ObjectContextMenu({host,selection,placement,onProperties}: {host:EditorHost;selection:CanvasSelectionSummary;placement?:'top';onProperties?:()=>void}) {
   const [point,setPoint]=useState<{left:number;top:number}|null>(null);
   const [actionError,setActionError]=useState<string|null>(null);
   const [,setImageRevision]=useState(0);
   const ref=useRef<HTMLDivElement>(null);
   const trigger=useRef<HTMLButtonElement>(null);
-  const openAt=(x:number,y:number)=>setPoint({left:Math.max(8,Math.min(x,window.innerWidth-240)),top:Math.max(8,Math.min(y,window.innerHeight-560))});
+  const openedSelection=useRef('');
+  const currentSelection=()=>host.std.get(GfxControllerIdentifier).selection.selectedElements.map(model=>model.id).sort().join('|');
+  const openAt=(x:number,y:number)=>{openedSelection.current=currentSelection();setPoint({left:Math.max(8,Math.min(x,window.innerWidth-240)),top:Math.max(8,Math.min(y,window.innerHeight-560))});};
+  useEffect(()=>{
+    const gfx=host.std.get(GfxControllerIdentifier);
+    const selected=gfx.selection.slots.updated.subscribe(()=>{if(currentSelection()!==openedSelection.current)setPoint(null);});
+    const removed=gfx.surface?.elementRemoved.subscribe(()=>setPoint(null));
+    return()=>{selected.unsubscribe();removed?.unsubscribe();};
+  },[host]);
   useEffect(()=>{
     const open=(e:MouseEvent)=>{
       if(e.target instanceof Element && e.target.closest('input,textarea,[contenteditable="true"]')) return;
@@ -56,6 +64,10 @@ export function ObjectContextMenu({host,selection,placement}: {host:EditorHost;s
           <section>
             
             <div className="layers-action-grid">
+              {onProperties&&<button role="menuitem" onClick={()=>{
+                if(host.isConnected&&currentSelection()===openedSelection.current)onProperties();
+                setPoint(null);
+              }}>Properties</button>}
               <button role="menuitem" disabled={!canvasSelectionEditable(host)} title="Duplicate (⌘/Ctrl+D)"
                 onClick={() => void duplicateCanvasSelection(host).catch(cause => setActionError(String(cause)))}>Duplicate</button>
               <button role="menuitem" disabled={!selectedLayerCanGroup(host)} title="Group (⌘/Ctrl+G)"

@@ -256,7 +256,8 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
   }, [open, selection?.key, cropOpen]);
 
   if (!selection) return null;
-  if (singleMindmapTopic) return <ObjectContextMenu host={host} selection={selection} placement="top" />;
+  if (singleMindmapTopic) return <ObjectContextMenu host={host} selection={selection}
+    onProperties={() => host.dispatchEvent(new Event('dali:mindmap-properties'))} />;
 
   const imageActions = !cropOpen && selection.kind === 'image' && quickPosition && (
     <div

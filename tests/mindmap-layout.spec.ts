@@ -1,3 +1,4 @@
+import { openMindmapProperties } from "./mindmap-properties";
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -8,6 +9,7 @@ export async function seedLayout(page: Page, size = 7) {
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
   await page.keyboard.press('Enter');
+  await openMindmapProperties(page);
   return page.locator('affine-edgeless-root').evaluate((el, size) => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;
@@ -112,6 +114,7 @@ test('@02-05-01 multiline edit add delete and history use measured native geomet
     (el as HTMLElement & { gfx: GfxController }).gfx.selection.set({ elements: [id], editing: false });
   }, ids.a);
   const before = await geometry(page);
+  await openMindmapProperties(page);
   await page.getByRole('group', { name: 'Mind-map layout', exact: true }).getByRole('button', { name: 'Left', exact: true }).click();
   const left = await geometry(page);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
