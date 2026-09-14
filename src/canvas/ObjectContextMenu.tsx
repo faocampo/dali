@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, type GfxModel } from '@blocksuite/affine/std/gfx';
 import type { CanvasSelectionSummary } from './selection-summary';
+import { OBJECT_ACTIONS_EVENT } from './object-actions-toolbar';
 import {
   alignCanvasSelection, canvasSelectionEditable, duplicateCanvasSelection,
   groupCanvasSelection, ungroupCanvasSelection, selectedLayerCanGroup,
@@ -10,20 +11,47 @@ import {
   type AlignmentAction,
 } from './arrangement';
 
-export function ObjectContextMenu({host,selection,placement,onProperties}: {host:EditorHost;selection:CanvasSelectionSummary;placement?:'top';onProperties?:()=>void}) {
+export function ObjectContextMenu({host,selection,onProperties}: {host:EditorHost;selection:CanvasSelectionSummary;onProperties?:()=>void}) {
   const [point,setPoint]=useState<{left:number;top:number}|null>(null);
   const [actionError,setActionError]=useState<string|null>(null);
   const [,setImageRevision]=useState(0);
   const ref=useRef<HTMLDivElement>(null);
-  const trigger=useRef<HTMLButtonElement>(null);
+  const trigger=useRef<HTMLElement|null>(null);
   const openedSelection=useRef('');
   const currentSelection=()=>host.std.get(GfxControllerIdentifier).selection.selectedElements.map(model=>model.id).sort().join('|');
   const openAt=(x:number,y:number)=>{openedSelection.current=currentSelection();setPoint({left:Math.max(8,Math.min(x,window.innerWidth-240)),top:Math.max(8,Math.min(y,window.innerHeight-560))});};
+  useLayoutEffect(()=>{
+    if(!point||!ref.current)return;
+    const menu=ref.current.getBoundingClientRect();
+    const anchor=trigger.current;
+    const parent=anchor?.closest('editor-menu-button')?.shadowRoot?.querySelector('editor-menu-content')?.getBoundingClientRect();
+    let left=point.left,top=point.top;
+    if(parent&&anchor){
+      const item=anchor.getBoundingClientRect();
+      if(parent.right+8+menu.width<=window.innerWidth-8){left=parent.right+8;top=item.top;}
+      else if(parent.left-8-menu.width>=8){left=parent.left-8-menu.width;top=item.top;}
+      else {left=parent.left;top=parent.bottom+8+menu.height<=window.innerHeight-8?parent.bottom+8:parent.top-8-menu.height;}
+    }
+    left=Math.max(8,Math.min(left,window.innerWidth-menu.width-8));
+    top=Math.max(8,Math.min(top,window.innerHeight-menu.height-8));
+    if(left!==point.left||top!==point.top)setPoint({left,top});
+  },[point]);
   useEffect(()=>{
     const gfx=host.std.get(GfxControllerIdentifier);
     const selected=gfx.selection.slots.updated.subscribe(()=>{if(currentSelection()!==openedSelection.current)setPoint(null);});
     const removed=gfx.surface?.elementRemoved.subscribe(()=>setPoint(null));
     return()=>{selected.unsubscribe();removed?.unsubscribe();};
+  },[host]);
+  useEffect(()=>{
+    const open=(event:Event)=>{
+      const anchor=(event as CustomEvent<{anchor:HTMLElement}>).detail?.anchor;
+      if(!host.isConnected||!anchor?.isConnected||!currentSelection())return;
+      trigger.current=anchor;
+      const rect=anchor.getBoundingClientRect();
+      openAt(rect.right+8,rect.top);
+    };
+    host.addEventListener(OBJECT_ACTIONS_EVENT,open);
+    return()=>host.removeEventListener(OBJECT_ACTIONS_EVENT,open);
   },[host]);
   useEffect(()=>{
     const open=(e:MouseEvent)=>{
@@ -32,29 +60,30 @@ export function ObjectContextMenu({host,selection,placement,onProperties}: {host
       const point=gfx.viewport.toModelCoord(...gfx.viewport.toViewCoordFromClientCoord([e.clientX,e.clientY]));
       const target=gfx.getElementByPoint(...point);
       if(!target)return;
+      trigger.current=host;
       e.preventDefault();e.stopImmediatePropagation();
       if(!gfx.selection.selectedElements.some(m=>m.id===target.id))gfx.selection.set({elements:[target.id],editing:false});
       openAt(e.clientX,e.clientY);
     };
-    const keyboard=(e:KeyboardEvent)=>{if(e.key==='F10'&&e.shiftKey){e.preventDefault();const r=host.getBoundingClientRect();openAt(r.left+80,r.top+80);}};
+    const keyboard=(e:KeyboardEvent)=>{if(e.key==='F10'&&e.shiftKey){e.preventDefault();trigger.current=host;const r=host.getBoundingClientRect();openAt(r.left+80,r.top+80);}};
     host.addEventListener('contextmenu',open,true);host.addEventListener('keydown',keyboard,true);
     return()=>{host.removeEventListener('contextmenu',open,true);host.removeEventListener('keydown',keyboard,true);};
   },[host,selection.key]);
 
-  useEffect(()=>{
+  useLayoutEffect(()=>{
     if(!point)return;
+    trigger.current?.setAttribute('aria-expanded','true');
     ref.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
     const outside=(e:PointerEvent)=>{if(!ref.current?.contains(e.target as Node)&&!trigger.current?.contains(e.target as Node))setPoint(null);};
     document.addEventListener('pointerdown',outside,true);
-    return()=>document.removeEventListener('pointerdown',outside,true);
-  },[point]);
+    return()=>{document.removeEventListener('pointerdown',outside,true);trigger.current?.setAttribute('aria-expanded','false');};
+  },[!!point]);
   return <>
-    <button ref={trigger} className="object-actions-trigger djai-ghost" data-placement={placement} aria-haspopup="menu" aria-expanded={!!point}
-      onPointerDown={e=>e.stopPropagation()} onClick={e=>{const r=e.currentTarget.getBoundingClientRect();if(point)setPoint(null);else openAt(r.left,r.bottom+8);}}>Object actions</button>
     {point&&createPortal(<div ref={ref} className="object-context-menu" data-testid="object-context-menu" role="menu" aria-label="Object actions" style={point}
+      onClick={e=>e.stopPropagation()}
       onPointerDown={e=>e.stopPropagation()} onKeyDown={e=>{
         e.stopPropagation();
-        if(e.key==='Escape'){setPoint(null);trigger.current?.focus();}
+        if(e.key==='Escape'||e.key==='ArrowLeft'){e.preventDefault();setPoint(null);trigger.current?.focus();}
         if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){
           e.preventDefault();const buttons=[...e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
           const i=buttons.indexOf(document.activeElement as HTMLButtonElement);
@@ -74,7 +103,7 @@ export function ObjectContextMenu({host,selection,placement,onProperties}: {host
                 onClick={() => groupCanvasSelection(host)}>Group</button>
               <button role="menuitem" disabled={!selectedLayerCanUngroup(host)} title="Ungroup (⌘/Ctrl+Shift+G)"
                 onClick={() => ungroupCanvasSelection(host)}>Ungroup</button>
-              {(['left', 'center-x', 'right', 'top', 'center-y', 'bottom', 'distribute-x', 'distribute-y'] as AlignmentAction[]).map(action =>
+              {selection.count>1&&(['left', 'center-x', 'right', 'top', 'center-y', 'bottom', 'distribute-x', 'distribute-y'] as AlignmentAction[]).map(action =>
                 <button role="menuitem" key={action} disabled={!canvasSelectionEditable(host) || selection.count < (action.startsWith('distribute') ? 3 : 2)}
                   onClick={() => alignCanvasSelection(host, action)}>{`Align ${action}`}</button>)}
               {(['front', 'back'] as const).map(direction => <button role="menuitem" key={direction}

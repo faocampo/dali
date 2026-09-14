@@ -82,6 +82,7 @@ import { EdgelessSelectedRectViewExtension } from '@blocksuite/affine-widget-edg
 import { EdgelessZoomToolbarViewExtension } from '@blocksuite/affine-widget-edgeless-zoom-toolbar/view';
 import { FrameTitleViewExtension } from '@blocksuite/affine/widgets/frame-title/view';
 import { ToolbarViewExtension } from '@blocksuite/affine/widgets/toolbar/view';
+import { ObjectActionsToolbarExtension } from './object-actions-toolbar';
 import {
   ImageVisualEditStoreExtension,
   ImageVisualEditViewExtension,
@@ -145,5 +146,6 @@ export const viewExtensions = [
   EdgelessDraggingAreaViewExtension,
   FrameTitleViewExtension,
   ToolbarViewExtension,
+  ObjectActionsToolbarExtension,
   ImageVisualEditViewExtension,
 ];

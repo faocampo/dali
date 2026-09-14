@@ -1,3 +1,4 @@
+import { openObjectActions } from './object-actions';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -99,7 +100,7 @@ for (const angle of [90, 37]) test(`rotated ${angle} degree image keeps native g
 test('Duplicate gives edited images independent history and placement', async ({ page }) => {
   await setup(page); await crop(page);
   const original = (await state(page)).images[0]!;
-  await page.getByRole('button',{name:'Object actions',exact:true}).click();
+  await openObjectActions(page);
   await page.getByRole('menuitem', { name: 'Duplicate', exact: true }).click();
   await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
   await expect.poll(async () => (await state(page)).edits.length).toBe(2);

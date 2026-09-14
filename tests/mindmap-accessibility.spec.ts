@@ -39,13 +39,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(panel).toBeVisible();
     await expectTopicClear(page);
     await expect(page.getByTestId('selection-inspector')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Object actions', exact: true })).toBeVisible();
-    const weight = page.getByRole('combobox', { name: 'Font weight', exact: true });
-    await weight.scrollIntoViewIfNeeded();
-    const weightBox = (await weight.boundingBox())!;
-    const actionsBox = (await page.getByRole('button', { name: 'Object actions', exact: true }).boundingBox())!;
-    expect(actionsBox.x + actionsBox.width <= weightBox.x || actionsBox.x >= weightBox.x + weightBox.width ||
-      actionsBox.y + actionsBox.height <= weightBox.y || actionsBox.y >= weightBox.y + weightBox.height).toBe(true);
+    await expect(page.locator('.object-actions-trigger')).toHaveCount(0);
     await page.locator('affine-edgeless-root').evaluate(el => {
       const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
       const id = gfx.surface!.addElement({ type: 'shape', xywh: '[10,10,100,80]' });

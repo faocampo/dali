@@ -1,3 +1,4 @@
+import { openObjectActions } from './object-actions';
 import { test, expect } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { MindmapElementModel } from '@blocksuite/affine/model';
@@ -15,7 +16,7 @@ test('@02-uat-properties Properties opens only from the context menu and stays c
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('New topic');
   await expect(panel).toHaveCount(0);
   await page.keyboard.type('Synthetic child'); await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Object actions', exact: true }).click();
+  await openObjectActions(page);
   await page.getByRole('menuitem', { name: 'Properties', exact: true }).click();
   await expect(panel).toHaveClass(/selection-inspector/);
   await expect(panel.locator('.selection-inspector__eyebrow')).toHaveText('Properties');
@@ -73,7 +74,7 @@ for (const invalidation of ['selection', 'removed', 'detached'] as const) {
     await page.goto('/'); await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
     await page.keyboard.press('Enter');
-    await page.getByRole('button', { name: 'Object actions', exact: true }).click();
+    await openObjectActions(page);
     const property = page.getByRole('menuitem', { name: 'Properties', exact: true });
     await property.evaluate((el, invalidation) => {
       const root = document.querySelector('affine-edgeless-root') as HTMLElement & { gfx: GfxController };
@@ -114,12 +115,13 @@ test('@02-uat-properties context menu owns Escape and keyboard navigation', asyn
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
   await page.keyboard.press('Enter');
-  const trigger = page.getByRole('button', { name: 'Object actions', exact: true });
-  await trigger.click(); await page.keyboard.press('Escape');
+  const trigger = page.getByRole('menuitem', { name: 'Object actions', exact: true });
+  await openObjectActions(page); await page.keyboard.press('Escape');
   await expect(page.getByRole('menu', { name: 'Object actions', exact: true })).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await trigger.press('Enter');
   const menu = page.getByRole('menu', { name: 'Object actions', exact: true });
+  await expect(menu.getByRole('menuitem', { name: 'Properties', exact: true })).toBeFocused();
   await page.keyboard.press('End'); await expect(menu.getByRole('menuitem').last()).toBeFocused();
   await page.keyboard.press('Home'); await expect(menu.getByRole('menuitem', { name: 'Properties', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowDown'); await expect(menu.getByRole('menuitem', { name: 'Duplicate', exact: true })).toBeFocused();

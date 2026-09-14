@@ -32,7 +32,7 @@ export function installMindmapShortcuts(host: EditorHost, onError: (error: unkno
     if (external) {
       // Portalled menus own their Escape/activation keys and never bubble
       // through the native canvas host.
-      if (path.some(target => target instanceof HTMLElement && target.matches('[role="menu"],.mindmap-panel') && !host.contains(target))) return;
+      if (path.some(target => target instanceof HTMLElement && (target.matches('editor-menu-button') || (target.matches('[role="menu"],.mindmap-panel') && !host.contains(target))))) return;
       event.stopPropagation(); return;
     }
     const inCanvas = path.includes(host) || event.target === doc.body;
@@ -51,6 +51,17 @@ export function installMindmapShortcuts(host: EditorHost, onError: (error: unkno
       editor.addEventListener('blur', blur => blur.stopImmediatePropagation(), { capture: true, once: true });
       editor.remove();
       selected.gfx.selection.set({ elements: [selected.shape.id], editing: false });
+      // Native More follows the topic bounds. Reveal an offscreen committed
+      // topic so the toolbar remains reachable on narrow canvases.
+      const viewport = selected.gfx.viewport;
+      const bound = viewport.toViewBound(selected.shape.elementBound);
+      const rect = host.getBoundingClientRect();
+      const left = Math.max(24, Math.min(bound.x, Math.max(24, rect.width - bound.w - 24)));
+      const top = Math.max(80, Math.min(bound.y, Math.max(80, rect.height - bound.h - 24)));
+      if (left !== bound.x || top !== bound.y) viewport.setCenter(
+        viewport.center.x + (bound.x - left) / viewport.zoom,
+        viewport.center.y + (bound.y - top) / viewport.zoom
+      );
       (doc.activeElement as HTMLElement | null)?.blur();
       return;
     }
