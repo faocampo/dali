@@ -16,7 +16,9 @@ number: 1
 name: Explicit Properties sidebar retest
 expected: |
   Select a topic, press Tab, and enter its text: Properties stays closed.
-  Right-click the topic and choose Properties: a matching right-side panel opens.
+  Open the selection toolbar More menu, then Object actions → Properties:
+  a matching right-side panel opens. Alignment entries are absent for one object
+  and appear when multiple objects are selected.
   Close the panel, select another topic, or resume editing: it stays closed until
   Properties is requested again. Confirm the panel appearance and workflow.
 awaiting: user response
@@ -60,3 +62,7 @@ blocked: 0
   evidence: "02-07-SUMMARY.md; explicit-opening, editing, focus and stale-action browser regressions pass."
 
 Keyboard actions are reported working. This presentation correction requires retest; native input environment details remain unreported.
+
+## Follow-up menu correction
+
+User requested Object actions as a submenu of the native More menu and alignment entries only for multi-selection. Plan 02-08 captures this correction. Properties and this menu placement remain pending user retest.

@@ -1,6 +1,6 @@
 ---
 phase: 02-daily-mind-maps
-verified: 2026-09-14T16:12:59+00:00
+verified: 2026-09-14T17:21:45+00:00
 status: human_needed
 score: 29/31 plan truths verified; 2 native interaction checks pending
 covered_files:
@@ -19,12 +19,15 @@ covered_files:
   - .planning/phases/02-daily-mind-maps/02-06-SUMMARY.md
   - .planning/phases/02-daily-mind-maps/02-07-PLAN.md
   - .planning/phases/02-daily-mind-maps/02-07-SUMMARY.md
+  - .planning/phases/02-daily-mind-maps/02-08-PLAN.md
+  - .planning/phases/02-daily-mind-maps/02-08-SUMMARY.md
   - .planning/phases/02-daily-mind-maps/02-UI-SPEC.md
   - src/boards/operations.ts
   - src/canvas/BlockSuiteCanvas.tsx
   - src/canvas/LayersInspector.tsx
   - src/canvas/MindMapInspector.tsx
   - src/canvas/ObjectContextMenu.tsx
+  - src/canvas/object-actions-toolbar.ts
   - src/canvas/SelectionInspector.tsx
   - src/canvas/arrangement.ts
   - src/canvas/blocksuite-editor.ts
@@ -41,6 +44,10 @@ covered_files:
   - src/header/ExportDialog.tsx
   - src/index.css
   - tests/canvas-editing.spec.ts
+  - tests/canvas-arrangement.spec.ts
+  - tests/image-visual-edits.spec.ts
+  - tests/object-actions.ts
+  - tests/object-actions-submenu.spec.ts
   - tests/clipboard-route.ts
   - tests/fixtures.ts
   - tests/mindmap-accessibility.spec.ts
@@ -57,7 +64,7 @@ covered_files:
   - tests/mindmap-workflow.spec.ts
   - tests/mindmap.spec.ts
   - vite.config.ts
-covered_digest: "v1:sha256:033b5f4e2232e0a205d0e045dee073b40586b8c3f20ebab1fac62052bea322f5"
+covered_digest: "v1:sha256:45180db475c73669004dc475229719b7c8e07387f0e3ad5c27a88710e67b3bfb"
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
@@ -76,9 +83,9 @@ human_verification:
 
 Goal: Users can develop and reorganize readable mind maps through rapid keyboard editing and automatic hierarchical layout.
 
-Status: **human_needed**. All seven plans are implemented; the explicit Properties correction awaits user retest. The four requirement capabilities have automated evidence; final acceptance remains open for the three native interaction checks in 02-UAT.md. Phase 3 remains pending.
+Status: **human_needed**. All eight plans are implemented; native More submenu and Properties corrections await user retest. The four requirement capabilities have automated evidence; final acceptance remains open for the three native interaction checks in 02-UAT.md. Phase 3 remains pending.
 
-Verified implementation HEAD: `28329b35dd40c1d8e3a69fff341229e6d6a95555`.
+Verified implementation HEAD: `cc7fd89fa6680728e43bc1d147227e9754869404`.
 
 Method: Inline orchestrator goal-backward verification using the GSD verifier role and report contract. The session agent limit prevented a fresh verifier dispatch; no independent typed-verifier run is claimed. Source, wiring, actual test assertions and execution logs were inspected. Code/UI reviewers reused executor threads with the independence limits stated in their reports.
 
@@ -183,3 +190,7 @@ No unresolved functional review blocker remains. Properties presentation retest 
 3. **Firefox and WebKit/Safari native clipboard:** copy/paste a nested collapsed map and independently edit its copy in each available browser. Record environments separately.
 
 The executable checklist is 02-UAT.md. Requirements remain unchecked and Phase 2 remains pending human acceptance until those results are recorded.
+
+## Plan 02-08 correction verification
+
+Native ToolbarModuleExtension → More → Object actions → current-host menu event is registered through extensions.ts. The standalone trigger is removed. Alignment entries require selection.count > 1 and existing guards remain. Properties, right-click access and keyboard focus persist. Current correction evidence: 204/204 affected browser cases, 67/67 units, typecheck and build passed; see 02-08-SUMMARY.md. Earlier broader suite counts retain their recorded revisions. Phase acceptance remains human_needed.

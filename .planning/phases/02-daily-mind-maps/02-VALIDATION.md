@@ -150,3 +150,7 @@ Post-review UI correction `a05b94d`: 36/36 accessibility cases across four proje
 - 02-07-02 / MIND-01, MIND-04: `tests/mindmap-properties.ts` supplies an actual Object actions → Properties gesture to affected formatting, collapse, keyboard, layout and workflow suites. Existing content/history assertions remain.
 - RED reproduced automatic opening, swallowed menu Escape and narrow-view topic containment. The final 392/392 mind-map browser matrix passed across dev Chromium and production Chromium, Firefox and WebKit; 67/67 unit tests, typecheck and build passed.
 - Ordinary regression totals and final source revision are recorded in 02-07-SUMMARY.md. Native IME, real browser magnification and non-Chromium OS clipboard acceptance remain separately pending in 02-UAT.md.
+
+## Plan 02-08 — native More submenu
+
+The final affected matrix passed 204/204 cases across four browser projects, with 67/67 units, typecheck and build passing. `object-actions-submenu.spec.ts` verifies native More nesting, submenu placement, keyboard return/reopen, Properties and single/two-object alignment visibility. Existing arrangement tests validate all eight alignment/distribution operations; Properties, image, keyboard and accessibility suites validate preserved behavior. The earlier 392-case result remains tied to plan 02-07. See 02-08-SUMMARY.md for this correction's evidence.

@@ -82,3 +82,7 @@ No commits were created during review or remediation. Exact remediation source/t
 The review covered explicit opening, editing and dismissal lifecycle, menu keyboard ownership, stale selection/host handling and sidebar-only viewport framing. A reused executor reviewed the correction read-only; the orchestrator inspected the production diff. A fresh independent verifier was unavailable in this session.
 
 The editing-state finding is closed: entering text editing clears open state, rendering and opening reject editing, and an unmounted panel cannot pan. Menu Escape returns focus to its trigger; pane Escape returns focus to the canvas. Captured selection identity and current-host checks reject stale Properties activation. Focused tests cover these paths, including Add child and double-click editing. No unresolved source blocker remains in this correction. Execution evidence is recorded in 02-07-SUMMARY.md.
+
+## Native More submenu review — 2026-09-14
+
+Read-only review of plan 02-08 found no concrete blocker. The native ToolbarModuleExtension uses ActionPlacement.More; subscriptions and host listeners dispose on teardown. Selection changes/removal dismiss the submenu and Properties retains current-host/selection guards. Escape/ArrowLeft restores the invoking entry; ArrowRight opens the submenu. Alignment entries require multiple selected objects and distribution retains its three-object guard. A reused executor performed this scoped review; runtime results are recorded separately in 02-08-SUMMARY.md.

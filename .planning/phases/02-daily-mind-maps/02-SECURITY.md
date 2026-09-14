@@ -67,3 +67,5 @@ Post-audit adversarial review found inconsistent empty/duplicate sibling order v
 | 02-07 / T-02-23 | Tampering | Properties menu lifecycle | medium | mitigate | CLOSED | ObjectContextMenu captures selected IDs, dismisses on selection/removal, and checks host connectivity before Properties. MindMapInspector checks the current topic and editing state; existing mutation guards remain. mindmap-properties.spec.ts tests changed selection, removal and detached host. |
 
 Inline source audit and reused executor source review found the mitigation wired. This adds a local UI boundary; prior threat dispositions remain unchanged.
+
+Plan 02-08 carries forward T-02-23: the native More adapter dispatches to the current host, the React submenu captures selection identities and dismisses on changes/removal, and Properties checks current connected host/selection before activation. Existing mutation guards remain authoritative. The native extension introduces no external service or data-storage boundary. Read-only source review found no concrete blocker; focused stale-selection/removal/detached-host tests remain in the affected suite.

@@ -132,3 +132,7 @@ User feedback supersedes automatic panel opening and the earlier bottom-panel pr
 Executor and orchestrator inspected final synthetic 1280×800 and 390×844 views. The selected topic is fully inside the narrow viewport below the pane, with 16px separation; desktop positions it 16px left of the pane. Controls remain scrollable. Existing narrow header clipping remains a prior advisory. No new score is inferred from this focused correction.
 
 Final 392/392 mind-map cases and 40/40 ordinary/keyboard regressions pass, together with 67/67 units, typecheck and build. Native browser magnification remains pending human evidence. See 02-07-SUMMARY.md for revision and test provenance.
+
+## Native More correction — 2026-09-14
+
+Object actions now appears as a styled submenu entry in the native selection More menu. The standalone canvas trigger is removed; single selections omit alignment entries. A synthetic desktop capture was inspected and submenu geometry/keyboard behavior and narrow toolbar reachability passed in the 204-case browser matrix. The sidebar interaction remains explicit. See 02-08-SUMMARY.md; prior scores and native magnification limitations retain their historical scope.
