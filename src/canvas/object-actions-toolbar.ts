@@ -1,3 +1,5 @@
+import { canvasLayerLockTarget, setCanvasLayerLocked } from './arrangement';
+import { mindmapOwner } from './selection-summary';
 import { BlockFlavourIdentifier } from '@blocksuite/affine/std';
 import { ActionPlacement, ToolbarModuleExtension } from '@blocksuite/affine/shared/services';
 import { html } from 'lit';
@@ -38,10 +40,29 @@ const objectActionsToolbarModule = ToolbarModuleExtension({
   },
 });
 
+const mindmapUnlockToolbarModule = ToolbarModuleExtension({
+  id: BlockFlavourIdentifier('custom:affine:surface:locked'),
+  config: {
+    when: context => {
+      const models = context.gfx.selection.selectedElements;
+      return models.length === 1 && !!mindmapOwner(models[0]!);
+    },
+    actions: [{
+      id: 'b.unlock',
+      run: context => {
+        const model = context.gfx.selection.selectedElements[0];
+        if (!model || !context.host.isConnected || context.store.readonly || !mindmapOwner(model)) return;
+        const target = canvasLayerLockTarget(context.host, model.id);
+        setCanvasLayerLocked(context.host, target.id, false);
+      },
+    }],
+  },
+});
+
 export class ObjectActionsToolbarExtension extends ViewExtensionProvider {
   override name = 'dali-object-actions-toolbar';
   override setup(context: ViewExtensionContext) {
     super.setup(context);
-    if (this.isEdgeless(context.scope)) context.register(objectActionsToolbarModule);
+    if (this.isEdgeless(context.scope)) context.register([objectActionsToolbarModule, mindmapUnlockToolbarModule]);
   }
 }

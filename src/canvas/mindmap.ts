@@ -199,6 +199,21 @@ function addTopic(host: EditorHost, sibling: boolean): string {
         }
       }
       created = map.addNode(parentId, sibling ? shape.id : undefined, 'after', { text: 'New topic' });
+      // Continue the selected topic's text presentation while retaining the
+      // new node's native branch shape, padding, stroke, and layout defaults.
+      const target = map.surface.getElementById(created) as ShapeElementModel;
+      Object.assign(target, {
+        fontSize: shape.fontSize, fontWeight: shape.fontWeight, color: shape.color,
+        fontFamily: shape.fontFamily, fontStyle: shape.fontStyle,
+        textAlign: shape.textAlign, textVerticalAlign: shape.textVerticalAlign,
+      });
+      const runs = (shape.text?.toDelta() ?? []) as { insert: unknown; attributes?: Record<string, unknown> }[];
+      const attributes = runs.reverse().find(run => typeof run.insert === 'string' && run.insert.length)?.attributes;
+      if (attributes && target.text) {
+        const marks = Object.fromEntries(Object.entries(attributes).filter(([key]) =>
+          ['bold', 'italic', 'underline', 'strike', 'code'].includes(key)));
+        target.text.format(0, target.text.length, marks);
+      }
       map.layout();
     } catch {
       failed = true;

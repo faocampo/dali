@@ -196,7 +196,7 @@ for (const defect of ['orphan', 'cycle', 'duplicate', 'nonfinite', 'empty-order'
     JSON.stringify((el as HTMLElement & { gfx: GfxController }).gfx.doc.spaceDoc.toJSON()))).toBe(documentBefore);
 });
 
-test('@02-02-01 native topic copy produces an independent shape and ordinary duplicate remains available', async ({ page }) => {
+test('@02-02-01 native topic copy preserves its branch and ordinary duplicate remains available', async ({ page }) => {
   const ids = await seed(page);
   const before = await state(page);
   await page.locator('affine-edgeless-root').evaluate((el, id) => {
@@ -204,11 +204,17 @@ test('@02-02-01 native topic copy produces an independent shape and ordinary dup
     gfx.selection.set({ elements: [id], editing: false });
   }, ids.branch);
   await page.keyboard.press('ControlOrMeta+d');
-  await expect.poll(async () => (await state(page)).elements.length).toBe(before.elements.length + 1);
-  expect((await state(page)).maps).toEqual(before.maps);
+  await expect.poll(async () => (await state(page)).elements.length).toBe(before.elements.length + 4);
+  const copied = await state(page);
+  expect(copied.maps[0]!.nodes).toHaveLength(11);
+  await page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    const id = gfx.surface!.addElement({ type: 'shape', xywh: '[0,0,50,50]' });
+    gfx.selection.set({ elements: [id], editing: false });
+  });
   await page.keyboard.press('ControlOrMeta+d');
-  await expect.poll(async () => (await state(page)).elements.length).toBe(before.elements.length + 2);
-  expect((await state(page)).maps).toEqual(before.maps);
+  await expect.poll(async () => (await state(page)).elements.length).toBe(copied.elements.length + 2);
+  expect((await state(page)).maps).toEqual(copied.maps);
 });
 
 test('@02-02-01 source lock immediately before native conversion prevents mutation', async ({ page }) => {

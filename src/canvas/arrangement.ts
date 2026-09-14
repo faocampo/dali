@@ -190,6 +190,13 @@ export function reorderCanvasLayer(
   host.std.store.captureSync();
 }
 
+/** Resolve the actual lock owner, including a containing mind map. */
+export function canvasLayerLockTarget(host: EditorHost, id: string): GfxModel {
+  let model = modelById(host, id);
+  while (!model.isLockedBySelf() && model.group && model.isLockedByAncestor()) model = model.group;
+  return model;
+}
+
 export function setCanvasLayerLocked(host: EditorHost, id: string, locked: boolean): void {
   if (!host.isConnected || host.std.store.readonly) return;
   const model = modelById(host, id);

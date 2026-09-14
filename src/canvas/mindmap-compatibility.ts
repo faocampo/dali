@@ -8,6 +8,7 @@ import type { Store } from '@blocksuite/affine/store';
 import { createGroupCommand, createGroupFromSelectedCommand, ungroupCommand } from '@blocksuite/affine-gfx-group';
 import { canvasModelVisible, mindmapArrangementReason, mindmapOwner, nativeMindmapState } from './selection-summary';
 import { validateMindmapState } from './mindmap-state';
+import { convertMindmapBranch, installMindmapBranchClipboard } from './mindmap-node-copy';
 
 const MAX_COPY_ELEMENTS = 10_000;
 const copySources = new WeakMap<EditorHost, () => boolean>();
@@ -87,6 +88,7 @@ function installCopyBoundary(host: EditorHost): () => void {
   const nativeRemove = crud.removeElement;
   let removing = false;
   let active = true;
+  const disposeBranchClipboard = installMindmapBranchClipboard(host, validateMindmapCopyData);
   const current = () => active && host.isConnected && host.store === store && !store.readonly && (copySources.get(host)?.() ?? true);
   manager.exec = ((command, input) => {
     if ((command as unknown) === createGroupCommand) {
@@ -101,6 +103,21 @@ function installCopyBoundary(host: EditorHost): () => void {
       try {
         if (!current()) return [false, { std: host.std }];
         validateMindmapCopyData((input as { elementsRawData: unknown[] }).elementsRawData);
+        const branch = convertMindmapBranch(host, input as Parameters<typeof convertMindmapBranch>[1], (records, created) => {
+          const add = crud.addElement;
+          crud.addElement = ((...args: Parameters<typeof add>) => {
+            const id = add.apply(crud, args);
+            if (id && records.includes(args[1] as typeof records[number])) created.add(id);
+            return id;
+          }) as typeof add;
+          try {
+            // Branch records are primitive shapes/maps: pinned native conversion
+            // creates them synchronously, before its returned promise resolves.
+            const [, result] = nativeExec(command, { ...input, elementsRawData: records } as typeof input);
+            return (result as unknown as { createdElementsPromise: ReturnType<Parameters<typeof convertMindmapBranch>[2]> }).createdElementsPromise;
+          } finally { crud.addElement = add; }
+        }, validateMindmapCopyData);
+        if (branch) return [true, { std: host.std, createdElementsPromise: branch }];
       } catch { return [false, { std: host.std }]; }
     }
     return nativeExec(command, input);
@@ -124,7 +141,7 @@ function installCopyBoundary(host: EditorHost): () => void {
     removing = true;
     try { nativeRemove.call(crud, value); } finally { removing = false; }
   };
-  return () => { active = false; manager.exec = nativeExec; crud.addElement = nativeAdd; crud.removeElement = nativeRemove; copySources.delete(host); };
+  return () => { active = false; disposeBranchClipboard(); manager.exec = nativeExec; crud.addElement = nativeAdd; crud.removeElement = nativeRemove; copySources.delete(host); };
 }
 
 /** Validate native membership before any adapter writes; no secondary tree schema. */

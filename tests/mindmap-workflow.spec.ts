@@ -5,7 +5,10 @@ import type {GfxController} from '@blocksuite/affine/std/gfx';
 import type {MindmapElementModel,ShapeElementModel} from '@blocksuite/affine/model';
 import {writeFileSync} from 'node:fs';
 
-async function maps(page:Page){return page.locator('affine-edgeless-root').evaluate(el=>{
+async function maps(page:Page){
+  // Reload briefly overlaps native editor hydration and teardown.
+  await expect(page.locator('affine-edgeless-root')).toHaveCount(1);
+  return page.locator('affine-edgeless-root').evaluate(el=>{
   const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
   return gfx.surface!.elementModels.filter(e=>e.type==='mindmap').map(e=>{
     const map=e as MindmapElementModel;return {id:map.id,layout:map.layoutType,style:map.style,nodes:[...map.children].map(([id,detail])=>{

@@ -111,7 +111,12 @@ test('@02-05-01 multiline edit add delete and history use measured native geomet
   await expect.poll(async () => (await geometry(page)).nodes.length).toBe(7);
   assertGeometry(await geometry(page), initial);
   await page.locator('affine-edgeless-root').evaluate((el, id) => {
-    (el as HTMLElement & { gfx: GfxController }).gfx.selection.set({ elements: [id], editing: false });
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    // Synthetic selection can target a topic outside the viewport after the
+    // long editor pans it. Bring that topic into view before using its toolbar.
+    const topic = gfx.surface!.getElementById(id) as ShapeElementModel;
+    gfx.viewport.setCenter(topic.x + topic.w / 2, topic.y + topic.h / 2);
+    gfx.selection.set({ elements: [id], editing: false });
   }, ids.a);
   const before = await geometry(page);
   await openMindmapProperties(page);

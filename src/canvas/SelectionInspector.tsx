@@ -3,7 +3,6 @@ import type { ImageBlockModel } from '@blocksuite/affine/model';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { Bound } from '@blocksuite/global/gfx';
-import { ObjectContextMenu } from './ObjectContextMenu';
 import { ImageCropOverlay } from './ImageCropOverlay';
 import {
   summarizeCanvasSelection,
@@ -256,8 +255,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
   }, [open, selection?.key, cropOpen]);
 
   if (!selection) return null;
-  if (singleMindmapTopic) return <ObjectContextMenu host={host} selection={selection}
-    onProperties={() => host.dispatchEvent(new Event('dali:mindmap-properties'))} />;
+  if (singleMindmapTopic) return null;
 
   const imageActions = !cropOpen && selection.kind === 'image' && quickPosition && (
     <div
@@ -278,7 +276,6 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
   if (!open) {
     return (
       <Fragment>
-        <ObjectContextMenu host={host} selection={selection} />
       {cropOpen && selection.kind === 'image' && <ImageCropOverlay key={selection.key} host={host} imageId={selection.key} busy={editingImage}
         onApply={next=>void applyVisual(next)} onCancel={()=>{visualGeneration.current++;visualPending.current=false;setEditingImage(false);setCropOpen(false);}} />}
       {imageActions}
@@ -308,7 +305,6 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
 
   return (
     <Fragment>
-      <ObjectContextMenu host={host} selection={selection} />
       {cropOpen && selection.kind === 'image' && <ImageCropOverlay key={selection.key} host={host} imageId={selection.key} busy={editingImage}
         onApply={next=>void applyVisual(next)} onCancel={()=>{visualGeneration.current++;visualPending.current=false;setEditingImage(false);setCropOpen(false);}} />}
       {imageActions}

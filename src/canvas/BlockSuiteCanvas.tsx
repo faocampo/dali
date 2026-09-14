@@ -1,3 +1,4 @@
+import { ObjectContextMenu } from './ObjectContextMenu';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { importLocalImages, installImageInputs, type ImageImportRequest } from './image-input';
@@ -85,6 +86,7 @@ export default function BlockSuiteCanvas() {
       {host && <BoardControls host={host} onOpenLayers={() => setLayersOpen(true)} />}
       {host && <FrameBorderOverlay host={host} />}
       {host && <MindMapInspector host={host} />}
+      {host && <ObjectContextMenu host={host} />}
       {host && (layersOpen
         ? <LayersInspector host={host} onClose={() => setLayersOpen(false)} />
         : <SelectionInspector host={host} />)}

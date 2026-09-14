@@ -2,16 +2,23 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, type GfxModel } from '@blocksuite/affine/std/gfx';
-import type { CanvasSelectionSummary } from './selection-summary';
+import { summarizeCanvasSelection, canvasModelVisible, mindmapOwner } from './selection-summary';
 import { OBJECT_ACTIONS_EVENT } from './object-actions-toolbar';
 import {
   alignCanvasSelection, canvasSelectionEditable, duplicateCanvasSelection,
-  groupCanvasSelection, ungroupCanvasSelection, selectedLayerCanGroup,
+  groupCanvasSelection, ungroupCanvasSelection, selectedLayerCanGroup, canvasLayerLockTarget,
   selectedLayerCanUngroup, reorderCanvasLayer, setCanvasLayerLocked,
   type AlignmentAction,
 } from './arrangement';
 
-export function ObjectContextMenu({host,selection,onProperties}: {host:EditorHost;selection:CanvasSelectionSummary;onProperties?:()=>void}) {
+export function ObjectContextMenu({host}: {host:EditorHost}) {
+  const gfx = host.std.get(GfxControllerIdentifier);
+  const [,updateSelection] = useState(0);
+  const selection = summarizeCanvasSelection(gfx.selection.selectedElements);
+  const selected = gfx.selection.selectedElements;
+  const owner = selected.length === 1 ? mindmapOwner(selected[0]!) : null;
+  const onProperties = owner && owner.id !== selected[0]!.id
+    ? () => host.dispatchEvent(new Event('dali:mindmap-properties')) : undefined;
   const [point,setPoint]=useState<{left:number;top:number}|null>(null);
   const [actionError,setActionError]=useState<string|null>(null);
   const [,setImageRevision]=useState(0);
@@ -38,7 +45,7 @@ export function ObjectContextMenu({host,selection,onProperties}: {host:EditorHos
   },[point]);
   useEffect(()=>{
     const gfx=host.std.get(GfxControllerIdentifier);
-    const selected=gfx.selection.slots.updated.subscribe(()=>{if(currentSelection()!==openedSelection.current)setPoint(null);});
+    const selected=gfx.selection.slots.updated.subscribe(()=>{if(currentSelection()!==openedSelection.current)setPoint(null);updateSelection(value=>value+1);});
     const removed=gfx.surface?.elementRemoved.subscribe(()=>setPoint(null));
     return()=>{selected.unsubscribe();removed?.unsubscribe();};
   },[host]);
@@ -59,7 +66,7 @@ export function ObjectContextMenu({host,selection,onProperties}: {host:EditorHos
       const gfx=host.std.get(GfxControllerIdentifier);
       const point=gfx.viewport.toModelCoord(...gfx.viewport.toViewCoordFromClientCoord([e.clientX,e.clientY]));
       const target=gfx.getElementByPoint(...point);
-      if(!target)return;
+      if(!target || !canvasModelVisible(target))return;
       trigger.current=host;
       e.preventDefault();e.stopImmediatePropagation();
       if(!gfx.selection.selectedElements.some(m=>m.id===target.id))gfx.selection.set({elements:[target.id],editing:false});
@@ -68,7 +75,7 @@ export function ObjectContextMenu({host,selection,onProperties}: {host:EditorHos
     const keyboard=(e:KeyboardEvent)=>{if(e.key==='F10'&&e.shiftKey){e.preventDefault();trigger.current=host;const r=host.getBoundingClientRect();openAt(r.left+80,r.top+80);}};
     host.addEventListener('contextmenu',open,true);host.addEventListener('keydown',keyboard,true);
     return()=>{host.removeEventListener('contextmenu',open,true);host.removeEventListener('keydown',keyboard,true);};
-  },[host,selection.key]);
+  },[host]);
 
   useLayoutEffect(()=>{
     if(!point)return;
@@ -78,6 +85,7 @@ export function ObjectContextMenu({host,selection,onProperties}: {host:EditorHos
     document.addEventListener('pointerdown',outside,true);
     return()=>{document.removeEventListener('pointerdown',outside,true);trigger.current?.setAttribute('aria-expanded','false');};
   },[!!point]);
+  if (!selection) return null;
   return <>
     {point&&createPortal(<div ref={ref} className="object-context-menu" data-testid="object-context-menu" role="menu" aria-label="Object actions" style={point}
       onClick={e=>e.stopPropagation()}
@@ -109,11 +117,12 @@ export function ObjectContextMenu({host,selection,onProperties}: {host:EditorHos
               {(['front', 'back'] as const).map(direction => <button role="menuitem" key={direction}
                 disabled={selection.count !== 1 || !canvasSelectionEditable(host)}
                 onClick={() => reorderCanvasLayer(host, selection.key, direction)}>{`To ${direction}`}</button>)}
-              {selection.count === 1 && <button role="menuitem" onClick={() => {
+              {selection.count === 1 && <button role="menuitem" disabled={host.store.readonly} onClick={() => {
+                if (!host.isConnected || currentSelection() !== openedSelection.current) return;
                 const model = host.std.get(GfxControllerIdentifier).getElementById<GfxModel>(selection.key);
-                if (model) setCanvasLayerLocked(host, model.id, !model.isLockedBySelf());
+                if (model && canvasModelVisible(model)) { const target = canvasLayerLockTarget(host, model.id); setCanvasLayerLocked(host, target.id, !target.isLockedBySelf()); }
                 setImageRevision(value => value + 1);
-              }}>{host.std.get(GfxControllerIdentifier).getElementById<GfxModel>(selection.key)?.isLockedBySelf() ? 'Unlock object' : 'Lock object'}</button>}
+              }}>{host.std.get(GfxControllerIdentifier).getElementById<GfxModel>(selection.key)?.isLocked() ? 'Unlock object' : 'Lock object'}</button>}
             </div>
           </section>
       {actionError&&<p role="alert">{actionError}</p>}
