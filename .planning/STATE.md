@@ -4,7 +4,7 @@ current_phase: 2
 current_phase_name: Daily Mind Maps
 current_plan: 8
 status: verifying
-stopped_at: More submenu correction verified; user retest pending
+stopped_at: More submenu correction approved; native UAT pending
 last_updated: "2026-09-14T17:21:45+00:00"
 last_activity: 2026-09-14
 last_activity_desc: Explicit Properties sidebar correction verified; UAT pending
@@ -24,14 +24,14 @@ progress:
 See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-12).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
-**Current focus:** Phase 2: Daily Mind Maps. All eight plans are implemented; More/Properties retest and native UAT remain pending.
+**Current focus:** Phase 2: Daily Mind Maps. All eight plans are implemented; More/Properties approved; native UAT remains pending.
 
 ## Current Position
 
 Phase: 2 (Daily Mind Maps)
 Current Plan: 8
 Total Plans in Phase: 8
-Status: Awaiting Properties retest and native interaction acceptance
+Status: Menu/Properties approved; awaiting native interaction acceptance
 Last activity: 2026-09-14 — Properties correction verified; see 02-VERIFICATION.md and 02-UAT.md.
 
 Progress: [█░░░░░░░░░] 8%
@@ -97,7 +97,7 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ### Pending Todos
 
-- Retest Properties and finish native UAT for the eight implemented Phase 2 plans; retain surfaced SEED-001 / SEED-002 for separate scheduling. The historical RED-test process deviation remains in WINDOWS.md.
+- Finish native UAT for the eight implemented Phase 2 plans; retain surfaced SEED-001 / SEED-002 for separate scheduling. The historical RED-test process deviation remains in WINDOWS.md.
 
 ### Blockers/Concerns
 
@@ -116,7 +116,7 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 Last session: 2026-09-14T16:12:59+00:00
 Stopped at: Phase 2 implemented; native interaction UAT pending
 Resume file: None
-Next action: Continue Phase 2 user acceptance with the explicit Properties retest. Keep native OS input, clipboard and magnification evidence limits explicit; do not start Phase 3.
+Next action: Continue Phase 2 user acceptance with actual browser zoom. Keep native OS input, clipboard and magnification evidence limits explicit; do not start Phase 3.
 
 ## Phase 1 verification outcome
 

@@ -82,7 +82,7 @@ Parallel browser checks and production builds share an exclusive execution slot;
   3. The visible mind-map layout adapts automatically when the user changes nodes or expands and collapses branches. (MIND-03)
   4. A user can format node text and style branches while continuing to edit the mind map as a hierarchy. (MIND-04)
 
-**Plans**: 8/8 plans executed; menu/Properties retest and native UAT pending
+**Plans**: 8/8 plans executed; native UAT pending; menu/Properties approved
 
 Plans:
 **Wave 1**
