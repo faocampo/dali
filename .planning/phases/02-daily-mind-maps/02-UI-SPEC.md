@@ -218,3 +218,7 @@ Fixtures use synthetic topics such as Release plan, Research, Design, and Review
 - [x] Dimension 7 Inventory Provenance: PASS / not applicable to Tool none
 
 **Approval:** UI checker passed all seven dimensions on 2026-09-12. Interaction defaults remain proposals authorized for planning.
+
+## UAT amendment — 2026-09-14
+
+The user replaces automatic topic formatting with explicit **Properties** from the topic context menu. Creation, selection and Tab child creation keep Properties closed. The pane opens from the right and shares the existing SelectionInspector visual shell, header, typography and section spacing. Closing it or entering topic text editing keeps it closed until another explicit Properties request. This amendment supersedes conflicting earlier automatic-panel and bottom-panel proposals. Keyboard hierarchy actions remain unchanged.

@@ -3,7 +3,7 @@ status: testing
 phase: 02-daily-mind-maps
 source: [02-VERIFICATION.md]
 started: 2026-09-13T01:50:13Z
-updated: 2026-09-13T01:50:13Z
+updated: 2026-09-14T15:49:05+00:00
 ---
 
 # Phase 2 — Native interaction acceptance
@@ -27,7 +27,11 @@ awaiting: user response
 
 ### 1. Keyboard mind-map editing and native IME
 expected: The keyboard workflow above is usable; actual OS composition commit/cancel produces intended text without accidental topic creation. Nested branches retain content. Report input method and browser used.
-result: [pending]
+result: issue
+reported: "Keyboard actions execute correctly. Formatting must open only from Properties in the context menu and use the existing right-side properties appearance."
+severity: major
+gap_id: G-02-1
+notes: "User confirmed actions; exact browser and native IME environment were not separately reported."
 
 ### 2. Actual browser zoom at 200 percent
 expected: Set the browser's own zoom to 200 percent. Create/edit a topic and open mind-map controls. Panels remain reachable and scroll when needed, the edited topic stays visible, and Tab/Shift+Tab/Escape allow predictable focus movement. Report browser and viewport. CSS zoom evidence is tracked separately.
@@ -41,11 +45,19 @@ result: [pending]
 
 total: 3
 passed: 0
-issues: 0
-pending: 3
+issues: 1
+pending: 2
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-No human results reported yet. Review fixes and final automated evidence are recorded in 02-VERIFICATION.md.
+- gap_id: G-02-1
+  status: implementing
+  truth: "Formatting opens only by explicit Properties action and uses the existing right-side inspector."
+  severity: major
+  source: "Test 1 user feedback"
+  root_cause: "MindMapInspector renders for every selected topic and resets dismissal on selection changes. Its standalone bottom panel has separate dimensions and styling. Tab-created topics therefore trigger the panel."
+  plan: 02-07-PLAN.md
+
+Keyboard actions are reported working. This presentation correction requires retest; native input environment details remain unreported.

@@ -82,7 +82,7 @@ Parallel browser checks and production builds share an exclusive execution slot;
   3. The visible mind-map layout adapts automatically when the user changes nodes or expands and collapses branches. (MIND-03)
   4. A user can format node text and style branches while continuing to edit the mind map as a hierarchy. (MIND-04)
 
-**Plans**: 6/6 plans executed in 6 sequential waves
+**Plans**: 6/7 plans executed; UAT Properties correction in progress
 
 Plans:
 **Wave 1**
@@ -108,6 +108,10 @@ Plans:
 **Wave 6** *(blocked on Wave 5 completion)*
 
 - [x] 02-06-PLAN.md — Visible and selected-map PNG exports with the complete canvas regression gate.
+
+**UAT correction**
+
+- [ ] 02-07-PLAN.md — Explicit contextual Properties and consistent right-side inspector.
 
 Each wave depends on the preceding plan; shared browser/build execution uses one exclusive slot. Detailed UI defaults remain research proposals under the user's planning authorization; native integration mechanisms are resolved in Phase 2 research.
 **UI hint**: yes
@@ -318,7 +322,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
-| 2. Daily Mind Maps | 6/6 | Awaiting native interaction UAT |  |
+| 2. Daily Mind Maps | 6/7 | UAT Properties correction |  |
 | 3. Okta and Board Access | 0/TBD | Not started | - |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
