@@ -345,3 +345,18 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 - [research/SUMMARY.md](research/SUMMARY.md) (research findings and risks, including the final scope update that supersedes the earlier phase proposal).
 
 *Last updated: 2026-09-11 — roadmap approved; public-repository privacy boundary added.*
+
+## Backlog
+
+### Phase 999.1: Wireframe shapes and icons (BACKLOG)
+
+**Goal:** Provide editable wireframe-style shapes and icons for conceptually modeling desktop and web applications on the canvas.
+**Requirements:** TBD; related to Phase 11 / DESIGN-01 (Editable Mockups).
+**Plans:** 0 plans
+
+**Captured context:** A reusable palette for composing application windows/browser shells, navigation sidebars, content panels, buttons, labels, step indicators and common interface icons. These are generic visual examples derived from the supplied reference; the component inventory will be finalized during planning.
+
+**Planning relationship:** Reconcile this palette detail with Phase 11 before promotion to avoid duplicate implementation.
+
+Plans:
+- [ ] TBD (promote with $gsd-review-backlog when ready)
