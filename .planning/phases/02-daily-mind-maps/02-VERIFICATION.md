@@ -1,8 +1,8 @@
 ---
 phase: 02-daily-mind-maps
-verified: 2026-09-13T01:50:13Z
+verified: 2026-09-14T16:12:59+00:00
 status: human_needed
-score: 25/27 plan truths verified; 2 native interaction checks pending
+score: 29/31 plan truths verified; 2 native interaction checks pending
 covered_files:
   - .planning/REQUIREMENTS.md
   - .planning/phases/02-daily-mind-maps/02-01-PLAN.md
@@ -17,6 +17,9 @@ covered_files:
   - .planning/phases/02-daily-mind-maps/02-05-SUMMARY.md
   - .planning/phases/02-daily-mind-maps/02-06-PLAN.md
   - .planning/phases/02-daily-mind-maps/02-06-SUMMARY.md
+  - .planning/phases/02-daily-mind-maps/02-07-PLAN.md
+  - .planning/phases/02-daily-mind-maps/02-07-SUMMARY.md
+  - .planning/phases/02-daily-mind-maps/02-UI-SPEC.md
   - src/boards/operations.ts
   - src/canvas/BlockSuiteCanvas.tsx
   - src/canvas/LayersInspector.tsx
@@ -49,10 +52,12 @@ covered_files:
   - tests/mindmap-keyboard.spec.ts
   - tests/mindmap-layout.spec.ts
   - tests/mindmap-visibility.spec.ts
+  - tests/mindmap-properties.spec.ts
+  - tests/mindmap-properties.ts
   - tests/mindmap-workflow.spec.ts
   - tests/mindmap.spec.ts
   - vite.config.ts
-covered_digest: "v1:sha256:afe419932b995190fc4e9656c03f02adb01f81beebe62390ab9120ad0843eee7"
+covered_digest: "v1:sha256:033b5f4e2232e0a205d0e045dee073b40586b8c3f20ebab1fac62052bea322f5"
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
@@ -71,9 +76,9 @@ human_verification:
 
 Goal: Users can develop and reorganize readable mind maps through rapid keyboard editing and automatic hierarchical layout.
 
-Status: **human_needed**. All six plans are implemented. The four requirement capabilities have automated evidence; final acceptance remains open for the three native interaction checks in 02-UAT.md. Phase 3 remains pending.
+Status: **human_needed**. All seven plans are implemented; the explicit Properties correction awaits user retest. The four requirement capabilities have automated evidence; final acceptance remains open for the three native interaction checks in 02-UAT.md. Phase 3 remains pending.
 
-Verified implementation HEAD: `a05b94d1522c02eca348c0c26081a53eaec48319`.
+Verified implementation HEAD: `28329b35dd40c1d8e3a69fff341229e6d6a95555`.
 
 Method: Inline orchestrator goal-backward verification using the GSD verifier role and report contract. The session agent limit prevented a fresh verifier dispatch; no independent typed-verifier run is claimed. Source, wiring, actual test assertions and execution logs were inspected. Code/UI reviewers reused executor threads with the independence limits stated in their reports.
 
@@ -121,6 +126,10 @@ All 27 plan truths are retained below. The four roadmap criteria above aggregate
 | 02-06/4 | Existing ordinary selected-connector/group rules, exact frame clipping, 1x/2x/4x scale and white/transparent backgrounds remain intact. | VERIFIED | `mindmap-export.spec.ts; mindmap-export.test.ts; mindmap-workflow.spec.ts; image-export.spec.ts` — active value and multi-step behavior assertions. |
 | 02-06/5 | A stale export or resource-limit failure creates no successful download, preserves map state and offers the existing explicit retry/lower-scale path. | VERIFIED | `mindmap-export.spec.ts; mindmap-export.test.ts; mindmap-workflow.spec.ts; image-export.spec.ts` — active value and multi-step behavior assertions. |
 | 02-06/6 | Users can complete create, edit, style, collapse, copy, reopen and export in the existing canvas while the Phase 1 regression gate passes. | VERIFIED | `mindmap-export.spec.ts; mindmap-export.test.ts; mindmap-workflow.spec.ts; image-export.spec.ts` — active value and multi-step behavior assertions. |
+| 02-07/1 | Creating/selecting topics and Tab never automatically open Properties. | VERIFIED | mindmap-properties.spec.ts checks root, child, commit and reselection with panel absent. |
+| 02-07/2 | Explicit contextual Properties opens the shared right-side inspector. | VERIFIED | Actual right-click, Object actions and keyboard menu gestures; sidebar class and geometry assertions. |
+| 02-07/3 | Closing and editing retain dismissal until another explicit request. | VERIFIED | Close, double-click editing, Add child, commit and reselect lifecycle assertions. |
+| 02-07/4 | Formatting and hierarchy retain content and history. | VERIFIED | Explicit font value assertion and complete formatting, layout, collapse, copy and workflow matrix. |
 
 ## Artifacts and wiring
 
@@ -134,7 +143,12 @@ All 27 plan truths are retained below. The four roadmap criteria above aggregate
 | boards/operations.ts → native snapshot transformer | Independent copied document retains native hierarchy. Substantive and wired. |
 | ExportDialog.tsx → presentation-export.ts → mindmap-export.ts → mindmap-state.ts | Frozen visible membership and eligible edges drive bounded, revision-guarded native PNG rendering. Substantive and wired. |
 
+Properties wiring: SelectionInspector → ObjectContextMenu current-selection action → current-host `dali:mindmap-properties` event → MindMapInspector explicit open state. Keyboard routing gives external menus/sidebar ownership of their own keys. Shared SelectionInspector CSS establishes right-side dimensions; mounted-panel framing preserves selected-topic visibility.
+
 ## Test quality and execution
+
+- UAT correction `28329b3`: **392/392 mind-map browser cases**, **40/40 production ordinary/keyboard regressions**, **67/67 unit tests**, typecheck and build passed. Synthetic desktop/narrow screenshots were inspected. See 02-07-SUMMARY.md for RED/GREEN provenance.
+
 
 - Full implementation gate at `e52dab1`: **604/604 browser cases** in 13.6 minutes across dev, production Chromium, Firefox and WebKit; **67/67 unit cases**, typecheck and production build passed.
 - Focused prior-phase export regression: **23 unit and 18 browser cases passed**.
@@ -157,10 +171,10 @@ No requirement-linked skip/todo or generated expected-output fixture was found. 
 - UI topic occlusion, duplicate inspector and action-button collision findings: corrected in `a05b94d`; viewport evidence in 02-UI-REVIEW.md. Remaining advisory items concern style guidance, accent-role wording and inherited narrow header clipping.
 - The two unclassified planning probe markers received explicit semantic classifications in 02-VALIDATION.md: descendant preservation/reversibility and geometry/lifecycle. Original plan markers remain for provenance.
 - No phase CONTEXT.md or locked D-NN decisions exist. The approved plans provide defaults and acceptance boundaries. No requirement override or risk acceptance was invented.
-- Security register and remaining evidence limitations are recorded in 02-SECURITY.md and WINDOWS.md. The phase register has 22 plan-qualified rows (20 distinct IDs).
+- Security register and remaining evidence limitations are recorded in 02-SECURITY.md and WINDOWS.md. The phase register has 23 plan-qualified rows (21 distinct IDs).
 - Grid/guideline/snapping, proximity distances/alignment and branding seeds retain their separate deferred scope.
 
-No unresolved functional review blocker remains. Native human evidence is the remaining phase-completion gate.
+No unresolved functional review blocker remains. Properties presentation retest and native human evidence remain the phase-completion gate.
 
 ## Human verification required
 

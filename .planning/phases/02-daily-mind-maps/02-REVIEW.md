@@ -76,3 +76,9 @@ The orchestrator supplied the completed 604-browser-test and 67-unit-test regres
 No keyboard source change was made. The preliminary external-control concern did not establish another product defect: Board Library unmounts the editor, while Export and Layers register Escape listeners on document capture, where the investigated `stopPropagation` call does not suppress other same-target listeners.
 
 No commits were created during review or remediation. Exact remediation source/test paths are the two files listed above; this report is the accompanying artifact.
+
+## UAT correction source review — 2026-09-14
+
+The review covered explicit opening, editing and dismissal lifecycle, menu keyboard ownership, stale selection/host handling and sidebar-only viewport framing. A reused executor reviewed the correction read-only; the orchestrator inspected the production diff. A fresh independent verifier was unavailable in this session.
+
+The editing-state finding is closed: entering text editing clears open state, rendering and opening reject editing, and an unmounted panel cannot pan. Menu Escape returns focus to its trigger; pane Escape returns focus to the canvas. Captured selection identity and current-host checks reject stale Properties activation. Focused tests cover these paths, including Add child and double-click editing. No unresolved source blocker remains in this correction. Execution evidence is recorded in 02-07-SUMMARY.md.

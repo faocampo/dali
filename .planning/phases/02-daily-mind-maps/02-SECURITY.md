@@ -21,7 +21,7 @@ Audited implementation revisions: `e52dab1`, with copy-boundary remediation `a5c
 
 ## Threat register
 
-The six plans contain 22 rows and 20 distinct IDs. T-02-05 and T-02-06 are reused across plans for different components; plan-qualified rows preserve all original obligations.
+The seven plans contain 23 rows and 21 distinct IDs. T-02-05 and T-02-06 are reused across plans for different components; plan-qualified rows preserve all original obligations.
 
 | Plan / ID | Category | Component | Severity | Disposition | Status | Source and test evidence |
 |---|---|---|---|---|---|---|
@@ -59,3 +59,11 @@ None. Native OS input evidence remains a separate UAT limitation in WINDOWS.md; 
 | 2026-09-13 | 22 | 22 | 0 | Inline L1 mitigation-presence review; passing 604-case browser gate and 67 unit cases from 02-06 execution |
 
 Post-audit adversarial review found inconsistent empty/duplicate sibling order validation and excessive depth at the clipboard boundary. Commit `a5c6f8d` unifies that preflight with the canonical validator and rejects depth above 128 before conversion. Empty order, duplicate sibling order and excessive depth failed exact-document RED assertions, then all 68 copy cases passed across four projects. T-02-06 (02-01) and T-02-20 (02-02) are CLOSED after this correction; 67 unit cases, typecheck and build also passed. No risk acceptance was invented. Final staged privacy review remains required before each commit.
+
+## Properties correction audit — 2026-09-14
+
+| Plan / ID | Category | Component | Severity | Disposition | Status | Source and test evidence |
+|---|---|---|---|---|---|---|
+| 02-07 / T-02-23 | Tampering | Properties menu lifecycle | medium | mitigate | CLOSED | ObjectContextMenu captures selected IDs, dismisses on selection/removal, and checks host connectivity before Properties. MindMapInspector checks the current topic and editing state; existing mutation guards remain. mindmap-properties.spec.ts tests changed selection, removal and detached host. |
+
+Inline source audit and reused executor source review found the mitigation wired. This adds a local UI boundary; prior threat dispositions remain unchanged.

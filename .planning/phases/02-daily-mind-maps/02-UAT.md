@@ -3,7 +3,7 @@ status: testing
 phase: 02-daily-mind-maps
 source: [02-VERIFICATION.md]
 started: 2026-09-13T01:50:13Z
-updated: 2026-09-14T15:49:05+00:00
+updated: 2026-09-14T16:10:48+00:00
 ---
 
 # Phase 2 — Native interaction acceptance
@@ -13,21 +13,19 @@ Use a synthetic board. Record browser/OS and the actual input method where relev
 ## Current Test
 
 number: 1
-name: Keyboard mind-map editing and native IME
+name: Explicit Properties sidebar retest
 expected: |
-  Add a mind map. Finish the central topic with Enter. Tab adds a child;
-  after committing its text, Enter adds a sibling. Shift+Enter adds a line
-  while editing. Enter/Tab/Escape finish editing without adding another topic.
-  With an actual OS IME, committing or cancelling a candidate retains the
-  intended text and produces no accidental nodes. Collapse/expand nested
-  branches and confirm the content returns unchanged.
+  Select a topic, press Tab, and enter its text: Properties stays closed.
+  Right-click the topic and choose Properties: a matching right-side panel opens.
+  Close the panel, select another topic, or resume editing: it stays closed until
+  Properties is requested again. Confirm the panel appearance and workflow.
 awaiting: user response
 
 ## Tests
 
 ### 1. Keyboard mind-map editing and native IME
 expected: The keyboard workflow above is usable; actual OS composition commit/cancel produces intended text without accidental topic creation. Nested branches retain content. Report input method and browser used.
-result: issue
+result: [pending]
 reported: "Keyboard actions execute correctly. Formatting must open only from Properties in the context menu and use the existing right-side properties appearance."
 severity: major
 gap_id: G-02-1
@@ -45,19 +43,20 @@ result: [pending]
 
 total: 3
 passed: 0
-issues: 1
-pending: 2
+issues: 0
+pending: 3
 skipped: 0
 blocked: 0
 
 ## Gaps
 
 - gap_id: G-02-1
-  status: implementing
+  status: resolved_awaiting_retest
   truth: "Formatting opens only by explicit Properties action and uses the existing right-side inspector."
   severity: major
   source: "Test 1 user feedback"
   root_cause: "MindMapInspector renders for every selected topic and resets dismissal on selection changes. Its standalone bottom panel has separate dimensions and styling. Tab-created topics therefore trigger the panel."
   plan: 02-07-PLAN.md
+  evidence: "02-07-SUMMARY.md; explicit-opening, editing, focus and stale-action browser regressions pass."
 
 Keyboard actions are reported working. This presentation correction requires retest; native input environment details remain unreported.

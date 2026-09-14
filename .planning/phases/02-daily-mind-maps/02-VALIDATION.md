@@ -9,7 +9,7 @@ created: "2026-09-12"
 
 # Phase 2 — Validation Strategy
 
-Derived from 02-RESEARCH.md (native seams and validation architecture) and 02-UI-SPEC.md (proposed interaction contract). All planned suites are implemented. Final evidence: 67 unit tests, typecheck, production build and 604 browser cases passed; browser elapsed time 13.6 minutes. See 02-06-SUMMARY.md for decoded PNG inspection, regression repairs and explicit native input limits.
+Derived from 02-RESEARCH.md (native seams and validation architecture) and 02-UI-SPEC.md (proposed interaction contract). All planned suites are implemented. Original implementation evidence at e52dab1: 67 unit tests, typecheck, production build and 604 browser cases passed; browser elapsed time 13.6 minutes. See 02-06-SUMMARY.md for decoded PNG inspection, regression repairs and explicit native input limits.
 
 ## Test Infrastructure
 
@@ -143,3 +143,10 @@ Native Firefox/WebKit OS clipboard use remains manual: copy a map with nested co
 Post-review correction `a5c6f8d`: 68/68 copy cases across four projects passed after three new malformed-paste regressions failed before the fix. The correction uses canonical hierarchy validation before conversion; all 67 unit cases, typecheck and build passed again. The prior 604-case aggregate is retained with its original revision scope.
 
 Post-review UI correction `a05b94d`: 36/36 accessibility cases across four projects and 25/25 production canvas/image/keyboard regressions passed. Typecheck and production build passed. Synthetic desktop and narrow renders confirm topic/panel clearance, a single inspector and separate action controls. See 02-UI-REVIEW.md for the 22/24 audit and advisory copy/color observations.
+
+## Plan 02-07 — explicit Properties UAT correction
+
+- 02-07-01 / MIND-01, MIND-04: `tests/mindmap-properties.spec.ts` verifies no automatic panel during creation/Tab, explicit contextual opening, editing/close lifecycle, current-selection/host invalidation, menu keyboard navigation and focus. `tests/mindmap-accessibility.spec.ts` verifies shared sidebar placement and selected-topic viewport containment.
+- 02-07-02 / MIND-01, MIND-04: `tests/mindmap-properties.ts` supplies an actual Object actions → Properties gesture to affected formatting, collapse, keyboard, layout and workflow suites. Existing content/history assertions remain.
+- RED reproduced automatic opening, swallowed menu Escape and narrow-view topic containment. The final 392/392 mind-map browser matrix passed across dev Chromium and production Chromium, Firefox and WebKit; 67/67 unit tests, typecheck and build passed.
+- Ordinary regression totals and final source revision are recorded in 02-07-SUMMARY.md. Native IME, real browser magnification and non-Chromium OS clipboard acceptance remain separately pending in 02-UAT.md.

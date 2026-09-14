@@ -124,3 +124,11 @@ No commits were made by this reviewer; changes are handed to the orchestrator fo
 - `src/canvas/mindmap.ts`, `src/index.css`, `src/header/ExportDialog.tsx`
 - `tests/mindmap-accessibility.spec.ts`
 - `02-UI-SPEC.md`, execution summaries `02-01` through `02-06` (prior executor context for 01–04), and supplied final validation results
+
+## Explicit Properties correction — 2026-09-14
+
+User feedback supersedes automatic panel opening and the earlier bottom-panel proposal. Commit `28329b3` opens Properties only from the selected topic context menu and uses the existing right-side SelectionInspector shell. Editing closes it and subsequent Tab or selection does not reopen it.
+
+Executor and orchestrator inspected final synthetic 1280×800 and 390×844 views. The selected topic is fully inside the narrow viewport below the pane, with 16px separation; desktop positions it 16px left of the pane. Controls remain scrollable. Existing narrow header clipping remains a prior advisory. No new score is inferred from this focused correction.
+
+Final 392/392 mind-map cases and 40/40 ordinary/keyboard regressions pass, together with 67/67 units, typecheck and build. Native browser magnification remains pending human evidence. See 02-07-SUMMARY.md for revision and test provenance.
