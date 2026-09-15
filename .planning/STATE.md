@@ -121,3 +121,12 @@ Next action: Retest typography, branch copy and unlock; continue native input an
 ## Phase 1 verification outcome
 
 Complete: five plans, five requirements, and four user-approved UAT checks. Current regression: 51 unit tests and 256 browser cases passed, with typecheck and production build passing. Canonical verification is refreshed; all 17 registered security threats are closed. Individual native OS steps were not separately reported, and that limit remains documented. Phase 2 plan 02-01 now supplies the native mind-map tracer and compatibility evidence.
+
+
+### Quick Tasks Completed
+
+| ID | Description | Date | Commit | Directory |
+|---|---|---|---|---|
+| 260914-qdt | Board title dropdown and persistent inline rename | 2026-09-15 | 3c6ae31 | [Quick task](quick/260914-qdt-fix-board-title-dropdown-and-inline-rena/260914-qdt-SUMMARY.md) |
+
+Phase 2 remains awaiting focused and native UAT. Refresh its verification fingerprint on resumption; this quick correction retains separate validation provenance.
