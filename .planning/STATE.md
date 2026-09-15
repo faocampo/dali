@@ -128,5 +128,6 @@ Complete: five plans, five requirements, and four user-approved UAT checks. Curr
 | ID | Description | Date | Commit | Directory |
 |---|---|---|---|---|
 | 260914-qdt | Board title dropdown and persistent inline rename | 2026-09-15 | 3c6ae31 | [Quick task](quick/260914-qdt-fix-board-title-dropdown-and-inline-rena/260914-qdt-SUMMARY.md) |
+| 260915-cf2 | Editable title, mouse pointer and native Hand tool | 2026-09-15 | 8e083a1 | [Quick task](quick/260915-cf2-editable-title-pointer-icon-and-hand-too/260915-cf2-SUMMARY.md) |
 
 Phase 2 remains awaiting focused and native UAT. Refresh its verification fingerprint on resumption; this quick correction retains separate validation provenance.
