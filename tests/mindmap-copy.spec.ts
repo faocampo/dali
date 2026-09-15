@@ -115,8 +115,7 @@ test('@02-02-01 board copy retains document-local IDs and independent typography
   const ids = await seed(page);
   const original = await state(page);
   await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Untitled board', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
+  await page.getByRole('button', { name: 'All boards', exact: true }).click();
   await page.locator('.board-card').filter({ has: page.getByRole('button', { name: 'Open Untitled board', exact: true }) }).getByRole('button', { name: 'Duplicate', exact: true }).click();
   await page.getByRole('button', { name: 'Open Untitled board copy', exact: true }).click();
   await expect.poll(async () => (await state(page)).maps).toEqual(original.maps);
@@ -136,8 +135,7 @@ test('@02-02-01 board copy retains document-local IDs and independent typography
   await expect.poll(() => state(page)).toEqual(changed);
   await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
   await page.reload(); await expect.poll(() => state(page)).toEqual(changed);
-  await page.getByRole('button', { name: 'Untitled board copy', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
+  await page.getByRole('button', { name: 'All boards', exact: true }).click();
   await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
   await expect.poll(() => state(page)).toEqual(original);
 });

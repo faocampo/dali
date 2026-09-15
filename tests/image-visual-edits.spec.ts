@@ -195,7 +195,6 @@ test('Replace cannot mutate a disconnected board when blob storage finishes', as
   await page.locator('.selection-inspector input[type=file]').setInputFiles(await raster(page, 80, 160));
   await expect(page.locator('body')).toHaveAttribute('data-synthetic-replacement', 'pending');
   await page.locator('.djai-board-switcher').click();
-  await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
   await expect(page.locator('affine-edgeless-root')).toHaveCount(0);
   await page.evaluate(async () => {
     (window as Window & { finishSyntheticReplacement?: () => void }).finishSyntheticReplacement!();

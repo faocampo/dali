@@ -58,7 +58,6 @@ test('repeated editor reopen preserves IDs without duplicate objects or handlers
   const stored = await notes(page);
   for (let repeat = 0; repeat < 3; repeat += 1) {
     await page.locator('.djai-board-switcher').click();
-    await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
     await expect(page.locator('editor-host')).toHaveCount(0);
     await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
     await expect(page.getByTestId('board-action-menu')).toBeVisible();
@@ -75,7 +74,6 @@ test('interrupted mounting and rapid board switching keep the final board isolat
   await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
   const first = await notes(page);
   await page.locator('.djai-board-switcher').click();
-  await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
   await page.getByRole('button', { name: '+ New board', exact: true }).click();
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
   const second = await notes(page);
@@ -84,11 +82,9 @@ test('interrupted mounting and rapid board switching keep the final board isolat
 
   for (const title of ['Untitled board', 'Untitled board 2', 'Untitled board']) {
     await page.locator('.djai-board-switcher').click();
-    await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
     await page.getByRole('button', { name: `Open ${title}`, exact: true }).click();
     // The React header exists before the asynchronous native editor finishes.
     await page.locator('.djai-board-switcher').click();
-    await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
     await expect(page.locator('editor-host')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
     await page.getByRole('button', { name: `Open ${title}`, exact: true }).click();
@@ -97,14 +93,12 @@ test('interrupted mounting and rapid board switching keep the final board isolat
     await expect.poll(() => notes(page)).toEqual(title === 'Untitled board' ? first : second);
   }
   await page.locator('.djai-board-switcher').click();
-  await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
   await page.getByRole('button', { name: 'Open Untitled board 2', exact: true }).click();
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect.poll(async () => (await notes(page)).notes.length).toBe(1);
   await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
   await page.locator('.djai-board-switcher').click();
-  await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
   await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
   await expect.poll(() => notes(page)).toEqual(first);
 });

@@ -1515,13 +1515,9 @@ djai-image-visual-edit {
 .mindmap-feedback .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
 
 .board-title-control { position: relative; min-width: 0; margin-right: auto; }
-.board-title-popover {
-  position: absolute; top: calc(100% + 8px); left: 0; z-index: 100;
-  width: min(280px, 70vw); padding: 12px; border: 1px solid var(--board-line);
-  border-radius: 12px; background: var(--board-surface); color: var(--board-ink);
-  box-shadow: 0 8px 24px #0002; display: grid; gap: 10px;
-}
-.board-title-popover [role="menuitem"] { border: 0; border-radius: 6px; padding: 10px; text-align: left; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-.board-title-popover [role="menuitem"]:hover, .board-title-popover [role="menuitem"]:focus-visible { background: var(--affine-hover-color); }
-.board-title-popover input { min-width: 0; width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid var(--board-line); border-radius: 6px; font: inherit; }
-.board-title-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* Editable board title and separate library navigation. */
+.board-title-inline { display: flex; align-items: center; gap: 8px; }
+.board-title-inline input { min-width: 60px; max-width: 28vw; padding: 7px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--board-ink); font: 600 var(--affine-font-sm)/1.2 var(--affine-font-family); }
+.board-title-inline input:hover { border-color: var(--board-line); }
+.board-title-inline input:focus { border-color: var(--affine-primary-color); outline: 2px solid var(--affine-primary-color); background: var(--board-surface); }
+.board-title-error { position: absolute; top: 100%; background: var(--board-surface); padding: 8px; border: 1px solid var(--board-line); }
