@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { DaliMenu } from './DaliMenu';
 import { BoardTitleMenu } from './BoardTitleMenu';
-import logo from '../assets/djai-design-logo.png';
+import logo from '../../imgs/svg/dali-logo-light.svg';
 import { exportBoardFile } from '../canvas/export-board';
 import { getCanvasRuntime } from '../canvas/runtime';
 import { getSaveStatus, subscribeSaveStatus } from '../canvas/save-status';
@@ -41,14 +41,14 @@ export function Header({
       <a
         className="djai-brand"
         href="/"
-        aria-label="DJAI Design"
+        aria-label="Dalí"
         onClick={(event) => {
           if (!onOpenBoards) return;
           event.preventDefault();
           onOpenBoards();
         }}
       >
-        <img src={logo} alt="DJAI Design" height={34} />
+        <img src={logo} alt="Dalí" height={34} />
       </a>
 
       <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} />

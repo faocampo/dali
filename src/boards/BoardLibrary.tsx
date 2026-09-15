@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import logo from '../assets/djai-design-logo.png';
+import logo from '../../imgs/svg/dali-logo-light.svg';
 import {
   createLocalBoard,
   deleteLocalBoard,
@@ -133,8 +133,8 @@ export function BoardLibrary() {
   return (
     <div className="board-library">
       <header className="board-library__header">
-        <a className="djai-brand" href="/" aria-label="DJAI Design">
-          <img src={logo} alt="DJAI Design" height={34} />
+        <a className="djai-brand" href="/" aria-label="Dalí">
+          <img src={logo} alt="Dalí" height={34} />
         </a>
         <div className="board-library__header-copy">
           <strong>Your boards</strong>
