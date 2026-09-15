@@ -145,6 +145,15 @@ export async function createPersistedWorkspace(
   }
 }
 
+/** Finish initial board writes before pinning a new tab to its persisted ID. */
+export async function persistWorkspaceBeforeOpen(workspace: TestWorkspace): Promise<void> {
+  await withTimeout(
+    workspace.waitForSynced(),
+    SYNC_TIMEOUT_MS,
+    'Timed out saving the new board. Check local storage and try again.'
+  );
+}
+
 /** Retry failed blob writes, then restart document persistence from memory. */
 export async function retryWorkspacePersistence(workspace: TestWorkspace): Promise<void> {
   const blobSource = workspace.blobSync.main;

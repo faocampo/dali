@@ -19,6 +19,7 @@ import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { signal } from '@preact/signals-core';
 import { viewExtensions } from './extensions';
 import { getCanvasRuntime } from './runtime';
+import { installShapeTextTypography } from './shape-text-editor';
 
 export type EdgelessEditorHandle = {
   host: EditorHost;
@@ -28,6 +29,7 @@ export type EdgelessEditorHandle = {
 export async function mountEdgelessEditor(
   container: HTMLElement
 ): Promise<EdgelessEditorHandle> {
+  installShapeTextTypography();
   const { store } = await getCanvasRuntime();
 
   const viewManager = new ViewExtensionManager(viewExtensions);

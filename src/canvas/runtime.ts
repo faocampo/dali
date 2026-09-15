@@ -21,9 +21,10 @@ import {
   createPersistedWorkspace,
   disposeWorkspace,
   forgetPersistedDoc,
+  persistWorkspaceBeforeOpen,
   updateWorkspaceDocMeta,
 } from './workspace';
-import { consumeDeferredBoardRemoval, getActiveBoardId } from '../boards/preferences';
+import { consumeDeferredBoardRemoval, getActiveBoardId, isNewBoardRequested, setActiveBoardId } from '../boards/preferences';
 import {
   reconcileBoardCatalog,
   removeBoardCatalogEntry,
@@ -78,11 +79,15 @@ async function createRuntime(): Promise<CanvasRuntime> {
     const existingId =
       (preferredId && workspace.docs.has(preferredId) ? preferredId : null) ??
       [...workspace.docs.keys()][0];
-    const store = existingId
+    const store = existingId && !isNewBoardRequested()
       ? loadExistingBoard(workspace, existingId)
       : initializeBlankBoard(workspace);
     ensureBoardMetadata(workspace, store);
     reconcileBoardCatalog(workspace.meta.docMetas);
+    // Persist a newly created board before consuming the one-shot URL intent.
+    // Pin restored boards too, so another tab cannot change this tab's reload.
+    await persistWorkspaceBeforeOpen(workspace);
+    setActiveBoardId(store.id);
     trackBoardUpdates(workspace, store);
     return {
       workspace,

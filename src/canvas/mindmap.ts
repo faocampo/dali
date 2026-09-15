@@ -214,6 +214,9 @@ function addTopic(host: EditorHost, sibling: boolean): string {
           ['bold', 'italic', 'underline', 'strike', 'code'].includes(key)));
         target.text.format(0, target.text.length, marks);
       }
+      // The outer transaction delays native children observers. Include the
+      // new node in the layout tree before measuring its viewport position.
+      map.buildTree();
       map.layout();
     } catch {
       failed = true;
@@ -234,12 +237,10 @@ function addTopic(host: EditorHost, sibling: boolean): string {
   store.captureSync();
   if (failed) throw new Error(MINDMAP_EDIT_ERROR);
   const target = map.surface.getElementById(created) as ShapeElementModel;
+  // Position the topic before native rich text takes focus. Focusing an
+  // offscreen editor can scroll DOM ancestors independently of canvas panning.
+  gfx.viewport.setCenter(target.x + target.w / 2, target.y + target.h / 2);
   mountShapeTextEditor(target, root);
-  // Translate only the excess beyond the safe viewport; preserve current zoom.
-  const bound = gfx.viewport.toViewBound(target.elementBound);
-  const dx = bound.x < 80 ? bound.x - 80 : Math.max(0, bound.maxX - gfx.viewport.width + 24);
-  const dy = bound.y < 80 ? bound.y - 80 : Math.max(0, bound.maxY - gfx.viewport.height + 120);
-  if (dx || dy) gfx.viewport.setCenter(gfx.viewport.center.x + dx / gfx.viewport.zoom, gfx.viewport.center.y + dy / gfx.viewport.zoom);
   return created;
 }
 

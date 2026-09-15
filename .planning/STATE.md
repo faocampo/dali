@@ -4,10 +4,10 @@ current_phase: 2
 current_phase_name: Daily Mind Maps
 current_plan: 9
 status: verifying
-stopped_at: Behavior corrections verified; focused and native UAT pending
-last_updated: "2026-09-14T21:51:41+00:00"
-last_activity: 2026-09-14
-last_activity_desc: Typography, branch copy and unlock verified; UAT pending
+stopped_at: Inline font and topic focus corrected; focused and native UAT pending
+last_updated: "2026-09-15"
+last_activity: 2026-09-15
+last_activity_desc: Inline font, centered topic editing and new board tabs corrected; UAT retest pending
 state_head: 5bb1e4c3c3781d6cb36ba4d6766357dc1aff94ad
 progress:
   total_phases: 13
@@ -32,7 +32,7 @@ Phase: 2 (Daily Mind Maps)
 Current Plan: 9
 Total Plans in Phase: 9
 Status: Behavior corrections verified; awaiting focused and native interaction acceptance
-Last activity: 2026-09-14 — Behavior corrections verified; see 02-VERIFICATION.md and 02-UAT.md.
+Last activity: 2026-09-15 — Corrected the reported inline font and viewport failures; File → New opens an independent board tab. See quick/260915-topic-editing-new-board/SUMMARY.md and 02-UAT.md.
 
 Progress: [█░░░░░░░░░] 8%
 
@@ -113,10 +113,10 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ## Session Continuity
 
-Last session: 2026-09-14T16:12:59+00:00
+Last session: 2026-09-15
 Stopped at: Phase 2 implemented; native interaction UAT pending
 Resume file: None
-Next action: Retest typography, branch copy and unlock; continue native input and actual browser zoom acceptance. Keep native OS input, clipboard and magnification evidence limits explicit; do not start Phase 3.
+Next action: Retest inline font, centered keyboard creation, typography, branch copy and unlock; continue native input and actual browser zoom acceptance. Keep native OS input, clipboard and magnification evidence limits explicit; do not start Phase 3.
 
 ## Phase 1 verification outcome
 
@@ -132,6 +132,7 @@ Complete: five plans, five requirements, and four user-approved UAT checks. Curr
 | 260915-cig | Remove redundant header link and export | 2026-09-15 | b188a47 | [Quick task](quick/260915-cig-remove-redundant-header-link-and-export/260915-cig-SUMMARY.md) |
 | 260915-ui | Canvas accessibility, export flow and toolbar organization | 2026-09-15 | See summary | [Quick task](quick/260915-ui-critique-fixes/SUMMARY.md) |
 | 260915-menu | Top-bar Dalí menu with File, View and Help | 2026-09-15 | See summary | [Quick task](quick/260915-dali-application-menu/SUMMARY.md) |
+| 260915-topic-editing | Inline font, centered topic creation and File → New | 2026-09-15 | See summary | [Quick task](quick/260915-topic-editing-new-board/SUMMARY.md) |
 | 260915-interactions | Transparency, connector creation, tooltips, keyboard focus and text bounds | 2026-09-15 | See summary | [Quick task](quick/260915-canvas-interactions/SUMMARY.md) |
 
 Phase 2 remains awaiting focused and native UAT. Refresh its verification fingerprint on resumption; this quick correction retains separate validation provenance.

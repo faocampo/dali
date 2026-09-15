@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { APP_URL } from './links';
+import { newBoardUrl } from '../boards/preferences';
 
 type Category = 'File' | 'View' | 'Edit' | 'Settings' | 'Help';
 export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void; onExport: () => void }) {
@@ -64,6 +65,7 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
       </div>
       {category && <div role="menu" aria-label={category} className="dali-submenu">
         {category === 'File' && <>
+          <a role="menuitem" tabIndex={-1} href={newBoardUrl()} target="_blank" rel="noopener noreferrer" onClick={close}><MenuIcon name="new" /><span className="dali-menu-label">New</span></a>
           <button role="menuitem" tabIndex={-1} disabled={!onOpenBoards} onClick={() => run(() => onOpenBoards?.())}><MenuIcon name="boards" /><span className="dali-menu-label">All boards</span></button>
           <button role="menuitem" tabIndex={-1} onClick={() => command('import')}><MenuIcon name="import" /><span className="dali-menu-label">Import board</span></button>
           <button role="menuitem" tabIndex={-1} onClick={() => run(onExport)}><MenuIcon name="export" /><span className="dali-menu-label">Export board</span></button>
@@ -101,6 +103,7 @@ const menuIconPaths = {
   Edit: 'm4 16 12-12 4 4L8 20H4Z M13 7l4 4',
   Settings: 'M4 7h16M4 17h16M8 4v6M16 14v6',
   Help: 'M21 12a9 9 0 1 1-18 0 9 9 0 1 1 18 0 M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4 M12 16v.1',
+  new: 'M6 3h8l4 4v14H6Z M14 3v5h4 M9 14h6 M12 11v6',
   boards: 'M3 3h7v7H3Z M14 3h7v7h-7Z M3 14h7v7H3Z M14 14h7v7h-7Z',
   import: 'M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5',
   export: 'M12 15V3m-4 4 4-4 4 4M4 16v5h16v-5',

@@ -19,11 +19,16 @@ function writeStorage(storage: Storage, key: string, value: string): void {
   }
 }
 
+/** Each open tab owns its board; local storage supplies the last-opened default. */
 export function getActiveBoardId(): string | null {
-  return readStorage(localStorage, ACTIVE_BOARD_KEY);
+  return new URL(window.location.href).searchParams.get('board') || readStorage(localStorage, ACTIVE_BOARD_KEY);
 }
 
 export function setActiveBoardId(id: string): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set('board', id);
+  url.searchParams.delete('new');
+  window.history.replaceState(window.history.state, '', url);
   writeStorage(localStorage, ACTIVE_BOARD_KEY, id);
 }
 
@@ -61,4 +66,16 @@ export function consumeDeferredBoardRemoval(): string | null {
   } catch {
     return null;
   }
+}
+
+/** A native link opens the tab synchronously; the destination creates its board. */
+export function newBoardUrl(): string {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('board');
+  url.searchParams.set('new', '1');
+  return url.href;
+}
+
+export function isNewBoardRequested(): boolean {
+  return new URL(window.location.href).searchParams.get('new') === '1';
 }

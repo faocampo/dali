@@ -28,7 +28,7 @@ async function raster(page: Page, mimeType = 'image/png', width = 320, height = 
 
 test('picker rejects corrupt bytes with an actionable error and permits retry', async ({page}) => {
   await page.goto('/');
-  const input=page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]');
+  const input=page.locator('input[type=file][accept="image/*"]');
   await input.setInputFiles({name:'synthetic-corrupt.png',mimeType:'image/png',buffer:Buffer.from('invalid')});
   await expect(page.getByTestId('image-import-error')).toContainText('PNG or JPEG');
   await expect(page.locator('affine-edgeless-image')).toHaveCount(0);
@@ -39,7 +39,7 @@ test('picker rejects corrupt bytes with an actionable error and permits retry', 
 
 test('picker centers proportional images, supports repeated selection and persists arranged pixels', async ({page})=> {
   await page.goto('/');
-  const input=page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]');
+  const input=page.locator('input[type=file][accept="image/*"]');
   const file=await raster(page);
   await input.setInputFiles(file);
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
@@ -86,7 +86,7 @@ test('leaving the board during decode cancels insertion',async({page})=>{
     };
     (window as Window & {syntheticImageCount?:()=>number}).syntheticImageCount=()=>store.getBlocksByFlavour('affine:image').length;
   });
-  await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles(file);
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles(file);
   await expect(page.locator('body')).toHaveAttribute('data-synthetic-decode','pending');
   await fileAction(page, 'All boards');
   await expect(page.locator('affine-edgeless-root')).toHaveCount(0);
@@ -96,7 +96,7 @@ test('leaving the board during decode cancels insertion',async({page})=>{
 test('multiple picker files preserve per-file results and sequential offsets',async({page})=>{
   await page.goto('/');
   const file=await raster(page);
-  await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles([
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles([
     file,{...file,name:'synthetic-corrupt.png',buffer:Buffer.from('invalid')},file,
   ]);
   await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
@@ -169,7 +169,7 @@ test('plain-text SVG paste is rejected before native image decoding and permits 
 
 test('image input rejects size budgets and stale or failed storage then retries',async({page})=>{
   await page.goto('/');await page.getByRole('button',{name:'Insert image',exact:true}).waitFor();
-  const input=page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]');
+  const input=page.locator('input[type=file][accept="image/*"]');
   const file=await raster(page);
   await input.setInputFiles({...file,buffer:Buffer.alloc(16*1024*1024+1)});
   await expect(page.getByTestId('image-import-error')).toContainText('16 MiB');
@@ -186,7 +186,7 @@ test('image input rejects size budgets and stale or failed storage then retries'
         sync.set=original;
         if(failure==='storage') throw new Error('Synthetic storage rejection');
         const id=await Reflect.apply(original,sync,args);
-        localStorage.setItem('djai-design.active-board','synthetic-other-board');
+        history.replaceState(null, '', '?board=synthetic-other-board');
         return id;
       }) as typeof sync.set;
     },failure);
@@ -194,7 +194,7 @@ test('image input rejects size budgets and stale or failed storage then retries'
     await expect(page.getByTestId('image-import-error')).toContainText(failure==='storage'?'could not be saved':'board changed');
     expect(await images(page)).toHaveLength(0);
     await page.locator('affine-edgeless-root').evaluate(el=>{
-      localStorage.setItem('djai-design.active-board',(el as HTMLElement & {gfx:GfxController}).gfx.doc.id);
+      history.replaceState(null, '', '?board=' + (el as HTMLElement & {gfx:GfxController}).gfx.doc.id);
     });
   }
   await input.setInputFiles(file);
@@ -244,7 +244,7 @@ test('clipboard keeps rich text paste and imports a bitmap once',async({page,con
 test('restores a reduced image to source resolution without changing bytes or center', async ({page}) => {
   await page.goto('/');
   const file = await raster(page, 'image/png', 1040, 640);
-  await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles(file);
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles(file);
   await expect(page.locator('affine-edgeless-image img')).toBeVisible();
   await page.locator('affine-edgeless-root').evaluate(el => {
     const gfx = (el as HTMLElement & {gfx:GfxController}).gfx;

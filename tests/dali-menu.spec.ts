@@ -9,7 +9,7 @@ test('Dalí menu supports arrow navigation, nested Escape, View actions and outs
   await trigger.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'File', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowRight');
-  await expect(page.getByRole('menuitem', { name: 'All boards', exact: true })).toBeFocused();
+  await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeFocused();
   await page.keyboard.press('End');
   await expect(page.getByRole('menuitem', { name: 'Export board', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');

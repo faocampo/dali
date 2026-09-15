@@ -3,7 +3,7 @@ status: testing
 phase: 02-daily-mind-maps
 source: [02-VERIFICATION.md]
 started: 2026-09-13T01:50:13Z
-updated: 2026-09-14T21:51:41+00:00
+updated: 2026-09-15
 ---
 
 # Phase 2 — Native interaction acceptance
@@ -16,10 +16,11 @@ number: 5
 name: Mind-map typography, branch copying and unlocking
 expected: |
   Format a selected topic, then press Enter: the new node retains typography.
+  Inline editing keeps the canvas font. Tab/Enter-created nodes stay focused and centered at the current zoom.
   Duplicate a branch: it remains a sibling branch with its descendants.
   Copy a branch and paste beneath a selected topic: hierarchy and styles remain.
   Lock, deselect, then right-click and unlock a node; editing works again.
-awaiting: user response
+awaiting: focused user retest after correction
 
 ## Tests
 
@@ -46,16 +47,18 @@ notes: Separated from the approved keyboard/UI test because native composition e
 
 ### 5. Mind-map typography, branch copying and unlocking
 expected: The current focused test above preserves native node behavior and permits unlocking.
-result: [pending]
+result: issue
+severity: major
+latest_report: "When in edit mode, the text changes its font to times style. Enter and Tab create the corresponding sibling and child nodes but move focus elsewhere instead of recentering the view around the edited node."
 reported: Enter changes typography, duplicate/paste becomes free objects, and a locked node cannot be unlocked.
-gap_ids: [G-02-2, G-02-3, G-02-4]
+gap_ids: [G-02-2, G-02-3, G-02-4, G-02-5, G-02-6]
 
 ## Summary
 
 total: 5
 passed: 1
-issues: 0
-pending: 4
+issues: 1
+pending: 3
 skipped: 0
 blocked: 0
 
@@ -70,7 +73,7 @@ blocked: 0
   plan: 02-07-PLAN.md
   evidence: "02-07-SUMMARY.md; explicit-opening, editing, focus and stale-action browser regressions pass."
 
-Keyboard actions are reported working. The presentation correction is user-approved; native input environment details remain unreported.
+The initial keyboard workflow and presentation correction were user-approved. Test 5 tracks the subsequently reported inline font and viewport failures; native input environment details remain unreported.
 
 ## Follow-up menu correction
 
@@ -83,3 +86,8 @@ User requested Object actions as a submenu of the native More menu and alignment
 - G-02-4 — Locked node cannot be unlocked after deselection. Implemented in 02-09; user retest pending.
 
 Actual 200% browser zoom remains unconfirmed; these reported defects require focused retest before proceeding.
+
+- G-02-5 — Inline topic editing falls back to a serif font while the canvas uses sans-serif. Implemented in quick/260915-topic-editing-new-board; user retest pending.
+- G-02-6 — Created topics need stable editing focus and viewport centering at the current zoom. Implemented in quick/260915-topic-editing-new-board; user retest pending.
+
+The latest report does not confirm branch copying or unlocking. Their focused acceptance remains pending.

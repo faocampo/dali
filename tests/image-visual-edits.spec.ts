@@ -18,7 +18,7 @@ async function raster(page: Page, width = 200, height = 100) {
 
 async function setup(page: Page, rotate = 0) {
   await page.goto('/');
-  await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles(await raster(page));
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles(await raster(page));
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
   if (rotate) await page.locator('affine-edgeless-root').evaluate((el, rotate) => {
     const store = (el as HTMLElement & { gfx: GfxController }).gfx.doc;
@@ -159,7 +159,7 @@ test('Replace rejects a changed board after blob storage and permits retry', asy
     sync.set = (async (...args: unknown[]) => {
       sync.set = original;
       const id = await Reflect.apply(original, sync, args);
-      localStorage.setItem('djai-design.active-board', 'synthetic-other-board');
+      history.replaceState(null, '', '?board=synthetic-other-board');
       return id;
     }) as typeof sync.set;
   });
@@ -169,7 +169,7 @@ test('Replace rejects a changed board after blob storage and permits retry', asy
   await expect(page.locator('.selection-inspector [role=alert]')).toContainText('board changed');
   expect(await state(page)).toEqual(before);
   await page.locator('affine-edgeless-root').evaluate(el => {
-    localStorage.setItem('djai-design.active-board', (el as HTMLElement & { gfx: GfxController }).gfx.doc.id);
+    history.replaceState(null, '', '?board=' + (el as HTMLElement & { gfx: GfxController }).gfx.doc.id);
   });
   await input.setInputFiles(file);
   await expect.poll(async () => (await state(page)).edits.length).toBe(0);
