@@ -1,5 +1,5 @@
 /**
- * The Export dialog, and the follow-us prompt that comes after a download.
+ * Accessible export settings and artifact download status.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EXPORT_FORMATS, exportBoardFile, type ExportFormat } from '../canvas/export-board';
@@ -9,7 +9,7 @@ import {
   exportHasCollapsedTopics,
   type PresentationScope,
 } from '../canvas/presentation-export';
-import { APP_URL, FOLLOW_LINKS, SHARE_TARGETS } from './links';
+import { createPortal } from 'react-dom';
 import { DEFAULT_EXPORT_OPTIONS, type ExportScale } from '../canvas/export-plan';
 
 export function ExportDialog({ onClose }: { onClose: () => void }) {
@@ -19,7 +19,6 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
   const [padding, setPadding] = useState('0');
   const [transparent, setTransparent] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [availability] = useState(() => presentationScopeAvailability());
@@ -36,8 +35,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
     setExporting(true);
     try {
       await exportBoardFile(format, { scope, transparent, scale, plan: format === 'png' ? plan : undefined });
-      // The follow prompt replaces this panel only once a download has really
-      // happened, so a failed export cannot look like a success.
+      // Show success only after the export has actually started.
       setDownloaded(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -49,36 +47,19 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
 
   const download = useCallback(() => void performDownload(), [performDownload]);
 
-  const share = useCallback((target: (typeof SHARE_TARGETS)[number]) => {
-    window.open(target.href(), '_blank', 'noopener,noreferrer');
-  }, []);
-
-  const shareToDevice = useCallback(async () => {
-    if (!navigator.share) {
-      setError('System sharing is not available in this browser. Use Share link instead.');
-      return;
-    }
-    try {
-      await navigator.share({ title: 'DJAI Canvas', text: 'I made this with DJAI Canvas', url: APP_URL });
-    } catch (cause) {
-      if (cause instanceof DOMException && cause.name === 'AbortError') return;
-      setError('The system share menu could not be opened.');
-    }
-  }, []);
-
-  const copyLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(APP_URL);
-      setCopied(true);
-    } catch {
-      setError('Could not copy the link. Your browser blocked clipboard access.');
-    }
-  }, []);
-
-  if (downloaded) return <FollowPrompt onClose={onClose} />;
-
   return (
-    <Panel title="Export board" onClose={onClose}>
+    <Panel title={downloaded ? 'Download started' : 'Export board'} onClose={onClose}>
+      {downloaded ? <>
+        <div className="export-settings" role="status">
+          <p className="export-artifact">{EXPORT_FORMATS.find(item => item.id === format)?.label}</p>
+          <p className="djai-note">Your browser is downloading the file. Find it in your browser’s downloads.</p>
+        </div>
+        <footer className="export-footer">
+          <button type="button" className="djai-chip" onClick={() => setDownloaded(false)}>Export again</button>
+          <button type="button" className="djai-primary" autoFocus onClick={onClose}>Done</button>
+        </footer>
+      </> : <>
+      <div className="export-settings">
       <Section label="Format">
         {EXPORT_FORMATS.map((f) => (
           <label key={f.id} className="djai-radio">
@@ -145,7 +126,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       )}
 
       {format === 'png' && <Section label="Resolution">
-        {scope === 'selection' && <label>
+        {scope === 'selection' && <label className="export-padding">
           Selection padding
           <input aria-label="Selection padding" type="number" min="0" max="256" step="1" value={padding} disabled={exporting} onChange={event => setPadding(event.target.value)} />
           <span>World units on each side (0–256).</span>
@@ -156,12 +137,18 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
             <span>{value}×</span>
           </label>)}
         </div>
-        <p data-testid="export-dimensions" data-export-ids={JSON.stringify(plan.includedIds)}>{Number.isFinite(plan.pixelWidth) && Number.isFinite(plan.pixelHeight) ? `${plan.pixelWidth} × ${plan.pixelHeight} pixels` : 'Dimensions unavailable'}</p>
         {exportHasCollapsedTopics(plan) && <p className="djai-note">Only visible topics are exported. Expand branches to include their hidden topics.</p>}
         {plan.error && <p role="alert">{plan.error}</p>}
         {plan.lowerScale && <button type="button" onClick={() => setScale(plan.lowerScale!)}>Use {plan.lowerScale}×</button>}
       </Section>}
 
+      </div>
+      <footer className="export-footer">
+        <div className="export-summary" aria-live="polite">
+        {format === 'png' && <p data-testid="export-dimensions" data-export-ids={JSON.stringify(plan.includedIds)}>{Number.isFinite(plan.pixelWidth) && Number.isFinite(plan.pixelHeight) ? `${plan.pixelWidth} × ${plan.pixelHeight} pixels` : 'Dimensions unavailable'}</p>}
+          {format !== 'png' && <p>{format === 'board' ? 'Editable board file' : 'A4 landscape pages'}</p>}
+          {error && <p role="alert" className="djai-error">{error}</p>}
+        </div>
       <button
         ref={downloadButtonRef}
         type="button"
@@ -172,112 +159,71 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         {exporting ? 'Preparing…' : 'Download'}
       </button>
 
-      <Section label="Share">
-        <div className="djai-row">
-          {SHARE_TARGETS.map((t) => (
-            <button
-              type="button"
-              key={t.id}
-              className="djai-chip"
-              onClick={() => share(t)}
-            >
-              {t.label}
-            </button>
-          ))}
-          <button type="button" className="djai-chip" onClick={() => void shareToDevice()}>
-            Device
-          </button>
-          <button type="button" className="djai-chip" onClick={() => void copyLink()}>
-            {copied ? 'Link copied' : 'Share link'}
-          </button>
-        </div>
-        <p className="djai-note">
-          Sharing links to the hosted DJAI Canvas. Boards remain local, so links do not publish
-          private board content.
-        </p>
-      </Section>
-
-      {error && (
-        <p role="alert" className="djai-error">
-          {error}
-        </p>
-      )}
+      </footer>
+      </>}
     </Panel>
   );
 }
 
-function FollowPrompt({ onClose }: { onClose: () => void }) {
-  return (
-    <Panel title="Download started" onClose={onClose}>
-      <p className="djai-note">Your browser is downloading the file.</p>
-      <div className="djai-row">
-        {FOLLOW_LINKS.map((l) => (
-          <a
-            key={l.label}
-            className="djai-chip"
-            href={l.href}
-            target="_blank"
-            rel="noreferrer noopener"
-          >
-            {l.label}
-          </a>
-        ))}
-      </div>
-      <a className="djai-primary djai-link" href={APP_URL} target="_blank" rel="noreferrer noopener">
-        Open the full DJAI Canvas
-      </a>
-    </Panel>
-  );
-}
-
-function Panel({
-  title,
-  onClose,
-  children,
-}: {
+function Panel({ title, onClose, children }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  const panelRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    panelRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
+    const dialog = panelRef.current!;
+    const previousFocus = document.activeElement;
+    dialog.showModal();
+    return () => {
+      dialog.close();
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
     };
-    document.addEventListener('keydown', closeOnEscape, true);
-    return () => document.removeEventListener('keydown', closeOnEscape, true);
-  }, [onClose]);
+  }, []);
 
-  return (
-    <div
-      className="djai-backdrop"
-      // Click-outside to dismiss, but only on the backdrop itself -- a click
-      // that started inside the panel must not close it.
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+  useEffect(() => {
+    // Move focus to the primary action when the download status replaces settings.
+    const selector = title === 'Download started' ? '.djai-primary' : '.djai-close';
+    panelRef.current?.querySelector<HTMLButtonElement>(selector)?.focus();
+  }, [title]);
+
+  return createPortal(
+    <dialog
+      ref={panelRef}
+      className="djai-panel export-dialog"
+      aria-label={title}
+      onKeyDown={event => {
+        event.stopPropagation();
+        if (event.key !== 'Tab') return;
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(
+          'button, input, select, textarea, a[href], [tabindex]',
+        )).filter(control => control.tabIndex >= 0 && !control.matches(':disabled') && control.getClientRects().length > 0 && (
+          !(control instanceof HTMLInputElement) || control.type !== 'radio' || control.checked
+        ));
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }}
+      onCancel={event => { event.preventDefault(); onClose(); }}
+      onPointerDown={event => {
+        if (event.target !== event.currentTarget) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
       }}
     >
-      <div
-        ref={panelRef}
-        className="djai-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        tabIndex={-1}
-      >
-        <header className="djai-panel-head">
-          <h2>{title}</h2>
-          <button type="button" aria-label="Close" onClick={onClose} className="djai-close">
-            ×
-          </button>
-        </header>
-        {children}
-      </div>
-    </div>
+      <header className="djai-panel-head">
+        <h2>{title}</h2>
+        <button type="button" aria-label="Close" onClick={onClose} className="djai-close">×</button>
+      </header>
+      {children}
+    </dialog>,
+    document.body,
   );
 }
 

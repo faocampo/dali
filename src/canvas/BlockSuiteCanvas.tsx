@@ -1,3 +1,5 @@
+import { ViewportControls } from './ViewportControls';
+import { APP_URL } from '../header/links';
 import { ObjectContextMenu } from './ObjectContextMenu';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
@@ -99,7 +101,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   const inputRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const store = host.std.store;
-  const [history, setHistory] = useState({ canUndo: false, canRedo: false });
+
   const [actionError, setActionError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const alive = useRef(true);
@@ -124,16 +126,6 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   useEffect(() => installMindmapShortcuts(host, () => {
     setActionError('This change could not be applied. Your previous topic is still available. Try again.');
   }), [host]);
-
-  useEffect(() => {
-    const sync = () =>
-      setHistory({ canUndo: store.history.canUndo, canRedo: store.history.canRedo });
-    // Seed from the current state as well as subscribing: the first stack item
-    // may already exist by the time this mounts.
-    sync();
-    const sub = store.history.onUpdated.subscribe(sync);
-    return () => sub.unsubscribe();
-  }, [store]);
 
   const onFiles = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -198,6 +190,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   );
 
   return (
+    <>
     <div
       data-testid="board-action-menu"
       role="toolbar"
@@ -206,14 +199,14 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
       style={{
         position: 'absolute',
         left: '1rem',
-        top: '24px',
+        top: '16px',
         zIndex: 10,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '8px',
+        gap: '4px',
         padding: '8px',
-        maxHeight: 'calc(100dvh - 128px)',
+        maxHeight: 'calc(100% - 88px)',
         boxSizing: 'border-box',
         overflowY: 'auto',
         borderRadius: 'var(--board-radius)',
@@ -277,80 +270,31 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
         <path d="m4 12 8 4 8-4M4 16l8 4 8-4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       </ControlButton>
 
-      <span
-        aria-hidden="true"
-        style={{ height: '1px', alignSelf: 'stretch', background: 'var(--board-line)', margin: '0.15rem 0.3rem' }}
-      />
-
-      <ControlButton label="Undo" disabled={!history.canUndo} onClick={() => store.undo()}>
-        <path
-          d="M9 7 4.5 11.5 9 16"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M4.5 11.5H14a5.5 5.5 0 0 1 0 11h-3"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-        />
-      </ControlButton>
-
-      <ControlButton label="Redo" disabled={!history.canRedo} onClick={() => store.redo()}>
-        <path
-          d="M15 7l4.5 4.5L15 16"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M19.5 11.5H10a5.5 5.5 0 0 0 0 11h3"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-        />
-      </ControlButton>
-
-      <span
-        aria-hidden="true"
-        style={{ height: '1px', alignSelf: 'stretch', background: 'var(--board-line)', margin: '0.15rem 0.3rem' }}
-      />
-
-      <ControlButton label="Export board" onClick={() => void onExport()}>
-        <path
-          d="M12 3.5v11m0 0 4-4m-4 4-4-4"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M4.5 16.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-        />
-      </ControlButton>
-
-      <ControlButton label="Import board" onClick={() => importRef.current?.click()}>
-        <path
-          d="M12 14.5v-11m0 0 4 4m-4-4-4 4"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M4.5 16.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2"
-          stroke="currentColor"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-        />
-      </ControlButton>
-
+    </div>
+    <div className="board-utilities" role="toolbar" aria-label="Board actions">
+      <button type="button" className="djai-ghost" aria-label="Export board" onClick={() => void onExport()}>Export</button>
+      <button type="button" className="djai-ghost" aria-label="Import board" onClick={() => importRef.current?.click()}>Import</button>
+      <details className="board-help" onKeyDown={event => {
+        if (event.key === 'Escape') {
+          event.currentTarget.open = false;
+          event.currentTarget.querySelector('summary')?.focus();
+          event.stopPropagation();
+        }
+      }}>
+        <summary>Help</summary>
+        <div className="board-help-content">
+          <h2>Canvas shortcuts</h2>
+          <p>Select <kbd>V</kbd> · Frame <kbd>F</kbd> · Shape <kbd>S</kbd> · Connector <kbd>C</kbd> · Freehand <kbd>P</kbd></p>
+          <p>Use Hand to drag the canvas. Hold Space for temporary panning.</p>
+          <h3>Mind maps</h3>
+          <p>With a topic selected, Tab adds a child; Enter adds a sibling (or a child for the root). Double-click to edit text. Escape finishes editing. Open Properties from the object's More menu for formatting.</p>
+          <h3>Board files</h3>
+          <p>Export an editable backup or an image. Import restores an editable board file.</p>
+          <a href={APP_URL} target="_blank" rel="noopener noreferrer">Upstream source</a>
+        </div>
+      </details>
+    </div>
+    <ViewportControls host={host} />
       <input
         ref={inputRef}
         type="file"
@@ -366,7 +310,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
         onChange={onImportFile}
         style={{ display: 'none' }}
       />
-    </div>
+    </>
   );
 }
 
@@ -408,8 +352,8 @@ function ControlButton({
       style={{
         display: 'grid',
         placeContent: 'center',
-        width: label === 'Add mind map' ? '44px' : '2rem',
-        height: label === 'Add mind map' ? '44px' : '2rem',
+        width: '40px',
+        height: '40px',
         flexShrink: 0,
         borderRadius: '8px',
         border: 'none',

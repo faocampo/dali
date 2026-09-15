@@ -211,8 +211,8 @@ affine-edgeless-root .widgets-container > edgeless-toolbar-widget {
 }
 
 .canvas-tool-button {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -250,13 +250,6 @@ djai-image-visual-edit {
 .board-action-panel {
   max-height: calc(100% - 7rem);
   overflow: auto;
-}
-
-@media (max-height: 700px) {
-  .board-action-panel {
-    top: 4.25rem !important;
-    max-height: calc(100% - 5rem);
-  }
 }
 
 /* ---- Contextual properties inspector -------------------------------- */
@@ -1521,3 +1514,100 @@ djai-image-visual-edit {
 .board-title-inline input:hover { border-color: var(--board-line); }
 .board-title-inline input:focus { border-color: var(--affine-primary-color); outline: 2px solid var(--affine-primary-color); background: var(--board-surface); }
 .board-title-error { position: absolute; top: 100%; background: var(--board-surface); padding: 8px; border: 1px solid var(--board-line); }
+
+/* Export dialog: native modal, scrolling settings and persistent download footer. */
+.export-dialog {
+  --board-ink-soft: #69645c;
+  box-sizing: border-box;
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  border: 0;
+  color: var(--board-ink);
+}
+.export-dialog:not([open]) { display: none; }
+.export-dialog::backdrop { background: rgb(28 26 24 / 0.3); }
+.export-dialog .djai-panel-head { flex-shrink: 0; padding: 18px 20px 14px; border-bottom: 1px solid var(--board-line); }
+.export-settings { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px; display: flex; flex-direction: column; gap: 22px; }
+.export-dialog .djai-section { gap: 6px; }
+.export-dialog .djai-section h3 { margin-bottom: 5px; text-transform: none; letter-spacing: normal; font-size: 13px; }
+.export-dialog .djai-radio { border: 0; border-radius: 6px; padding: 6px 0; align-items: flex-start; }
+.export-dialog .djai-radio input, .export-dialog .djai-check input { flex: 0 0 auto; margin: 3px 0 0; accent-color: var(--affine-primary-color); }
+.export-dialog .djai-radio.is-disabled { opacity: 1; color: var(--board-ink-soft); }
+.export-dialog .djai-row .djai-radio { min-width: 65px; }
+.export-padding { display: grid; grid-template-columns: 1fr 80px; gap: 6px 12px; align-items: center; font-size: 13px; }
+.export-padding input { width: 100%; box-sizing: border-box; padding: 6px; border: 1px solid var(--board-line); border-radius: 6px; background: var(--board-surface); color: var(--board-ink); }
+.export-padding span { grid-column: 1 / -1; font-size: 12px; color: var(--board-ink-soft); }
+.export-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; border-top: 1px solid var(--board-line); }
+.export-summary { min-width: 0; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--board-ink-soft); }
+.export-summary p { margin: 0; overflow-wrap: anywhere; }
+.export-summary .djai-error { margin-top: 4px; }
+.export-footer > button { flex-shrink: 0; }
+.export-artifact { margin: 0; font-weight: 600; }
+.export-dialog :focus-visible { outline: 2px solid var(--affine-primary-color); outline-offset: 3px; }
+
+/* Stable canvas creation, board operations, and viewport groups. */
+.canvas-tool-button svg { width: 24px; height: 24px; }
+.canvas-tool-button:hover { background: var(--affine-hover-color); }
+.board-utilities, .canvas-viewport-controls {
+  position: absolute;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--board-radius);
+  background: var(--board-surface);
+  box-shadow: var(--board-shadow);
+}
+.board-utilities { top: 16px; left: 84px; z-index: 151; }
+.canvas-viewport-controls { bottom: 16px; left: 16px; }
+.canvas-viewport-controls button, .board-help summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--board-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.canvas-viewport-controls button:disabled { opacity: 0.45; cursor: default; }
+.canvas-viewport-controls button:hover:not(:disabled), .board-help summary:hover { background: var(--affine-hover-color); }
+.canvas-viewport-controls button:focus-visible, .board-utilities :is(button, summary, a):focus-visible {
+  outline: 2px solid var(--affine-primary-color);
+  outline-offset: 2px;
+}
+.viewport-divider { height: 24px; width: 1px; background: var(--board-line); margin-inline: 4px; }
+.board-help summary { list-style: none; }
+.board-help summary::-webkit-details-marker { display: none; }
+.board-help[open] summary { background: var(--affine-hover-color); }
+.board-help-content {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(320px, calc(100vw - 100px));
+  max-height: calc(100dvh - 210px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 16px;
+  background: var(--board-surface);
+  color: var(--board-ink);
+  border-radius: var(--board-radius);
+  box-shadow: var(--board-shadow);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.board-help-content h2 { font-size: 16px; margin: 0 0 8px; }
+.board-help-content h3 { font-size: 14px; margin: 20px 0 6px; }
+.board-help-content p { margin: 0 0 10px; }
+.board-help-content kbd { font: inherit; font-weight: 600; }

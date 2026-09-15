@@ -26,7 +26,7 @@ export function Header({
 
   const closeExport = useCallback(() => {
     setExportOpen(false);
-    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.board-action-panel button[aria-label="Export board"]')?.focus());
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.board-utilities button[aria-label="Export board"]')?.focus());
   }, []);
 
   useEffect(() => {

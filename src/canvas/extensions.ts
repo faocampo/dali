@@ -79,7 +79,6 @@ import { EdgelessDraggingAreaViewExtension } from '@blocksuite/affine/widgets/ed
 // edgeless-selected-rect is what draws the selection / resize handles, so it is
 // required for move-and-resize, not optional chrome.
 import { EdgelessSelectedRectViewExtension } from '@blocksuite/affine-widget-edgeless-selected-rect/view';
-import { EdgelessZoomToolbarViewExtension } from '@blocksuite/affine-widget-edgeless-zoom-toolbar/view';
 import { FrameTitleViewExtension } from '@blocksuite/affine/widgets/frame-title/view';
 import { ToolbarViewExtension } from '@blocksuite/affine/widgets/toolbar/view';
 import { ObjectActionsToolbarExtension } from './object-actions-toolbar';
@@ -141,7 +140,6 @@ export const viewExtensions = [
   FootnoteViewExtension,
   MentionViewExtension,
   EdgelessToolbarViewExtension,
-  EdgelessZoomToolbarViewExtension,
   EdgelessSelectedRectViewExtension,
   EdgelessDraggingAreaViewExtension,
   FrameTitleViewExtension,
