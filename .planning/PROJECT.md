@@ -16,6 +16,12 @@ Product and engineering teams can collaboratively turn ideas into clear product 
 - ✓ CAN-02: Selection, movement, resizing, grouping, alignment, duplication, layering, and styling — Phase 1.
 - ✓ IMG-01: Local reference-image import and arrangement, visual crop, live adjustments, and source-size restoration — Phase 1.
 - ✓ IMG-02 / IMG-03: PNG export for whole boards, frames, and selected objects, with explicit resolution and background controls — Phase 1.
+- ✓ MIND-01: Hierarchical mind maps with keyboard child/sibling creation and stable inline editing — Phase 2.
+- ✓ MIND-02: Nested branch collapse/expand with retained descendants and history — Phase 2.
+- ✓ MIND-03: Automatic measured layout as nodes and visibility change — Phase 2.
+- ✓ MIND-04: Persistent topic typography and branch styling — Phase 2.
+
+Evidence: [Phase 2 verification](phases/02-daily-mind-maps/02-VERIFICATION.md) (four requirements, corrective regressions and final user approval).
 
 Evidence: [Phase 1 verification](phases/01-editable-canvas-and-image-portability/01-VERIFICATION.md) (regression results and user acceptance).
 
@@ -49,12 +55,9 @@ These are the agreed capabilities to scope into requirements and phases, rather 
 - [ ] Templates support customer-role maps, product-market-fit discovery, pains/gains, and assumptions/findings layouts.
 - [ ] Users arrange reference diagrams, photos, and notes for presentation ideation on the canvas.
 
-#### Mind maps — daily-use priority
+#### Mind maps
 
-- [ ] Users create editable mind maps with keyboard shortcuts for adding nodes, including child and sibling nodes.
-- [ ] Users expand and collapse branches while preserving their content.
-- [ ] Layout automatically adapts as the mind map changes, including node additions and branch expansion/collapse.
-- [ ] Mind maps support readable hierarchical text and visual styling. Collapsed-branch count badges remain a design detail to specify.
+- [ ] MIND-05: Retain mind-map hierarchy and content through durable saving, reopening and concurrent editing — Phase 5.
 
 #### Roadmaps and Gantt
 
@@ -128,7 +131,7 @@ Keep the repository and its entire publishable history organization-neutral. Nev
 | Use the defined product workflows to scope the Miro replacement | Prioritize daily diagramming and product-development needs | Confirmed direction |
 | Deploy on operator-managed infrastructure with Okta SSO | Matches the requested internal deployment and identity model | Confirmed direction |
 | Provide per-board owner/editor/viewer access and a board-library home | Support private and shared work with explicit access | Confirmed direction |
-| Treat mind maps as an initial-scope priority | User identified them as very important for daily work | Confirmed direction |
+| Treat mind maps as an initial-scope priority | User identified them as very important for daily work | Validated in Phase 2 |
 | Start with new boards and exported Miro images | User-selected initial migration approach | Confirmed direction |
 | Defer MCP creation of editable diagrams and mind maps | User placed AI-agent creation after the initial release | Confirmed direction |
 | Include roadmap composition and the Gantt widget in the initial release | User confirmed both are needed at launch | Confirmed direction |
@@ -168,4 +171,4 @@ After each milestone:
 4. Update context with actual usage and feedback.
 
 ---
-*Last updated: 2026-09-12 after Phase 1 acceptance.*
+*Last updated: 2026-09-15 after Phase 2 acceptance.*

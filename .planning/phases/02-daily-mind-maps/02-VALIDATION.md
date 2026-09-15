@@ -1,7 +1,7 @@
 ---
 phase: "02"
 slug: "daily-mind-maps"
-status: executed
+status: complete
 nyquist_compliant: true
 wave_0_complete: true
 created: "2026-09-12"
@@ -77,7 +77,7 @@ Mandatory final gate: `npm test && npm run build && npm run test:browser`. Prese
 - [x] Timing is measured.
 - [x] All four requirements have execution evidence.
 
-Automated sign-off complete. Approval: pending phase verification and human-only evidence; requirements remain open.
+Automated sign-off complete. Phase-wide user approval received on 2026-09-15; MIND-01 through MIND-04 are complete. Individual native environment details remain unreported in 02-UAT.md.
 
 ## Dependency and Scope Audit
 
@@ -161,3 +161,17 @@ The final affected matrix passed 204/204 cases across four browser projects, wit
 Implementation `5bb1e4c3c3781d6cb36ba4d6766357dc1aff94ad`. The 572-case matrix passed 571 cases and exposed one reload-hydration race in the workflow fixture. After waiting for a single hydrated editor, the workflow passed 4/4 projects (development Chromium and production Chromium, Firefox and WebKit). All 572 distinct matrix scenarios therefore have passing evidence; the original run is not represented as a clean sweep. Typecheck, production build and 67/67 unit tests passed.
 
 Coverage includes typography on selected-node Enter/Tab, branch duplication through native/custom/keyboard routes, branch paste, source isolation and reload, malformed/locked/stale conversion, rollback preserving intervening edits, and context/native unlock after deselection. The multiline fixture correction separately passed 4/4 projects. See 02-09-SUMMARY.md for RED/GREEN and review provenance. UAT remains pending.
+
+## Acceptance and current revision refresh — 2026-09-15
+
+User acceptance: **"Phase 2 tested and approved."** See [02-UAT.md](02-UAT.md) (five accepted checklist items and six resolved reported gaps). Historical pending statements above describe the state at their original runs; the final approval closes those acceptance items.
+
+Current implementation revision `aec5311` passed:
+
+- 29/29 production Chromium cases in 47.5 seconds: `topic-focus-new-board.spec.ts`, `mindmap-collapse.spec.ts`, `mindmap-layout.spec.ts` and `mindmap-formatting.spec.ts`.
+- 67/67 unit tests across six files.
+- TypeScript checking and a fresh production build, performed by the browser test server; existing chunk-size and dynamic-import advisories remain.
+
+Coverage: MIND-01 creation/editing, selected text and centered focus; MIND-02 full nested-collapse/history preservation; MIND-03 measured layout, lifecycle and root anchoring; MIND-04 explicit typography, presets and international labels. Later branch-copy/unlock and cross-browser input regressions retain their recorded 02-09 and quick-correction evidence. This refresh is a focused run at the current revision; historical full-matrix counts remain tied to their original revisions.
+
+Security verification remains at zero open threats; native input environments are accepted at phase level with their reporting granularity preserved. No capability beyond MIND-01 through MIND-04 is graduated by this approval.

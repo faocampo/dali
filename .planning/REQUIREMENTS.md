@@ -36,10 +36,10 @@ Initial release includes the capabilities below. Delivery proceeds through small
 
 ### Mind maps
 
-- [ ] **MIND-01**: Users can create and edit hierarchical mind maps and add child and sibling nodes through keyboard shortcuts.
-- [ ] **MIND-02**: Users can collapse and expand branches without deleting or changing their descendants.
-- [ ] **MIND-03**: Mind-map layout automatically adapts when nodes change or branches expand and collapse.
-- [ ] **MIND-04**: Users can format node text and style mind-map branches.
+- [x] **MIND-01**: Users can create and edit hierarchical mind maps and add child and sibling nodes through keyboard shortcuts.
+- [x] **MIND-02**: Users can collapse and expand branches without deleting or changing their descendants.
+- [x] **MIND-03**: Mind-map layout automatically adapts when nodes change or branches expand and collapse.
+- [x] **MIND-04**: Users can format node text and style mind-map branches.
 - [ ] **MIND-05**: Mind maps retain their hierarchy and content after saving, reopening, and concurrent editing.
 
 ### Facilitation
@@ -120,7 +120,7 @@ All deliverables must be organization-neutral. Keep real organizational informat
 
 ## Traceability
 
-The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential MVP capabilities and success criteria). Five Phase 1 requirements are complete; later-phase requirements remain pending.
+The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential MVP capabilities and success criteria). Five Phase 1 requirements and four Phase 2 requirements are complete; the remaining 33 requirements are pending.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -141,10 +141,10 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 | COL-02 | Phase 5 | Pending |
 | COL-03 | Phase 5 | Pending |
 | COL-04 | Phase 5 | Pending |
-| MIND-01 | Phase 2 | Pending |
-| MIND-02 | Phase 2 | Pending |
-| MIND-03 | Phase 2 | Pending |
-| MIND-04 | Phase 2 | Pending |
+| MIND-01 | Phase 2 | Complete |
+| MIND-02 | Phase 2 | Complete |
+| MIND-03 | Phase 2 | Complete |
+| MIND-04 | Phase 2 | Complete |
 | MIND-05 | Phase 5 | Pending |
 | FOLLOW-01 | Phase 6 | Pending |
 | COMMENT-01 | Phase 7 | Pending |
@@ -184,4 +184,4 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 User scope decisions supersede earlier research proposals, particularly the deferral of MCP creation and use of ordinary shapes for roadmaps.
 
 ---
-*Last updated: 2026-09-11 after user approval of all 42 initial-release requirements.*
+*Last updated: 2026-09-15 after Phase 2 testing and approval; all 42 initial-release requirements retain their approved scope.*
