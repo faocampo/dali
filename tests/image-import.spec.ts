@@ -88,6 +88,7 @@ test('leaving the board during decode cancels insertion',async({page})=>{
   await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles(file);
   await expect(page.locator('body')).toHaveAttribute('data-synthetic-decode','pending');
   await page.locator('.djai-board-switcher').click();
+  await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
   await expect(page.locator('affine-edgeless-root')).toHaveCount(0);
   expect(await page.evaluate(()=>(window as Window & {syntheticImageCount?:()=>number}).syntheticImageCount!())).toBe(0);
 });

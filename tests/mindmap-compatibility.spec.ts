@@ -171,6 +171,7 @@ test('@02-01-02 board transformer copy keeps document-scoped hierarchy independe
   const before = await snapshot(page);
   await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Untitled board', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
   const original = page.locator('.board-card').filter({ has: page.getByRole('button', { name: 'Open Untitled board', exact: true }) });
   await original.getByRole('button', { name: 'Duplicate', exact: true }).click();
   await page.getByRole('button', { name: 'Open Untitled board copy', exact: true }).click();
@@ -184,6 +185,7 @@ test('@02-01-02 board transformer copy keeps document-scoped hierarchy independe
   });
   await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
   await page.getByRole('button', { name: 'Untitled board copy', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'All boards', exact: true }).click();
   await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
   await expect.poll(() => snapshot(page)).toEqual(before);
 });

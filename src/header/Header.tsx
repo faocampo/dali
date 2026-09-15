@@ -2,6 +2,7 @@
  * The app header: local board access, save state, attribution, and export.
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { BoardTitleMenu } from './BoardTitleMenu';
 import logo from '../assets/djai-design-logo.png';
 import { exportBoardFile } from '../canvas/export-board';
 import { getCanvasRuntime } from '../canvas/runtime';
@@ -13,9 +14,11 @@ import { CANVAS_HOME_URL } from './links';
 export function Header({
   boardTitle = 'Untitled board',
   onOpenBoards,
+  onRenameBoard,
 }: {
   boardTitle?: string;
   onOpenBoards?: () => void;
+  onRenameBoard?: (title: string) => Promise<void>;
 }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
@@ -49,14 +52,7 @@ export function Header({
         <img src={logo} alt="DJAI Design" height={34} />
       </a>
 
-      {onOpenBoards && (
-        <button type="button" className="djai-board-switcher" onClick={onOpenBoards}>
-          <span>{boardTitle}</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="2" />
-          </svg>
-        </button>
-      )}
+      {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onOpenBoards={onOpenBoards} onRename={onRenameBoard} />}
 
       <nav className="djai-header-actions">
         <a

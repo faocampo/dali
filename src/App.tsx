@@ -3,6 +3,7 @@ import BlockSuiteCanvas from './canvas/BlockSuiteCanvas';
 import { getCanvasRuntime } from './canvas/runtime';
 import { Header } from './header/Header';
 import { BoardLibrary } from './boards/BoardLibrary';
+import { renameLocalBoard } from './boards/operations';
 import { boardCatalogEntry } from './boards/catalog';
 
 export default function App() {
@@ -38,7 +39,11 @@ export default function App() {
 
   return (
     <div className="djai-app">
-      <Header boardTitle={boardTitle} onOpenBoards={() => setScreen('library')} />
+      <Header boardTitle={boardTitle} onOpenBoards={() => setScreen('library')} onRenameBoard={async title => {
+        const { store } = await getCanvasRuntime();
+        await renameLocalBoard(store.id, title);
+        setBoardTitle(title);
+      }} />
       {/* The canvas takes whatever is left. It positions its own children
           absolutely, so this wrapper has to be the positioning context. */}
       <main className="djai-canvas-area">

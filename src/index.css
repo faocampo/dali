@@ -1513,3 +1513,15 @@ djai-image-visual-edit {
 .object-context-menu button:disabled { color:#76716b; cursor:default; }
 
 .mindmap-feedback .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+
+.board-title-control { position: relative; min-width: 0; margin-right: auto; }
+.board-title-popover {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 100;
+  width: min(280px, 70vw); padding: 12px; border: 1px solid var(--board-line);
+  border-radius: 12px; background: var(--board-surface); color: var(--board-ink);
+  box-shadow: 0 8px 24px #0002; display: grid; gap: 10px;
+}
+.board-title-popover [role="menuitem"] { border: 0; border-radius: 6px; padding: 10px; text-align: left; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.board-title-popover [role="menuitem"]:hover, .board-title-popover [role="menuitem"]:focus-visible { background: var(--affine-hover-color); }
+.board-title-popover input { min-width: 0; width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid var(--board-line); border-radius: 6px; font: inherit; }
+.board-title-actions { display: flex; justify-content: flex-end; gap: 8px; }
