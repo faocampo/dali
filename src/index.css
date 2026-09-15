@@ -1603,7 +1603,7 @@ djai-image-visual-edit {
   border-radius: var(--board-radius);
   box-shadow: var(--board-shadow);
 }
-.dali-menu-categories { width: 108px; flex-shrink: 0; }
+.dali-menu-categories { width: 140px; flex-shrink: 0; }
 .dali-submenu { width: 220px; max-height: calc(100dvh - 120px); overflow-y: auto; border-left: 1px solid var(--board-line); margin-left: 6px; padding-left: 6px; }
 .dali-menu-popup [role='menuitem'] { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; box-sizing: border-box; min-height: 40px; padding: 8px 10px; background: transparent; border: 0; border-radius: 6px; text-decoration: none; text-align: left; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 .dali-menu-popup [role='menuitem']:hover, .dali-menu-popup [aria-expanded='true'] { background: var(--affine-hover-color); }
@@ -1626,3 +1626,6 @@ djai-image-visual-edit {
 .drawing-palette-options button:hover { background: #f0ebfa; }
 .drawing-palette-options button:focus-visible { outline: 2px solid #6841ae; outline-offset: -2px; background: #f0ebfa; }
 .drawing-palette p { font-size: 12px; line-height: 1.5; color: #625d55; margin: 12px 0 0; }
+
+.dali-menu-icon { flex: 0 0 18px; }
+.dali-menu-label { flex: 1; min-width: 0; }

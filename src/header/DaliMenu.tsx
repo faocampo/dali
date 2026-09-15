@@ -59,27 +59,27 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
       <div role="menu" aria-label="Dalí" className="dali-menu-categories">
         {(['File', 'View', 'Edit', 'Settings', 'Help'] as const).map(item => <button key={item} type="button" role="menuitem" tabIndex={-1} data-category={item} aria-haspopup="menu" aria-expanded={category === item}
           onClick={() => setCategory(item)} onKeyDown={event => { if (event.key === 'ArrowRight') { event.preventDefault(); setCategory(item); } }}>
-          {item}<svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="m4 3 3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+          <MenuIcon name={item} /><span className="dali-menu-label">{item}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="m4 3 3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
         </button>)}
       </div>
       {category && <div role="menu" aria-label={category} className="dali-submenu">
         {category === 'File' && <>
-          <button role="menuitem" tabIndex={-1} disabled={!onOpenBoards} onClick={() => run(() => onOpenBoards?.())}>All boards</button>
-          <button role="menuitem" tabIndex={-1} onClick={() => command('import')}>Import board</button>
-          <button role="menuitem" tabIndex={-1} onClick={() => run(onExport)}>Export board</button>
+          <button role="menuitem" tabIndex={-1} disabled={!onOpenBoards} onClick={() => run(() => onOpenBoards?.())}><MenuIcon name="boards" /><span className="dali-menu-label">All boards</span></button>
+          <button role="menuitem" tabIndex={-1} onClick={() => command('import')}><MenuIcon name="import" /><span className="dali-menu-label">Import board</span></button>
+          <button role="menuitem" tabIndex={-1} onClick={() => run(onExport)}><MenuIcon name="export" /><span className="dali-menu-label">Export board</span></button>
         </>}
         {category === 'View' && <>
-          <button role="menuitem" tabIndex={-1} onClick={() => command('fit')}>Fit to screen</button>
-          <button role="menuitem" tabIndex={-1} onClick={() => command('reset-zoom')}>Reset zoom to 100%</button>
-          <button role="menuitem" tabIndex={-1} onClick={() => command('layers')}>Layers</button>
+          <button role="menuitem" tabIndex={-1} onClick={() => command('fit')}><MenuIcon name="fit" /><span className="dali-menu-label">Fit to screen</span></button>
+          <button role="menuitem" tabIndex={-1} onClick={() => command('reset-zoom')}><MenuIcon name="zoom" /><span className="dali-menu-label">Reset zoom to 100%</span></button>
+          <button role="menuitem" tabIndex={-1} onClick={() => command('layers')}><MenuIcon name="layers" /><span className="dali-menu-label">Layers</span></button>
         </>}
         {category === 'Edit' && <>
-          <button role="menuitem" tabIndex={-1} disabled={!history.undo} onClick={() => command('undo')}>Undo</button>
-          <button role="menuitem" tabIndex={-1} disabled={!history.redo} onClick={() => command('redo')}>Redo</button>
+          <button role="menuitem" tabIndex={-1} disabled={!history.undo} onClick={() => command('undo')}><MenuIcon name="undo" /><span className="dali-menu-label">Undo</span></button>
+          <button role="menuitem" tabIndex={-1} disabled={!history.redo} onClick={() => command('redo')}><MenuIcon name="redo" /><span className="dali-menu-label">Redo</span></button>
         </>}
-        {category === 'Settings' && <button role="menuitem" tabIndex={-1} onClick={() => { setShowControls(!showControls); close(); }}>{showControls ? 'Hide' : 'Show'} viewport controls</button>}
+        {category === 'Settings' && <button role="menuitem" tabIndex={-1} onClick={() => { setShowControls(!showControls); close(); }}><MenuIcon name="controls" /><span className="dali-menu-label">{showControls ? 'Hide' : 'Show'} viewport controls</span></button>}
         {category === 'Help' && <>
-          <a role="menuitem" tabIndex={-1} href={APP_URL} target="_blank" rel="noopener noreferrer" onClick={close}>Upstream source</a>
+          <a role="menuitem" tabIndex={-1} href={APP_URL} target="_blank" rel="noopener noreferrer" onClick={close}><MenuIcon name="source" /><span className="dali-menu-label">Upstream source</span></a>
           <div className="dali-shortcuts">
             <h2>Canvas shortcuts</h2>
             <p>Select V · Frame F · Shape S · Connector C · Freehand P</p>
@@ -92,4 +92,26 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
       </div>}
     </div>}
   </div>;
+}
+
+
+const menuIconPaths = {
+  File: 'M6 3h8l4 4v14H6Z M14 3v5h4',
+  View: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z M15 12a3 3 0 1 1-6 0 3 3 0 1 1 6 0',
+  Edit: 'm4 16 12-12 4 4L8 20H4Z M13 7l4 4',
+  Settings: 'M4 7h16M4 17h16M8 4v6M16 14v6',
+  Help: 'M21 12a9 9 0 1 1-18 0 9 9 0 1 1 18 0 M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4 M12 16v.1',
+  boards: 'M3 3h7v7H3Z M14 3h7v7h-7Z M3 14h7v7H3Z M14 14h7v7h-7Z',
+  import: 'M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5',
+  export: 'M12 15V3m-4 4 4-4 4 4M4 16v5h16v-5',
+  fit: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
+  zoom: 'M16 10a6 6 0 1 1-12 0 6 6 0 1 1 12 0m-1 5 6 6 M7 10h6',
+  layers: 'm3 8 9-5 9 5-9 5Z M3 12l9 5 9-5 M3 16l9 5 9-5',
+  undo: 'm9 5-5 5 5 5M4 10h10a5 5 0 0 1 0 10',
+  redo: 'm15 5 5 5-5 5M20 10H10a5 5 0 0 0 0 10',
+  controls: 'M3 5h18v14H3Z M6 15h3M12 15h6M15 12v6',
+  source: 'm8 7-5 5 5 5m8-10 5 5-5 5M14 4l-4 16',
+} as const;
+function MenuIcon({ name }: { name: keyof typeof menuIconPaths }) {
+  return <svg className="dali-menu-icon" aria-hidden="true" focusable="false" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d={menuIconPaths[name]} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }

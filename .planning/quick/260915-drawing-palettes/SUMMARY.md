@@ -13,3 +13,7 @@ Outstanding: full editable stars, arrow shapes, pentagons, and other polygons. T
 Validation: typecheck, production build, and 67 unit tests passed. Eleven initial Chromium editing/menu/palette checks passed. The broad three-browser run passed 122 cases and exposed one ambiguous test selector; that selector was scoped to the palette. All nine final focused checks passed across Chromium, Firefox, and WebKit after the selector correction and history-availability changes. Desktop and narrow-screen palette inspection passed. Build retains its existing chunk-size advisory.
 
 Phase 2 acceptance and deferred positioning/branding scope are unchanged.
+
+## Menu icon follow-up
+
+Added decorative outline icons to all five menu categories and every submenu action, retaining text labels and accessible names. Widened the category column to preserve label and chevron alignment. Validation: typecheck, production build, both existing menu browser tests, and desktop/narrow-screen visual checks passed.
