@@ -30,9 +30,11 @@ async function typeTopic(page:Page,text:string){
 
 test('@02-06-03 daily workflow retains formatted collapsed independent maps beside ordinary content',async({page},testInfo)=>{
   await page.goto('/');
-  await page.getByRole('button',{name:'Shape',exact:true}).click();
+  await page.getByRole('button',{name:'Shapes',exact:true}).click();
+  await page.getByRole('button',{name:'Square / rectangle',exact:true}).click();
   await page.mouse.move(200,150);await page.mouse.down();await page.mouse.move(300,220,{steps:8});await page.mouse.up();
-  await page.getByRole('button',{name:'Arrow / connector',exact:true}).click();
+  await page.getByRole('button',{name:'Lines',exact:true}).click();
+  await page.getByRole('button',{name:'Straight arrow',exact:true}).click();
   await page.mouse.move(220,300);await page.mouse.down();await page.mouse.move(330,340,{steps:8});await page.mouse.up();
   const image=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=32;c.height=32;const ctx=c.getContext('2d')!;ctx.fillStyle='#12ab34';ctx.fillRect(0,0,32,32);return c.toDataURL().split(',')[1]!;});
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({name:'synthetic-workflow.png',mimeType:'image/png',buffer:Buffer.from(image,'base64')});

@@ -45,6 +45,7 @@ export function LayersInspector({ host, onClose }: { host: EditorHost; onClose: 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (event.target instanceof Element && event.target.closest('.dali-menu')) return;
       event.preventDefault();
       event.stopPropagation();
       onClose();

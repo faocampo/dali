@@ -240,7 +240,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (event.target instanceof Element && event.target.closest('.object-context-menu')) return;
+      if (event.target instanceof Element && event.target.closest('.object-context-menu, .dali-menu')) return;
       if (cropOpen) { event.preventDefault(); event.stopPropagation(); visualGeneration.current++; visualPending.current=false; setEditingImage(false); setCropOpen(false); return; }
       // While the inspector is open, Escape belongs to the inspector. Capture
       // it before the editor so closing this panel does not also clear the

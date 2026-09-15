@@ -1,3 +1,4 @@
+import { CanvasMeasurements } from './CanvasMeasurements';
 import { ConnectorQuickAdd } from './ConnectorQuickAdd';
 import { Tooltips } from './Tooltips';
 import { installCanvasAffordances } from './canvas-affordances';
@@ -91,6 +92,7 @@ export default function BlockSuiteCanvas() {
       {host && <Tooltips />}
       {host && <ConnectorQuickAdd host={host} />}
       {host && <FrameBorderOverlay host={host} />}
+      {host && <CanvasMeasurements host={host} />}
       {host && <MindMapInspector host={host} />}
       {host && <ObjectContextMenu host={host} />}
       {host && (layersOpen

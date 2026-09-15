@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { ViewMenu } from './ViewMenu';
 import { APP_URL } from './links';
 import { newBoardUrl } from '../boards/preferences';
 
@@ -22,6 +23,7 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
   }, [showControls]);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const returnCategory = useRef<Category | null>(null);
   const close = () => { setOpen(false); setCategory(null); trigger.current?.focus(); };
   useEffect(() => {
     if (!open) return;
@@ -29,8 +31,9 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
     document.addEventListener('pointerdown', outside);
     return () => document.removeEventListener('pointerdown', outside);
   }, [open]);
-  useEffect(() => {
-    if (open) root.current?.querySelector<HTMLElement>(category ? '.dali-submenu [role="menuitem"]:not(:disabled)' : '.dali-menu-categories [role="menuitem"]')?.focus();
+  useLayoutEffect(() => {
+    if (open) root.current?.querySelector<HTMLElement>(category ? '.dali-submenu [role="menuitem"]:not(:disabled)' : `[data-category="${returnCategory.current ?? 'File'}"]`)?.focus();
+    returnCategory.current = null;
   }, [open, category]);
   const run = (action: () => void) => { close(); action(); };
   const command = (action: string) => run(() => window.dispatchEvent(new CustomEvent('dali:board-command', { detail: action })));
@@ -40,14 +43,14 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
     event.stopPropagation();
     if (event.key === 'Escape' || event.key === 'ArrowLeft') {
       event.preventDefault();
-      if (category) { const previous = category; setCategory(null); requestAnimationFrame(() => root.current?.querySelector<HTMLButtonElement>(`[data-category="${previous}"]`)?.focus()); }
+      if (category) { returnCategory.current = category; setCategory(null); }
       else close();
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Home' || event.key === 'End') {
       event.preventDefault();
       if (!open) { setOpen(true); return; }
       const menu = (event.target as HTMLElement).closest('[role="menu"]');
-      const items = Array.from(menu?.querySelectorAll<HTMLElement>(':scope > [role="menuitem"]:not(:disabled)') ?? []);
+      const items = Array.from(menu?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not(:disabled)') ?? []).filter(item => item.closest('[role="menu"]') === menu);
       const index = items.indexOf(document.activeElement as HTMLElement);
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
       items[next]?.focus();
@@ -70,11 +73,11 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
           <button role="menuitem" tabIndex={-1} onClick={() => command('import')}><MenuIcon name="import" /><span className="dali-menu-label">Import board</span></button>
           <button role="menuitem" tabIndex={-1} onClick={() => run(onExport)}><MenuIcon name="export" /><span className="dali-menu-label">Export board</span></button>
         </>}
-        {category === 'View' && <>
+        {category === 'View' && <ViewMenu>
           <button role="menuitem" tabIndex={-1} onClick={() => command('fit')}><MenuIcon name="fit" /><span className="dali-menu-label">Fit to screen</span></button>
           <button role="menuitem" tabIndex={-1} onClick={() => command('reset-zoom')}><MenuIcon name="zoom" /><span className="dali-menu-label">Reset zoom to 100%</span></button>
           <button role="menuitem" tabIndex={-1} onClick={() => command('layers')}><MenuIcon name="layers" /><span className="dali-menu-label">Layers</span></button>
-        </>}
+        </ViewMenu>}
         {category === 'Edit' && <>
           <button role="menuitem" tabIndex={-1} disabled={!history.undo} onClick={() => command('undo')}><MenuIcon name="undo" /><span className="dali-menu-label">Undo</span></button>
           <button role="menuitem" tabIndex={-1} disabled={!history.redo} onClick={() => command('redo')}><MenuIcon name="redo" /><span className="dali-menu-label">Redo</span></button>

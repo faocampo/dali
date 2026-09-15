@@ -1605,10 +1605,10 @@ djai-image-visual-edit {
 }
 .dali-menu-categories { width: 140px; flex-shrink: 0; }
 .dali-submenu { width: 220px; max-height: calc(100dvh - 120px); overflow-y: auto; border-left: 1px solid var(--board-line); margin-left: 6px; padding-left: 6px; }
-.dali-menu-popup [role='menuitem'] { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; box-sizing: border-box; min-height: 40px; padding: 8px 10px; background: transparent; border: 0; border-radius: 6px; text-decoration: none; text-align: left; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
-.dali-menu-popup [role='menuitem']:hover, .dali-menu-popup [aria-expanded='true'] { background: var(--affine-hover-color); }
-.dali-menu-popup [role='menuitem']:focus-visible { outline: 2px solid var(--affine-primary-color); outline-offset: -2px; }
-.dali-menu-popup [role='menuitem']:disabled { opacity: .5; cursor: default; }
+.dali-menu-popup [role^='menuitem'] { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; box-sizing: border-box; min-height: 40px; padding: 8px 10px; background: transparent; border: 0; border-radius: 6px; text-decoration: none; text-align: left; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.dali-menu-popup [role^='menuitem']:hover, .dali-menu-popup [aria-expanded='true'] { background: var(--affine-hover-color); }
+.dali-menu-popup [role^='menuitem']:focus-visible { outline: 2px solid var(--affine-primary-color); outline-offset: -2px; }
+.dali-menu-popup [role^='menuitem']:disabled { opacity: .5; cursor: default; }
 .dali-shortcuts { padding: 10px; font-size: 13px; line-height: 1.5; }
 .dali-shortcuts h2, .dali-shortcuts h3 { font-size: 14px; margin: 10px 0 6px; }
 .dali-shortcuts p { margin: 0 0 10px; }
@@ -1635,3 +1635,27 @@ djai-image-visual-edit {
 .connector-quick-add { position: absolute; z-index: 8; width: 28px; height: 28px; border: 1px solid var(--board-line); border-radius: 50%; background: var(--board-surface); color: var(--board-ink); font-size: 20px; cursor: pointer; }
 .connector-quick-add:hover { background: var(--affine-hover-color); }
 .canvas-tooltip { position: fixed; z-index: 1000; transform: translateY(-50%); pointer-events: none; padding: 7px 10px; border-radius: 6px; background: #282522; color: white; font-size: 12px; box-shadow: 0 2px 8px #0002; }
+
+/* View controls share the application menu and leave the canvas fully interactive. */
+.dali-submenu:has(.dali-menu-switch), .dali-submenu:has(.dali-grid-menu) { width: 268px; }
+.dali-menu-value, .dali-menu-section-label, .dali-menu-hint { color: #69645c; font-size: 12px; }
+.dali-menu-section-label { padding: 10px 10px 4px; font-weight: 600; }
+.dali-menu-hint { margin: 6px 10px 10px; line-height: 1.5; }
+.dali-menu-separator { border-top: 1px solid var(--board-line); margin: 6px 4px; }
+.dali-menu-switch { width: 30px; height: 18px; flex-shrink: 0; border-radius: 12px; background: #77736e; padding: 3px; box-sizing: border-box; }
+.dali-menu-switch::after { content: ''; display: block; width: 12px; height: 12px; border-radius: 50%; background: white; }
+[aria-checked='true'] > .dali-menu-switch { background: var(--affine-primary-color); }
+[aria-checked='true'] > .dali-menu-switch::after { transform: translateX(12px); }
+.grid-preview { width: 22px; height: 22px; flex-shrink: 0; border: 1px solid var(--board-line); border-radius: 4px; }
+.grid-preview--off { background: linear-gradient(135deg, transparent 46%, #77736e 48%, #77736e 52%, transparent 54%); }
+.grid-preview--dots { background-image: radial-gradient(#77736e 1px, transparent 1px); background-size: 6px 6px; }
+.grid-preview--lines { background-image: linear-gradient(#77736e66 1px, transparent 1px), linear-gradient(90deg, #77736e66 1px, transparent 1px); background-size: 6px 6px; }
+.canvas-measurements { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; }
+.canvas-measurements text { font: 500 12px var(--affine-font-family); fill: #59429a; }
+.canvas-measurements rect { fill: white; stroke: #c1b4dd; stroke-width: 1; }
+.canvas-distance > line { stroke: #7959ad; stroke-width: 1; }
+.canvas-dimensions rect { fill: #f6f2fc; }
+@media (max-width: 600px) {
+  .dali-submenu:has(.dali-menu-switch), .dali-submenu:has(.dali-grid-menu) { width: auto; }
+  .dali-menu-categories { width: 120px; }
+}
