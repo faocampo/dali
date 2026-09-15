@@ -1,3 +1,4 @@
+import { fileAction } from './app-menu';
 import { openObjectActions } from './object-actions';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
@@ -194,7 +195,7 @@ test('Replace cannot mutate a disconnected board when blob storage finishes', as
   const source = await page.evaluate(() => (window as Window & { syntheticSource?: () => unknown }).syntheticSource!());
   await page.locator('.selection-inspector input[type=file]').setInputFiles(await raster(page, 80, 160));
   await expect(page.locator('body')).toHaveAttribute('data-synthetic-replacement', 'pending');
-  await page.locator('.djai-board-switcher').click();
+  await fileAction(page, 'All boards');
   await expect(page.locator('affine-edgeless-root')).toHaveCount(0);
   await page.evaluate(async () => {
     (window as Window & { finishSyntheticReplacement?: () => void }).finishSyntheticReplacement!();

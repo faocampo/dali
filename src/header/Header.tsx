@@ -2,6 +2,7 @@
  * The app header: local board access, save state, and shared export dialog.
  */
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { DaliMenu } from './DaliMenu';
 import { BoardTitleMenu } from './BoardTitleMenu';
 import logo from '../assets/djai-design-logo.png';
 import { exportBoardFile } from '../canvas/export-board';
@@ -26,7 +27,7 @@ export function Header({
 
   const closeExport = useCallback(() => {
     setExportOpen(false);
-    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.board-utilities button[aria-label="Export board"]')?.focus());
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.dali-menu-trigger')?.focus());
   }, []);
 
   useEffect(() => {
@@ -50,7 +51,8 @@ export function Header({
         <img src={logo} alt="DJAI Design" height={34} />
       </a>
 
-      {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onOpenBoards={onOpenBoards} onRename={onRenameBoard} />}
+      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} />
+      {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
       <nav className="djai-header-actions">
         <div className="djai-save">

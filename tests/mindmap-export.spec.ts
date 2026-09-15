@@ -1,3 +1,4 @@
+import { fileAction } from './app-menu';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -28,7 +29,7 @@ async function seed(page: Page) {
 }
 
 async function preview(page: Page, scope = 'board') {
-  await page.getByRole('button', { name: 'Export board', exact: true }).click();
+  await fileAction(page, 'Export board');
   await page.getByRole('radio', { name: 'PNG image' }).check();
   await page.locator(`input[name="export-scope"][value="${scope}"]`).check();
   return page.getByTestId('export-dimensions');

@@ -1,3 +1,4 @@
+import { fileAction } from './app-menu';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -87,7 +88,7 @@ test('leaving the board during decode cancels insertion',async({page})=>{
   });
   await page.getByTestId('board-action-menu').locator('input[type=file][accept="image/*"]').setInputFiles(file);
   await expect(page.locator('body')).toHaveAttribute('data-synthetic-decode','pending');
-  await page.locator('.djai-board-switcher').click();
+  await fileAction(page, 'All boards');
   await expect(page.locator('affine-edgeless-root')).toHaveCount(0);
   expect(await page.evaluate(()=>(window as Window & {syntheticImageCount?:()=>number}).syntheticImageCount!())).toBe(0);
 });

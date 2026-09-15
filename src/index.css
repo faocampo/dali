@@ -1552,7 +1552,7 @@ djai-image-visual-edit {
 /* Stable canvas creation, board operations, and viewport groups. */
 .canvas-tool-button svg { width: 24px; height: 24px; }
 .canvas-tool-button:hover { background: var(--affine-hover-color); }
-.board-utilities, .canvas-viewport-controls {
+.canvas-viewport-controls {
   position: absolute;
   z-index: 12;
   display: flex;
@@ -1563,9 +1563,8 @@ djai-image-visual-edit {
   background: var(--board-surface);
   box-shadow: var(--board-shadow);
 }
-.board-utilities { top: 16px; left: 84px; z-index: 151; }
 .canvas-viewport-controls { bottom: 16px; left: 16px; }
-.canvas-viewport-controls button, .board-help summary {
+.canvas-viewport-controls button {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1582,32 +1581,39 @@ djai-image-visual-edit {
   font-variant-numeric: tabular-nums;
 }
 .canvas-viewport-controls button:disabled { opacity: 0.45; cursor: default; }
-.canvas-viewport-controls button:hover:not(:disabled), .board-help summary:hover { background: var(--affine-hover-color); }
-.canvas-viewport-controls button:focus-visible, .board-utilities :is(button, summary, a):focus-visible {
+.canvas-viewport-controls button:hover:not(:disabled) { background: var(--affine-hover-color); }
+.canvas-viewport-controls button:focus-visible {
   outline: 2px solid var(--affine-primary-color);
   outline-offset: 2px;
 }
 .viewport-divider { height: 24px; width: 1px; background: var(--board-line); margin-inline: 4px; }
-.board-help summary { list-style: none; }
-.board-help summary::-webkit-details-marker { display: none; }
-.board-help[open] summary { background: var(--affine-hover-color); }
-.board-help-content {
+/* Top-bar application menu; submenu stays within narrow viewports. */
+.dali-menu { position: relative; flex-shrink: 0; }
+.dali-menu-trigger { display: flex; align-items: center; gap: 8px; }
+.dali-menu-popup {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 10px);
   left: 0;
-  width: min(320px, calc(100vw - 100px));
-  max-height: calc(100dvh - 210px);
-  overflow-y: auto;
-  box-sizing: border-box;
-  padding: 16px;
+  display: flex;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 6px;
   background: var(--board-surface);
   color: var(--board-ink);
   border-radius: var(--board-radius);
   box-shadow: var(--board-shadow);
-  font-size: 14px;
-  line-height: 1.5;
 }
-.board-help-content h2 { font-size: 16px; margin: 0 0 8px; }
-.board-help-content h3 { font-size: 14px; margin: 20px 0 6px; }
-.board-help-content p { margin: 0 0 10px; }
-.board-help-content kbd { font: inherit; font-weight: 600; }
+.dali-menu-categories { width: 108px; flex-shrink: 0; }
+.dali-submenu { width: 220px; max-height: calc(100dvh - 120px); overflow-y: auto; border-left: 1px solid var(--board-line); margin-left: 6px; padding-left: 6px; }
+.dali-menu-popup [role='menuitem'] { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; box-sizing: border-box; min-height: 40px; padding: 8px 10px; background: transparent; border: 0; border-radius: 6px; text-decoration: none; text-align: left; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.dali-menu-popup [role='menuitem']:hover, .dali-menu-popup [aria-expanded='true'] { background: var(--affine-hover-color); }
+.dali-menu-popup [role='menuitem']:focus-visible { outline: 2px solid var(--affine-primary-color); outline-offset: -2px; }
+.dali-menu-popup [role='menuitem']:disabled { opacity: .5; cursor: default; }
+.dali-shortcuts { padding: 10px; font-size: 13px; line-height: 1.5; }
+.dali-shortcuts h2, .dali-shortcuts h3 { font-size: 14px; margin: 10px 0 6px; }
+.dali-shortcuts p { margin: 0 0 10px; }
+@media (max-width: 600px) {
+  .dali-menu-popup { position: fixed; left: 12px; top: 58px; width: calc(100vw - 24px); box-sizing: border-box; }
+  .dali-submenu { width: auto; flex: 1; min-width: 0; }
+  .djai-header { gap: 8px; }
+}

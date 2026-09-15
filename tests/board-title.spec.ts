@@ -1,3 +1,4 @@
+import { fileAction } from './app-menu';
 import { test, expect } from './fixtures';
 
 test('inline title saves with Enter and survives reload without replacing canvas', async ({ page }) => {
@@ -10,7 +11,7 @@ test('inline title saves with Enter and survives reload without replacing canvas
   await expect(page.getByRole('textbox', { name: 'Board name' })).toBeEnabled();
   await page.reload();
   await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveValue('Synthetic planning');
-  await page.getByRole('button', { name: 'All boards', exact: true }).click();
+  await fileAction(page, 'All boards');
   await expect(page.getByRole('button', { name: 'Open Synthetic planning', exact: true })).toBeVisible();
 });
 

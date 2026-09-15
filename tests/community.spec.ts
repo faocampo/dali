@@ -1,3 +1,4 @@
+import { fileAction } from './app-menu';
 import { expect, test } from './fixtures';
 import type { EditorHost } from '@blocksuite/affine/std';
 
@@ -13,11 +14,11 @@ test.beforeEach(async ({ page }) => openCanvas(page));
 test('opens the empty canvas with local home navigation', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Full DJAI Canvas' })).toHaveCount(0);
   await expect(page.locator('header').getByRole('button', { name: 'Export', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Export board', exact: true }).click();
+  await fileAction(page, 'Export board');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Export board', exact: true })).toBeFocused();
-  for (const name of ['Insert image', 'Add sticky note', 'Add text', 'Layers', 'Export board']) {
+  await expect(page.getByRole('button', { name: 'Dalí', exact: true })).toBeFocused();
+  for (const name of ['Insert image', 'Add sticky note', 'Add text', 'Layers', 'Dalí']) {
     await expect(page.getByRole('button', { name })).toBeVisible();
   }
   await expect(page.locator('affine-edgeless-note')).toHaveCount(0);
@@ -59,7 +60,7 @@ test('repeated editor reopen preserves IDs without duplicate objects or handlers
   await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
   const stored = await notes(page);
   for (let repeat = 0; repeat < 3; repeat += 1) {
-    await page.locator('.djai-board-switcher').click();
+    await fileAction(page, 'All boards');
     await expect(page.locator('editor-host')).toHaveCount(0);
     await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
     await expect(page.getByTestId('board-action-menu')).toBeVisible();
@@ -75,7 +76,7 @@ test('interrupted mounting and rapid board switching keep the final board isolat
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
   const first = await notes(page);
-  await page.locator('.djai-board-switcher').click();
+  await fileAction(page, 'All boards');
   await page.getByRole('button', { name: '+ New board', exact: true }).click();
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
   const second = await notes(page);
@@ -83,10 +84,10 @@ test('interrupted mounting and rapid board switching keep the final board isolat
   expect(second.notes).toEqual([]);
 
   for (const title of ['Untitled board', 'Untitled board 2', 'Untitled board']) {
-    await page.locator('.djai-board-switcher').click();
+    await fileAction(page, 'All boards');
     await page.getByRole('button', { name: `Open ${title}`, exact: true }).click();
     // The React header exists before the asynchronous native editor finishes.
-    await page.locator('.djai-board-switcher').click();
+    await fileAction(page, 'All boards');
     await expect(page.locator('editor-host')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
     await page.getByRole('button', { name: `Open ${title}`, exact: true }).click();
@@ -94,13 +95,13 @@ test('interrupted mounting and rapid board switching keep the final board isolat
     await expect(page.locator('editor-host')).toHaveCount(1);
     await expect.poll(() => notes(page)).toEqual(title === 'Untitled board' ? first : second);
   }
-  await page.locator('.djai-board-switcher').click();
+  await fileAction(page, 'All boards');
   await page.getByRole('button', { name: 'Open Untitled board 2', exact: true }).click();
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect.poll(async () => (await notes(page)).notes.length).toBe(1);
   await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
-  await page.locator('.djai-board-switcher').click();
+  await fileAction(page, 'All boards');
   await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
   await expect.poll(() => notes(page)).toEqual(first);
 });

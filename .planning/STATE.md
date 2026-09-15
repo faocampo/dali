@@ -131,5 +131,6 @@ Complete: five plans, five requirements, and four user-approved UAT checks. Curr
 | 260915-cf2 | Editable title, mouse pointer and native Hand tool | 2026-09-15 | 8e083a1 | [Quick task](quick/260915-cf2-editable-title-pointer-icon-and-hand-too/260915-cf2-SUMMARY.md) |
 | 260915-cig | Remove redundant header link and export | 2026-09-15 | b188a47 | [Quick task](quick/260915-cig-remove-redundant-header-link-and-export/260915-cig-SUMMARY.md) |
 | 260915-ui | Canvas accessibility, export flow and toolbar organization | 2026-09-15 | See summary | [Quick task](quick/260915-ui-critique-fixes/SUMMARY.md) |
+| 260915-menu | Top-bar Dalí menu with File, View and Help | 2026-09-15 | See summary | [Quick task](quick/260915-dali-application-menu/SUMMARY.md) |
 
 Phase 2 remains awaiting focused and native UAT. Refresh its verification fingerprint on resumption; this quick correction retains separate validation provenance.

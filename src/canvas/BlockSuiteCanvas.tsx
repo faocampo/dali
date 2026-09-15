@@ -1,5 +1,4 @@
 import { ViewportControls } from './ViewportControls';
-import { APP_URL } from '../header/links';
 import { ObjectContextMenu } from './ObjectContextMenu';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
@@ -101,6 +100,19 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   const inputRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const store = host.std.store;
+  useEffect(() => {
+    const command = (event: Event) => {
+      const action = (event as CustomEvent<string>).detail;
+      const gfx = host.std.get(GfxControllerIdentifier);
+      if (action === 'import') importRef.current?.click();
+      if (action === 'fit') gfx.fitToScreen();
+      if (action === 'reset-zoom') gfx.viewport.smoothZoom(1);
+      if (action === 'layers') onOpenLayers();
+    };
+    window.addEventListener('dali:board-command', command);
+    return () => window.removeEventListener('dali:board-command', command);
+  }, [host, onOpenLayers]);
+
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -140,9 +152,6 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
     [host,importImages]
   );
 
-  const onExport = useCallback(async () => {
-    window.dispatchEvent(new Event('djai:open-export'));
-  }, []);
 
   const onImportFile = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -270,29 +279,6 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
         <path d="m4 12 8 4 8-4M4 16l8 4 8-4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       </ControlButton>
 
-    </div>
-    <div className="board-utilities" role="toolbar" aria-label="Board actions">
-      <button type="button" className="djai-ghost" aria-label="Export board" onClick={() => void onExport()}>Export</button>
-      <button type="button" className="djai-ghost" aria-label="Import board" onClick={() => importRef.current?.click()}>Import</button>
-      <details className="board-help" onKeyDown={event => {
-        if (event.key === 'Escape') {
-          event.currentTarget.open = false;
-          event.currentTarget.querySelector('summary')?.focus();
-          event.stopPropagation();
-        }
-      }}>
-        <summary>Help</summary>
-        <div className="board-help-content">
-          <h2>Canvas shortcuts</h2>
-          <p>Select <kbd>V</kbd> · Frame <kbd>F</kbd> · Shape <kbd>S</kbd> · Connector <kbd>C</kbd> · Freehand <kbd>P</kbd></p>
-          <p>Use Hand to drag the canvas. Hold Space for temporary panning.</p>
-          <h3>Mind maps</h3>
-          <p>With a topic selected, Tab adds a child; Enter adds a sibling (or a child for the root). Double-click to edit text. Escape finishes editing. Open Properties from the object's More menu for formatting.</p>
-          <h3>Board files</h3>
-          <p>Export an editable backup or an image. Import restores an editable board file.</p>
-          <a href={APP_URL} target="_blank" rel="noopener noreferrer">Upstream source</a>
-        </div>
-      </details>
     </div>
     <ViewportControls host={host} />
       <input

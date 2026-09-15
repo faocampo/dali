@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 
 /** The title edits in place; library navigation has a separate control. */
-export function BoardTitleMenu({ title, onRename, onOpenBoards }: {
+export function BoardTitleMenu({ title, onRename }: {
   title: string;
   onRename: (title: string) => Promise<void>;
-  onOpenBoards: () => void;
 }) {
   const [draft, setDraft] = useState(title);
   const [busy, setBusy] = useState(false);
@@ -23,7 +22,6 @@ export function BoardTitleMenu({ title, onRename, onOpenBoards }: {
       .finally(() => { saving.current = false; setBusy(false); });
   };
   return <div className="board-title-control board-title-inline">
-    <button type="button" className="djai-board-switcher" onClick={onOpenBoards} disabled={busy}>All boards</button>
     <input aria-label="Board name" title="Edit board name" value={draft} disabled={busy}
       style={{ width: `${Math.max(12, Math.min(28, draft.length + 2))}ch` }}
       onFocus={() => { cancelled.current = false; }}

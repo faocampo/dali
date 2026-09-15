@@ -1,3 +1,4 @@
+import { fileAction } from './app-menu';
 import { test, expect } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { MindmapElementModel, ShapeElementModel } from '@blocksuite/affine/model';
@@ -55,7 +56,7 @@ test('@02-01-01 native map creation, keyboard hierarchy, reload and PNG', async 
     return { x: (root.x + root.w + child.x) / 2 - root.x, edges: map.getConnectors(map.tree)?.length };
   });
   expect(bridge.edges).toBe(2);
-  await page.getByRole('button', { name: 'Export board', exact: true }).click();
+  await fileAction(page, 'Export board');
   await page.getByRole('radio', { name: 'PNG image' }).check();
   await page.locator('input[name="export-scope"][value="board"]').check();
   const pending = page.waitForEvent('download');

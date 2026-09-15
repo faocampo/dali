@@ -1,3 +1,4 @@
+import { fileAction } from './app-menu';
 import { openMindmapProperties } from "./mindmap-properties";
 import {test,expect} from './fixtures';
 import type {Page} from '@playwright/test';
@@ -65,7 +66,7 @@ test('@02-06-03 daily workflow retains formatted collapsed independent maps besi
   await page.getByRole('button',{name:'Saved locally',exact:true}).waitFor();const saved=await maps(page);
   await page.reload();await expect.poll(()=>maps(page)).toEqual(saved);
   await selectLayer(page,copy.id);
-  await page.getByRole('button',{name: 'Export board', exact: true}).click();await page.getByRole('radio',{name:'PNG image'}).check();
+  await fileAction(page, 'Export board');await page.getByRole('radio',{name:'PNG image'}).check();
   await page.locator('input[name="export-scope"][value="selection"]').check();
   await expect(page.getByText('Only visible topics are exported. Expand branches to include their hidden topics.',{exact:true})).toBeVisible();
   const members=JSON.parse((await page.getByTestId('export-dimensions').getAttribute('data-export-ids'))!);
