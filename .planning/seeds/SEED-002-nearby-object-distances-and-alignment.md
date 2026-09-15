@@ -46,3 +46,5 @@ The supplied visual reference shows numeric horizontal and vertical spacing labe
 The reference image remains outside the repository; only this organization-neutral behavior description is retained. Activation and implementation planning occur after the trigger is met.
 
 **Surfaced:** 2026-09-12 after Phase 1 acceptance. Implementation scope and placement in the roadmap await planning.
+
+**Partial delivery:** 2026-09-15 [quick task 260915-s9s](../quick/260915-s9s-add-view-menu-grid-styles-object-dimensi/260915-s9s-SUMMARY.md) adds a Distances switch under Dalí → View. Nearest horizontal/vertical edge gaps appear during selection and dragging, within 160 screen pixels, with values in canvas pixels. Hidden and offscreen neighbors are excluded. Existing native alignment remains available; additional drag-alignment modes remain follow-ups, so this seed stays surfaced.

@@ -43,3 +43,5 @@ Effort and detailed interaction behavior remain to be determined during planning
 Captured as a follow-up seed. Activation and implementation planning occur after the trigger is met.
 
 **Surfaced:** 2026-09-12 after Phase 1 acceptance. Implementation scope and placement in the roadmap await planning.
+
+**Partial delivery:** 2026-09-15 [quick task 260915-s9s](../quick/260915-s9s-add-view-menu-grid-styles-object-dimensi/260915-s9s-SUMMARY.md) adds Off/Dots/Lines grid visibility and 20/40/80 canvas-pixel spacing under Dalí → View. Grid display stays anchored during pan/zoom. Additional guideline controls and snap-to-grid remain follow-ups; this seed stays surfaced for that remaining scope.

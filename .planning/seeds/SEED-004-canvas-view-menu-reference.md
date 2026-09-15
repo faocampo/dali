@@ -1,6 +1,6 @@
 ---
 id: SEED-004
-status: dormant
+status: implemented
 planted: 2026-09-15
 planted_during: Phase 2 — Daily Mind Maps, user acceptance
 trigger_when: When planning or implementing grid, distance, and object-dimension visibility
@@ -45,3 +45,5 @@ Unknown. Decide the exact menu location, control inventory, defaults, and prefer
 ## Notes
 
 The user-supplied screenshot is a visual reference. Only this organization-neutral description is retained in the repository; the image and its underlying board content remain outside it. Displayed switch values are reference states, not approved defaults.
+
+**Implemented:** 2026-09-15 in [quick task 260915-s9s](../quick/260915-s9s-add-view-menu-grid-styles-object-dimensi/260915-s9s-SUMMARY.md). Dalí → View contains an icon-led Grid submenu (Off, Dots, Lines; 20/40/80 canvas-pixel spacing) and independent Object dimensions and Distances switches. Browser-local preferences survive reload; measurements follow selection and movement. Additional example controls remain subject to their approved feature scope.
