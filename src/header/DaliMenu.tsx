@@ -1,10 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { APP_URL } from './links';
 
-type Category = 'File' | 'View' | 'Help';
+type Category = 'File' | 'View' | 'Edit' | 'Settings' | 'Help';
 export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void; onExport: () => void }) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
+  const [history, setHistory] = useState({ undo: false, redo: false });
+  useEffect(() => {
+    const update = (event: Event) => setHistory((event as CustomEvent<{ undo: boolean; redo: boolean }>).detail);
+    window.addEventListener('dali:history-state', update);
+    if (open) window.dispatchEvent(new CustomEvent('dali:board-command', { detail: 'history-state' }));
+    return () => window.removeEventListener('dali:history-state', update);
+  }, [open]);
+  const [showControls, setShowControls] = useState(() => {
+    try { return localStorage.getItem('dali:viewport-controls') !== 'hidden'; } catch { return true; }
+  });
+  useEffect(() => {
+    document.documentElement.dataset.viewportControls = showControls ? 'visible' : 'hidden';
+    try { localStorage.setItem('dali:viewport-controls', showControls ? 'visible' : 'hidden'); } catch { /* Session preference still works when storage is unavailable. */ }
+  }, [showControls]);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const close = () => { setOpen(false); setCategory(null); trigger.current?.focus(); };
@@ -15,7 +29,7 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
     return () => document.removeEventListener('pointerdown', outside);
   }, [open]);
   useEffect(() => {
-    if (open) root.current?.querySelector<HTMLElement>(category ? '.dali-submenu [role="menuitem"]' : '.dali-menu-categories [role="menuitem"]')?.focus();
+    if (open) root.current?.querySelector<HTMLElement>(category ? '.dali-submenu [role="menuitem"]:not(:disabled)' : '.dali-menu-categories [role="menuitem"]')?.focus();
   }, [open, category]);
   const run = (action: () => void) => { close(); action(); };
   const command = (action: string) => run(() => window.dispatchEvent(new CustomEvent('dali:board-command', { detail: action })));
@@ -43,7 +57,7 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
     </button>
     {open && <div className="dali-menu-popup">
       <div role="menu" aria-label="Dalí" className="dali-menu-categories">
-        {(['File', 'View', 'Help'] as const).map(item => <button key={item} type="button" role="menuitem" tabIndex={-1} data-category={item} aria-haspopup="menu" aria-expanded={category === item}
+        {(['File', 'View', 'Edit', 'Settings', 'Help'] as const).map(item => <button key={item} type="button" role="menuitem" tabIndex={-1} data-category={item} aria-haspopup="menu" aria-expanded={category === item}
           onClick={() => setCategory(item)} onKeyDown={event => { if (event.key === 'ArrowRight') { event.preventDefault(); setCategory(item); } }}>
           {item}<svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="m4 3 3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
         </button>)}
@@ -59,6 +73,11 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
           <button role="menuitem" tabIndex={-1} onClick={() => command('reset-zoom')}>Reset zoom to 100%</button>
           <button role="menuitem" tabIndex={-1} onClick={() => command('layers')}>Layers</button>
         </>}
+        {category === 'Edit' && <>
+          <button role="menuitem" tabIndex={-1} disabled={!history.undo} onClick={() => command('undo')}>Undo</button>
+          <button role="menuitem" tabIndex={-1} disabled={!history.redo} onClick={() => command('redo')}>Redo</button>
+        </>}
+        {category === 'Settings' && <button role="menuitem" tabIndex={-1} onClick={() => { setShowControls(!showControls); close(); }}>{showControls ? 'Hide' : 'Show'} viewport controls</button>}
         {category === 'Help' && <>
           <a role="menuitem" tabIndex={-1} href={APP_URL} target="_blank" rel="noopener noreferrer" onClick={close}>Upstream source</a>
           <div className="dali-shortcuts">

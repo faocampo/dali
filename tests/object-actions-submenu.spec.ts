@@ -27,7 +27,8 @@ test('Object actions is nested under the native More menu', async ({ page }) => 
 
 test('alignment appears for multiple objects and hides again for one', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Shape', exact: true }).click();
+  await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+  await page.getByRole('button', { name: 'Square / rectangle', exact: true }).click();
   await page.mouse.move(260, 210); await page.mouse.down();
   await page.mouse.move(350, 270); await page.mouse.up();
   await page.locator('affine-edgeless-root').evaluate(el => {

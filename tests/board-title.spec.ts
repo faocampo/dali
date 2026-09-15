@@ -29,7 +29,8 @@ test('inline title cancels on Escape, rejects blanks, and saves on blur', async 
 
 test('hand drags the viewport without changing objects and Select restores selection', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Shape', exact: true }).click();
+  await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+  await page.getByRole('button', { name: 'Square / rectangle', exact: true }).click();
   await page.mouse.move(350, 300); await page.mouse.down(); await page.mouse.move(450, 380); await page.mouse.up();
   const read = () => page.locator('affine-edgeless-root').evaluate((el: any) => ({
     center: [el.gfx.viewport.center.x, el.gfx.viewport.center.y],

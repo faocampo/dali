@@ -23,8 +23,9 @@ test('native drawing tools create editable shapes, frames, arrows and freehand',
   await page.goto('/');
   await page.getByRole('button', { name: 'Frame', exact: true }).click();
   await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Shape', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Shapes', exact: true })).toBeFocused();
   await page.keyboard.press('Space');
+  await page.getByRole('button', { name: 'Square / rectangle', exact: true }).click();
   await drag(page, 240, 180, 160, 100);
   await expect.poll(async () => (await models(page)).filter(m => m.type === 'shape').length).toBe(1);
   const currentShapePoint=()=>page.locator('affine-edgeless-root').evaluate(el=>{
@@ -43,7 +44,8 @@ test('native drawing tools create editable shapes, frames, arrows and freehand',
   await expect.poll(async () => (await models(page)).find(m => m.type === 'shape')?.text).toBe('Synthetic shape');
   await page.getByRole('button', { name: 'Frame', exact: true }).click();
   await drag(page, 450, 180, 200, 150);
-  await page.getByRole('button', { name: 'Arrow / connector', exact: true }).click();
+  await page.getByRole('button', { name: 'Lines', exact: true }).click();
+  await page.getByRole('button', { name: 'Straight arrow', exact: true }).click();
   await drag(page, 260, 380, 200, 50);
   await page.getByRole('button', { name: 'Freehand', exact: true }).click();
   await drag(page, 450, 470, 170, -30);

@@ -258,7 +258,8 @@ test('whole board source scale preserves primitive and DOM detail at every scale
 
 test('whole board offers explicit source scale and exact downloaded dimensions', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Shape', exact: true }).click();
+  await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+  await page.getByRole('button', { name: 'Square / rectangle', exact: true }).click();
   await page.mouse.move(250, 200);
   await page.mouse.down();
   await page.mouse.move(450, 320, { steps: 10 });

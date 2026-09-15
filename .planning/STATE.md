@@ -134,3 +134,7 @@ Complete: five plans, five requirements, and four user-approved UAT checks. Curr
 | 260915-menu | Top-bar Dalí menu with File, View and Help | 2026-09-15 | See summary | [Quick task](quick/260915-dali-application-menu/SUMMARY.md) |
 
 Phase 2 remains awaiting focused and native UAT. Refresh its verification fingerprint on resumption; this quick correction retains separate validation provenance.
+
+### Quick follow-up awaiting decision
+
+260915-drawing-palettes: consolidated five-category menu and native shape/line palettes implemented. Additional stars, arrow shapes, and polygons await the user's choice of full shape support versus grouped outlines. See [summary](quick/260915-drawing-palettes/SUMMARY.md). Phase 2 remains awaiting its existing UAT.

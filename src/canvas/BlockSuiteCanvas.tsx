@@ -104,9 +104,12 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
     const command = (event: Event) => {
       const action = (event as CustomEvent<string>).detail;
       const gfx = host.std.get(GfxControllerIdentifier);
+      if (action === 'history-state') window.dispatchEvent(new CustomEvent('dali:history-state', { detail: { undo: store.history.canUndo && !store.readonly, redo: store.history.canRedo && !store.readonly } }));
       if (action === 'import') importRef.current?.click();
       if (action === 'fit') gfx.fitToScreen();
       if (action === 'reset-zoom') gfx.viewport.smoothZoom(1);
+      if (action === 'undo' && !store.readonly) store.undo();
+      if (action === 'redo' && !store.readonly) store.redo();
       if (action === 'layers') onOpenLayers();
     };
     window.addEventListener('dali:board-command', command);

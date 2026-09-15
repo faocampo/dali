@@ -14,7 +14,8 @@ async function state(page: Page) {
 }
 
 async function shape(page: Page, x = 240, y = 180, width = 120, height = 80) {
-  await page.getByRole('button', { name: 'Shape', exact: true }).click();
+  await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+  await page.getByRole('button', { name: 'Square / rectangle', exact: true }).click();
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + width, y + height, { steps: 10 });
