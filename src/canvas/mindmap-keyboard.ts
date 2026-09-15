@@ -8,6 +8,13 @@ export function installMindmapShortcuts(host: EditorHost, onError: (error: unkno
   installations.get(host)?.();
   const doc = host.ownerDocument;
   const store = host.store;
+  const previousTabIndex = host.getAttribute('tabindex');
+  host.tabIndex = -1;
+  const focusCanvas = (event: PointerEvent) => {
+    const interactive = event.composedPath().some(target => target instanceof HTMLElement && (target.isContentEditable || target.matches('input,textarea,select,button,[role="button"],[role="textbox"],editor-menu-button')));
+    if (!interactive) host.focus({ preventScroll: true });
+  };
+  host.addEventListener('pointerdown', focusCanvas, true);
   const held = new Set<string>();
   let composing = false;
   let endingComposition = false;
@@ -82,6 +89,8 @@ export function installMindmapShortcuts(host: EditorHost, onError: (error: unkno
   doc.addEventListener('compositionend', end, true);
   doc.defaultView?.addEventListener('blur', reset);
   const dispose = () => {
+    host.removeEventListener('pointerdown', focusCanvas, true);
+    if (previousTabIndex === null) host.removeAttribute('tabindex'); else host.setAttribute('tabindex', previousTabIndex);
     doc.removeEventListener('keydown', key, true); doc.removeEventListener('keyup', up, true);
     doc.removeEventListener('compositionstart', start, true); doc.removeEventListener('compositionend', end, true);
     doc.defaultView?.removeEventListener('blur', reset); reset();

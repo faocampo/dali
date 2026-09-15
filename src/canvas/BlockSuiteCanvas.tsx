@@ -1,3 +1,6 @@
+import { ConnectorQuickAdd } from './ConnectorQuickAdd';
+import { Tooltips } from './Tooltips';
+import { installCanvasAffordances } from './canvas-affordances';
 import { ViewportControls } from './ViewportControls';
 import { ObjectContextMenu } from './ObjectContextMenu';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -85,6 +88,8 @@ export default function BlockSuiteCanvas() {
     <div ref={ref} style={{ position: 'absolute', inset: 0 }}>
       {!host && <p role="status" className="mindmap-opening">Opening board…</p>}
       {host && <BoardControls host={host} onOpenLayers={() => setLayersOpen(true)} />}
+      {host && <Tooltips />}
+      {host && <ConnectorQuickAdd host={host} />}
       {host && <FrameBorderOverlay host={host} />}
       {host && <MindMapInspector host={host} />}
       {host && <ObjectContextMenu host={host} />}
@@ -135,6 +140,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
     }).catch(()=>{ if(alive.current) setImageError('The image could not be imported. Choose a PNG or JPEG and try again.'); });
   },[host]);
   useEffect(()=>installImageInputs(host,importImages),[host,importImages]);
+  useEffect(() => installCanvasAffordances(host), [host]);
   useEffect(() => installArrangementShortcuts(host, cause => {
     setActionError(cause instanceof Error ? cause.message : 'The canvas action failed.');
   }), [host]);
