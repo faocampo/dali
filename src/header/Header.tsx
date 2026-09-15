@@ -1,7 +1,7 @@
 /**
- * The app header: local board access, save state, attribution, and export.
+ * The app header: local board access, save state, and shared export dialog.
  */
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { BoardTitleMenu } from './BoardTitleMenu';
 import logo from '../assets/djai-design-logo.png';
 import { exportBoardFile } from '../canvas/export-board';
@@ -9,7 +9,6 @@ import { getCanvasRuntime } from '../canvas/runtime';
 import { getSaveStatus, subscribeSaveStatus } from '../canvas/save-status';
 import { retryWorkspacePersistence } from '../canvas/workspace';
 import { ExportDialog } from './ExportDialog';
-import { CANVAS_HOME_URL } from './links';
 
 export function Header({
   boardTitle = 'Untitled board',
@@ -24,11 +23,10 @@ export function Header({
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const saveStatus = useSyncExternalStore(subscribeSaveStatus, getSaveStatus);
-  const exportButtonRef = useRef<HTMLButtonElement>(null);
 
   const closeExport = useCallback(() => {
     setExportOpen(false);
-    requestAnimationFrame(() => exportButtonRef.current?.focus());
+    requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('.board-action-panel button[aria-label="Export board"]')?.focus());
   }, []);
 
   useEffect(() => {
@@ -55,14 +53,6 @@ export function Header({
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onOpenBoards={onOpenBoards} onRename={onRenameBoard} />}
 
       <nav className="djai-header-actions">
-        <a
-          className="djai-community-link"
-          href={CANVAS_HOME_URL}
-          target="_blank"
-          rel="noreferrer noopener"
-        >
-          Full DJAI Canvas
-        </a>
         <div className="djai-save">
           <button
             type="button"
@@ -108,14 +98,6 @@ export function Header({
             </div>
           )}
         </div>
-        <button
-          ref={exportButtonRef}
-          type="button"
-          className="djai-primary"
-          onClick={() => setExportOpen(true)}
-        >
-          Export
-        </button>
       </nav>
 
       {exportOpen && <ExportDialog onClose={closeExport} />}

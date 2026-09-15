@@ -4,7 +4,7 @@ import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { writeFileSync } from 'node:fs';
 
 async function pngDownload(page: Page, scale: 1 | 2 | 4, transparent = true, scope = 'board', padding = 0, expectedIds?: string[]) {
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByRole('button', { name: 'Export board', exact: true }).click();
   await page.getByRole('radio', { name: 'PNG image' }).check();
   await page.locator(`input[name="export-scope"][value="${scope}"]`).check();
   if(scope==='selection') await page.getByLabel('Selection padding').fill(String(padding));
@@ -154,7 +154,7 @@ test('frame workflow clips all four edges and preserves picker-imported image pi
     },png.toString('base64'));
     expect(edges).toEqual([[255,0,0,255],[255,0,0,255],[0,0,255,255],[0,0,255,255]]);
   }
-  await page.getByRole('button',{name:'Export',exact:true}).click();
+  await page.getByRole('button',{name: 'Export board', exact: true}).click();
   await page.getByRole('radio',{name:'PNG image'}).check();
   await page.locator('input[value="frame"]').check();
   const membership=JSON.parse((await page.getByTestId('export-dimensions').getAttribute('data-export-ids'))!) as string[];
@@ -165,7 +165,7 @@ test('frame workflow clips all four edges and preserves picker-imported image pi
 
 test('frame empty background and unavailable scopes are explained',async({page})=>{
   await page.goto('/');
-  await page.getByRole('button',{name:'Export',exact:true}).click();await page.getByRole('radio',{name:'PNG image'}).check();
+  await page.getByRole('button',{name: 'Export board', exact: true}).click();await page.getByRole('radio',{name:'PNG image'}).check();
   await expect(page.locator('input[value="selection"]')).toBeDisabled();await expect(page.locator('input[value="frame"]')).toBeDisabled();
   await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
   await page.locator('affine-edgeless-root').evaluate(el=>{
@@ -192,7 +192,7 @@ test('frame rejects oversized intermediate objects before allocation and offers 
     gfx.doc.updateBlock(gfx.doc.getBlocksByFlavour('affine:note')[0]!.model,{xywh:'[0,0,3000,1000]'});
     const frame=gfx.doc.addBlock('affine:frame',{xywh:'[0,0,100,80]'},gfx.surface!.id);gfx.selection.set({elements:[frame],editing:false});
   });
-  await page.getByRole('button',{name:'Export',exact:true}).click();await page.getByRole('radio',{name:'PNG image'}).check();
+  await page.getByRole('button',{name: 'Export board', exact: true}).click();await page.getByRole('radio',{name:'PNG image'}).check();
   await page.locator('input[value="frame"]').check();await page.getByRole('radio',{name:'4×',exact:true}).check();
   await expect(page.getByTestId('export-dimensions')).toHaveText('400 × 320 pixels');
   await expect(page.getByRole('dialog').getByRole('button',{name:'Download',exact:true})).toBeDisabled();
@@ -266,7 +266,7 @@ test('whole board offers explicit source scale and exact downloaded dimensions',
   await page.locator('affine-edgeless-note').dblclick();
   await page.keyboard.insertText('Café Fine text 123');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByRole('button', { name: 'Export board', exact: true }).click();
   await page.getByRole('radio', { name: 'PNG image' }).check();
   await expect(page.getByRole('radio', { name: '4×', exact: true })).toBeVisible();
   await page.getByRole('radio', { name: '4×', exact: true }).check();
@@ -341,7 +341,7 @@ async function currentDialogDownload(page: Page) {
 
 test('limits reject empty and oversized output and require explicit lower scale',async({page})=>{
   await page.goto('/');
-  await page.getByRole('button',{name:'Export',exact:true}).click();
+  await page.getByRole('button',{name: 'Export board', exact: true}).click();
   await page.getByRole('radio',{name:'PNG image'}).check();
   await expect(page.getByRole('dialog').getByRole('button',{name:'Download',exact:true})).toBeDisabled();
   await expect(page.getByRole('alert')).toContainText('nothing');
@@ -350,7 +350,7 @@ test('limits reject empty and oversized output and require explicit lower scale'
     const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
     gfx.surface!.addElement({type:'shape',xywh:'[0,0,3000,1000]',shapeType:'rect',shapeStyle:'General',filled:true,fillColor:'#ff0000',strokeWidth:1});
   });
-  await page.getByRole('button',{name:'Export',exact:true}).click();
+  await page.getByRole('button',{name: 'Export board', exact: true}).click();
   await page.getByRole('radio',{name:'PNG image'}).check();
   await page.getByRole('radio',{name:'4×',exact:true}).check();
   await expect(page.getByRole('radio',{name:'4×',exact:true})).toBeChecked();
@@ -386,7 +386,7 @@ test('limits bounded allocation probes encode the conservative two-layer budget'
 for(const fault of ['encoder-null','encoder-throw','tainted','missing-blob','stale','font-timeout','image-timeout'] as const) {
   test(`recovery ${fault} retains controls and downloads decoded pixels on retry`,async({page})=>{
     await mixedBoard(page);
-    await page.getByRole('button',{name:'Export',exact:true}).click();
+    await page.getByRole('button',{name: 'Export board', exact: true}).click();
     await page.getByRole('radio',{name:'PNG image'}).check();
     await page.locator('affine-edgeless-root').evaluate((el,kind)=>{
       const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;

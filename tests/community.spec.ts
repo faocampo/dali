@@ -11,10 +11,12 @@ async function openCanvas(page: import('@playwright/test').Page) {
 test.beforeEach(async ({ page }) => openCanvas(page));
 
 test('opens the empty canvas with local home navigation', async ({ page }) => {
-  await expect(page.getByRole('link', { name: 'Full DJAI Canvas' })).toHaveAttribute(
-    'href',
-    '/'
-  );
+  await expect(page.getByRole('link', { name: 'Full DJAI Canvas' })).toHaveCount(0);
+  await expect(page.locator('header').getByRole('button', { name: 'Export', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Export board', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Export board', exact: true })).toBeFocused();
   for (const name of ['Insert image', 'Add sticky note', 'Add text', 'Layers', 'Export board']) {
     await expect(page.getByRole('button', { name })).toBeVisible();
   }

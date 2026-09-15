@@ -28,7 +28,7 @@ async function seed(page: Page) {
 }
 
 async function preview(page: Page, scope = 'board') {
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByRole('button', { name: 'Export board', exact: true }).click();
   await page.getByRole('radio', { name: 'PNG image' }).check();
   await page.locator(`input[name="export-scope"][value="${scope}"]`).check();
   return page.getByTestId('export-dimensions');
