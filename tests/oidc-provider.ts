@@ -21,18 +21,19 @@ export type IdentityName = keyof typeof identities;
 export type ProviderFaults = {
   issuer?: string; audience?: string; signature?: boolean; nonce?: string;
   state?: string; omitClaims?: string[]; claims?: Record<string, unknown>;
-  clockOffsetSeconds?: number; userInfoSubject?: string;
+  clockOffsetSeconds?: number; userInfoSubject?: string; kid?: string;
 };
 export type ClientRegistration = { clientId: string; clientSecret: string; redirectUri: string };
 type Code = {
   client: ClientRegistration; challenge: string; nonce: string; identity: IdentityName;
-  expiresAt: number; faults: ProviderFaults;
+  expiresAt: number; faults: ProviderFaults; signingKid: string;
 };
 const opaque = () => randomBytes(32).toString('base64url');
 const escaped = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 
 export async function createOidcProvider(options: {
   port?: number; clients: ClientRegistration[]; now?: () => number;
+  signingKeyControls?: true; onIdToken?: (token: string) => void;
 }) {
   const now = options.now ?? Date.now;
   const app = Fastify({ logger: false, bodyLimit: 16_384 });
@@ -44,6 +45,25 @@ export async function createOidcProvider(options: {
   const wrongKey = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
   const kid = opaque();
   const jwk = { ...publicKey.export({ format: 'jwk' }), kid, use: 'sig', alg: 'RS256' };
+  // Opt-in protocol probes keep the ordinary provider's single-key behavior.
+  const signingKeys = new Map([[kid, { privateKey, jwk }]]);
+  let signingKid = kid; let publishedKids = [kid];
+  const jwksRequests: string[][] = [];
+  const keyControls = options.signingKeyControls ? {
+    currentKid: () => signingKid,
+    createKey() {
+      const pair = generateKeyPairSync('rsa', { modulusLength: 2048 }); const next = opaque();
+      signingKeys.set(next, { privateKey: pair.privateKey, jwk: { ...pair.publicKey.export({ format: 'jwk' }), kid: next, use: 'sig', alg: 'RS256' } });
+      return next;
+    },
+    publish(kids: readonly string[]) {
+      assert(kids.length > 0 && new Set(kids).size === kids.length && kids.every(id => signingKeys.has(id)));
+      publishedKids = [...kids];
+    },
+    signWith(id: string) { assert(signingKeys.has(id)); signingKid = id; },
+    publicJwk(id: string) { assert(signingKeys.has(id)); return structuredClone(signingKeys.get(id)!.jwk); },
+    requests: () => structuredClone(jwksRequests),
+  } : undefined;
   const codes = new Map<string, Code>();
   const tokens = new Map<string, { claims: Record<string, unknown>; expiresAt: number }>();
   let faults: ProviderFaults = {};
@@ -60,7 +80,10 @@ export async function createOidcProvider(options: {
     code_challenge_methods_supported: ['S256'], scopes_supported: ['openid', 'profile', 'email'],
     authorization_response_iss_parameter_supported: true,
   }));
-  app.get('/jwks', async () => ({ keys: [jwk] }));
+  app.get('/jwks', async () => {
+    if (keyControls) jwksRequests.push([...publishedKids]);
+    return { keys: publishedKids.map(id => signingKeys.get(id)!.jwk) };
+  });
   app.get('/authorize', async (request, reply) => {
     const url = new URL(request.url, issuer);
     const p = url.searchParams;
@@ -80,7 +103,7 @@ export async function createOidcProvider(options: {
     for (const [code, value] of codes) if (value.expiresAt <= now()) codes.delete(code);
     const code = opaque();
     codes.set(code, { client, challenge: p.get('code_challenge')!, nonce: p.get('nonce')!,
-      identity: selected as IdentityName, expiresAt: now() + 60_000, faults: structuredClone(faults) });
+      identity: selected as IdentityName, expiresAt: now() + 60_000, faults: structuredClone(faults), signingKid });
     const target = new URL(client.redirectUri);
     target.searchParams.set('code', code); target.searchParams.set('state', faults.state ?? p.get('state')!);
     target.searchParams.set('iss', issuer);
@@ -113,13 +136,15 @@ export async function createOidcProvider(options: {
       nonce: f.nonce ?? record.nonce, ...f.claims,
     };
     for (const claim of f.omitClaims ?? []) delete claims[claim];
-    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid })).toString('base64url');
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: keyControls ? f.kid ?? record.signingKid : kid })).toString('base64url');
     const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
     const input = `${header}.${payload}`;
-    const signature = sign('RSA-SHA256', Buffer.from(input), f.signature ? wrongKey : privateKey).toString('base64url');
+    const signature = sign('RSA-SHA256', Buffer.from(input), f.signature ? wrongKey : signingKeys.get(record.signingKid)!.privateKey).toString('base64url');
     const accessToken = opaque();
     tokens.set(accessToken, { claims: { ...claims, sub: f.userInfoSubject ?? claims.sub }, expiresAt: now() + 300_000 });
-    return { access_token: accessToken, token_type: 'Bearer', expires_in: 300, id_token: `${input}.${signature}` };
+    const idToken = `${input}.${signature}`;
+    if (keyControls) options.onIdToken?.(idToken);
+    return { access_token: accessToken, token_type: 'Bearer', expires_in: 300, id_token: idToken };
   });
   app.get('/userinfo', async (request, reply) => {
     const token = request.headers.authorization?.match(/^Bearer (.+)$/)?.[1] ?? '';
@@ -133,7 +158,7 @@ export async function createOidcProvider(options: {
   assert(address && typeof address !== 'string');
   issuer = `http://127.0.0.1:${address.port}`;
   return {
-    app, issuer, now,
+    app, issuer, now, keyControls,
     setFaults(value: ProviderFaults) { faults = structuredClone(value); },
     async close() { codes.clear(); tokens.clear(); await app.close(); },
   };

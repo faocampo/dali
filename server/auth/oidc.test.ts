@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { randomBytes } from 'node:crypto';
+import { createPublicKey, randomBytes, verify } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,15 +11,20 @@ import { createOidcProvider, IDENTITY_COOKIE, type ProviderFaults } from '../../
 describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   let provider: Awaited<ReturnType<typeof createOidcProvider>>;
   let app: FastifyInstance; let database: AccountDatabase; let env: Record<string, string>;
-  let clock: number; let directory: string;
+  let clock: number; let directory: string; let issuedTokens: string[];
   const cookieOf = (response: { headers: Record<string, unknown> }) => {
     const values = response.headers['set-cookie'];
     return (Array.isArray(values) ? values.at(-1) : values)?.split(';')[0] as string;
   };
-  beforeEach(async () => {
+  beforeEach(async context => {
+    issuedTokens = [];
     clock = Date.now(); directory = await mkdtemp(join(tmpdir(), 'dali-auth-'));
     const registration = { clientId: 'synthetic-app', clientSecret: randomBytes(32).toString('hex'), redirectUri: 'http://127.0.0.1:5499/auth/callback' };
-    provider = await createOidcProvider({ clients: [registration] });
+    const keyProbe = context.task.name.includes('@NYQ-01');
+    if (keyProbe) vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    provider = await createOidcProvider({ clients: [registration], ...(keyProbe ? {
+      now: () => clock, signingKeyControls: true as const, onIdToken: (token: string) => { issuedTokens.push(token); },
+    } : {}) });
     env = { DALI_ORIGIN: 'http://127.0.0.1:5499', DALI_DATABASE_PATH: join(directory, 'accounts.sqlite'),
       DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000',
       DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId,
@@ -29,7 +34,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     database = openDatabase(env.DALI_DATABASE_PATH!);
     app = await buildApp({ config: env, database, now: () => clock });
   });
-  afterEach(async () => { vi.unstubAllEnvs(); await app?.close(); database?.close(); await provider?.close(); await rm(directory, { recursive: true, force: true }); });
+  afterEach(async () => { vi.restoreAllMocks(); vi.unstubAllEnvs(); await app?.close(); database?.close(); await provider?.close(); await rm(directory, { recursive: true, force: true }); });
   const begin = async (returnTo = '/', identity = 'owner') => {
     const start = await app.inject({ method: 'GET', url: `/auth/start?returnTo=${encodeURIComponent(returnTo)}` });
     expect(start.statusCode).toBe(302);
@@ -43,6 +48,57 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   const session = (cookie: string) => app.inject({ method: 'GET', url: '/api/session', headers: { cookie } });
   const members = () => database.prepare('SELECT * FROM members ORDER BY id').all();
   const count = () => (database.prepare('SELECT count(*) AS n FROM sessions WHERE member_id IS NOT NULL').get() as { n: number }).n;
+
+  it('@NYQ-01 a valid signature with an unpublished kid rejects identity mutation and callback replay', async () => {
+    const keys = provider.keyControls!; const knownKid = keys.currentKid();
+    const valid = await signIn(); const validSession = (await session(valid.authenticated)).json();
+    expect(keys.requests()).toEqual([[knownKid]]);
+    const authenticated = () => database.prepare('SELECT * FROM sessions WHERE member_id IS NOT NULL ORDER BY id').all();
+    const before = { members: members(), sessions: authenticated() };
+    const unknownKid = 'unpublished-' + randomBytes(16).toString('hex');
+    provider.setFaults({ kid: unknownKid }); const flow = await begin(); const rejected = await finish(flow);
+    const token = issuedTokens.at(-1)!; const [header, payload, signature] = token.split('.');
+    expect(JSON.parse(Buffer.from(header!, 'base64url').toString()).kid).toBe(unknownKid);
+    expect(verify('RSA-SHA256', Buffer.from(header + '.' + payload), createPublicKey({ key: keys.publicJwk(knownKid), format: 'jwk' }), Buffer.from(signature!, 'base64url'))).toBe(true);
+    expect(keys.requests().flat()).not.toContain(unknownKid);
+    for (const response of [rejected, await finish(flow)]) {
+      expect(response.headers.location).toBe('/?authError=signin');
+      expect(response.body).not.toContain('owner@example.org'); expect(response.body).not.toContain(env.DALI_OIDC_CLIENT_SECRET);
+      expect((await session(flow.cookie)).statusCode).toBe(401);
+      expect({ members: members(), sessions: authenticated() }).toEqual(before);
+    }
+    expect((await session(valid.authenticated)).json()).toEqual(validSession);
+    provider.setFaults({}); expect((await session((await signIn()).authenticated)).json().accountId).toBe(validSession.accountId);
+  });
+
+  it('@NYQ-01 newly published signing key refreshes cached JWKS in the same running application', async () => {
+    const keys = provider.keyControls!; const initialKid = keys.currentKid(); const issuer = provider.issuer; const runningApp = app;
+    const first = await signIn(); const initial = (await session(first.authenticated)).json(); const originalMembers = members();
+    expect(keys.requests()).toEqual([[initialKid]]); expect(count()).toBe(1);
+    const nextKid = keys.createKey(); expect(nextKid).not.toBe(initialKid);
+    expect(keys.requests().flat()).not.toContain(nextKid); keys.publish([initialKid, nextKid]); keys.signWith(nextKid);
+    // Pinned oauth4webapi refreshes an unknown kid after 60s; ordinary cache expiry is 300s.
+    // Advance Date.now only. Provider/app clocks agree; actual timers and HTTP remain real.
+    clock += 61_000;
+    expect(initial.expiresAt).toBeGreaterThan(clock); expect((await session(first.authenticated)).json()).toEqual(initial);
+    const second = await signIn(); const current = (await session(second.authenticated)).json();
+    expect(app).toBe(runningApp); expect(provider.issuer).toBe(issuer);
+    expect(keys.requests()).toEqual([[initialKid], [initialKid, nextKid]]);
+    const [header, payload] = issuedTokens.at(-1)!.split('.');
+    expect(JSON.parse(Buffer.from(header!, 'base64url').toString()).kid).toBe(nextKid);
+    expect(JSON.parse(Buffer.from(payload!, 'base64url').toString())).toMatchObject({ iat: Math.floor(clock / 1000), exp: Math.floor(clock / 1000) + 300 });
+    expect(current).toEqual({ ...initial, expiresAt: clock + 86400000 }); expect(current.expiresAt - initial.expiresAt).toBe(61000);
+    expect(second.authenticated).not.toBe(second.cookie); expect(second.authenticated).not.toBe(first.authenticated);
+    expect((await session(second.cookie)).statusCode).toBe(401); expect((await session(first.authenticated)).json()).toEqual(initial);
+    expect(members()).toEqual(originalMembers);
+    const rows = database.prepare('SELECT id,member_id,expires_at FROM sessions WHERE member_id IS NOT NULL ORDER BY expires_at').all() as { id: string; member_id: string; expires_at: number }[];
+    expect(rows).toHaveLength(2); expect(new Set(rows.map(row => row.id)).size).toBe(2);
+    expect(rows.map(({ member_id, expires_at }) => ({ member_id, expires_at }))).toEqual([
+      { member_id: initial.accountId, expires_at: initial.expiresAt }, { member_id: initial.accountId, expires_at: current.expiresAt },
+    ]);
+    expect((await finish(second)).headers.location).toBe('/?authError=signin'); expect(count()).toBe(2);
+    expect(members()).toEqual(originalMembers);
+  });
 
   it('production rejects ambient test-auth enablement', async () => {
     vi.stubEnv('DALI_TEST_AUTH', 'true');
