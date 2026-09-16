@@ -162,3 +162,47 @@ for (const failure of ['upload', 'commit', 'missing-image'] as const) test(`@03-
   }
   await dialog.getByRole('button', { name: 'Close local copies', exact: true }).click(); expect(await originalState(page)).toEqual(before);
 });
+
+test('@03-11-02 empty inventory never creates legacy storage and stays distinct from unavailable storage', async ({ page }) => {
+  const before = await page.evaluate(async () => ({ dbs: await indexedDB.databases(), catalog: localStorage.getItem('djai-design.board-catalog.v1') }));
+  await page.getByRole('button', { name: 'Copy local boards', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByText('No local boards are available in this browser.', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Copy selected boards', exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: 'Close local copies', exact: true }).click();
+  expect(await page.evaluate(async () => ({ dbs: await indexedDB.databases(), catalog: localStorage.getItem('djai-design.board-catalog.v1') }))).toEqual(before);
+  await page.evaluate(() => { Object.defineProperty(window, 'indexedDB', { configurable: true, get() { throw new Error('Synthetic unavailable storage'); } }); });
+  await page.getByRole('button', { name: 'Copy local boards', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('read local boards'); await expect(dialog.getByText('No local boards are available in this browser.', { exact: true })).toHaveCount(0);
+});
+
+test('@03-11-02 multiple explicit selections retain per-row partial success and retry only the failed operation', async ({ page }) => {
+  await seedLocal(page); const before = await originalState(page);
+  let commits = 0; const paths: string[] = [];
+  await page.route('**/api/imports/*/commit', route => { paths.push(route.request().url()); commits++; return commits === 2 ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }) : route.continue(); });
+  await page.getByRole('button', { name: 'Copy local boards', exact: true }).click(); const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(0);
+  for (const title of ['Legacy map canary', 'Unselected canary']) await dialog.getByRole('checkbox', { name: title, exact: true }).check();
+  await expect(dialog.getByText('2 boards selected.', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
+  await expect(dialog.getByText('1 copied; 1 could not be copied. Retry the failed boards. Originals remain in this browser.', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
+  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
+  await dialog.getByRole('button', { name: 'Retry failed boards', exact: true }).click();
+  await expect(dialog.getByText('2 boards copied. Originals remain in this browser.', { exact: true })).toBeVisible();
+  expect(paths).toHaveLength(3); expect(paths[2]).toBe(paths[1]); expect(paths[2]).not.toBe(paths[0]);
+  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 2 }); expect(await originalState(page)).toEqual(before);
+});
+
+test('@03-11-02 inventory reads original catalog titles and excludes account recovery namespaces', async ({ page }) => {
+  const local = await seedLocal(page, ['Root title']);
+  await page.evaluate(async id => {
+    localStorage.setItem('djai-design.board-catalog.v1', JSON.stringify({ [id]: { title: 'Exact catalog title 界', createdAt: 1000, updatedAt: 3000 } }));
+    for (const name of ['dali-account-recovery-v1', 'dali-account-cache-canary']) await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open(name); req.onupgradeneeded = () => req.result.createObjectStore('canary').put({ title: 'Private recovery canary' }, 'secret'); req.onsuccess = () => { req.result.close(); resolve(); }; req.onerror = () => reject(req.error);
+    });
+  }, local.ids[0]!);
+  const before = await originalState(page); await page.getByRole('button', { name: 'Copy local boards', exact: true }).click(); const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('checkbox', { name: 'Exact catalog title 界', exact: true })).toBeVisible(); await expect(dialog.getByRole('checkbox')).toHaveCount(1);
+  await expect(dialog).not.toContainText('Private recovery canary'); await dialog.getByRole('button', { name: 'Close local copies', exact: true }).click(); expect(await originalState(page)).toEqual(before);
+});
