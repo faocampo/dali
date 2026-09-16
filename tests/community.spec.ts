@@ -46,7 +46,7 @@ test('creates, edits and reopens exactly one locally stored sticky note', async 
   await page.keyboard.type('Synthetic local canvas idea');
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await notes(page)).notes.map(n => n.text)).toEqual(['Synthetic local canvas idea']);
-  await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const stored = await notes(page);
   await page.reload();
   await expect(page.locator('affine-edgeless-root')).toBeAttached();
@@ -57,7 +57,7 @@ test('creates, edits and reopens exactly one locally stored sticky note', async 
 test('repeated editor reopen preserves IDs without duplicate objects or handlers', async ({ page }) => {
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect(page.locator('affine-edgeless-note')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const stored = await notes(page);
   for (let repeat = 0; repeat < 3; repeat += 1) {
     await fileAction(page, 'All boards');
@@ -74,7 +74,7 @@ test('repeated editor reopen preserves IDs without duplicate objects or handlers
 // Explicit opt-in negative control: normal passing suites never inject errors.
 test('interrupted mounting and rapid board switching keep the final board isolated', async ({ page }) => {
   await page.getByRole('button', { name: 'Add sticky note' }).click();
-  await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const first = await notes(page);
   await fileAction(page, 'All boards');
   await page.getByRole('button', { name: '+ New board', exact: true }).click();
@@ -100,7 +100,7 @@ test('interrupted mounting and rapid board switching keep the final board isolat
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect.poll(async () => (await notes(page)).notes.length).toBe(1);
-  await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   await fileAction(page, 'All boards');
   await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
   await expect.poll(() => notes(page)).toEqual(first);
@@ -109,7 +109,7 @@ test('interrupted mounting and rapid board switching keep the final board isolat
 test.describe('local write failures', () => {
   test.use({ expectErrors: ['Synthetic storage quota'] });
   test('a failed IndexedDB write is reported without a saved acknowledgement', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
     await page.evaluate(() => {
       const transaction = IDBDatabase.prototype.transaction;
       IDBDatabase.prototype.transaction = function (...args: Parameters<IDBDatabase['transaction']>) {
@@ -121,7 +121,7 @@ test.describe('local write failures', () => {
     });
     await page.getByRole('button', { name: 'Add sticky note' }).click();
     await expect(page.getByRole('button', { name: 'Save failed', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toHaveCount(0);
     await expect(page.locator('affine-edgeless-note')).toHaveCount(1);
     await page.getByRole('button', { name: 'Save failed', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Local save recovery' })).toContainText('local storage is full');

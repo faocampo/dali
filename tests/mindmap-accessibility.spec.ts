@@ -117,7 +117,7 @@ test('@02-05-03 empty loading populated partial and long-text states retain usab
   await openMindmapProperties(page);
   await expect(page.getByRole('status').filter({ hasText: 'Level 1. Parent: Empty topic.' })).toBeVisible();
   await expect(page.getByText('Start a mind map', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
 });
 
 test('@02-05-03 live counts readonly controls error retry and zoomed-out canvas', async ({ page }) => {

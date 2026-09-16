@@ -52,7 +52,7 @@ async function mixedBoard(page: Page) {
     gfx.surface!.addElement({ type: 'brush', points: [[20,420],[80,425],[130,415],[220,430]], color: '#800080', lineWidth: 1 });
     gfx.viewport.setCenter(300,200);
   });
-  await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
 }
 
 test('selection nested groups exclude overlapping landmarks and support padding at every scale', async ({page}) => {

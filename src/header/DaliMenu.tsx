@@ -4,7 +4,7 @@ import { APP_URL } from './links';
 import { newBoardUrl } from '../boards/preferences';
 
 type Category = 'File' | 'View' | 'Edit' | 'Settings' | 'Help';
-export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void; onExport: () => void }) {
+export function DaliMenu({ onOpenBoards, onExport, onNewBoard }: { onOpenBoards?: () => void; onExport: () => void; onNewBoard?: () => void }) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
   const [history, setHistory] = useState({ undo: false, redo: false });
@@ -68,7 +68,7 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
       </div>
       {category && <div role="menu" aria-label={category} className="dali-submenu">
         {category === 'File' && <>
-          <a role="menuitem" tabIndex={-1} href={newBoardUrl()} target="_blank" rel="noopener noreferrer" onClick={close}><MenuIcon name="new" /><span className="dali-menu-label">New</span></a>
+          <a role="menuitem" tabIndex={-1} href={newBoardUrl()} target="_blank" rel="noopener noreferrer" onClick={event => { if (onNewBoard) { event.preventDefault(); onNewBoard(); } close(); }}><MenuIcon name="new" /><span className="dali-menu-label">New</span></a>
           <button role="menuitem" tabIndex={-1} disabled={!onOpenBoards} onClick={() => run(() => onOpenBoards?.())}><MenuIcon name="boards" /><span className="dali-menu-label">All boards</span></button>
           <button role="menuitem" tabIndex={-1} onClick={() => command('import')}><MenuIcon name="import" /><span className="dali-menu-label">Import board</span></button>
           <button role="menuitem" tabIndex={-1} onClick={() => run(onExport)}><MenuIcon name="export" /><span className="dali-menu-label">Export board</span></button>

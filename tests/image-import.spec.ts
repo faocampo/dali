@@ -64,7 +64,7 @@ test('picker centers proportional images, supports repeated selection and persis
   await input.setInputFiles(file);
   await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
   expect((await images(page))[1]!.id).not.toBe(first.id);
-  await page.getByRole('button',{name:'Saved locally',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Saved',exact:true}).waitFor();
   await page.reload();
   await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
   expect((await images(page)).find(i=>i.id===first.id)).toEqual(moved);
@@ -177,6 +177,7 @@ test('image input rejects size budgets and stale or failed storage then retries'
   await input.setInputFiles({...file,buffer:huge});
   await expect(page.getByTestId('image-import-error')).toContainText('8192');
   expect(await images(page)).toHaveLength(0);
+  const accountBoardUrl = page.url();
   for(const failure of ['storage','board'] as const) {
     await page.locator('affine-edgeless-root').evaluate((el,failure)=>{
       const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
@@ -193,9 +194,7 @@ test('image input rejects size budgets and stale or failed storage then retries'
     await input.setInputFiles(file);
     await expect(page.getByTestId('image-import-error')).toContainText(failure==='storage'?'could not be saved':'board changed');
     expect(await images(page)).toHaveLength(0);
-    await page.locator('affine-edgeless-root').evaluate(el=>{
-      history.replaceState(null, '', '?board=' + (el as HTMLElement & {gfx:GfxController}).gfx.doc.id);
-    });
+    await page.evaluate(url => history.replaceState(null, '', url), accountBoardUrl);
   }
   await input.setInputFiles(file);
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);

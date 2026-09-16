@@ -19,7 +19,7 @@ test('all sticky shadow presets render distinctly and persist after reload', asy
       await expect(note).not.toHaveCSS('box-shadow','none');
       shadows.add(await note.evaluate(el=>getComputedStyle(el).boxShadow));
     } else await expect(note).toHaveCSS('box-shadow','none');
-    await page.getByRole('button',{name:'Saved locally',exact:true}).waitFor();
+    await page.getByRole('button',{name:'Saved',exact:true}).waitFor();
     await page.reload();
     await expect(note).toHaveCount(1);
     if(preset) await expect(note).not.toHaveCSS('box-shadow','none');

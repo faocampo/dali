@@ -4,6 +4,7 @@ import { fileAction } from './app-menu';
 test('Main Menu supports arrow navigation, nested Escape, View actions and outside dismissal', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('affine-edgeless-root')).toHaveCount(1);
+  const boardId = new URL(page.url()).searchParams.get('board');
   const trigger = page.getByRole('button', { name: 'Main Menu', exact: true });
   await expect(page.locator('.board-utilities')).toHaveCount(0);
   await trigger.press('ArrowDown');
@@ -23,7 +24,7 @@ test('Main Menu supports arrow navigation, nested Escape, View actions and outsi
   await page.mouse.click(600, 400);
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   await fileAction(page, 'All boards');
-  await expect(page.getByRole('button', { name: 'Open Untitled board', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open Untitled board', exact: true }).and(page.locator(`[href="/?board=${boardId}"]`))).toBeVisible();
 });
 
 test('File Import opens the editable-board file picker', async ({ page }) => {

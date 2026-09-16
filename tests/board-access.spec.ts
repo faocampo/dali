@@ -30,6 +30,45 @@ test('@03-06-02 two New commands create distinct private tabs and preserve the s
   expect(errors).toEqual([]);
 });
 
+test.describe('blocked popup and interrupted creation', () => {
+test.use({ expectErrors: ['401 (Unauthorized)', '503 (Service Unavailable)', 'net::ERR_TIMED_OUT'] });
+test('@03-06-02 blocked popup retry reconciles one committed destination without touching source', async ({ page, context, baseURL }) => {
+  await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+  const member = await (await context.request.get('/api/session')).json();
+  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
+  const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Popup source canary' } })).json();
+  await page.goto('/?board=' + board.summary.id); await expect(page.locator('editor-host')).toBeVisible();
+  const before = await (await context.request.get('/api/boards', { headers })).json();
+  await page.evaluate(() => { window.open = () => null; });
+  let posts = 0; let operations = 0;
+  await page.route('**/api/boards', async route => { if (route.request().method() !== 'POST') return route.continue(); posts++; await route.fetch(); await route.abort('timedout'); });
+  await page.route('**/api/operations/*', route => { operations++; return operations === 2 ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }) : route.continue(); });
+  await fileAction(page, 'New'); await expect(page.getByRole('button', { name: 'Retry new board' })).toBeVisible();
+  await page.getByRole('button', { name: 'Retry new board' }).click();
+  const link = page.getByRole('link', { name: 'Open new board', exact: true }); await expect(link).toBeVisible();
+  expect(posts).toBe(1); expect(operations).toBe(3);
+  const after = await (await context.request.get('/api/boards', { headers })).json(); expect(after).toHaveLength(before.length + 1);
+  const href = await link.getAttribute('href'); expect(href).toMatch(/^\/\?board=/);
+  expect(new URL(page.url()).searchParams.get('board')).toBe(board.summary.id);
+  await expect(page.getByRole('heading', { name: 'Popup source canary' })).toBeVisible();
+  const copy = await (await context.request.get('/api/boards/' + new URL(href!, baseURL!).searchParams.get('board'), { headers })).json();
+  expect(copy.summary).toMatchObject({ role: 'owner', access: 'private', accountId: member.accountId });
+});
+});
+
+test('@03-06-02 valid new intent survives OIDC and reload reconciles the same operation', async ({ page, context }) => {
+  const operationId = randomUUID(); await page.goto('/?new=1&operationId=' + operationId);
+  await page.getByRole('link', { name: 'Synthetic Editor', exact: true }).click();
+  await expect(page.locator('editor-host')).toBeVisible();
+  const boardId = new URL(page.url()).searchParams.get('board'); expect(boardId).toBeTruthy();
+  const member = await (await context.request.get('/api/session')).json(); const headers = { 'X-Dali-Account': member.accountId };
+  expect(await (await context.request.get('/api/operations/' + operationId, { headers })).json()).toMatchObject({ status: 'completed', result: { summary: { id: boardId, role: 'owner', access: 'private' } } });
+  const before = await (await context.request.get('/api/boards', { headers })).json();
+  await page.goto('/?new=1&operationId=' + operationId); await expect(page.locator('editor-host')).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('board')).toBe(boardId);
+  expect(await (await context.request.get('/api/boards', { headers })).json()).toEqual(before);
+});
+
 test('@03-06-01 authorized deep link mounts native editing and cold reopen retains acknowledged content', async ({ page, context, browser, baseURL }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();

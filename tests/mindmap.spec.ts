@@ -45,7 +45,7 @@ test('@02-01-01 native map creation, keyboard hierarchy, reload and PNG', async 
   const root = before[0]!.nodes.find(n => !n.parent)!;
   expect(root.text).toBe('Synthetic central topic');
   expect(before[0]!.nodes.filter(n => n.parent === root.id).map(n => n.text).sort()).toEqual(['Synthetic child', 'Synthetic sibling']);
-  await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
   await page.reload();
   await expect.poll(read).toEqual(before);
   const bridge = await page.locator('affine-edgeless-root').evaluate(el => {

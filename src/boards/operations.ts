@@ -16,6 +16,36 @@ import {
   templatePreviewKinds,
   type TemplateId,
 } from './templates';
+import { validSummary, type BoardDescriptor } from './BoardLibrary';
+
+/** Retries reconcile the caller-owned operation before submitting any new create. */
+export async function createAccountBoard(accountId: string, operationId: string, signal?: AbortSignal): Promise<BoardDescriptor> {
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(operationId)) throw new Error('Invalid creation request');
+  const headers = { 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': 'application/json' };
+  const validate = (result: BoardDescriptor) => {
+    if (!result || !validSummary(result.summary, accountId) || result.summary.role !== 'owner' || !result.rootDocId || !result.contentDocId || signal?.aborted) throw new Error('Board creation is unavailable');
+    return result;
+  };
+  const reconcile = async (): Promise<BoardDescriptor | undefined> => {
+    const response = await fetch('/api/operations/' + encodeURIComponent(operationId), { headers, cache: 'no-store', signal });
+    if (!response.ok) throw new Error('Board creation is unavailable');
+    const known = await response.json() as { status: string; result?: BoardDescriptor };
+    if (known.status === 'completed') return validate(known.result!);
+    if (known.status !== 'unknown') throw new Error('Board creation is pending');
+  };
+  const previous = await reconcile(); if (previous) return previous;
+  const timeout = new AbortController(); const abort = () => timeout.abort();
+  signal?.addEventListener('abort', abort, { once: true }); const timer = setTimeout(abort, 10_000);
+  try {
+    const response = await fetch('/api/boards', { method: 'POST', headers, signal: timeout.signal, body: JSON.stringify({ operationId, title: 'Untitled board' }) });
+    if (!response.ok) throw new Error('Board creation is unavailable');
+    return validate(await response.json() as BoardDescriptor);
+  } catch (cause) {
+    if (signal?.aborted) throw cause;
+    const committed = await reconcile(); if (committed) return committed;
+    throw cause;
+  } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
+}
 
 export type BoardPreviewKind = 'image' | 'sticky' | 'shape' | 'text';
 

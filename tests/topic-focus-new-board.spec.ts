@@ -73,7 +73,7 @@ test('File New opens a blank independent board and both tabs survive reload', as
   await page.keyboard.type('Original content'); await page.keyboard.press('Enter');
   await page.getByRole('textbox', { name: 'Board name' }).fill('Original board');
   await page.getByRole('textbox', { name: 'Board name' }).press('Enter');
-  await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const sourceURL = page.url();
   const popupPromise = page.waitForEvent('popup');
   await fileAction(page, 'New');
@@ -94,7 +94,7 @@ test('File New opens a blank independent board and both tabs survive reload', as
   await popup.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => popup.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
   await popup.keyboard.type('New content'); await popup.keyboard.press('Enter');
-  await expect(popup.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
+  await expect(popup.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   // The destination updated the shared last-opened preference. Imports must
   // still target the source tab's pinned board and remain isolated on reload.
   const bitmap = await page.evaluate(() => {
@@ -106,7 +106,7 @@ test('File New opens a blank independent board and both tabs survive reload', as
     name: 'synthetic-tab-image.png', mimeType: 'image/png', buffer: Buffer.from(bitmap, 'base64'),
   });
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Saved locally', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   await page.reload(); await popup.reload();
   await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveValue('Original board');
   await expect(popup.getByRole('textbox', { name: 'Board name' })).toHaveValue('New board');

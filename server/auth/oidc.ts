@@ -11,7 +11,10 @@ export function localReturnIntent(value: string | null): string {
   const url = new URL(value, 'https://app.example.org'); const board = url.searchParams.get('board');
   if (url.origin !== 'https://app.example.org' || url.pathname !== '/' || url.hash) return '/';
   if (board && /^[A-Za-z0-9_-]{1,128}$/.test(board)) return `/?board=${encodeURIComponent(board)}`;
-  return url.searchParams.get('new') === '1' ? '/?new=1' : '/';
+  if (url.searchParams.get('new') !== '1') return '/';
+  if (!url.searchParams.has('operationId')) return '/?new=1';
+  const operationId = url.searchParams.get('operationId')!;
+  return /^[A-Za-z0-9_-]{1,128}$/.test(operationId) ? '/?new=1&operationId=' + encodeURIComponent(operationId) : '/';
 }
 export async function registerOidcRoutes(app: FastifyInstance, config: AuthConfig, database: AccountDatabase, now: () => number) {
   let discovery: Promise<oidc.Configuration> | undefined;

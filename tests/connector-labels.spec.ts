@@ -37,7 +37,7 @@ for (const [name, mode] of [['straight', 0], ['angled', 1], ['curved', 2]] as co
     await expect.poll(async () => (await labels(page))[0]?.bounds?.[3]).toBeGreaterThan(40);
     await page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.doc.redo());
     await expect.poll(async () => (await labels(page))[0]?.bounds?.[3]).toBeLessThan(30);
-    await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
     await page.reload();
     await expect.poll(async () => (await labels(page))[0]?.bounds).toEqual(long.bounds);
   });

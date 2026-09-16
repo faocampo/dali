@@ -1,12 +1,14 @@
 /**
  * The app header: local board access, save state, and shared export dialog.
  */
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { DaliMenu } from './DaliMenu';
 import { BoardTitleMenu } from './BoardTitleMenu';
 import logo from '../../imgs/svg/dali-symbol-color.svg';
 import { exportBoardFile } from '../canvas/export-board';
-import { getCanvasRuntime } from '../canvas/runtime';
+import { getActiveAccessScope, getCanvasRuntime } from '../canvas/runtime';
+import { createAccountBoard } from '../boards/operations';
+import { accountBoardUrl } from '../boards/preferences';
 import { getSaveStatus, subscribeSaveStatus } from '../canvas/save-status';
 import { ExportDialog } from './ExportDialog';
 
@@ -23,6 +25,31 @@ export function Header({
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const saveStatus = useSyncExternalStore(subscribeSaveStatus, getSaveStatus);
+  type Creation = { id: string; accountId: string; generation: number; tab: Window | null; state: 'pending' | 'error' | 'ready'; href?: string };
+  const [creations, setCreations] = useState<Creation[]>([]);
+  const lifetime = useRef(new AbortController());
+  useEffect(() => { lifetime.current = new AbortController(); return () => lifetime.current.abort(); }, []);
+  const completeCreation = async (creation: Creation) => {
+    const signal = lifetime.current.signal;
+    setCreations(values => values.map(value => value.id === creation.id ? { ...value, state: 'pending' } : value));
+    try {
+      const result = await createAccountBoard(creation.accountId, creation.id, signal);
+      const scope = getActiveAccessScope();
+      if (signal.aborted || scope?.phase !== 'active' || scope.accountId !== creation.accountId || scope.generation !== creation.generation) return;
+      const href = accountBoardUrl(result.summary.id);
+      if (creation.tab && !creation.tab.closed) { creation.tab.location.replace(href); setCreations(values => values.filter(value => value.id !== creation.id)); }
+      else setCreations(values => values.map(value => value.id === creation.id ? { ...value, href, state: 'ready' } : value));
+    } catch {
+      if (!signal.aborted) setCreations(values => values.map(value => value.id === creation.id ? { ...value, state: 'error' } : value));
+    }
+  };
+  const newBoard = () => {
+    const scope = getActiveAccessScope(); if (scope?.phase !== 'active') return;
+    // Reserve synchronously in the gesture; network completion only navigates it.
+    const tab = window.open('about:blank', '_blank'); if (tab) tab.opener = null;
+    const creation: Creation = { id: crypto.randomUUID(), accountId: scope.accountId, generation: scope.generation, tab, state: 'pending' };
+    setCreations(values => [...values, creation]); void completeCreation(creation);
+  };
 
   const closeExport = useCallback(() => {
     setExportOpen(false);
@@ -50,7 +77,7 @@ export function Header({
         <img src={logo} alt="Dalí" height={34} />
       </a>
 
-      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} />
+      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} />
       {!onRenameBoard && <h1 style={{ fontSize: 15 }}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
@@ -103,6 +130,10 @@ export function Header({
       </nav>
 
       {exportOpen && <ExportDialog onClose={closeExport} />}
+      {creations.map(creation => <div key={creation.id} role={creation.state === 'error' ? 'alert' : 'status'}>
+        {creation.state === 'pending' ? 'Creating board…' : creation.state === 'error' ? <><span>We couldn't open the new board. Your current board is unchanged.</span><button onClick={() => { void completeCreation(creation); }}>Retry new board</button></>
+          : <><span>Your new board is ready.</span><a href={creation.href} target="_blank" rel="noopener noreferrer">Open new board</a></>}
+      </div>)}
     </header>
   );
 }

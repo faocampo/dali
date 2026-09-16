@@ -21,12 +21,13 @@ function writeStorage(storage: Storage, key: string, value: string): void {
 
 /** Each open tab owns its board; local storage supplies the last-opened default. */
 export function getActiveBoardId(): string | null {
-  return new URL(window.location.href).searchParams.get('board') || readStorage(localStorage, ACTIVE_BOARD_KEY);
+  return new URL(window.location.href).searchParams.get('localBoard') || readStorage(localStorage, ACTIVE_BOARD_KEY);
 }
 
 export function setActiveBoardId(id: string): void {
   const url = new URL(window.location.href);
-  url.searchParams.set('board', id);
+  url.searchParams.set('localBoard', id);
+  url.searchParams.delete('board');
   url.searchParams.delete('new');
   window.history.replaceState(window.history.state, '', url);
   writeStorage(localStorage, ACTIVE_BOARD_KEY, id);
@@ -70,10 +71,26 @@ export function consumeDeferredBoardRemoval(): string | null {
 
 /** A native link opens the tab synchronously; the destination creates its board. */
 export function newBoardUrl(): string {
-  const url = new URL(window.location.href);
-  url.searchParams.delete('board');
+  const url = new URL('/', window.location.origin);
   url.searchParams.set('new', '1');
+  url.searchParams.set('operationId', crypto.randomUUID());
   return url.href;
+}
+
+export type AccountIntent = { kind: 'home' } | { kind: 'invalid' } | { kind: 'board'; boardId: string } | { kind: 'new'; operationId?: string };
+const validId = (id: string) => /^[A-Za-z0-9_-]{1,128}$/.test(id);
+export function accountIntent(search = window.location.search): AccountIntent {
+  const params = new URLSearchParams(search);
+  if (params.has('board')) return validId(params.get('board')!) ? { kind: 'board', boardId: params.get('board')! } : { kind: 'invalid' };
+  if (params.has('new')) {
+    if (params.get('new') !== '1' || (params.has('operationId') && !validId(params.get('operationId')!))) return { kind: 'invalid' };
+    return { kind: 'new', ...(params.has('operationId') ? { operationId: params.get('operationId')! } : {}) };
+  }
+  return { kind: 'home' };
+}
+export function accountBoardUrl(boardId: string): string {
+  if (!validId(boardId)) throw new Error('Invalid board location');
+  return '/?board=' + encodeURIComponent(boardId);
 }
 
 export function isNewBoardRequested(): boolean {

@@ -1,4 +1,5 @@
 import { test as base, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Every test gets console/page-error checking automatically.
@@ -15,6 +16,8 @@ export const test = base.extend<{
   /** Substrings of errors this test is allowed to produce. */
   expectErrors: string[];
   pageErrors: string[];
+  /** Public and explicit legacy inventory tests retain their own entry flow. */
+  entryMode: 'auto' | 'account' | 'public-entry' | 'local-only';
 }>({
   browser: [async ({ browser, browserName, playwright, launchOptions }, use) => {
     if (browserName !== 'webkit') { await use(browser); return; }
@@ -37,6 +40,28 @@ export const test = base.extend<{
   }, { scope: 'worker' }],
 
   expectErrors: [[], { option: true }],
+  entryMode: ['auto', { option: true }],
+  page: async ({ page, context, baseURL, entryMode }, use, testInfo) => {
+    const publicSuite = /(?:authentication|board-access|board-library|board-sharing|board-actions|board-roles|session-recovery|local-board-import|access-boundaries|accessibility-access|account-workspace)\.spec\.ts$/.test(testInfo.file);
+    const account = entryMode === 'account' || (entryMode === 'auto' && !publicSuite);
+    const original = page.goto.bind(page); let boardId: string | undefined;
+    page.goto = async (url, options) => {
+      if (account && url === '/') {
+        if (!boardId) {
+          await original('/auth/start');
+          await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+          await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+          const session = await context.request.get('/api/session'); expect(session.status()).toBe(200);
+          const member = await session.json();
+          const response = await context.request.post('/api/boards', { headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1' }, data: { operationId: randomUUID(), title: 'Untitled board' } });
+          expect(response.status()).toBe(201); boardId = (await response.json()).summary.id as string;
+        }
+        return original('/?board=' + encodeURIComponent(boardId), options);
+      }
+      return original(url, options);
+    };
+    try { await use(page); } finally { page.goto = original; }
+  },
 
   pageErrors: [
     async ({ page, expectErrors }, use) => {

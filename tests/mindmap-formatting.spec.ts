@@ -88,7 +88,7 @@ test('@02-05-02 selected typography survives four branch presets collapse direct
   await page.keyboard.press('ControlOrMeta+d');
   await expect.poll(async () => (await state(page)).length).toBe(2);
   for (const map of await state(page)) expect(map.nodes.find(n => n.text === 'Research')).toMatchObject({ fontSize: 31, fontWeight: '700', color: '#234567' });
-  await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
   const saved = (await state(page)).map(m => m.nodes);
   await page.reload();
   await expect.poll(async () => (await state(page)).map(m => m.nodes)).toEqual(saved);
@@ -111,7 +111,7 @@ for (const text of ['', 'Cafe\u0301 👩🏽‍💻 家族 日本語 العرب�
     expect(actual.width).toBeGreaterThan(0); expect(actual.height).toBeGreaterThan(0);
     expect(actual.height).toBeGreaterThanOrEqual(original.height);
     await expect(page.locator('img[src="x"]')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor(); await page.reload();
+    await page.getByRole('button', { name: 'Saved', exact: true }).waitFor(); await page.reload();
     await expect.poll(async () => (await state(page))[0]!.nodes.find(n => n.id === ids.a)?.text).toBe(text);
   });
 }

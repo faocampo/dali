@@ -77,7 +77,7 @@ for (const size of [7, 50]) test(`@02-05-01 ${size} topics retain anchor collaps
   }
   await page.getByRole('button', { name: /Expand branch:/ }).click();
   assertGeometry(await geometry(page), initial);
-  await page.getByRole('button', { name: 'Saved locally', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
   const saved = await geometry(page);
   await page.reload();
   await expect.poll(async () => (await geometry(page)).nodes).toEqual(saved.nodes);
