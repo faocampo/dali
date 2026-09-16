@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SessionDescriptor } from '../auth/AuthBoundary';
+import { ShareBoardDialog } from './ShareBoardDialog';
 
 export type BoardSummary = { id: string; title: string; updatedAt: number; role: 'owner' | 'editor' | 'viewer'; access: 'private' | 'shared'; pendingCount: number; accountId: string; thumbnailUrl?: string };
 export type BoardDescriptor = { summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number };
@@ -30,6 +31,7 @@ function ProtectedPreview({ board }: { board: BoardSummary }) {
   return <span className="board-card__preview">{url ? <img src={url} alt="" onError={() => setUrl(undefined)} /> : 'Preview unavailable'}</span>;
 }
 export function BoardLibrary({ member }: { member: SessionDescriptor }) {
+  const [sharing, setSharing] = useState<BoardSummary>();
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -116,8 +118,12 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
           <ProtectedPreview board={board} /><strong className="board-card__title">{board.title}</strong>
           <small>Edited {new Date(board.updatedAt).toLocaleString()}</small>
         </a><div className="board-card__metadata"><span>{board.access === 'private' ? 'Private' : 'Shared'}</span><span>{board.role[0]!.toUpperCase() + board.role.slice(1)}</span>{board.pendingCount > 0 && <span>Pending member sign-in</span>}</div>
-        <div className="board-card__actions"><details><summary>Full board name</summary><p>{board.title}</p></details></div>
+        <div className="board-card__actions"><details><summary>Full board name</summary><p>{board.title}</p></details>{board.role === 'owner' && <button onClick={() => setSharing(board)}>Share board</button>}</div>
       </article>)}
     </div>}
+    {sharing && <ShareBoardDialog key={sharing.id + member.accountId} board={sharing} onClose={() => setSharing(undefined)} onChanged={state => {
+      if (!state) { setRefresh(value => value + 1); return; }
+      setBoards(current => current.map(row => row.id === sharing.id ? { ...row, access: state.grants.length ? 'shared' : 'private', pendingCount: state.grants.filter(grant => grant.status === 'pending').length } : row));
+    }} />}
   </>;
 }

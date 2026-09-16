@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { Page, Route } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { createOidcProvider } from './oidc-provider';
+import { createOidcProvider, IDENTITY_COOKIE } from './oidc-provider';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
 
@@ -109,7 +109,7 @@ test('@03-07-01 existing members default Viewer and link copy preserves grants',
   await row.getByLabel('Access role').selectOption('viewer');
   expect(database.prepare('SELECT role FROM board_grants WHERE board_id=?').get(id)).toEqual({ role: 'editor' });
   await row.getByRole('button', { name: 'Save access' }).click();
-  await expect(row.getByText('Viewer', { exact: true })).toBeVisible();
+  await expect(row.locator('span').getByText('Viewer', { exact: true })).toBeVisible();
   const before = database.prepare('SELECT * FROM board_grants WHERE board_id=?').all(id);
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('unavailable'); } }, configurable: true }));
   await dialog.getByRole('button', { name: 'Copy board link' }).click();
@@ -117,4 +117,36 @@ test('@03-07-01 existing members default Viewer and link copy preserves grants',
   expect(database.prepare('SELECT * FROM board_grants WHERE board_id=?').all(id)).toEqual(before);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(card(page, id).getByRole('button', { name: 'Share board' })).toBeFocused();
+});
+
+test('@03-07-01 direct non-owner grant reads and mutations deny with unchanged owner state', async ({ page }) => {
+  const id = seed('Private sharing canary'); await refresh(page);
+  const cookieOf = (response: { headers: Record<string, unknown> }) => { const cookies = response.headers['set-cookie']; return (Array.isArray(cookies) ? cookies.at(-1) : cookies)?.split(';')[0] as string; };
+  const ownerHeaders = { 'x-dali-account': accountId, 'x-dali-request': '1', origin };
+  const url = origin + '/api/boards/' + id + '/grants';
+  const added = await page.request.post(url, { headers: ownerHeaders, data: { email: 'waiting@example.org', revision: 1, operationId: randomUUID() } });
+  expect(added.status()).toBe(200); const state = await added.json(); const target = state.grants[0];
+  for (const actor of ['editor', 'viewer', 'nonMember']) {
+    const start = await app.inject('/auth/start');
+    const authorization = await fetch(start.headers.location!, { redirect: 'manual', headers: { cookie: `${IDENTITY_COOKIE}=${actor}` } });
+    const callback = new URL(authorization.headers.get('location')!);
+    const authenticated = await app.inject({ url: callback.pathname + callback.search, headers: { cookie: cookieOf(start) } });
+    const cookie = cookieOf(authenticated); const session = await app.inject({ url: '/api/session', headers: { cookie } }); expect(session.statusCode).toBe(200);
+    const member = session.json().accountId;
+    if (actor !== 'nonMember') database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(id, member, actor);
+    const before = await (await page.request.get(url, { headers: ownerHeaders })).json();
+    const headers = { cookie, origin, 'x-dali-account': member, 'x-dali-request': '1' };
+    for (const method of ['GET', 'POST', 'PATCH', 'DELETE'] as const) {
+      const response = await app.inject({ method, url: '/api/boards/' + id + '/grants' + (['PATCH', 'DELETE'].includes(method) ? '/' + target.id : ''), headers,
+        ...(method === 'GET' ? {} : { payload: { revision: target.revision, operationId: randomUUID(), role: 'editor' } }) });
+      expect(response.statusCode).toBe(actor === 'nonMember' ? 404 : 403); expect(response.body).not.toContain('waiting@example.org');
+      expect(await (await page.request.get(url, { headers: ownerHeaders })).json()).toEqual(before);
+    }
+    const search = await app.inject({ url: '/api/members?boardId=' + id + '&q=owner', headers }); expect(search.statusCode).toBe(actor === 'nonMember' ? 404 : 403);
+  }
+  const revoke = { revision: target.revision, operationId: randomUUID() };
+  for (let i = 0; i < 2; i++) expect((await page.request.delete(url + '/' + target.id, { headers: ownerHeaders, data: revoke })).status()).toBe(200);
+  expect(database.prepare('SELECT * FROM pending_grants WHERE board_id=?').all(id)).toEqual([]);
+  const stale = await page.request.patch(url + '/' + target.id, { headers: ownerHeaders, data: { revision: target.revision, operationId: randomUUID(), role: 'editor' } }); expect(stale.status()).toBe(409);
+  expect(database.prepare('SELECT * FROM pending_grants WHERE board_id=?').all(id)).toEqual([]);
 });
