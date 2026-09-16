@@ -132,7 +132,7 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
 
-**Plans**: 9/12 executed; signed authentication, private library, protected resources, native account workspace/editor, internal sharing, board actions, compact account header, native Viewer guards and permitted presentation exports verified. Continue with plan 03-10 session recovery. Native 200% zoom and actual-provider acceptance remain final-phase obligations.
+**Plans**: 10/12 executed; signed authentication, private library, protected resources, native account workspace/editor, internal sharing, board actions, compact account header, native Viewer guards, permitted presentation exports and durable account-isolated interruption recovery verified. Continue with plan 03-11 explicit local-board copies. Native 200% zoom and actual-provider acceptance remain final-phase obligations.
 
 Plans:
 **Wave 1**
@@ -170,7 +170,7 @@ Plans:
 **Wave 9** *(blocked on Wave 8 completion)*
 
 - [x] 03-09-PLAN.md — Enforce native read-only editing and permitted viewer exports.
-- [ ] 03-10-PLAN.md — Preserve interrupted work and isolate account recovery.
+- [x] 03-10-PLAN.md — Preserve interrupted work and isolate account recovery.
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
@@ -372,7 +372,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 |-------|----------------|--------|-----------|
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
-| 3. Okta and Board Access | 9/12 | In Progress|  |
+| 3. Okta and Board Access | 10/12 | In Progress|  |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
 | 6. Follow Me | 0/TBD | Not started | - |

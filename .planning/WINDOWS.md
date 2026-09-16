@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 6
+open_count: 7
 waived_count: 1
 fixed_count: 1
-total_count: 8
-last_updated: 2026-09-16T16:00:53.159Z
+total_count: 9
+last_updated: 2026-09-16T17:51:23.432Z
 ---
 
 # Broken Windows Ledger
@@ -23,6 +23,7 @@ last_updated: 2026-09-16T16:00:53.159Z
 | 6 | 03 | deviation | server/preflight.test.ts | 13 | Task 03-01 dependency installation began after observed RED but before RED evidence gate and test commit; baseline assertion was independently replayed and verified before GREEN commit. | open |  | 2026-09-16T13:09:29.543Z |  |
 | 7 | 03 | stub | src/App.tsx | 28 | Authorized board transition awaits account canvas mounting in plan 03-06; permission is checked before displaying the canonical board title. | fixed |  | 2026-09-16T14:06:50.521Z | 2026-09-16T15:36:52.704Z |
 | 8 | 03 | unrun-verify | tests/board-sharing.spec.ts |  | Native 200% browser zoom for sharing remains plan 03-12 acceptance; automated 490px viewport geometry is covered. | open |  | 2026-09-16T16:00:53.159Z |  |
+| 9 | 03 | unrun-verify | tests/session-recovery.spec.ts |  | Native 200% browser zoom and actual OS IME or screen-reader speech for recovery remain plan 03-12 acceptance; automated 490px geometry, keyboard focus, constructed composition and reduced motion are covered. | open |  | 2026-09-16T17:51:23.432Z |  |
 
 ````json
 [
@@ -120,6 +121,18 @@ last_updated: 2026-09-16T16:00:53.159Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-16T16:00:53.159Z",
+    "resolved_at": null
+  },
+  {
+    "id": 9,
+    "kind": "unrun-verify",
+    "phase": "03",
+    "file": "tests/session-recovery.spec.ts",
+    "line": null,
+    "description": "Native 200% browser zoom and actual OS IME or screen-reader speech for recovery remain plan 03-12 acceptance; automated 490px geometry, keyboard focus, constructed composition and reduced motion are covered.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-16T17:51:23.432Z",
     "resolved_at": null
   }
 ]
