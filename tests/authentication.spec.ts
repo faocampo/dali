@@ -1,5 +1,20 @@
 import { test, expect } from './fixtures';
 
+test.use({ expectErrors: ['Failed to load resource: the server responded with a status of 401 (Unauthorized)'] });
+
+test('@03-02-01 UI-AUTH-loading keeps protected content unmounted until session validation', async ({ page }) => {
+  let release!: () => void;
+  const pending = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/session', async route => { await pending; await route.continue(); });
+  await page.goto('/');
+  await expect(page.getByRole('status')).toHaveText('Signing you in…');
+  await expect(page.getByRole('heading', { name: 'Your boards' })).toHaveCount(0);
+  await expect(page.locator('affine-editor-container')).toHaveCount(0);
+  expect(await page.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  release();
+  await expect(page.getByRole('link', { name: 'Synthetic Owner', exact: true })).toBeVisible();
+});
+
 test('@03-02-01 ordinary entry signs in through OIDC and explicit logout stays signed out', async ({ page, context }) => {
   await page.goto('/');
   await expect(page.getByRole('link', { name: 'Synthetic Owner', exact: true })).toBeVisible();
