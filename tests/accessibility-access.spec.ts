@@ -58,6 +58,8 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     service.database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, member, i % 2 ? 'editor' : 'viewer');
   }
   await page.reload(); await expect(page.locator('[data-board-id]')).toHaveCount(50);
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-color', 'rgb(180, 69, 31)');
   const card = page.locator(`[data-board-id="${board.summary.id}"]`);
   await expect(card.getByRole('link', { name: 'Open ' + title, exact: true })).toBeVisible();
   for (const width of [490, 1404]) {
@@ -77,6 +79,7 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     await page.screenshot({ path: testInfo.outputPath(`synthetic-library-${width}.png`) });
     await card.getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
     await expect(dialog.getByRole('combobox', { name: 'Access role', exact: true })).toHaveCount(50);
+    for (const select of await dialog.locator('select').all()) await expect(select).toHaveCSS('height', '44px');
     await geometry(page, 'dialog');
     for (const label of await dialog.locator('.share-owner > span:not(:first-of-type), .share-row > span:not(:first-of-type)').all()) { await expect(label).toHaveCSS('font-size', '13px'); await expect(label).toHaveCSS('font-weight', '600'); }
     for (const email of await dialog.locator('.share-owner > span:first-of-type, .share-row > span:first-of-type').all()) { await expect(email).toHaveCSS('font-size', '12px'); await expect(email).toHaveCSS('font-weight', '400'); }
@@ -96,11 +99,11 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
       return [...el.querySelectorAll<HTMLElement>('h2,p,label,button')].filter(node => node.getClientRects().length && !(node instanceof HTMLButtonElement && node.disabled) && node.textContent?.trim()).map(node => {
         const style = getComputedStyle(node); let parent: Element | null = node; let bg = [255, 255, 255];
         while (parent) { const color = rgb(getComputedStyle(parent).backgroundColor); if (color.length === 3 || color[3] === 1) { bg = color; break; } parent = parent.parentElement; }
-        const a = luminance(rgb(style.color)); const b = luminance(bg); return { text: node.textContent!.trim().slice(0, 40), ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05) };
+        const a = luminance(rgb(style.color)); const b = luminance(bg); return { text: node.textContent!.trim().slice(0, 40), color: style.color, background: bg, ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05) };
       });
     });
-    expect(contrast.length).toBeGreaterThan(5); for (const row of contrast) expect(row.ratio, row.text).toBeGreaterThanOrEqual(4.5);
     await testInfo.attach(`contrast-${width}`, { body: JSON.stringify(contrast), contentType: 'application/json' });
+    expect(contrast.length).toBeGreaterThan(5); for (const row of contrast) expect(row.ratio, row.text).toBeGreaterThanOrEqual(4.5);
     await page.screenshot({ path: testInfo.outputPath(`synthetic-sharing-${width}.png`) });
     await dialog.getByRole('button', { name: 'Close', exact: true }).click(); await expect(card.getByRole('button', { name: 'Share board' })).toBeFocused();
     await card.getByRole('button', { name: 'Rename board' }).click(); const action = page.getByRole('dialog', { name: 'Rename board' });

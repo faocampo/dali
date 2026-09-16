@@ -1732,7 +1732,10 @@ djai-image-visual-edit {
 .share-dialog__body { min-height: 0; overflow-y: auto; padding: 16px 20px; scroll-padding: 12px; overflow-wrap: anywhere; }
 .share-dialog input, .share-dialog select { max-width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; color: inherit; background: var(--board-surface); border: 1px solid var(--board-line); border-radius: 6px; padding: 8px; }
 .share-dialog input { width: 100%; }
+.share-dialog select { height: 44px; }
 .share-dialog button { min-height: 44px; white-space: normal; }
+.share-dialog button:not(.djai-primary) { background: var(--board-surface); }
+.share-dialog button:not(.djai-primary):not(.access-destructive) { color: var(--board-ink); }
 .share-dialog label { display: grid; gap: 4px; margin-block: 8px; }
 .share-dialog [role=listbox] { max-height: 220px; overflow-y: auto; margin: 8px 0; padding: 0; list-style: none; }
 .share-dialog [role=option] { min-height: 44px; padding: 10px; cursor: pointer; overflow-wrap: anywhere; }
@@ -1837,7 +1840,7 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 .share-owner > span:first-of-type, .share-row > span:first-of-type, .board-card__open small { font: 400 12px/1.5 var(--affine-font-family); }
 .share-owner > span:not(:first-of-type), .share-row > span:not(:first-of-type), .board-card__metadata { font: 600 13px/1.5 var(--affine-font-family); }
 .share-dialog button:not(.djai-primary), .board-action-dialog button:not(.djai-primary), .local-copy-dialog button:not(.djai-primary) { border: 1px solid #76736e; }
-.board-library h1:focus-visible, .session-recovery h1:focus-visible, #root > div > section > h1:focus-visible,
+.board-library h1[tabindex="-1"]:focus, .session-recovery h1[tabindex="-1"]:focus, #root > div > section > h1[tabindex="-1"]:focus,
 .board-action-dialog :is(button, input, a):focus-visible { outline: 2px solid #b4451f; outline-offset: 2px; }
 .share-owner, .share-row, .local-copy-dialog__body section { padding-block: 16px; }
 .share-dialog [role=option], .local-copy-dialog label span { padding: 8px; }
