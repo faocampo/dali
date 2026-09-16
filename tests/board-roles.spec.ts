@@ -223,5 +223,8 @@ test('@03-09-02 denied image and identity change during image resolution produce
   // A second tab signs in another account while authorized image bytes are in flight.
   const second = await page.context().newPage(); await page.context().clearCookies(); await second.goto(origin + '/auth/start');
   await second.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(second.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
-  release(); await expect(page.getByRole('dialog').getByRole('alert')).toContainText('access'); expect(downloads).toEqual([]); await second.close();
+  release();
+  await expect(page.getByRole('alert')).toHaveText("You're signed in with a different account. Return to your boards or sign in with the previous account to recover its pending changes.");
+  await expect(page.locator('affine-edgeless-root, editor-host')).toHaveCount(0);
+  expect(downloads).toEqual([]); await second.close();
 });

@@ -198,6 +198,7 @@ test('@03-03-02 UI-HOME-partial denied preview keeps the authorized open action 
   await refresh(page); await expect(card(page, id).getByText('Preview unavailable')).toBeVisible();
   await expect(card(page, id).locator('img')).toHaveCount(0);
   await card(page, id).getByRole('link', { name: 'Open Missing preview board' }).click();
-  await expect(page.getByRole('heading', { name: 'Missing preview board', exact: true })).toBeVisible();
+  await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Missing preview board');
 });
 });
