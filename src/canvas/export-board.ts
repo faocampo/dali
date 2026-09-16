@@ -141,7 +141,7 @@ export async function exportBoardFile(
   format: ExportFormat = 'board',
   options: PresentationExportOptions = { scope: 'visible' }
 ): Promise<PresentationExportResult | void> {
-  const { store, scope, descriptor } = await getCanvasRuntime();
+  const { store, scope } = await getCanvasRuntime();
   const assertCurrent = () => {
     if (!accessScopeCurrent(scope, format === 'board')) throw new Error(format === 'board' ? 'Editable download requires current Owner or Editor access.' : 'Board access changed. Reopen the board before exporting.');
   };
@@ -152,11 +152,16 @@ export async function exportBoardFile(
     });
     assertCurrent();
     if (!response.ok) throw new Error('Export access could not be confirmed. Reopen the board and try again.');
-    // Consume the response before the final synchronous generation check.
-    await response.arrayBuffer(); assertCurrent();
+    const body = await response.json(); assertCurrent();
+    const summary = (format === 'board' ? body.descriptor : body)?.summary;
+    if (summary?.id !== scope.boardId || summary.accountId !== scope.accountId || typeof summary.title !== 'string') throw new Error('Export access changed. Reopen the board and try again.');
+    return summary.title as string;
   };
-  await authorize();
-  const catalog = { title: descriptor.summary.title };
+  const catalog = { title: await authorize() };
+  const confirm = async () => {
+    if (await authorize() !== catalog.title) throw new Error('The board name changed while exporting. Retry the download.');
+    assertCurrent();
+  };
   if (format === 'board') {
     // The upstream convenience exporter downloads internally and tolerates
     // missing assets. Build its compatible archive here so all assets and the
@@ -174,7 +179,7 @@ export async function exportBoardFile(
       const zip = await createAssetsArchive(job.assets, ids);
       await zip.file(`${safeFilename(catalog.title)}-${snapshot.meta.id}.snapshot.json`, JSON.stringify(snapshot));
       const blob = await zip.generate();
-      await authorize(); assertCurrent();
+      await confirm();
       downloadBlob(blob, `${safeFilename(catalog.title)}.bs.zip`);
     } finally { job[Symbol.dispose](); }
     return;
@@ -191,7 +196,7 @@ export async function exportBoardFile(
     if (format === 'png') {
       assertCurrent();
       const blob = await canvasBlob(render.canvas);
-      await authorize(); assertCurrent();
+      await confirm();
       downloadBlob(blob, `${title}.png`);
       return {
         format,
@@ -204,7 +209,7 @@ export async function exportBoardFile(
     }
 
     const pdf = await canvasPdf(render.canvas);
-    await authorize(); assertCurrent();
+    await confirm();
     downloadBlob(pdf.blob, `${title}.pdf`);
     return {
       format,

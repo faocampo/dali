@@ -51,6 +51,20 @@ async function ownerRead(id: string) {
   const response = await ownerRequest!.get(origin + '/api/boards/' + id + '/editable-export', { headers: { 'X-Dali-Account': ownerId } });
   expect(response.status()).toBe(200); return response.json();
 }
+test('@CR-06 immediate rename updates all download names and decoded archive metadata', async ({ page }) => {
+  const board = await create(page, 'Synthetic old'); await page.goto(origin + '/?board=' + board.summary.id);
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Rename export canary'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  const name = page.getByRole('textbox', { name: 'Board name', exact: true }); await name.fill('Synthetic new'); await page.getByRole('button', { name: 'Saved', exact: true }).click();
+  await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Synthetic new' });
+  for (const format of ['board', 'png', 'pdf']) {
+    await fileAction(page, 'Export board'); const dialog = page.getByRole('dialog', { name: 'Export board', exact: true });
+    if (format !== 'board') await dialog.getByRole('radio', { name: format === 'png' ? 'PNG image' : 'PDF document' }).check();
+    const pending = page.waitForEvent('download'); await dialog.getByRole('button', { name: 'Download', exact: true }).click(); const download = await pending;
+    expect(download.suggestedFilename()).toBe('Synthetic new.' + (format === 'board' ? 'bs.zip' : format));
+    if (format === 'board') { const chunks: Buffer[] = []; for await (const chunk of (await download.createReadStream())!) chunks.push(Buffer.from(chunk)); const archive = unzipSync(Buffer.concat(chunks)); const entry = Object.entries(archive).find(([path]) => path.endsWith('.snapshot.json'))!; expect(JSON.parse(strFromU8(entry[1])).meta.title).toBe('Synthetic new'); }
+    await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  }
+});
 test('@CR-04 Viewer menu zoom and fit navigate without native or server mutations', async ({ page }) => {
   const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id);
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Viewer fit canary'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
