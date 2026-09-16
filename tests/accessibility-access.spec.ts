@@ -66,7 +66,7 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     await card.getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
     await expect(dialog.getByRole('combobox', { name: 'Access role', exact: true })).toHaveCount(50);
     await geometry(page, 'dialog');
-    const field = dialog.getByRole('combobox', { name: 'Internal member or email', exact: true }); await expect(field).toBeFocused(); await field.fill('NoSuchMember' + 'x'.repeat(120));
+    const field = dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email', exact: true }); await expect(field).toBeFocused(); await field.fill('NoSuchMember' + 'x'.repeat(120));
     const before = service.database.prepare('SELECT * FROM board_grants WHERE board_id=? ORDER BY member_id').all(board.summary.id);
     await field.dispatchEvent('compositionstart'); await field.dispatchEvent('keydown', { key: 'Enter', isComposing: true }); await field.dispatchEvent('compositionend');
     expect(service.database.prepare('SELECT * FROM board_grants WHERE board_id=? ORDER BY member_id').all(board.summary.id)).toEqual(before);

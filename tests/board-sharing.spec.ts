@@ -73,6 +73,35 @@ function seed(title: string, options: { role?: 'owner' | 'editor' | 'viewer'; up
 const refresh = (page: Page) => page.getByRole('button', { name: 'Refresh boards', exact: true }).click();
 const card = (page: Page, id: string) => page.locator('[data-board-id="' + id + '"]');
 
+for (const method of ['POST', 'PATCH', 'DELETE']) test(`@UI-X1 ${method} retains its original sharing operation through busy and uncertain dismissal attempts`, async ({ page }) => {
+  const id = seed('Mutation lifetime');
+  if (method !== 'POST') database.prepare('INSERT INTO pending_grants(board_id,issuer,canonical_email,role) VALUES(?,?,?,?)').run(id, provider.issuer, 'waiting@example.org', 'viewer');
+  await refresh(page); const trigger = card(page, id).getByRole('button', { name: 'Share board' }); await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Share board' });
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  const mutations: { operationId: string; role?: string; revision: number }[] = []; const receipts: string[] = []; let canCheck = false;
+  await page.route('**/api/operations/*', async route => { receipts.push(new URL(route.request().url()).pathname.split('/').at(-1)!); if (!canCheck) return route.fulfill({ status: 503, json: {} }); await route.continue(); });
+  await page.route('**/grants{,/*}', async route => {
+    if (route.request().method() !== method) return route.continue();
+    mutations.push(route.request().postDataJSON()); await gate; await route.fetch(); await route.fulfill({ status: 503, json: {} });
+  });
+  try {
+    if (method === 'POST') { await dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' }).fill('waiting@example.org'); await dialog.getByRole('option', { name: /waiting@example.org/ }).click(); await dialog.getByRole('button', { name: 'Grant access', exact: true }).click(); }
+    else { const row = dialog.locator('[data-grant-id]'); if (method === 'PATCH') { await row.getByLabel('Access role').selectOption('editor'); await row.getByRole('button', { name: 'Save access' }).click(); } else { await row.getByRole('button', { name: 'Remove access' }).click(); await dialog.getByRole('alertdialog').getByRole('button', { name: 'Remove access', exact: true }).click(); } }
+    await expect.poll(() => mutations.length).toBe(1); const original = structuredClone(mutations[0]!);
+    await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeDisabled();
+    await dialog.getByRole('button', { name: 'Close', exact: true }).evaluate(el => (el as HTMLButtonElement).click()); await page.keyboard.press('Escape'); await expect(dialog).toBeVisible();
+    expect(database.prepare('SELECT * FROM operations WHERE operation_id=?').all(original.operationId)).toHaveLength(0);
+    release(); await expect(dialog.getByRole('alert').filter({ hasText: "We couldn't confirm this change. Check again before retrying." })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeDisabled(); await page.keyboard.press('Escape'); await expect(dialog).toBeVisible();
+    canCheck = true; await dialog.getByRole('button', { name: 'Check again', exact: true }).click();
+    await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeEnabled();
+    expect(mutations).toEqual([original]); expect(receipts.length).toBeGreaterThan(0); expect(receipts.every(value => value === original.operationId)).toBe(true);
+    expect(database.prepare('SELECT * FROM operations WHERE operation_id=?').all(original.operationId)).toHaveLength(1);
+    expect(database.prepare('SELECT role FROM pending_grants WHERE board_id=?').all(id)).toEqual(method === 'DELETE' ? [] : [{ role: method === 'PATCH' ? 'editor' : 'viewer' }]);
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click(); await expect(trigger).toBeFocused();
+  } finally { release(); }
+});
 
 test('@03-07-01 owner grants pending Viewer access and revokes with acknowledgment', async ({ page }) => {
   const id = seed('Sharing board'); await refresh(page);
@@ -80,16 +109,20 @@ test('@03-07-01 owner grants pending Viewer access and revokes with acknowledgme
   await card(page, id).getByRole('button', { name: 'Share board' }).click();
   const dialog = page.getByRole('dialog', { name: 'Share board' });
   await expect(dialog.getByText('Only you have access')).toBeVisible();
-  await dialog.getByRole('combobox', { name: 'Internal member or email' }).fill('waiting@example.org');
+  await expect(dialog.getByText('Only the owner can manage access. A board link works only for people who already have access.', { exact: true })).toBeVisible();
+  await dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' }).fill('waiting@example.org');
   await dialog.getByRole('option', { name: /waiting@example.org/ }).click();
-  await expect(dialog.getByLabel('New recipient role')).toHaveValue('viewer');
+  await expect(dialog.getByLabel('Access', { exact: true })).toHaveValue('viewer');
+  await expect(dialog.getByText('Access starts after this person signs in with a verified internal account.', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Grant access', exact: true }).click();
   const row = dialog.locator('[data-grant-id]').filter({ hasText: 'waiting@example.org' });
   await expect(row).toContainText('Pending member sign-in');
+  await expect(dialog.getByRole('status')).toHaveText('Pending access added.');
   expect(database.prepare('SELECT role FROM pending_grants WHERE board_id=?').get(id)).toEqual({ role: 'viewer' });
-  await row.getByRole('button', { name: 'Revoke access' }).click();
+  await row.getByRole('button', { name: 'Remove access' }).click();
   await expect(dialog.getByRole('button', { name: 'Keep access' })).toBeFocused();
-  await dialog.getByRole('button', { name: 'Confirm revoke' }).click();
+  await expect(dialog.getByRole('alertdialog')).toContainText('Remove pending access for waiting@example.org? This grant will no longer activate after sign-in.');
+  await dialog.getByRole('alertdialog').getByRole('button', { name: 'Remove access', exact: true }).click();
   await expect(row).toHaveCount(0);
   expect(database.prepare('SELECT * FROM pending_grants WHERE board_id=?').all(id)).toEqual([]);
 });
@@ -98,21 +131,24 @@ test('@03-07-01 existing members default Viewer and link copy preserves grants',
   const id = seed('Active access'); await refresh(page);
   await card(page, id).getByRole('button', { name: 'Share board' }).click();
   const dialog = page.getByRole('dialog', { name: 'Share board' });
-  await dialog.getByRole('combobox', { name: 'Internal member or email' }).fill('Other');
+  await dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' }).fill('Other');
   await dialog.getByRole('option', { name: /Synthetic Other/ }).click();
-  await expect(dialog.getByLabel('New recipient role')).toHaveValue('viewer');
-  await dialog.getByLabel('New recipient role').selectOption('editor');
+  await expect(dialog.getByLabel('Access', { exact: true })).toHaveValue('viewer');
+  await dialog.getByLabel('Access', { exact: true }).selectOption('editor');
   await dialog.getByRole('button', { name: 'Grant access', exact: true }).click();
   const row = dialog.locator('[data-grant-id]').filter({ hasText: 'other@example.org' });
   await expect(row).toContainText('Active');
+  await expect(dialog.getByRole('status')).toHaveText('Access granted.');
   await row.getByLabel('Access role').selectOption('viewer');
   expect(database.prepare('SELECT role FROM board_grants WHERE board_id=?').get(id)).toEqual({ role: 'editor' });
   await row.getByRole('button', { name: 'Save access' }).click();
   await expect(row.locator('span').getByText('Viewer', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('status')).toHaveText('Access updated.');
   const before = database.prepare('SELECT * FROM board_grants WHERE board_id=?').all(id);
   await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('unavailable'); } }, configurable: true }));
   await dialog.getByRole('button', { name: 'Copy board link' }).click();
   await expect(dialog.getByLabel('Board link')).toHaveValue(origin + '/?board=' + id);
+  await expect(dialog.getByRole('status')).toHaveText("We couldn't copy the link. Select and copy the board address below.");
   expect(database.prepare('SELECT * FROM board_grants WHERE board_id=?').all(id)).toEqual(before);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(card(page, id).getByRole('button', { name: 'Share board' })).toBeFocused();
@@ -152,31 +188,31 @@ test('@03-07-01 direct non-owner grant reads and mutations deny with unchanged o
 
 test('@03-07-02 UI-SHARE-empty partial keyboard and IME do not submit invalid recipients', async ({ page }) => {
   const id = seed('Recipient validation'); await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Share board' }); const input = dialog.getByRole('combobox', { name: 'Internal member or email' });
+  const dialog = page.getByRole('dialog', { name: 'Share board' }); const input = dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' });
   for (const query of ['', 'invalid', 'outside@external.example']) {
     await input.fill(query); await expect(dialog.getByRole('button', { name: 'Grant access', exact: true })).toBeDisabled();
-    if (query) await expect(dialog.getByText('No matching members. Enter an eligible internal email.')).toBeVisible();
+    if (query) await expect(dialog.getByText('No matching members. Enter an internal email to add access before their first sign-in.')).toBeVisible();
     expect(database.prepare('SELECT * FROM pending_grants WHERE board_id=?').all(id)).toEqual([]);
   }
   await input.fill('Other'); await expect(dialog.locator('[role=option]')).toHaveCount(1);
   await input.dispatchEvent('keydown', { key: 'Enter', code: 'Enter', isComposing: true });
   await expect(dialog.getByRole('button', { name: 'Grant access', exact: true })).toBeDisabled();
   await input.press('ArrowDown'); await input.press('ArrowUp'); await input.press('Enter');
-  await expect(dialog.getByLabel('New recipient role')).toHaveValue('viewer');
+  await expect(dialog.getByLabel('Access', { exact: true })).toHaveValue('viewer');
   await expect(dialog.getByRole('button', { name: 'Grant access', exact: true })).toBeEnabled();
   await input.fill('waiting@example.org'); await expect(dialog.locator('[role=option]')).toHaveCount(1);
   await input.press('Escape'); await expect(dialog).toBeVisible(); await expect(dialog.locator('[role=option]')).toHaveCount(0);
   await input.press('ArrowDown'); await input.press('Enter');
-  await dialog.getByLabel('New recipient role').selectOption('editor');
+  await dialog.getByLabel('Access', { exact: true }).selectOption('editor');
   await input.fill('other@example.org'); await expect(dialog.locator('[role=option]')).toHaveCount(1); await input.press('Enter');
-  await expect(dialog.getByLabel('New recipient role')).toHaveValue('viewer');
+  await expect(dialog.getByLabel('Access', { exact: true })).toHaveValue('viewer');
   await dialog.getByRole('button', { name: 'Close', exact: true }).focus(); await page.keyboard.press('Shift+Tab');
   await expect(dialog.getByRole('button', { name: 'Copy board link' })).toBeFocused();
 });
 
 test('@03-07-02 UI-SHARE-loading ignores stale search responses and recovers search failure', async ({ page }) => {
   const id = seed('Search ordering'); await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Share board' }); const input = dialog.getByRole('combobox', { name: 'Internal member or email' });
+  const dialog = page.getByRole('dialog', { name: 'Share board' }); const input = dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' });
   let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; }); let started!: () => void; const requested = new Promise<void>(resolve => { started = resolve; });
   await page.route('**/api/members?**', async route => {
     if (new URL(route.request().url()).searchParams.get('q') === 'Other') { const response = await route.fetch(); started(); await wait; await route.fulfill({ response }).catch(() => {}); }
@@ -197,25 +233,27 @@ test('@03-07-02 UI-SHARE-error grant and revoke failures preserve state and reco
   const dialog = page.getByRole('dialog', { name: 'Share board' }); let fail = true; const events: string[] = [];
   await page.route('**/api/operations/*', async route => { events.push('reconcile'); await route.continue(); });
   await page.route('**/grants{,/*}', async route => { const method = route.request().method(); if (method === 'GET') return route.continue(); events.push(method); if (fail) await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); else await route.continue(); });
-  await dialog.getByRole('combobox', { name: 'Internal member or email' }).fill('waiting@example.org'); await dialog.locator('[role=option]').click();
-  await dialog.getByRole('button', { name: 'Grant access', exact: true }).click(); await expect(dialog.getByRole('alert')).toContainText("We couldn't update access.");
+  await dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' }).fill('waiting@example.org'); await dialog.locator('[role=option]').click();
+  await dialog.getByRole('button', { name: 'Grant access', exact: true }).click(); await expect(dialog.getByRole('alert')).toContainText("We couldn't confirm this change. Check again before retrying.");
+  await expect(dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' })).toHaveAttribute('aria-describedby', 'share-reason share-new-error');
   expect(database.prepare('SELECT * FROM pending_grants WHERE board_id=?').all(id)).toEqual([]);
-  fail = false; await dialog.getByRole('button', { name: 'Grant access', exact: true }).click();
+  fail = false; await dialog.getByRole('button', { name: 'Check again', exact: true }).click();
   const row = dialog.locator('[data-grant-id]'); await expect(row).toHaveCount(1); expect(events.slice(0, 4)).toEqual(['POST', 'reconcile', 'reconcile', 'POST']);
-  fail = true; await row.getByRole('button', { name: 'Revoke access' }).click(); await dialog.getByRole('button', { name: 'Confirm revoke' }).click();
-  await expect(row.getByRole('alert')).toContainText("We couldn't update access."); await expect(row).toContainText('Pending member sign-in');
-  await expect(row.getByRole('button', { name: 'Check access' })).toBeEnabled();
+  fail = true; await row.getByRole('button', { name: 'Remove access' }).click(); await dialog.getByRole('alertdialog').getByRole('button', { name: 'Remove access', exact: true }).click();
+  await expect(row.getByRole('alert')).toContainText("We couldn't confirm this change. Check again before retrying."); await expect(row).toContainText('Pending member sign-in');
+  await expect(row.getByLabel('Access role')).toHaveAccessibleDescription("We couldn't confirm this change. Check again before retrying.");
+  await expect(row.getByRole('button', { name: 'Check again' })).toBeEnabled();
   await expect(row.getByRole('button', { name: 'Save access' })).toBeDisabled();
   expect(database.prepare('SELECT * FROM pending_grants WHERE board_id=?').all(id)).toHaveLength(1);
-  fail = false; await dialog.getByRole('button', { name: 'Confirm revoke' }).click(); await expect(row).toHaveCount(0);
-  await expect(dialog.getByRole('combobox', { name: 'Internal member or email' })).toBeFocused();
+  fail = false; await row.getByRole('button', { name: 'Check again', exact: true }).click(); await expect(row).toHaveCount(0);
+  await expect(dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' })).toBeFocused();
 });
 
 test('@03-07-02 owner control loss closes stale sharing and direct mutations preserve access', async ({ page }) => {
   const editor = seed('Editor actions', { role: 'editor' }); const viewer = seed('Viewer actions', { role: 'viewer' }); const id = seed('Ownership check'); await refresh(page);
   for (const boardId of [editor, viewer]) await expect(card(page, boardId).getByRole('button', { name: 'Share board' })).toHaveCount(0);
   await card(page, id).getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
-  await dialog.getByRole('combobox', { name: 'Internal member or email' }).fill('waiting@example.org'); await dialog.locator('[role=option]').click();
+  await dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' }).fill('waiting@example.org'); await dialog.locator('[role=option]').click();
   database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run('synthetic-other', id);
   await dialog.getByRole('button', { name: 'Grant access', exact: true }).click(); await expect(dialog).toHaveCount(0); await expect(card(page, id)).toHaveCount(0);
   expect(database.prepare('SELECT * FROM pending_grants WHERE board_id=?').all(id)).toEqual([]);
@@ -248,16 +286,16 @@ for (const count of [0, 1, 50]) test(`@03-07-02 UI-SHARE-zero-one-many ${count} 
   const dialog = page.getByRole('dialog', { name: 'Share board' }); const rows = dialog.locator('[data-grant-id]'); await expect(rows).toHaveCount(count);
   await expect(dialog.locator('.share-owner')).toContainText('Owner'); await expect(dialog.locator('.share-owner button, .share-owner select')).toHaveCount(0);
   if (!count) await expect(dialog.getByText('Only you have access')).toBeVisible();
-  const input = dialog.getByRole('combobox', { name: 'Internal member or email' }); await input.fill('Equal Name');
+  const input = dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' }); await input.fill('Equal Name');
   if (count) {
     await expect(dialog.locator('[role=option]')).toHaveCount(count);
     const names = await dialog.locator('[role=option]').allTextContents(); expect(names).toEqual([...names].sort());
-    await input.press('Escape'); const last = rows.last(); await last.getByRole('button', { name: 'Revoke access' }).focus();
-    const bounds = await last.getByRole('button', { name: 'Revoke access' }).boundingBox(); const footer = await dialog.locator('footer').boundingBox(); expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(footer!.y + 1);
-    await last.getByRole('button', { name: 'Revoke access' }).click(); await expect(dialog.getByRole('button', { name: 'Keep access' })).toBeFocused();
+    await input.press('Escape'); const last = rows.last(); await last.getByRole('button', { name: 'Remove access' }).focus();
+    const bounds = await last.getByRole('button', { name: 'Remove access' }).boundingBox(); const footer = await dialog.locator('footer').boundingBox(); expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(footer!.y + 1);
+    await last.getByRole('button', { name: 'Remove access' }).click(); await expect(dialog.getByRole('button', { name: 'Keep access' })).toBeFocused();
     await expect(dialog.getByRole('alertdialog')).toContainText('long'.repeat(30));
     await dialog.getByRole('button', { name: 'Keep access' }).click();
-  } else await expect(dialog.getByText('No matching members. Enter an eligible internal email.')).toBeVisible();
+  } else await expect(dialog.getByText('No matching members. Enter an internal email to add access before their first sign-in.')).toBeVisible();
   const geometry = await dialog.evaluate(node => ({ width: node.getBoundingClientRect().width, scroll: node.scrollWidth, client: node.clientWidth, body: node.querySelector('.share-dialog__body')!.scrollHeight > node.querySelector('.share-dialog__body')!.clientHeight }));
   expect(geometry.width).toBeLessThanOrEqual(490); expect(geometry.scroll).toBeLessThanOrEqual(geometry.client + 1); if (count === 50) expect(geometry.body).toBe(true);
   const targets = await dialog.locator('button,input,select').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height)); expect(targets.every(height => height >= 44)).toBe(true);
