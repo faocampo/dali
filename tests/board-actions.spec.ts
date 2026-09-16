@@ -123,3 +123,23 @@ test('@03-08-01 native map image duplicate has fresh identities private ownershi
   await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible(); const reopened = await native();
   expect(reopened.snapshot).toEqual(original.snapshot); expect(reopened.docs).toEqual(original.docs); expect(sourceState(board.summary.id)).toEqual(before);
 });
+test('@03-08-02 inline naming is acknowledged composition-safe and responsive with account role and sharing', async ({ page }) => {
+  const board = await create(page, 'Inline source'); await page.goto(origin + '/?board=' + board.summary.id);
+  await expect(page.locator('affine-edgeless-root')).toBeVisible(); const input = page.getByRole('textbox', { name: 'Board name', exact: true });
+  await expect(input).toBeVisible();
+  await input.fill('Uncommitted'); expect((database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id) as { title: string }).title).toBe('Inline source');
+  await input.press('Escape'); await expect(input).toHaveValue('Inline source');
+  await input.fill('Composition'); await input.dispatchEvent('compositionstart'); await input.dispatchEvent('keydown', { key: 'Enter', isComposing: true }); await input.dispatchEvent('blur');
+  expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Inline source' });
+  await input.dispatchEvent('compositionend'); await input.focus(); await input.press('Escape');
+  const title = '👩🏽‍💻'.repeat(200); await input.fill('  ' + title + '  '); await input.press('Enter'); await expect(input).toHaveValue(title);
+  await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title });
+  await input.fill(' '); await input.press('Tab'); await expect(input).toHaveValue(title);
+  await page.setViewportSize({ width: 490, height: 800 });
+  await expect(page.getByText('Owner', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Share board', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Share board' })).toBeVisible(); await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Share board', exact: true })).toBeFocused();
+  await page.getByText('Account', { exact: true }).click(); await expect(page.getByRole('button', { name: 'Sign out of Dalí', exact: true })).toBeVisible();
+  expect(await page.locator('.djai-header').evaluate(el => { const bounds = el.getBoundingClientRect(); return [...el.querySelectorAll('button, summary, input')].filter(node => (node as HTMLElement).offsetParent).every(node => { const rect = node.getBoundingClientRect(); return rect.x >= 0 && rect.right <= innerWidth && rect.height >= 44 && rect.y >= bounds.y; }); })).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
