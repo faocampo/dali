@@ -12,7 +12,7 @@ import { openDatabase, type AccountDatabase } from '../server/storage/database';
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 const origin = 'http://127.0.0.1:5499';
 let accountId: string;
-test.use({ expectErrors: ['the server responded with a status of 400', 'the server responded with a status of 401', 'the server responded with a status of 403', 'the server responded with a status of 404', 'the server responded with a status of 409', 'the server responded with a status of 503'] });
+test.use({ expectErrors: ['the server responded with a status of 400', 'the server responded with a status of 401', 'the server responded with a status of 403', 'the server responded with a status of 404', 'the server responded with a status of 409', 'the server responded with a status of 500', 'the server responded with a status of 503'] });
 test.beforeEach(async ({ page, baseURL }) => {
   const registration = { clientId: 'synthetic-actions', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
   provider = await createOidcProvider({ clients: [registration] }); database = openDatabase(':memory:');
@@ -22,6 +22,36 @@ test.beforeEach(async ({ page, baseURL }) => {
   await page.goto(origin); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   accountId = (await (await page.request.get(origin + '/api/session')).json()).accountId;
+});
+
+test('@03-11-01 actual commit rollback and lost acknowledgment reconcile the original operation', async ({ page }) => {
+  await seedLocal(page); const before = await originalState(page);
+  database.exec("CREATE TRIGGER synthetic_import_failure BEFORE INSERT ON board_documents BEGIN SELECT RAISE(ABORT, 'synthetic commit failure'); END");
+  await page.getByRole('button', { name: 'Copy local boards', exact: true }).click(); const dialog = page.getByRole('dialog');
+  await dialog.getByRole('checkbox', { name: 'Legacy map canary', exact: true }).check();
+  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click(); await expect(dialog.getByText('Failed', { exact: true })).toBeVisible();
+  expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(database.prepare('SELECT * FROM board_documents').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
+  database.exec('DROP TRIGGER synthetic_import_failure');
+  await page.route('**/api/imports/*/commit', async route => { const response = await route.fetch(); expect(response.status()).toBe(200); await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); });
+  await dialog.getByRole('button', { name: 'Retry failed copies', exact: true }).click(); await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
+  expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 1 }); expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
+});
+
+test('@03-11-01 staging validates complete manifest and binds every operation to the authenticated importer', async ({ page, browser }) => {
+  const local = await seedLocal(page); const before = await originalState(page);
+  const headers = { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' };
+  const operationId = randomUUID();
+  const reserved = await page.request.post(origin + '/api/imports', { headers, data: { operationId, title: 'Manifest canary', manifest: [local.key] } }); expect(reserved.status()).toBe(200);
+  expect((await page.request.post(origin + '/api/imports/' + operationId + '/commit', { headers, data: {} })).status()).toBe(409);
+  const foreign = await browser.newContext(); const other = await foreign.newPage();
+  try {
+    await other.goto(origin); await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+    const otherId = (await (await other.request.get(origin + '/api/session')).json()).accountId;
+    const denied = await other.request.get(origin + '/api/imports/' + operationId, { headers: { 'X-Dali-Account': otherId } }); expect(await denied.json()).toEqual({ status: 'unknown' });
+    expect((await other.request.post(origin + '/api/imports/' + operationId + '/commit', { headers: { ...headers, 'X-Dali-Account': otherId }, data: {} })).status()).toBe(404);
+    expect((await other.request.post(origin + '/api/imports', { headers, data: { operationId: randomUUID(), title: 'Denied canary', manifest: [] } })).status()).toBe(409);
+  } finally { await foreign.close(); }
+  expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
 });
 test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); await app?.close(); database?.close(); await provider?.close(); });
 test("@03-11-01 selected local copy entry requires deliberate selection", async ({ page }) => {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SessionDescriptor } from '../auth/AuthBoundary';
 import { ShareBoardDialog } from './ShareBoardDialog';
 import { BoardActionDialog } from './BoardActionDialog';
+import { listLocalBoards, LocalBoardCopy, type LocalBoard } from './import-local';
 
 export type BoardSummary = { id: string; title: string; updatedAt: number; role: 'owner' | 'editor' | 'viewer'; access: 'private' | 'shared'; pendingCount: number; accountId: string; thumbnailUrl?: string };
 export type BoardDescriptor = { summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number };
@@ -32,6 +33,7 @@ function ProtectedPreview({ board }: { board: BoardSummary }) {
   return <span className="board-card__preview">{url ? <img src={url} alt="" onError={() => setUrl(undefined)} /> : 'Preview unavailable'}</span>;
 }
 export function BoardLibrary({ member }: { member: SessionDescriptor }) {
+  const [localCopyOpen, setLocalCopyOpen] = useState(false);
   const [action, setAction] = useState<{ board: BoardSummary; kind: 'rename' | 'duplicate' | 'delete' }>();
   const [notice, setNotice] = useState('');
   const [sharing, setSharing] = useState<BoardSummary>();
@@ -131,6 +133,8 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
         <div className="board-card__actions"><details><summary>Full board name</summary><p>{board.title}</p></details>{board.role !== 'viewer' && <><button onClick={() => setAction({ board, kind: 'rename' })}>Rename board</button><button onClick={() => setAction({ board, kind: 'duplicate' })}>Duplicate board</button></>}{board.role === 'owner' && <><button onClick={() => setSharing(board)}>Share board</button><button onClick={() => setAction({ board, kind: 'delete' })}>Delete board</button></>}</div>
       </article>)}
     </div>}
+    <section><h2>Boards in this browser</h2><button onClick={() => setLocalCopyOpen(true)}>Copy local boards</button></section>
+    {localCopyOpen && <LocalCopySlice member={member} onClose={() => { setLocalCopyOpen(false); setRefresh(value => value + 1); }} />}
     {action && <BoardActionDialog board={action.board} kind={action.kind} onClose={() => setAction(undefined)} onComplete={result => {
       const remaining = boards.filter(row => row.id !== action.board.id);
       const next = result.deleted ? remaining[0]?.id : result.summary.id;
@@ -143,4 +147,34 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
       setBoards(current => current.map(row => row.id === sharing.id ? { ...row, access: state.grants.length ? 'shared' : 'private', pendingCount: state.grants.filter(grant => grant.status === 'pending').length } : row));
     }} />}
   </>;
+}
+
+function LocalCopySlice({ member, onClose }: { member: SessionDescriptor; onClose: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [rows, setRows] = useState<LocalBoard[]>([]);
+  const [selected, setSelected] = useState<string>();
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<BoardDescriptor>();
+  const operation = useRef<LocalBoardCopy>();
+  useEffect(() => {
+    const modal = dialog.current!; const previous = document.activeElement; modal.showModal();
+    void listLocalBoards().then(setRows, () => setError('We couldn’t read local boards. Try again.'));
+    return () => { modal.close(); if (previous instanceof HTMLElement) previous.focus(); };
+  }, []);
+  const copy = async () => {
+    const row = rows.find(row => row.id === selected); if (!row || busy) return;
+    operation.current ??= new LocalBoardCopy(member.accountId, row); setBusy(true); setError('');
+    try { setResult(await operation.current.run()); } catch (error) { setError(error instanceof Error ? error.message : 'Copy failed.'); }
+    finally { setBusy(false); }
+  };
+  return <dialog ref={dialog} aria-labelledby="local-copy-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
+    <h2 id="local-copy-title">Copy local boards</h2><p>Destination account: {member.email}</p>
+    <p>Your original boards and images stay in this browser.</p>
+    {rows.map(row => <label key={row.id} style={{ display: 'block' }}><input type="checkbox" aria-label={row.title} checked={selected === row.id} disabled={busy || !!operation.current} onChange={event => setSelected(event.target.checked ? row.id : undefined)} />{row.title}</label>)}
+    {busy && <p role="status">Copying</p>}{error && <><p>Failed</p><p role="alert">{error}</p></>}
+    {result && <p role="status">Copied <a href={'/?board=' + encodeURIComponent(result.summary.id)}>Open {result.summary.title}</a></p>}
+    <button disabled={!selected || busy || !!result} onClick={() => void copy()}>{error && operation.current ? 'Retry failed copies' : 'Copy selected boards'}</button>
+    <button disabled={busy} onClick={onClose}>Close local copies</button>
+  </dialog>;
 }
