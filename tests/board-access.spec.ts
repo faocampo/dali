@@ -1,6 +1,31 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 
+test('@03-06-01 authorized deep link mounts native editing and cold reopen retains acknowledged content', async ({ page, context, browser, baseURL }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+  const member = await (await context.request.get('/api/session')).json();
+  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
+  const created = await context.request.post('/api/boards', { headers, data: { title: 'Native shell canary', operationId: randomUUID() } });
+  expect(created.status()).toBe(201);
+  const board = await created.json();
+  await page.goto('/?board=' + board.summary.id);
+  await expect(page.locator('editor-host'), 'authorized account board mounts the native canvas').toBeVisible();
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
+  await expect(page.locator('affine-mindmap')).toHaveCount(1);
+  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  const cold = await browser.newContext({ baseURL });
+  try {
+    const tab = await cold.newPage();
+    await tab.goto('/?board=' + board.summary.id);
+    await expect(tab.locator('editor-host')).toHaveCount(0);
+    await tab.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+    await expect(tab.locator('editor-host')).toBeVisible();
+    await expect(tab.locator('affine-mindmap')).toHaveCount(1);
+    expect(new URL(tab.url()).searchParams.get('board')).toBe(board.summary.id);
+  } finally { await cold.close(); }
+});
+
 test.use({ expectErrors: ['Failed to load resource: the server responded with a status of 401 (Unauthorized)', 'Failed to load resource: the server responded with a status of 404 (Not Found)'] });
 
 test('@03-03-01 private creates have independent IDs and idempotent operation results', async ({ page, context, baseURL }) => {
