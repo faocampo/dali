@@ -1,8 +1,13 @@
 ---
 phase: 03-okta-and-board-access
-reviewed: 2026-09-16T19:42:00Z
+reviewed: 2026-09-16T20:52:09Z
 depth: standard
-source_head: 766918b4058c102d6dcd5ee04ea6dbaa6f61a800
+source_head: 033ecc0dd40665a6abd593d838db2e2f82453868
+reviewed_final_delta_files: 4
+resolved_total_findings: 8
+remediation_base: 43bd9c5
+remediation_files_reread: 19
+resolved_prior_findings: 7
 diff_base: 3b48c837e73203712020c496352c908a4cc87d3f
 reviewed_test_delta: f7be2f840b1110dab2b73dee4a31148cf95cbf1e
 reviewed_followup_test_delta: 1d3c9cb5bfd246c86a4bb3cb51f9ded0d0a3b84f
@@ -101,118 +106,103 @@ files_reviewed_list:
   - vite.config.ts
   - vitest.server.config.ts
 findings:
-  critical: 6
-  warning: 1
+  critical: 0
+  warning: 0
   info: 0
-  total: 7
-status: issues_found
+  total: 0
+status: clean
 ---
 
 # Phase 3: Code Review Report
 
 **Depth:** standard, with relevant cross-module call traces
-**Scope:** all 92 configured source, configuration, documentation and test files
-**Implementation snapshot:** `766918b4058c102d6dcd5ee04ea6dbaa6f61a800`
-**Additional test review:** `f7be2f840b1110dab2b73dee4a31148cf95cbf1e` and `1d3c9cb5bfd246c86a4bb3cb51f9ded0d0a3b84f`
+**Cumulative scope:** all 92 configured files
+**Implementation snapshot:** `033ecc0dd40665a6abd593d838db2e2f82453868`
+**Remediation rereview:** all 19 files changed in `43bd9c5..12a2184`, read in full, retaining the original complete phase review
+**Final delta:** three source/test files in `033ecc0` and the acceptance document in `7360be0`; checkpoint/tracking deltas reviewed as supporting context
+**Status:** clean — all seven original findings and follow-up CR-07 resolved; no open review findings
 
 ## Narrative Findings (AI reviewer)
 
-The reviewed implementation has six proved product defects and one separate test-reliability warning. Evidence below distinguishes executed pure analysis from source-derived reproduction procedures. No browser, build, listening service or test suite was started by this reviewer; the acceptance executor retained that slot.
+The eight original remediation commits address the six initial BLOCKER findings and separate test-reliability WARNING. Follow-up commit `033ecc0` resolves CR-07. Independent source review confirms the corrected contracts and their relevant consumers. No additional defect was proved in the final narrow delta. The clean status applies to this pinned code-review scope; final acceptance remains open.
 
-Actual-provider registration, membership/claim-policy validation and native OS zoom, IME and assistive-technology acceptance remain **pending**. Phase 4 durability/deployment and Phase 5 live collaboration/20-user acceptance are outside this review. Existing synthetic test results do not establish those outcomes.
+This rereview used source and test-oracle inspection. The reviewer ran no tests, build, browser or listening service; the acceptance executor owns those processes. The supplied fix report records both typechecks, 102 unit tests, 110 server tests, production build and 86 affected Chromium cases passing. Those execution results remain attributed to the fix executor. For the final CR-07 correction, the parent additionally reports both typechecks and 6/6 production Chromium cases passing in 29.1s; the semantic assertions were independently inspected, with no reviewer rerun.
 
-## Critical Issues
+Actual-provider registration and membership/claim-policy validation, native OS zoom, IME and assistive-technology acceptance remain **pending**. Full configured browser/access acceptance awaits final executor evidence. Phase 4 durability/deployment and Phase 5 live collaboration/20-user acceptance remain outside this review.
 
-### CR-01: BLOCKER — accepted root updates can make an acknowledged board unreadable
+## Final follow-up finding resolved
 
-**File:** `server/boards/documents.ts:30`
-**Related evidence:** `server/boards/documents.ts:76-87`; `src/canvas/account/board-meta.ts:11-25`; `src/canvas/account/board-workspace.ts:85-90`.
+### CR-07: original BLOCKER — inert Viewer File Import — resolved
 
-**Issue:** Root validation permits absent `meta.pages`, an empty array, and an entry with the correct content ID but missing native metadata fields. The push route persists that state and returns `{ acknowledged: true }`. The account client requires exactly one entry containing a string title, finite createDate and array tags; hydration then throws `Invalid board metadata`. A currently authorized writer can therefore commit a root the application cannot reopen. The content bytes remain stored, but normal board access is broken for every reader.
+**Fix evidence:** `src/header/DaliMenu.tsx:73-74` sets native `disabled` for Viewer and associates `viewer-import-reason` through `aria-describedby`. The matching explanation is visibly rendered in the File submenu. The existing keyboard menu selectors exclude disabled items, so navigation passes from All boards to Export and back. Owner/Editor retain the existing enabled import command and mounted BoardControls picker. No permission or staging service was broadened.
 
-**Reproduction and oracle:** Start from an API-created board, pull its root, remove `meta.pages` in Yjs, and POST the incremental update to the root's push endpoint as Owner or Editor. Current code returns 200/acknowledged and changes stored root bytes. A fresh account-workspace open fails before rendering. Empty pages and a sole correct-ID entry missing tags/createDate behave similarly. Pure in-memory execution of the actual `validateDocument` and `BoardMeta.initialize` implementations reproduced all three variants: server validator accepted; client threw `Invalid board metadata`. Existing `server/boards/access.test.ts:158-159` also intentionally submits an incomplete metadata entry and expects success, so that test currently preserves this contract mismatch.
+**Inspected semantic oracles:** `tests/board-roles.spec.ts:54-72` asserts disabled state, exact accessible description, visible explanation, keyboard traversal, no picker/dialog/import request after a native button click, exact native model/vector preservation and an independent Owner-authenticated server reread. The Owner API context is retained before the separate Viewer sign-in.
 
-**Fix:** Require exactly one native metadata entry and validate the same mandatory field types as BoardMeta before committing root updates. Apply the invariant to staged import/duplicate publication too, since it calls the same validator. Update successful synthetic roots to valid native metadata. Add rejection cases that assert unchanged bytes, vectors, revision and thumbnail plus a successful owner reopen.
+`tests/board-actions.spec.ts:48-109` now runs the real archive restoration as both Owner and Editor. The Editor case signs in as a distinct member and receives an Editor grant; it does not simulate a role only in the UI. Before switching identity, the fixture waits for the server export manifest to contain the synthetic image and for acknowledged save state. Both roles retain missing-asset rejection, failed-upload retry, complete image equality, fresh identities, private destination ownership, hierarchy equality and unchanged source assertions. The manifest wait strengthens readiness without weakening any content oracle.
 
-### CR-02: BLOCKER — File Import cannot restore any editable archive
+**Independent conclusion:** The previously enabled action without a consumer has been removed from the Viewer interaction path with an accessible explanation. Supported writable restoration remains covered by the actual picker/publication workflow. CR-07 is closed; no new issue was found in this correction.
 
-**File:** `src/canvas/BlockSuiteCanvas.tsx:229`
-**Related evidence:** `src/header/DaliMenu.tsx:73`; `src/canvas/BlockSuiteCanvas.tsx:242-265`; `src/boards/BoardLibrary.tsx:136-137`; `src/canvas/export-board.ts:28-30`.
+## Resolved original findings
 
-**Issue:** Every mounted account canvas has an active access scope, so choosing any ZIP file returns immediately with “Open your boards to import a copy into your account.” The library's Copy local boards action only inventories existing legacy browser storage; it provides no ZIP-file restoration path. The remaining ZipTransformer import branch is unreachable through the current authenticated application. Editable export still advertises a file “re-importable here,” and the save-recovery UI offers that archive as a backup.
+### CR-01: original BLOCKER — acknowledged unreadable root metadata — resolved
 
-**Reproduction and oracle:** As an Owner, export a board containing text and an image as Editable board file, then choose File > Import board and select that archive. The picker opens, but no import request or copied board follows; the action displays the redirect instruction. Navigate to Your boards: Copy local boards cannot select the downloaded archive. The existing `tests/dali-menu.spec.ts:31-38` asserts only that the picker opens and therefore misses restoration failure.
+**Fix evidence:** `server/boards/documents.ts:29-34` now requires a Y.Array with exactly one entry containing the bound content ID, string title, finite createDate and array tags. Y.Map entries are normalized consistently with `src/canvas/account/board-meta.ts:11-25`. The push transaction validates before changing bytes, revision or preview; staged document ingestion at `server/boards/imports.ts:59` calls the same validator. API-created and staging roots retain the native shape, and successful synthetic roots were corrected.
 
-**Fix:** Connect ZIP ingestion to the authorized, isolated destination staging/import pipeline with fresh board/document/element identities, complete image validation and atomic publication. Keep original boards unchanged. Verify export → ZIP selection → private account copy → fresh reopen with content/image equality. Do not restore the legacy branch against account storage.
+**Inspected semantic oracles:** `server/boards/access.test.ts:154-188` checks invalid metadata for Owner/Editor, unchanged rows/bytes/vector/preview, and valid Y.Map metadata. `server/boards/actions.test.ts` rejects an invalid staging root without state changes. `tests/board-actions.spec.ts:38-50` verifies the rejected variants leave the original board opening in the native editor. The stricter invariant was traced through BoardWorkspace hydration and staging initialization.
 
-### CR-03: BLOCKER — duplicating an open board silently omits pending edits and leaves without preservation
+### CR-02: original BLOCKER — missing account archive restoration — resolved for the supported writable workflow
 
-**File:** `src/boards/operations.ts:95`
-**Related evidence:** `src/boards/operations.ts:107-124`; `src/header/Header.tsx:147-151`; `src/canvas/runtime.ts:25-37`; `src/auth/session.ts:169-177`.
+**Fix evidence:** `src/canvas/BlockSuiteCanvas.tsx:238-278` now creates a confirmed LocalBoardCopy with a stable operation ID and captured scope. `src/boards/import-local.ts:69-96` imports native ZIP contents into an isolated memory workspace, requires one board, validates mind maps and checks referenced PNG/JPEG blobs and hashes. Cleanup runs in finally.
 
-**Issue:** The header invokes the same action used by the library. Duplication reads only the server's editable snapshot and never synchronizes the current native workspace first. If the open board contains visible edits whose document pushes have failed, the duplicate succeeds from older server content and reports success. Header completion immediately calls `window.location.assign`, bypassing the explicit capture/preservation path used by normal library navigation. The proved defect is an incomplete successful copy; loss of edits that have not yet reached the journal is an additional risk, not an executed data-loss claim.
+LocalBoardCopy stages the snapshot with server-reserved destination IDs, regenerated surface identities and native block-ID replacement, uploads documents/assets, then atomically commits. Its request wrapper checks the account/scope and freshly authorizes the originating writable board before each request. The server retains current-session, expected-account and transaction guards. Lost commit responses reconcile the same receipt. The new Open imported board link reaches the existing same-origin navigation listener in `src/auth/session.ts`, which preserves before navigation. ZIP conversion never opens persisted legacy storage.
 
-**Reproduction and oracle:** Open an authorized board with acknowledged text A. Make its document push requests return 503 while allowing metadata/export/duplicate/import routes to work. Change the visible text to B and invoke File > Duplicate board. The exported server snapshot still contains A, and the private destination commits A without warning that B was excluded. The header navigates away. Compare the destination's reopened native text to the visible source snapshot captured immediately before duplication: they differ. No concurrent-user or Phase 5 transport behavior is required.
+**Inspected semantic oracles:** `tests/board-actions.spec.ts` checks export/import text, hierarchy and images; fresh identities; private ownership; unchanged source; missing images; upload failure/retry; stale role; and cross-tab account change before publication. Viewer menu availability was subsequently corrected and independently closed as CR-07 above.
 
-**Fix:** When duplicating the active board, finish a bounded, generation-checked synchronization of its current edits before taking the server snapshot; show a recoverable failure if that cannot complete. Before any completion navigation, explicitly secure pending source work using the established preservation path, and retain the source tab if preservation fails. Preserve the existing authoritative revision and commit-time role checks. Add a header duplicate case with failed/held pushes and an exact destination-content oracle; keep the saved-source/library duplicate case.
+### CR-03: original BLOCKER — active copy omitted pending edits — resolved
 
-### CR-04: BLOCKER — Viewer Main Menu navigation commands are inert
+**Fix evidence:** `src/canvas/runtime.ts:39-69` captures complete current root/content updates, waits for journal preservation and replays them before export. It has a ten-second deadline, abort signal, three stability attempts and same-runtime/generation/write checks. It compares the visible encoded state after replay and gives a recoverable error if synchronization fails. `src/boards/operations.ts:99` invokes it before export and retains the guard around subsequent requests. Saved-source library copies keep their prior path. `src/header/Header.tsx:151` preserves before completion navigation.
 
-**File:** `src/canvas/BlockSuiteCanvas.tsx:96`
-**Related evidence:** `src/canvas/BlockSuiteCanvas.tsx:167-180`; `src/canvas/BlockSuiteCanvas.tsx:104-106`; `src/header/DaliMenu.tsx:78-82`.
+**Concurrency trace:** Captures use distinct record IDs. Concurrent native pushes and replay can acknowledge the same record idempotently; acknowledgment removes only that record. Native writes journal before network submission and replay pending blobs first. The duplicate path also replays blobs before documents, and server pushes merge Yjs updates against the newest committed state transactionally. Existing source-revision checks prevent publishing a reserved source after subsequent server changes. The timeout aborts replay and fails the action before destination creation. No new journal-ordering defect was proved.
 
-**Issue:** The sole `dali:board-command` listener for fit, reset-zoom and layers lives inside BoardControls, which is mounted only for writable users. Viewers receive ViewportControls instead, while Main Menu still offers all three commands. Selecting the menu items closes the menu without acting. Layers is additionally suppressed by the writable-only inspector render condition.
+**Inspected semantic oracles:** The failed/held-push cases in `tests/board-actions.spec.ts` assert exact visible text, no premature destination, retained source after failure, retry, and exact reopened copy/source content. Saved-source cases retain hierarchy, typography, connectors, images and source-integrity assertions.
 
-**Reproduction and oracle:** Open a shared board as Viewer; pan and set zoom to 50%. Select Main Menu > View > Reset zoom to 100%: zoom stays at 50%. Fit to screen leaves the viewport unchanged; Layers opens no panel. The ViewportControls buttons' separate handlers do not service these menu events. Existing role tests verify pointer navigation and menu visibility, but do not invoke these Viewer menu actions.
+### CR-04: original BLOCKER — Viewer View commands inert — resolved
 
-**Fix:** Mount the nonmutating viewport-command listener for every authorized canvas. Provide a read-only layer-selection view or remove/disable the unavailable Layers action with an explanation. Keep history and mutation handlers behind write authorization. Verify Viewer menu zoom/fit outcomes and unchanged local/server document state.
+**Fix evidence:** `src/canvas/BlockSuiteCanvas.tsx:50-62` mounts fit/reset-zoom handling for every current authorized host and respects viewport locks. Editing/history handlers remain writable-only. `src/header/DaliMenu.tsx:81-82` disables Viewer Layers with a visible associated explanation.
 
-### CR-05: BLOCKER — successful library actions violate the active filter and recent-first ordering
+**Inspected semantic oracle:** `tests/board-roles.spec.ts` invokes Viewer menu commands, checks 100% zoom and a changed viewport after Fit, verifies disabled Layers/explanation and history, and compares exact local model/vector and authorized owner rereads. It checks behavior rather than visibility alone.
 
-**File:** `src/boards/BoardLibrary.tsx:141`
-**Related evidence:** `src/boards/BoardLibrary.tsx:123-134`; `src/boards/BoardLibrary.tsx:107-108`; `server/boards/routes.ts` (authoritative filtered, ordered library query).
+### CR-05: original BLOCKER — actions broke filter/order — resolved
 
-**Issue:** Action completion directly prepends duplicates or replaces renamed summaries in the current array. It neither applies the selected filter nor restores server ordering. Duplicating an Editor board while Shared with me is selected inserts the new private Owner board into that filter. Renaming an older board changes its updatedAt but leaves it at its old position until refresh. This contradicts the implemented All/Mine/Shared with me and recent-first library contract.
+**Fix evidence:** `src/boards/BoardLibrary.tsx:147-153` refreshes the authoritative active-filter query after acknowledgment. The existing request effect rejects stale responses and validates account-bound summaries. The new focus effect at lines 49-55 waits for successful rows/loading completion. A duplicate excluded from Shared with me returns focus to its source; deletion chooses a surviving card or New board.
 
-**Reproduction and oracle:** In Shared with me, duplicate an Editor board and wait for “Private copy created.” A Private/Owner card now appears while Shared with me remains selected; a fresh GET with `filter=shared` excludes that destination. Separately, create two boards with distinct timestamps, rename the older one, and compare rendered IDs with a fresh authoritative GET: the renamed board remains lower despite being newest. Initial-load ordering tests do not exercise either mutation.
+**Inspected semantic oracles:** `tests/board-actions.spec.ts` compares exact rendered IDs with authoritative responses after older-board rename, timestamp ties and duplication under Shared with me. Existing duplicate/deletion cases assert target/fallback focus. Effect dependencies were traced to ensure focus is not consumed on the acknowledgment render before refresh starts.
 
-**Fix:** Refetch the active filtered library after acknowledgment, or route all action results through one filter-and-sort reducer that uses the same role membership and timestamp/ID ordering as the server. If the product wants to focus the duplicate, deliberately switch to All or Mine before showing it. Verify both active-filter membership and order after rename/duplicate, including timestamp ties.
+### CR-06: original BLOCKER — exports used stale renamed title — resolved
 
-### CR-06: BLOCKER — inline rename leaves exported archive metadata and filenames at the old title
+**Fix evidence:** `src/canvas/export-board.ts:148-184,199-213` parses a fresh authorized summary, verifies board/account identity and title type, then uses its title for archive metadata and all filenames. Final authorization rejects a changed title during preparation and rechecks scope immediately before download. The construction-time runtime title is no longer used.
 
-**File:** `src/canvas/export-board.ts:159`
-**Related evidence:** `src/canvas/export-board.ts:166-178`; `src/canvas/runtime.ts:79`; `src/canvas/account/board-workspace.ts:47-49,72`; `src/App.tsx:52-56,85`.
+**Inspected semantic oracles:** `tests/board-roles.spec.ts` renames and exports without reload, checking ZIP/PNG/PDF filenames and decoded snapshot title. `src/canvas/export-board.test.ts` now supplies the descriptor contract and asserts rendering occurred before identity-change rejection, avoiding a false pass from an early mock-contract error. The concurrent-title rejection is source-verified; independent execution of that interleaving is not claimed.
 
-**Issue:** Rename acknowledgment updates the React board descriptor, but the mounted runtime and BoardMeta retain their construction-time descriptor/title clones. Export takes the title from that stale runtime and explicitly writes it into `snapshot.meta.title`. Its fresh authorization response is consumed and discarded. Thus a successful rename is reflected in the header and SQL but not in an immediately downloaded editable archive, PNG or PDF filename. The editable snapshot also records the old title.
+### WR-01: original WARNING — obsolete regression fixtures — resolved
 
-**Reproduction and oracle:** Open board “Synthetic old,” rename it to “Synthetic new” using the inline field, wait for server acknowledgment, and export without reloading. The filename uses “Synthetic old”; unzip the editable archive and read `snapshot.meta.title`: it is also “Synthetic old,” while the authorized descriptor GET and header say “Synthetic new.” Reopening the board refreshes the clone and hides the defect.
+**Fix evidence:** `tests/community.spec.ts`, `tests/mindmap-compatibility.spec.ts` and `tests/mindmap-copy.spec.ts` use account-library links, named actions, confirmations and acknowledgments. Copy checks require fresh identities while comparing hierarchy, geometry, typography, collapse details and source independence.
 
-**Fix:** Propagate acknowledged title changes to the active runtime/metadata facade through a scoped update, or obtain and validate the current authorized descriptor during export and use its title consistently for snapshot metadata and filenames. Add an immediate rename/export assertion covering both downloaded filename and decoded archive title.
-
-## Warnings
-
-### WR-01: WARNING — migrated regression fixtures still exercise removed local-library contracts
-
-**File:** `tests/community.spec.ts:65`
-**Related evidence:** `tests/community.spec.ts:80-105,116-129`; `tests/mindmap-compatibility.spec.ts:175-188`; `tests/mindmap-copy.spec.ts:120-140`; `tests/fixtures.ts:43-59`; `src/boards/BoardLibrary.tsx:119,129,133`.
-
-**Issue:** The default fixture now signs these suites into account-backed boards. Several tests still locate Open board as a button, click “+ New board” or “Duplicate,” and assume an immediate local copy. The actual library uses Open links, New board, Duplicate board and a confirmation dialog. The old board-copy assertions also require equality of source/copied native IDs, whereas the account duplicate intentionally regenerates them. Community's quota test intercepts readwrite transactions only for `djai-storyboard`; account edits use the recovery journal and server source, so the intended failure injection no longer reaches the exercised persistence path. These tests cannot establish their advertised regression predicates.
-
-**Reproduction and oracle:** Run the affected existing browser cases with the default account fixture. The removed button locators cannot match current library markup. For the quota case, count intercepted `djai-storyboard` writes: account editing generates none, so Save failed is never induced by that hook. These are source-proved fixture inconsistencies; this reviewer did not execute the suite.
-
-**Fix:** Adapt the scenarios to actual account-library links/actions and confirmation/acknowledgment, verify fresh IDs plus semantic hierarchy/content equality for board copies, and inject failure into the real account persistence path. Preserve source-integrity assertions and error collection. Any explicit legacy-only conformance should use an isolated legacy harness; it must not stand in for the account regression gate. Rerun the affected cases before the full browser gate.
+Community's fault injection targets `dali-account-recovery-v1`. It asserts the injected failure occurred, pending state remained, the server stayed unchanged, preservation failed visibly, and retry/reopen recovered the pending model. Error collection remains enabled. These are test-reliability repairs, separate from product defects.
 
 ## Coverage, evidence limits and deltas
 
-- All 92 configured files were read at standard depth, with additional traces into the relevant account runtime, native synchronization/metadata contracts and consumers.
+- The original standard-depth review read all 92 listed files. This rereview preserves the full scope and rereads all 19 remediation files, plus relevant consumers and native ZIP-transformer code. No scope was dropped.
+- Commits reviewed: `8654e1c`, `536f5d3`, `b1b262b`, `19528cd`, `2cfd25c`, `f635a62`, `46a8402`, `12a2184`.
+- Prior reviewed test deltas `f7be2f8` and `1d3c9cb` remain included in the cumulative scope.
 - No structural pre-pass was supplied.
-- Executed focused evidence: actual server root validator versus actual client metadata initializer, in memory, using synthetic Yjs documents. Three accepted-server/rejected-client variants reproduced CR-01.
-- Other reproductions above are deterministic source traces with explicit browser oracles; browser execution remains with the acceptance executor.
-- A mocked preservation-order experiment was excluded from findings because it did not prove the real journal's scheduling order. No claim of a confirmed logout race is made.
-- The two-file test-only delta `f7be2f8` was reviewed in full context. It creates the missing native board fixture through the authorized API and rereads the correct protected board owner while checking both canaries. No additional finding in that delta.
-- Follow-up test-only commit `1d3c9cb` changes `tests/board-library.spec.ts:101` from an immediate ordering assertion to `expect.poll`, retaining the exact expected ID array. Its final committed delta was inspected and has no additional finding. At final inspection, HEAD was `1d3c9cb5bfd246c86a4bb3cb51f9ded0d0a3b84f`; there were no further tracked source/test deltas awaiting review. Subsequent edits require reconciliation.
-- Untracked planning/operator checkpoint and image assets are outside the immutable source scope. They were preserved and are not covered by this report.
-- This report changes only its own review artifact. Implementation, tests and commits remain with their assigned owners.
+- The fix report's “requires human verification” label is role-mandated wording. Its automated semantic assertions directly address the original defects. Independent source review establishes corrected control flow/contracts, while execution results remain attributed to the fix executor. Neither establishes actual-provider or native OS acceptance.
+- Final delta `033ecc0` was reviewed in all three affected source/test files, retaining the full 92-file scope. The accepted `docs/access-acceptance.md` change from `7360be0` describes the implemented writable-board/private-copy archive flow, retry/reconciliation and private evidence handling.
+- The `7360be0` checkpoint and tracking changes correctly attribute 2/2 smoke, 102 unit, 110 server and 110 access results to `12a2184`. They explicitly record that the full browser matrix had **not started** at that handoff, distinguish 1452 selected cases from executed cases, and keep Plan 12, Phase 3 and actual-provider/native acceptance open. The launcher termination is not represented as a failed access suite or completed final gate. No inconsistency was found against the supplied gate facts.
+- The full suite is now reported running by the acceptance executor after the CR-07 fix. Its final selection/result counts must be recorded against that later run; the earlier checkpoint's 1452 count is historical, not a claim about the final corrected suite.
+- At final inspection HEAD remained `033ecc0dd40665a6abd593d838db2e2f82453868`. No further tracked source/test/document delta was present outside this review artifact. Subsequent test corrections and final acceptance documentation require delta reconciliation.
+- Untracked planning/operator and image assets remain outside the pinned source scope and were preserved.
+- This reviewer changed only this report and performed no implementation/test edits, commits or runtime validation during rereview.
 
 _Reviewer: gsd-code-reviewer_
-_Reviewed: 2026-09-16T19:42:00Z_
+_Reviewed: 2026-09-16T20:52:09Z_
