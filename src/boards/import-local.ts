@@ -1,7 +1,6 @@
+import { readLegacyValue, createLegacyReader } from '../canvas/workspace';
+import { readLegacyCatalog } from './catalog';
 import * as Y from 'yjs';
-import { TestWorkspace } from '@blocksuite/affine/store/test';
-import { StoreExtensionManager } from '@blocksuite/affine/ext-loader';
-import { storeExtensions } from '../canvas/extensions';
 import { validateMindmapDocument } from '../canvas/mindmap-compatibility';
 import { createStagingWorkspace } from '../canvas/account/board-workspace';
 import { regenerateSurfaceIdentities } from './operations';
@@ -12,27 +11,9 @@ export type LocalBoard = { id: string; title: string; updatedAt: number };
 type StoredDoc = { id: string; updates: { update: Uint8Array }[] };
 const encode = (bytes: Uint8Array) => { let text = ''; for (const byte of bytes) text += String.fromCharCode(byte); return btoa(text); };
 
-/** Inspect only existing legacy databases. Abort any raced creation before it commits. */
-async function readExisting<T>(name: string, store: string, key: string): Promise<T | undefined> {
-  if (!(await indexedDB.databases()).some(db => db.name === name)) return undefined;
-  const db = await new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(name);
-    request.onupgradeneeded = () => { request.transaction?.abort(); reject(new Error('Local storage changed. Try again.')); };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Local storage is unavailable.'));
-    request.onblocked = () => reject(new Error('Local storage is blocked.'));
-  });
-  try {
-    if (!db.objectStoreNames.contains(store)) throw new Error('Local storage is unavailable.');
-    return await new Promise<T | undefined>((resolve, reject) => {
-      const request = db.transaction(store, 'readonly').objectStore(store).get(key);
-      request.onsuccess = () => resolve(request.result as T | undefined);
-      request.onerror = () => reject(request.error);
-    });
-  } finally { db.close(); }
-}
-async function rootBytes() { return readExisting<StoredDoc>('djai-storyboard', 'collection', 'djai-storyboard'); }
+async function rootBytes() { return readLegacyValue<StoredDoc>('djai-storyboard', 'collection', 'djai-storyboard'); }
 export async function listLocalBoards(): Promise<LocalBoard[]> {
+  const catalog = readLegacyCatalog();
   const stored = await rootBytes(); if (!stored) return [];
   const root = new Y.Doc();
   try {
@@ -41,16 +22,17 @@ export async function listLocalBoards(): Promise<LocalBoard[]> {
     if (!(pages instanceof Y.Array)) throw new Error('Local board inventory is unavailable.');
     return (pages.toJSON() as { id: string; title: string; createDate: number; updatedDate?: number }[]).map(meta => {
       if (typeof meta.id !== 'string' || typeof meta.title !== 'string') throw new Error('Local board inventory is unavailable.');
-      return { id: meta.id, title: meta.title || 'Untitled board', updatedAt: meta.updatedDate ?? meta.createDate };
+      const entry = catalog[meta.id];
+      if (entry && (typeof entry.title !== 'string' || !Number.isFinite(entry.updatedAt))) throw new Error('Local board catalog is unavailable.');
+      return { id: meta.id, title: entry?.title || meta.title || 'Untitled board', updatedAt: entry?.updatedAt ?? meta.updatedDate ?? meta.createDate };
     });
   } finally { root.destroy(); }
 }
 async function captureLocal(id: string) {
-  const stored = await rootBytes(); const content = await readExisting<StoredDoc>('djai-storyboard', 'collection', id);
+  const stored = await rootBytes(); const content = await readLegacyValue<StoredDoc>('djai-storyboard', 'collection', id);
   if (!stored || !content) throw new Error('This local board is unavailable.');
   // No persisted sources, start(), metadata initialization, or graceful-stop writes.
-  const workspace = new TestWorkspace({ id: 'djai-storyboard' });
-  workspace.storeExtensions = new StoreExtensionManager(storeExtensions).get('store');
+  const workspace = createLegacyReader();
   try {
     stored.updates.forEach(row => Y.applyUpdate(workspace.doc, row.update));
     const doc = workspace.getDoc(id); if (!doc) throw new Error('This local board is unavailable.');
@@ -68,8 +50,8 @@ async function captureLocal(id: string) {
     if (keys.size > 10000 || JSON.stringify(snapshot).length > 8 * 1024 * 1024) throw new Error('This board exceeds the copy limit.');
     const blobs = new Map<string, Blob>(); let total = 0;
     for (const key of keys) {
-      const bytes = await readExisting<ArrayBuffer>('djai-storyboard_blob', 'blob', key);
-      const mime = await readExisting<string>('djai-storyboard_blob_mime', 'blob_mime', key);
+      const bytes = await readLegacyValue<ArrayBuffer>('djai-storyboard_blob', 'blob', key);
+      const mime = await readLegacyValue<string>('djai-storyboard_blob_mime', 'blob_mime', key);
       if (!bytes || !['image/png', 'image/jpeg'].includes(mime ?? '')) throw new Error('A local image is missing. Your original remains in this browser.');
       const hash = encode(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).replace(/\+/g, '-').replace(/\//g, '_');
       if (hash !== key || (total += bytes.byteLength) > 256 * 1024 * 1024) throw new Error('The local images could not be verified.');

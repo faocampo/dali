@@ -12,6 +12,15 @@ export type BoardCatalogEntry = {
 
 type BoardCatalog = Record<string, BoardCatalogEntry>;
 
+/** Read-only import metadata: a storage/parse failure is never an empty result. */
+export function readLegacyCatalog(): BoardCatalog {
+  const raw = localStorage.getItem(CATALOG_KEY);
+  if (!raw) return {};
+  const parsed: unknown = JSON.parse(raw);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Local board catalog is unavailable.');
+  return parsed as BoardCatalog;
+}
+
 function readCatalog(): BoardCatalog {
   try {
     const raw = localStorage.getItem(CATALOG_KEY);

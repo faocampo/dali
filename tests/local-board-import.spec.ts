@@ -33,7 +33,7 @@ test('@03-11-01 actual commit rollback and lost acknowledgment reconcile the ori
   expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(database.prepare('SELECT * FROM board_documents').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
   database.exec('DROP TRIGGER synthetic_import_failure');
   await page.route('**/api/imports/*/commit', async route => { const response = await route.fetch(); expect(response.status()).toBe(200); await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); });
-  await dialog.getByRole('button', { name: 'Retry failed copies', exact: true }).click(); await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Retry failed boards', exact: true }).click(); await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
   expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 1 }); expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
 });
 
@@ -154,7 +154,7 @@ for (const failure of ['upload', 'commit', 'missing-image'] as const) test(`@03-
   await expect(dialog.getByText('Failed', { exact: true })).toBeVisible();
   expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
   if (failure !== 'missing-image') {
-    await page.unroute(routePattern); await dialog.getByRole('button', { name: 'Retry failed copies', exact: true }).click();
+    await page.unroute(routePattern); await dialog.getByRole('button', { name: 'Retry failed boards', exact: true }).click();
     await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
     expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 1 });
     expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(attempts).toHaveLength(1);
@@ -171,9 +171,14 @@ test('@03-11-02 empty inventory never creates legacy storage and stays distinct 
   await expect(dialog.getByRole('button', { name: 'Copy selected boards', exact: true })).toBeDisabled();
   await dialog.getByRole('button', { name: 'Close local copies', exact: true }).click();
   expect(await page.evaluate(async () => ({ dbs: await indexedDB.databases(), catalog: localStorage.getItem('djai-design.board-catalog.v1') }))).toEqual(before);
+  const storage = await page.evaluateHandle(() => indexedDB);
   await page.evaluate(() => { Object.defineProperty(window, 'indexedDB', { configurable: true, get() { throw new Error('Synthetic unavailable storage'); } }); });
   await page.getByRole('button', { name: 'Copy local boards', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('read local boards'); await expect(dialog.getByText('No local boards are available in this browser.', { exact: true })).toHaveCount(0);
+  await page.evaluate(storage => { Object.defineProperty(window, 'indexedDB', { configurable: true, value: storage }); }, storage);
+  await storage.dispose();
+  await dialog.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(dialog.getByText('No local boards are available in this browser.', { exact: true })).toBeVisible();
 });
 
 test('@03-11-02 multiple explicit selections retain per-row partial success and retry only the failed operation', async ({ page }) => {

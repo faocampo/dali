@@ -1,3 +1,5 @@
+import { StoreExtensionManager } from '@blocksuite/affine/ext-loader';
+import { storeExtensions } from './extensions';
 /**
  * Persisted workspace for the canvas.
  *
@@ -268,4 +270,30 @@ function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promi
       }
     );
   });
+}
+
+/** Inspect only existing legacy databases. Abort any raced creation before it commits. */
+export async function readLegacyValue<T>(name: string, store: string, key: string): Promise<T | undefined> {
+  if (!(await indexedDB.databases()).some(db => db.name === name)) return undefined;
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    const request = indexedDB.open(name);
+    request.onupgradeneeded = () => { request.transaction?.abort(); reject(new Error('Local storage changed. Try again.')); };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('Local storage is unavailable.'));
+    request.onblocked = () => reject(new Error('Local storage is blocked.'));
+  });
+  try {
+    if (!db.objectStoreNames.contains(store)) throw new Error('Local storage is unavailable.');
+    return await new Promise<T | undefined>((resolve, reject) => {
+      const request = db.transaction(store, 'readonly').objectStore(store).get(key);
+      request.onsuccess = () => resolve(request.result as T | undefined);
+      request.onerror = () => reject(request.error);
+    });
+  } finally { db.close(); }
+}
+
+export function createLegacyReader() {
+  const workspace = new TestWorkspace({ id: DB_NAME });
+  workspace.storeExtensions = new StoreExtensionManager(storeExtensions).get('store');
+  return workspace;
 }
