@@ -8,6 +8,7 @@ export { expiresAt, currentSession, requireExpectedMember, requireMutation } fro
 export { localReturnIntent } from './auth/oidc.js';
 export type { SessionDescriptor } from './auth/session-store.js';
 import { openDatabase, runMigrations, type AccountDatabase } from './storage/database.js';
+import { registerBoardRoutes } from './boards/routes.js';
 
 export type AuthConfig = {
   origin: string; databasePath: string; secret: string; ttl: number; issuer: string;
@@ -49,7 +50,10 @@ export async function buildApp(options: { config: Record<string, string | undefi
   if (Object.keys({ ...process.env, ...options.config }).some(key => /(?:TEST.*AUTH|AUTH.*TEST|AUTH.*BYPASS)/i.test(key))) throw new Error('Test authentication is forbidden');
   const app = Fastify({ logger: false, bodyLimit: 16384 });
   app.addHook('onRequest', async (_request, reply) => { reply.header('Cache-Control', 'private, no-store'); });
-  app.setErrorHandler((_error, _request, reply) => { reply.code(500).send({ code: 'REQUEST_FAILED' }); });
+  app.setErrorHandler((error, _request, reply) => {
+    const validation = error instanceof Error && 'validation' in error;
+    reply.code(validation ? 400 : 500).send({ code: validation ? 'INVALID_REQUEST' : 'REQUEST_FAILED' });
+  });
   let config: AuthConfig;
   try { config = readConfig(options.config); } catch {
     app.get('/api/session', async (_request, reply) => reply.code(503).send({ code: 'AUTH_CONFIGURATION' }));
@@ -62,7 +66,8 @@ export async function buildApp(options: { config: Record<string, string | undefi
   await app.register(session, { secret: config.secret, cookieName: SESSION_COOKIE,
     cookie: { path: '/', httpOnly: true, sameSite: 'lax', secure: config.secure },
     rolling: false, saveUninitialized: false, store: new SqliteSessionStore(database, now) });
-  await registerOidcRoutes(app, config, database, now); return app;
+  await registerOidcRoutes(app, config, database, now);
+  registerBoardRoutes(app, config, database, now); return app;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   readConfig(process.env); const app = await buildApp({ config: process.env });

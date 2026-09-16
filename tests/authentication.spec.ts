@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-test.use({ expectErrors: ['Failed to load resource: the server responded with a status of 401 (Unauthorized)'] });
+test.use({ expectErrors: ['Failed to load resource: the server responded with a status of 401 (Unauthorized)', 'Failed to load resource: the server responded with a status of 404 (Not Found)'] });
 
 test('@03-02-01 UI-AUTH-loading keeps protected content unmounted until session validation', async ({ page }) => {
   let release!: () => void;
@@ -92,7 +92,7 @@ test('@03-02-02 absolute UI expiry clears account content and offers deliberate 
 for (const intent of ['?board=synthetic-board', '?new=1']) {
   test(`@03-02-02 D-01 signed provider restores ${intent}`, async ({ page }) => {
     await page.goto(`/${intent}`); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Your boards' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: intent.startsWith('?board=') ? "You don't have access to this board" : 'Your boards' })).toBeVisible();
     expect(new URL(page.url()).search).toBe(intent);
   });
 }
