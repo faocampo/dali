@@ -42,7 +42,7 @@ export function AuthBoundary({ children }: { children: (session: SessionDescript
   const content = <>
     <h1 id="session-heading">{state.phase === 'signed-out' ? "You're signed out of Dalí" : interrupted ? 'Session expired — sign in to continue.' : "We couldn't sign you in."}</h1>
     {interrupted && state.member && recoveryBoard(state.member.accountId) && <p className="session-recovery__account">{state.member.email}</p>}
-    {state.phase === 'preserving' ? <p role="status">Securing pending changes…</p> : state.phase === 'preservation-failed' ? <p role="alert">Pending changes could not be secured for sign-in. Keep this tab open and retry preservation.</p> : <p>{state.phase === 'signed-out' ? 'Your Dalí session has ended.' : interrupted ? 'Editing is paused. Pending changes are kept for this account while you sign in.' : 'Try signing in again.'}</p>}
+    {state.phase === 'preserving' ? <p role="status">Securing pending changes…</p> : state.phase === 'preservation-failed' ? <p role="alert">Pending changes could not be secured for sign-in. Keep this tab open and retry preservation.</p> : <p role={state.phase === 'error' ? 'alert' : undefined}>{state.phase === 'signed-out' ? 'Your Dalí session has ended.' : interrupted ? 'Editing is paused. Pending changes are kept for this account while you sign in.' : 'Try signing in again.'}</p>}
     {state.phase === 'preservation-failed' ? <button className="djai-primary" onClick={() => { void interruptSession(state.intent); }}>Retry preservation</button> : <button className="djai-primary" disabled={state.phase === 'preserving'} onClick={startSignIn}>{interrupted ? 'Sign in to continue' : 'Sign in again'}</button>}
   </>;
   return <>
