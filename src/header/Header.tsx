@@ -11,17 +11,25 @@ import { createAccountBoard } from '../boards/operations';
 import { accountBoardUrl } from '../boards/preferences';
 import { getSaveStatus, subscribeSaveStatus } from '../canvas/save-status';
 import { ExportDialog } from './ExportDialog';
+import type { BoardDescriptor } from '../boards/BoardLibrary';
+import type { SessionDescriptor } from '../auth/AuthBoundary';
+import { ShareBoardDialog } from '../boards/ShareBoardDialog';
+import { BoardActionDialog } from '../boards/BoardActionDialog';
 
 export function Header({
   boardTitle = 'Untitled board',
   onOpenBoards,
   onRenameBoard,
+  board, member, signOut, onBoardChanged,
 }: {
   boardTitle?: string;
   onOpenBoards?: () => void;
   onRenameBoard?: (title: string) => Promise<void>;
+  board?: BoardDescriptor; member?: SessionDescriptor; signOut?: () => Promise<void>; onBoardChanged?: (board: BoardDescriptor) => void;
 }) {
   const [exportOpen, setExportOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [action, setAction] = useState<'rename' | 'duplicate' | 'delete'>();
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   const saveStatus = useSyncExternalStore(subscribeSaveStatus, getSaveStatus);
@@ -77,11 +85,14 @@ export function Header({
         <img src={logo} alt="Dalí" height={34} />
       </a>
 
-      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} />
-      {!onRenameBoard && <h1 style={{ fontSize: 15 }}>{boardTitle}</h1>}
+      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} role={board?.summary.role} onBoardAction={board ? setAction : undefined} />
+      {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
       <nav className="djai-header-actions">
+        {board && <span className="board-role">{board.summary.role[0]!.toUpperCase() + board.summary.role.slice(1)}{board.summary.role === 'viewer' ? ' · View only' : ''}</span>}
+        {board?.summary.role === 'owner' && <button className="djai-ghost" onClick={() => setSharing(true)}>Share board</button>}
+        {member && <details className="board-account"><summary>Account</summary><div><p>{member.displayName}</p><p>{member.email}</p><button onClick={() => { void signOut?.(); }}>Sign out of Dalí</button></div></details>}
         <div className="djai-save">
           <button
             type="button"
@@ -130,6 +141,15 @@ export function Header({
       </nav>
 
       {exportOpen && <ExportDialog onClose={closeExport} />}
+      {sharing && board && <ShareBoardDialog board={board.summary} onClose={() => setSharing(false)} onChanged={state => {
+        if (state) onBoardChanged?.({ ...board, summary: { ...board.summary, access: state.grants.length ? 'shared' : 'private', pendingCount: state.grants.filter(grant => grant.status === 'pending').length } });
+      }} />}
+      {action && board && <BoardActionDialog board={board.summary} kind={action} onClose={() => setAction(undefined)} onComplete={result => {
+        setAction(undefined);
+        if (result.deleted) onOpenBoards?.();
+        else if (action === 'duplicate') window.location.assign('/?focusBoard=' + encodeURIComponent(result.summary.id));
+        else onBoardChanged?.(result);
+      }} />}
       {creations.map(creation => <div key={creation.id} role={creation.state === 'error' ? 'alert' : 'status'}>
         {creation.state === 'pending' ? 'Creating board…' : creation.state === 'error' ? <><span>We couldn't open the new board. Your current board is unchanged.</span><button onClick={() => { void completeCreation(creation); }}>Retry new board</button></>
           : <><span>Your new board is ready.</span><a href={creation.href} target="_blank" rel="noopener noreferrer">Open new board</a></>}

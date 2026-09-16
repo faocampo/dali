@@ -136,10 +136,48 @@ test('@03-08-02 inline naming is acknowledged composition-safe and responsive wi
   await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title });
   await input.fill(' '); await input.press('Tab'); await expect(input).toHaveValue(title);
   await page.setViewportSize({ width: 490, height: 800 });
+  await input.focus(); await input.press('End');
+  expect(await input.evaluate(el => { const field = el as HTMLInputElement; return { caret: field.selectionStart, length: field.value.length, scroll: field.scrollLeft > 0 }; })).toEqual({ caret: title.length, length: title.length, scroll: true });
   await expect(page.getByText('Owner', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Share board', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Share board' })).toBeVisible(); await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Share board', exact: true })).toBeFocused();
   await page.getByText('Account', { exact: true }).click(); await expect(page.getByRole('button', { name: 'Sign out of Dalí', exact: true })).toBeVisible();
   expect(await page.locator('.djai-header').evaluate(el => { const bounds = el.getBoundingClientRect(); return [...el.querySelectorAll('button, summary, input')].filter(node => (node as HTMLElement).offsetParent).every(node => { const rect = node.getBoundingClientRect(); return rect.x >= 0 && rect.right <= innerWidth && rect.height >= 44 && rect.y >= bounds.y; }); })).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+test('@03-08-02 long library rename labels and errors wrap within 490px without losing draft', async ({ page }) => {
+  const title = '👩🏽‍💻'.repeat(200); const board = await create(page, title); await page.setViewportSize({ width: 490, height: 800 }); await page.reload();
+  await card(page, board.summary.id).getByRole('button', { name: 'Rename board' }).click(); const dialog = page.getByRole('dialog', { name: 'Rename board' });
+  await dialog.getByRole('textbox').fill(title + '界'); await dialog.getByRole('button', { name: 'Save name' }).click(); await expect(dialog.getByRole('alert')).toContainText('200'); await expect(dialog.getByRole('textbox')).toHaveValue(title + '界');
+  expect(await dialog.evaluate(el => { const r = el.getBoundingClientRect(); return r.x >= 0 && r.right <= innerWidth && el.scrollWidth <= el.clientWidth; })).toBe(true);
+  await dialog.getByRole('button', { name: 'Keep name' }).click(); await expect(card(page, board.summary.id).getByRole('button', { name: 'Rename board' })).toBeFocused();
+  expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title });
+});
+test('@03-08-02 inline loading guards repeated commits and uncertain failure retains a correctable draft', async ({ page }) => {
+  const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id); const input = page.getByRole('textbox', { name: 'Board name', exact: true }); await expect(input).toBeVisible();
+  let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; }); let writes = 0;
+  await page.route('**/api/boards/' + board.summary.id, async route => { if (route.request().method() !== 'PATCH') return route.continue(); writes++; await wait; await route.continue(); });
+  await input.fill('Pending name'); await input.press('Enter'); await expect(page.getByRole('status', { name: '' }).filter({ hasText: 'Saving name' })).toBeVisible(); await expect(input).toBeDisabled();
+  expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Synthetic actions' }); release(); await expect(input).toBeEnabled(); expect(writes).toBe(1);
+  await page.unroute('**/api/boards/' + board.summary.id);
+  await input.fill('Failed draft'); await page.route('**/api/boards/' + board.summary.id, route => route.request().method() === 'PATCH' ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }) : route.continue());
+  await input.press('Enter'); await expect(page.getByRole('button', { name: 'Check again' })).toBeVisible(); await expect(input).toHaveValue('Failed draft');
+  expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Pending name' }); await page.getByRole('button', { name: 'Check again' }).click(); await expect(input).toBeEnabled();
+  await page.unroute('**/api/boards/' + board.summary.id); await input.fill('Corrected draft'); await input.press('Tab');
+  await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Corrected draft' });
+  await input.fill('界'.repeat(201)); await input.press('Enter'); await expect(input).toHaveValue('界'.repeat(201)); await expect(page.getByRole('alert')).toContainText('200');
+  await input.press('Escape'); await expect(input).toHaveValue('Corrected draft');
+});
+test('@03-08-02 Viewer readable title account controls and Main Menu preserve role restrictions at 490px', async ({ page }) => {
+  const title = '長い名前👩🏽‍💻'.repeat(30); const board = await create(page, title);
+  database.prepare('INSERT INTO members(id,issuer,subject,email,canonical_email,display_name) VALUES(?,?,?,?,?,?)').run('synthetic-other', provider.issuer, 'other', 'other@example.org', 'other@example.org', 'Synthetic Other');
+  database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run('synthetic-other', board.summary.id);
+  database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, accountId, 'viewer');
+  await page.setViewportSize({ width: 490, height: 800 }); await page.goto(origin + '/?board=' + board.summary.id);
+  await expect(page.locator('affine-edgeless-root')).toBeVisible(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveCount(0); await expect(page.getByText('Viewer · View only', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: 'Share board' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Main Menu', exact: true }).click(); await page.getByRole('menuitem', { name: 'File', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeVisible(); await expect(page.getByRole('menuitem', { name: 'Duplicate board' })).toHaveCount(0); await expect(page.getByRole('menuitem', { name: 'Delete board' })).toHaveCount(0);
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.getByText('Account', { exact: true }).click(); await expect(page.getByRole('button', { name: 'Sign out of Dalí' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

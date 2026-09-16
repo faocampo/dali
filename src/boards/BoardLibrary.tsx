@@ -44,6 +44,12 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
   const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState('');
   const operation = useRef<{ id: string; title: string } | null>(null);
+  useEffect(() => {
+    const url = new URL(window.location.href); const id = url.searchParams.get('focusBoard');
+    if (!id || !boards.some(board => board.id === id)) return;
+    document.querySelector<HTMLAnchorElement>('[data-board-id="' + CSS.escape(id) + '"] .board-card__open')?.focus();
+    url.searchParams.delete('focusBoard'); window.history.replaceState(null, '', url);
+  }, [boards]);
   const lifetime = useRef<AbortController>();
   useEffect(() => {
     const controller = new AbortController(); lifetime.current = controller;

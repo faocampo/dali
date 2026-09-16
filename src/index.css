@@ -618,8 +618,9 @@ djai-image-visual-edit {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  height: 52px;
-  padding: 0 0.85rem;
+  min-height: 52px;
+  height: auto;
+  padding: 4px 0.85rem;
   background: var(--board-surface);
   border-bottom: 1px solid var(--board-line);
   /* Above the canvas chrome, so menus are never clipped by the board. */
@@ -1740,3 +1741,14 @@ djai-image-visual-edit {
 .board-action-dialog input { box-sizing: border-box; display: block; width: 100%; min-width: 0; min-height: 44px; margin-top: 8px; }
 .board-action-dialog__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
 .board-action-dialog button, .board-card__actions button { min-height: 44px; }
+.djai-header { height: auto; min-height: 52px; flex-wrap: wrap; padding-top: 4px; padding-bottom: 4px; }
+.djai-header-actions { flex-wrap: wrap; min-width: 0; }
+.djai-header button, .djai-header summary, .board-title-inline input { min-height: 44px; }
+.board-title-inline { flex-wrap: wrap; min-width: 0; }
+.board-title-readable { font-size: 15px; min-width: 0; max-width: 30vw; overflow-wrap: anywhere; }
+.board-role { font-size: 12px; white-space: nowrap; }
+.board-account { position: relative; font-size: 13px; }
+.board-account summary { display: flex; align-items: center; cursor: pointer; padding: 0 8px; }
+.board-account > div { position: absolute; right: 0; top: 100%; width: min(260px, calc(100vw - 32px)); padding: 16px; box-sizing: border-box; background: var(--board-surface); border: 1px solid var(--board-line); border-radius: 12px; box-shadow: 0 8px 24px #0002; }
+.board-account p { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .djai-header-actions { width: 100%; justify-content: flex-end; } .board-title-inline input { max-width: 48vw; } }

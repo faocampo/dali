@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AuthBoundary, type SessionDescriptor } from './auth/AuthBoundary';
 import { BoardLibrary, validSummary, type BoardDescriptor } from './boards/BoardLibrary';
 import logo from '../imgs/svg/dali-symbol-color.svg';
@@ -6,7 +6,7 @@ import BlockSuiteCanvas from './canvas/BlockSuiteCanvas';
 import { Header } from './header/Header';
 import { disposeCanvasRuntime, getCanvasRuntime, nextAccessGeneration, suspendAccessScope, type CanvasRuntime } from './canvas/runtime';
 import { accountBoardUrl, accountIntent } from './boards/preferences';
-import { createAccountBoard } from './boards/operations';
+import { createAccountBoard, AccountBoardAction, BoardActionError } from './boards/operations';
 
 function NewBoardTarget({ member, operationId }: { member: SessionDescriptor; operationId?: string }) {
   const [id] = useState(() => operationId ?? crypto.randomUUID());
@@ -22,11 +22,22 @@ function NewBoardTarget({ member, operationId }: { member: SessionDescriptor; op
   return error ? <section><p role="alert">We couldn't create this board. Try again.</p><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/">Back to your boards</a></section> : <p role="status">Creating board…</p>;
 }
 
-function BoardTarget({ member, target, onOpenBoards }: { member: SessionDescriptor; target: string; onOpenBoards: () => void }) {
+function BoardTarget({ member, target, onOpenBoards, signOut }: { member: SessionDescriptor; target: string; onOpenBoards: () => void; signOut: () => Promise<void> }) {
   const [state, setState] = useState<'loading' | 'denied' | 'expired' | 'error' | 'ready'>('loading');
   const [board, setBoard] = useState<BoardDescriptor>();
   const [runtime, setRuntime] = useState<CanvasRuntime>();
   const [retry, setRetry] = useState(0);
+  const rename = useRef<AccountBoardAction>();
+  const renameBoard = async (title: string) => {
+    if (rename.current) {
+      const known = await rename.current.check();
+      if (known.status === 'completed') { setBoard(known.result!); rename.current = undefined; return; }
+      rename.current = undefined; throw new BoardActionError('No completed change was found. You can retry the name.');
+    }
+    rename.current = new AccountBoardAction(member.accountId, target, 'rename');
+    try { setBoard(await rename.current.run(title)); rename.current = undefined; }
+    catch (cause) { if (!(cause instanceof BoardActionError && cause.uncertain)) rename.current = undefined; throw cause; }
+  };
   useEffect(() => {
     const controller = new AbortController(); const generation = nextAccessGeneration();
     setState('loading'); setBoard(undefined); setRuntime(undefined);
@@ -52,8 +63,7 @@ function BoardTarget({ member, target, onOpenBoards }: { member: SessionDescript
   if (state === 'denied') return <section><h1>You don't have access to this board</h1><p>Ask the board owner to grant access to your internal account.</p><a href="/">Back to your boards</a></section>;
   if (state === 'error') return <section><p role="alert">We couldn't open this board. Try again.</p><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/">Back to your boards</a></section>;
   return <div className="djai-app" data-board-id={board!.summary.id}>
-    <Header boardTitle={board!.summary.title} onOpenBoards={onOpenBoards} />
-    <div style={{ padding: '2px 16px', fontSize: 12 }}><span>{board!.summary.role} · {board!.summary.access}</span><a href="/" style={{ marginLeft: 16 }}>Back to your boards</a></div>
+    <Header boardTitle={board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={board!.summary.role === 'viewer' ? undefined : renameBoard} />
     <main className="djai-canvas-area"><BlockSuiteCanvas runtime={runtime!} /></main>
   </div>;
 }
@@ -61,7 +71,7 @@ export default function App() {
   const [intent, setIntent] = useState(() => accountIntent());
   useEffect(() => { const changed = () => setIntent(accountIntent()); window.addEventListener('popstate', changed); return () => window.removeEventListener('popstate', changed); }, []);
   const openBoards = () => { window.history.pushState(null, '', '/'); setIntent({ kind: 'home' }); };
-  return <AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} /> : <div className="board-library" key={member.accountId}>
+  return <AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} signOut={signOut} /> : <div className="board-library" key={member.accountId}>
     <header className="board-library__header" style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
       <a className="djai-brand" href="/" aria-label="Dalí"><img src={logo} alt="" height={34} /></a>
       <div style={{ flex: 1, overflowWrap: 'anywhere', minWidth: 0, fontSize: 15 }}>
