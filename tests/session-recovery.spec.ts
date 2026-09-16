@@ -222,3 +222,32 @@ test('@03-10-02 late session response cannot override simultaneous logout and ac
   release(); await page.unrouteAll({ behavior: 'ignoreErrors' }); await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0); expect((await records(page)).length).toBeGreaterThan(0); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before); await other.close();
 });
+test('@03-10-03 same-board recovery announces acknowledged resume and restores prior control focus', async ({ page }) => {
+  await board(page); await text(page, 'Focus recovery canary');
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).focus(); await expire(page);
+  const dialog = page.getByRole('dialog'); await expect(dialog).toBeVisible();
+  for (let i = 0; i < 4; i++) { await page.keyboard.press('Tab'); expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true); }
+  await page.keyboard.press('Escape'); await expect(dialog).toBeVisible(); await expect(page.getByRole('button', { name: 'Add mind map', exact: true })).toHaveCount(0);
+  await page.clock.setFixedTime(new Date()); await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: /^Editing resumed\.$/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add mind map', exact: true })).toBeFocused(); expect(await model(page)).toContain('Focus recovery canary');
+});
+test('@03-10-03 long account recovery fits 490px and short viewport with reachable static controls', async ({ page }) => {
+  const descriptor = await board(page); const email = 'synthetic-' + 'longidentifier'.repeat(22) + '@example.org';
+  database.prepare('UPDATE members SET email=?,display_name=? WHERE id=?').run(email, 'Synthetic ' + 'longname'.repeat(30), accountId);
+  await page.reload(); await expect(page.locator('affine-edgeless-root')).toBeVisible(); await page.setViewportSize({ width: 490, height: 240 }); await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expire(page); await expect(page.getByRole('dialog').getByText(email, { exact: true })).toBeVisible();
+  const action = page.getByRole('button', { name: 'Sign in to continue', exact: true }); await action.scrollIntoViewIfNeeded(); const box = (await action.boundingBox())!;
+  expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44); expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(490); expect(box.y + box.height).toBeLessThanOrEqual(240);
+  expect(await page.getByRole('dialog').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true); expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+  expect((await records(page)).every(record => record.boardId === descriptor.summary.id)).toBe(true);
+});
+test('@03-10-03 failed replay stays pending without resume and retries committed content', async ({ page }) => {
+  const descriptor = await board(page); await text(page, 'Replay retry canary'); await expire(page);
+  await page.clock.setFixedTime(new Date()); await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_UNAVAILABLE' } }));
+  await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible(); await expect(page.getByText('Editing resumed.', { exact: true })).toHaveCount(0); await expect(page.locator('editor-host')).toHaveCount(0);
+  expect((await records(page)).length).toBeGreaterThan(0); await page.unrouteAll({ behavior: 'ignoreErrors' }); await page.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(page.getByText('Editing resumed.', { exact: true })).toBeVisible(); expect(await model(page)).toContain('Replay retry canary');
+  const independent = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } }); expect(independent.status()).toBe(200);
+});
