@@ -152,6 +152,12 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     if (value === '/?board=synthetic-board' || value === '/?new=1') expect(localReturnIntent(value)).toBe(value);
     else expect(localReturnIntent(value)).toBe('/');
   });
+  it('@03-06-02 retains a bounded new operation identity through signed login', async () => {
+    const target = '/?new=1&operationId=synthetic-operation_123';
+    expect(localReturnIntent(target)).toBe(target);
+    const flow = await begin(target); expect((await finish(flow)).headers.location).toBe(target);
+    for (const value of ['../foreign', 'x'.repeat(129), '', 'space here']) expect(localReturnIntent('/?new=1&operationId=' + encodeURIComponent(value))).toBe('/');
+  });
   it('production configuration requires HTTPS, bounded policy and registers no fixture route', async () => {
     expect(() => readConfig({ ...env, NODE_ENV: 'production' })).toThrow();
     expect(() => readConfig({ ...env, DALI_INTERNAL_VALUES_JSON: '[]' })).toThrow();
