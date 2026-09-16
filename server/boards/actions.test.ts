@@ -96,10 +96,15 @@ describe('@03-08-01 board action transactions', () => {
     const commit = () => app.inject({ method: 'POST', url: '/api/imports/' + operationId + '/commit', headers: headers('editor'), payload: {} });
     expect((await commit()).statusCode).toBe(409);
     const root = new Y.Doc(); root.getMap('spaces').set(d.contentDocId, new Y.Doc({ guid: d.contentDocId }));
+    root.getMap('meta').set('pages', Y.Array.from([{ id: d.contentDocId, title: 'Synthetic copy', createDate: Date.now(), tags: [] }]));
     const content = new Y.Doc(); const replacements = new Map([...source.getMap('blocks').keys()].map(id => [id, randomUUID()]));
     source.getMap<Y.Map<unknown>>('blocks').forEach((block, id) => { const clone = block.clone(); clone.set('sys:id', replacements.get(id)); const children = clone.get('sys:children'); if (children instanceof Y.Array) clone.set('sys:children', Y.Array.from(children.toArray().map(child => replacements.get(child) ?? child))); content.getMap('blocks').set(replacements.get(id)!, clone); });
     const payload = { root: Buffer.from(Y.encodeStateAsUpdate(root)).toString('base64'), content: Buffer.from(Y.encodeStateAsUpdate(content)).toString('base64'), manifest: [key] };
     const upload = (body = payload) => app.inject({ method: 'PUT', url: '/api/imports/' + operationId + '/document', headers: headers('editor'), payload: body });
+    const stagedBefore = state();
+    const invalidRoot = new Y.Doc(); Y.applyUpdate(invalidRoot, Y.encodeStateAsUpdate(root)); invalidRoot.getMap('meta').delete('pages');
+    expect((await upload({ ...payload, root: Buffer.from(Y.encodeStateAsUpdate(invalidRoot)).toString('base64') })).statusCode).toBe(400);
+    expect(state()).toEqual(stagedBefore); invalidRoot.destroy();
     expect((await upload({ ...payload, content: Buffer.from(Y.encodeStateAsUpdate(source)).toString('base64') })).statusCode).toBe(400);
     expect((await upload()).statusCode).toBe(200); expect((await commit()).statusCode).toBe(409);
     expect((await app.inject({ method: 'PUT', url: '/api/imports/' + operationId + '/blobs/' + key, headers: { ...headers('editor'), 'content-type': 'image/png' }, payload: image })).statusCode).toBe(200);

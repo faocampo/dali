@@ -9,6 +9,7 @@ import { createOidcProvider } from './oidc-provider';
 import { syntheticCanaries } from './access-fixtures';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
+import * as Y from 'yjs';
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 let accountId: string; const origin = 'http://127.0.0.1:5499';
 test.use({ expectErrors: ['the server responded with a status of 400', 'the server responded with a status of 401', 'the server responded with a status of 403', 'the server responded with a status of 404', 'the server responded with a status of 409', 'the server responded with a status of 503'] });
@@ -29,6 +30,19 @@ async function create(page: Page, title = 'Synthetic actions') {
 }
 const card = (page: Page, id: string) => page.locator('[data-board-id="' + id + '"]');
 const sourceState = (id: string) => ['boards', 'board_documents', 'board_blobs', 'board_grants', 'pending_grants'].map(table => database.prepare(`SELECT * FROM ${table} WHERE ${table === 'boards' ? 'id' : 'board_id'}=?`).all(id));
+test('@CR-01 rejected malformed root still opens in the native account editor', async ({ page }) => {
+  const board = await create(page, 'Reopen canary'); const before = sourceState(board.summary.id);
+  const stored = database.prepare('SELECT update_bytes FROM board_documents WHERE doc_id=?').get(board.rootDocId) as { update_bytes: Buffer };
+  for (const pages of [undefined, [], [{ id: board.contentDocId }]]) {
+    const root = new Y.Doc(); Y.applyUpdate(root, stored.update_bytes);
+    if (pages) root.getMap('meta').set('pages', Y.Array.from(pages)); else root.getMap('meta').delete('pages');
+    const response = await page.request.post(`${origin}/api/boards/${board.summary.id}/docs/${board.rootDocId}/push`, { headers: { ...headers(), 'Content-Type': 'application/octet-stream' }, data: Buffer.from(Y.encodeStateAsUpdate(root)) });
+    expect(response.status()).toBe(400); expect(sourceState(board.summary.id)).toEqual(before); root.destroy();
+  }
+  await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Reopen canary');
+  expect(sourceState(board.summary.id)).toEqual(before);
+});
 test('@03-08-01 Unicode rename blank bounds acknowledgment and named safe-focus deletion', async ({ page }) => {
   const board = await create(page); await page.reload();
   const open = async () => { await card(page, board.summary.id).getByRole('button', { name: 'Rename board' }).click(); return page.getByRole('dialog', { name: 'Rename board' }); };

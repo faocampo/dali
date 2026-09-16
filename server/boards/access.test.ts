@@ -153,9 +153,25 @@ describe('protected board resources', () => {
     expect((await requestDoc('push', update, 'editor')).statusCode).toBe(200);
     expect(bytes()).toEqual(saved); expect(Y.encodeStateVectorFromUpdate(bytes())).toEqual(vector); doc.destroy();
   });
+  it('@CR-01 malformed native metadata cannot replace a reopenable root', async () => {
+    database.prepare('INSERT INTO board_thumbnails(board_id,bytes,mime) VALUES(?,?,?)').run(board.summary.id, syntheticCanaries().imageBytes, 'image/png');
+    const before = snapshot(); const saved = Buffer.from(bytes(board.rootDocId)); const vector = Y.encodeStateVectorFromUpdate(saved);
+    const invalid = [undefined, new Y.Array(), [{ id: board.contentDocId }], [{ id: board.contentDocId, title: 1, createDate: 1, tags: [] }], [{ id: board.contentDocId, title: 'Page', createDate: '1', tags: [] }], [{ id: board.contentDocId, title: 'Page', createDate: 1, tags: {} }]];
+    for (const actor of ['owner', 'editor']) for (const value of invalid) {
+      const root = new Y.Doc(); Y.applyUpdate(root, saved);
+      if (value === undefined) root.getMap('meta').delete('pages');
+      else root.getMap('meta').set('pages', Array.isArray(value) ? Y.Array.from(value) : new Y.Array());
+      expect((await requestDoc('push', Y.encodeStateAsUpdate(root, vector), actor, board.rootDocId)).statusCode).toBe(400);
+      expect(snapshot()).toEqual(before); expect(bytes(board.rootDocId)).toEqual(saved);
+      const reopened = new Y.Doc(); Y.applyUpdate(reopened, (await requestDoc('pull', new Uint8Array([0]), 'owner', board.rootDocId)).rawPayload);
+      expect(Y.encodeStateVector(reopened)).toEqual(vector);
+      expect((reopened.getMap('meta').get('pages') as Y.Array<unknown>).toJSON()).toEqual([{ id: board.contentDocId, title: 'Owner canary', createDate: clock, tags: [] }]);
+      reopened.destroy(); root.destroy();
+    }
+  });
   it('@03-04-01 root metadata remains bound and content commit invalidates preview atomically', async () => {
     const root = new Y.Doc(); Y.applyUpdate(root, bytes(board.rootDocId));
-    root.getMap('meta').set('pages', Y.Array.from([new Y.Map([['id', board.contentDocId], ['title', 'Bound page']])]));
+    root.getMap('meta').set('pages', Y.Array.from([new Y.Map<unknown>([['id', board.contentDocId], ['title', 'Bound page'], ['createDate', clock], ['tags', []]])]));
     expect((await requestDoc('push', Y.encodeStateAsUpdate(root), 'editor', board.rootDocId)).statusCode).toBe(200);
     // Pull re-encodes normalized Yjs state; deleted metadata can be GC-compacted.
     // Compare successful read semantics/vector; denial checks below retain bytes.

@@ -27,7 +27,10 @@ export function validateDocument(doc: Y.Doc, board: BoardRow, docId: string) {
       doc.getSubdocs().size !== 1) throw new Error('Invalid root binding');
     // Workspace metadata may describe only the already bound content document.
     const meta = doc.getMap('meta'); const pages = meta.get('pages');
-    if (pages !== undefined && (!(pages instanceof Y.Array) || pages.length > 1 || pages.toArray().some(p => (p instanceof Y.Map ? p.get('id') : p?.id) !== board.content_doc_id))) throw new Error('Invalid metadata binding');
+    if (!(pages instanceof Y.Array) || pages.length !== 1) throw new Error('Invalid metadata binding');
+    const raw = pages.get(0); const entry = raw instanceof Y.Map ? raw.toJSON() : raw;
+    if (!entry || entry.id !== board.content_doc_id || typeof entry.title !== 'string' ||
+      !Number.isFinite(entry.createDate) || !Array.isArray(entry.tags)) throw new Error('Invalid metadata binding');
     if ([...doc.share.keys()].some(key => !['spaces', 'meta'].includes(key))) throw new Error('Invalid root');
   } else {
     if (docId !== board.content_doc_id || doc.getSubdocs().size || [...doc.share.keys()].some(key => !['blocks', 'meta'].includes(key))) throw new Error('Invalid content binding');
