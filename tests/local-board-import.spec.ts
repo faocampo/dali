@@ -3,13 +3,14 @@ import * as Y from 'yjs';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { MindmapElementModel, ShapeElementModel } from '@blocksuite/affine/model';
-import { syntheticCanaries } from './access-fixtures';
+import { proxyApplicationAssets, syntheticCanaries } from './access-fixtures';
 import type { FastifyInstance } from 'fastify';
 import { test, expect } from './fixtures';
 import { createOidcProvider } from './oidc-provider';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
 import { IMAGE_LIMITS } from '../server/boards/blobs';
+let closeProxy: (() => void) | undefined;
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 const origin = 'http://127.0.0.1:5499';
 let accountId: string;
@@ -18,7 +19,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   const registration = { clientId: 'synthetic-actions', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
   provider = await createOidcProvider({ clients: [registration] }); database = openDatabase(':memory:');
   app = await buildApp({ database, config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000', DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]' } });
-  app.get('/*', async (request, reply) => { const response = await fetch(baseURL! + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
+  closeProxy = proxyApplicationAssets(app, baseURL!);
   await app.listen({ host: '127.0.0.1', port: 5499 });
   await page.goto(origin); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
@@ -54,7 +55,7 @@ test('@03-11-01 staging validates complete manifest and binds every operation to
   } finally { await foreign.close(); }
   expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
 });
-test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); await app?.close(); database?.close(); await provider?.close(); });
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); closeProxy?.(); closeProxy = undefined; await app?.close(); database?.close(); await provider?.close(); });
 test("@03-11-01 selected local copy entry requires deliberate selection", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Copy local boards", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Copy local boards", exact: true }).click();

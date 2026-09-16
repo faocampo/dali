@@ -6,7 +6,8 @@ import { test, expect } from './fixtures';
 import { createOidcProvider } from './oidc-provider';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
-import { syntheticCanaries } from './access-fixtures';
+import { proxyApplicationAssets, syntheticCanaries } from './access-fixtures';
+let closeProxy: (() => void) | undefined;
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 let accountId: string; const origin = 'http://127.0.0.1:5499';
 let beforeCommit: (() => Promise<void>) | undefined;
@@ -18,13 +19,13 @@ test.beforeEach(async ({ page, baseURL }) => {
   const registration = { clientId: 'synthetic-recovery', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
   provider = await createOidcProvider({ clients: [registration] }); database = openDatabase(':memory:');
   app = await buildApp({ database, beforeCommit: () => beforeCommit?.() ?? Promise.resolve(), config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000', DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]' } });
-  app.get('/*', async (request, reply) => { const response = await fetch(baseURL! + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
+  closeProxy = proxyApplicationAssets(app, baseURL!);
   await app.listen({ host: '127.0.0.1', port: 5499 });
   await page.goto(origin); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   accountId = (await (await page.request.get(origin + '/api/session')).json()).accountId;
 });
-test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); await app?.close(); database?.close(); await provider?.close(); });
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); closeProxy?.(); closeProxy = undefined; await app?.close(); database?.close(); await provider?.close(); });
 async function board(page: Page) {
   const response = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' }, data: { title: 'Recovery canary', operationId: randomUUID() } });
   expect(response.status()).toBe(201); const result = await response.json();
@@ -59,11 +60,12 @@ test('@03-10-01 full redirect restores unacknowledged image hash and map text ex
   await expire(page); await page.unrouteAll({ behavior: 'ignoreErrors' });
   await page.clock.setFixedTime(new Date());
   await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
+  await expect(page.locator('affine-edgeless-root')).toHaveCount(1);
   await expect(page.locator('affine-edgeless-root')).toBeVisible();
   expect(await model(page)).toBe(before);
   const blob = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/blobs/' + encodeURIComponent(createHash('sha256').update(bytes).digest('base64url') + '='), { headers: { 'X-Dali-Account': accountId } });
   expect(blob.status()).toBe(200); expect(await blob.body()).toEqual(bytes);
-  await page.reload(); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect(await model(page)).toBe(before);
+  await page.reload(); await expect(page.locator('affine-edgeless-root')).toHaveCount(1); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect(await model(page)).toBe(before);
 });
 test('@03-10-01 interrupted acknowledgment replays idempotently against committed server bytes', async ({ page }) => {
   const descriptor = await board(page); let committed = 0;

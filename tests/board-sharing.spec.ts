@@ -1,3 +1,4 @@
+import { proxyApplicationAssets } from './access-fixtures';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { Page, Route } from '@playwright/test';
@@ -8,6 +9,7 @@ import { openDatabase, type AccountDatabase } from '../server/storage/database';
 
 // The production shell and application use an isolated real HTTP listener and
 // repository in this test process; every browser completes signed OIDC login.
+let closeProxy: (() => void) | undefined;
 let app: FastifyInstance; let database: AccountDatabase;
 let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 let accountId: string; let origin: string;
@@ -26,10 +28,7 @@ test.beforeEach(async ({ page, baseURL }) => {
     DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret,
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]',
     DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]' } });
-  app.get('/*', async (request, reply) => {
-    const response = await fetch(baseURL! + request.url);
-    return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer()));
-  });
+  closeProxy = proxyApplicationAssets(app, baseURL!);
   await app.listen({ host: '127.0.0.1', port: 5499 });
   const proxy = async (route: Route) => {
     const request = route.request(); const url = new URL(request.url());
@@ -61,7 +60,7 @@ test.beforeEach(async ({ page, baseURL }) => {
     .run('synthetic-other', provider.issuer, 'synthetic-other', 'other@example.org', 'other@example.org', 'Synthetic Other');
   await expect(page.getByRole('heading', { name: 'Create your first board' })).toBeVisible();
 });
-test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); await app?.close(); database?.close(); await provider?.close(); });
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); closeProxy?.(); closeProxy = undefined; await app?.close(); database?.close(); await provider?.close(); });
 function seed(title: string, options: { role?: 'owner' | 'editor' | 'viewer'; updatedAt?: number; pending?: boolean; foreign?: boolean; image?: Buffer } = {}) {
   const id = randomUUID(); const role = options.role ?? 'owner';
   database.prepare('INSERT INTO boards(id,owner_id,title,root_doc_id,content_doc_id,created_at,updated_at,revision) VALUES(?,?,?,?,?,?,?,1)')

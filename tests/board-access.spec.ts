@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
-import { syntheticCanaries } from './access-fixtures';
+import { acceptanceService, syntheticCanaries } from './access-fixtures';
 import { fileAction } from './app-menu';
 import type { Page } from '@playwright/test';
 
@@ -220,7 +220,11 @@ test('@03-03-01 private creates have independent IDs and idempotent operation re
 });
 
 test('@03-03-01 BOARD-01 empty creates server-confirmed default and named cards without local authority', async ({ page, context, baseURL }) => {
-  await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Viewer', exact: true }).click();
+  // Conformance suites grant this identity boards; empty-state acceptance needs
+  // its own repository while retaining the real signed provider and account UI.
+  const service = await acceptanceService(baseURL!);
+  try {
+  await page.goto(service.origin); await page.getByRole('link', { name: 'Synthetic Viewer', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Create your first board' })).toBeVisible();
   await page.getByRole('button', { name: 'New board', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Open Untitled board', exact: true })).toBeVisible();
@@ -232,15 +236,16 @@ test('@03-03-01 BOARD-01 empty creates server-confirmed default and named cards 
   await expectAcknowledgedJournal(page);
   await fileAction(page, 'All boards');
   await expect(page.getByRole('link', { name: 'Open Named synthetic board', exact: true })).toBeVisible();
-  const member = await (await context.request.get('/api/session')).json();
-  const headers = { 'X-Dali-Account': member.accountId, Origin: baseURL!, 'X-Dali-Request': '1' };
-  const before = await (await context.request.get('/api/boards', { headers })).json();
+  const member = await (await context.request.get(service.origin + '/api/session')).json();
+  const headers = { 'X-Dali-Account': member.accountId, Origin: service.origin, 'X-Dali-Request': '1' };
+  const before = await (await context.request.get(service.origin + '/api/boards', { headers })).json();
   await page.evaluate(() => localStorage.setItem('djai-design.active-board', 'remembered-foreign-target'));
   for (const target of ['missing-target', '']) {
-    await page.goto('/?board=' + target); await expect(page.getByRole('heading', { name: "You don't have access to this board" })).toBeVisible();
+    await page.goto(service.origin + '/?board=' + target); await expect(page.getByRole('heading', { name: "You don't have access to this board" })).toBeVisible();
     await expect(page.locator('[data-board-id]')).toHaveCount(0);
   }
-  expect(await (await context.request.get('/api/boards', { headers })).json()).toEqual(before);
+  expect(await (await context.request.get(service.origin + '/api/boards', { headers })).json()).toEqual(before);
+  } finally { await service.close(); }
 });
 
 test('@03-03-01 @03-06-01 D-05 D-13 foreign target and library conceal canary and preserve owner descriptor', async ({ page, context, browser, baseURL }) => {

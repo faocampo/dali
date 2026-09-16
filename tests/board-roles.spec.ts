@@ -8,10 +8,11 @@ import { test, expect } from './fixtures';
 import { createOidcProvider } from './oidc-provider';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
-import { syntheticCanaries } from './access-fixtures';
+import { proxyApplicationAssets, syntheticCanaries } from './access-fixtures';
 import { fileAction } from './app-menu';
 import { PDFDocument, PDFRawStream, PDFName, decodePDFRawStream } from 'pdf-lib';
 import { unzipSync, strFromU8 } from 'fflate';
+let closeProxy: (() => void) | undefined;
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 let accountId: string; const origin = 'http://127.0.0.1:5499';
 let ownerRequest: APIRequestContext | undefined; let ownerId: string;
@@ -20,13 +21,13 @@ test.beforeEach(async ({ page, baseURL }) => {
   const registration = { clientId: 'synthetic-actions', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
   provider = await createOidcProvider({ clients: [registration] }); database = openDatabase(':memory:');
   app = await buildApp({ database, config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000', DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]' } });
-  app.get('/*', async (request, reply) => { const response = await fetch(baseURL! + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
+  closeProxy = proxyApplicationAssets(app, baseURL!);
   await app.listen({ host: '127.0.0.1', port: 5499 });
   await page.goto(origin); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   accountId = (await (await page.request.get(origin + '/api/session')).json()).accountId;
 });
-test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); await ownerRequest?.dispose(); ownerRequest = undefined; await app?.close(); database?.close(); await provider?.close(); });
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); await ownerRequest?.dispose(); ownerRequest = undefined; closeProxy?.(); closeProxy = undefined; await app?.close(); database?.close(); await provider?.close(); });
 const headers = () => ({ Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' });
 async function create(page: Page, title = 'Synthetic actions') {
   const response = await page.request.post(origin + '/api/boards', { headers: headers(), data: { title, operationId: randomUUID() } }); expect(response.status()).toBe(201); return response.json();

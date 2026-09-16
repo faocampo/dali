@@ -3,6 +3,7 @@ import { deflateSync } from 'node:zlib';
 import { randomBytes } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import type { Duplex } from 'node:stream';
+import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../server/app.js';
 import { openDatabase } from '../server/storage/database.js';
 import { createOidcProvider } from './oidc-provider.js';
@@ -29,6 +30,14 @@ export async function acceptanceService(baseURL: string) {
     DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret,
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',
   } });
+  const closeProxy = proxyApplicationAssets(app, baseURL);
+  await app.listen({ host: '127.0.0.1', port: 5499 });
+  return { origin, database, provider, setBarrier(value?: () => Promise<void>) { barrier = value; },
+    async close() { closeProxy(); await app.close(); database.close(); await provider.close(); } };
+}
+
+/** Preserve both HTTP assets and dev HMR for each isolated synthetic service. */
+export function proxyApplicationAssets(app: FastifyInstance, baseURL: string) {
   app.get('/*', async (request, reply) => { const response = await fetch(baseURL + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
   // Dev assets retain Vite's HMR client. Forward its upgrade as well as HTTP
   // assets so the isolated origin exercises dev without hiding runtime errors.
@@ -57,9 +66,7 @@ export async function acceptanceService(baseURL: string) {
     });
     upstream.end();
   });
-  await app.listen({ host: '127.0.0.1', port: 5499 });
-  return { origin, database, provider, setBarrier(value?: () => Promise<void>) { barrier = value; },
-    async close() { for (const socket of upgradeSockets) socket.destroy(); await app.close(); database.close(); await provider.close(); } };
+  return () => { for (const socket of upgradeSockets) socket.destroy(); };
 }
 
 /** Every identity traverses the application's ordinary OIDC boundary in its own cookie jar. */
