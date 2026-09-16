@@ -5,10 +5,10 @@ current_phase_name: Okta and Board Access
 current_plan: Not started
 status: planning
 stopped_at: Phase 2 complete, ready to plan Phase 3
-last_updated: "2026-09-16T01:13:37.035Z"
+last_updated: "2026-09-16T01:15:39.703Z"
 last_activity: 2026-09-15
-last_activity_desc: Renamed header menu to Main Menu; static checks, build and menu tests passed
-state_head: 46d2b7d45bdf42de1ad12588d11051a946426d2b
+last_activity_desc: Made Shapes palette icon-only; static checks, build and palette tests passed
+state_head: 51f25426f6c1902c398903e6e1e262a005132701
 progress:
   total_phases: 13
   completed_phases: 2
@@ -32,7 +32,7 @@ Phase: 3 — Okta and Board Access
 Current Plan: Not started
 Total Plans in Phase: TBD
 Status: Ready to plan
-Last activity: 2026-09-15 — Renamed the header menu to Main Menu and updated its accessible name and test selectors. Static checks, production build and two menu tests passed. Phase 3 remains ready to plan.
+Last activity: 2026-09-15 — Made the Shapes palette a compact icon grid with accessible names, hover tooltips and matching keyboard navigation. Static checks, production build and two palette tests passed. Phase 3 remains ready to plan.
 
 Progress: [██░░░░░░░░] 15% (2/13 phases complete)
 
@@ -142,6 +142,7 @@ Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted
 | 260915-s9s | View menu grid styles, distances and object dimensions | 2026-09-15 | 4bdee55 | — | [260915-s9s-add-view-menu-grid-styles-object-dimensi](./quick/260915-s9s-add-view-menu-grid-styles-object-dimensi/) |
 | 260915-u2a | Refine Dalí branding, connector labels, selection panels and classical shapes | 2026-09-15 | d86078f | — | [260915-u2a-refine-dal-branding-connector-labels-sel](./quick/260915-u2a-refine-dal-branding-connector-labels-sel/) |
 | 11 | Rename header menu to Main Menu; typecheck, production build and two menu tests passed | 2026-09-15 | 46d2b7d | — | — |
+| 12 | Make Shapes palette icon-only with accessible names, tooltips and four-column keyboard navigation; static checks, build and two browser tests passed | 2026-09-15 | 51f2542 | — | — |
 
 Phase 2 was tested and approved on 2026-09-15. Canonical phase verification records the acceptance revision; subsequent quick tasks retain separate validation provenance. Quick task 260915-s9s passed 79 unit tests and 51 distinct browser/project cases across focused runs, with TypeScript checks and production build passing.
 
