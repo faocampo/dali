@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import * as Y from 'yjs';
 import { buildApp } from '../app.js';
 import { openDatabase, type AccountDatabase } from '../storage/database.js';
 import { createOidcProvider, IDENTITY_COOKIE } from '../../tests/oidc-provider.js';
+import { syntheticCanaries } from '../../tests/access-fixtures.js';
 
 describe('protected board resources', () => {
   let app: FastifyInstance; let database: AccountDatabase;
@@ -52,6 +53,19 @@ describe('protected board resources', () => {
     for (const role of ['editor', 'viewer']) database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, actors[role]!.accountId, role);
   });
   afterEach(async () => { await app?.close(); database?.close(); await provider?.close(); });
+  const blobKey = (data: Buffer) => createHash('sha256').update(data).digest('base64url');
+  const image = (method: 'GET' | 'PUT' | 'DELETE', key: string, actor = 'owner', b = board, payload?: Buffer, extra = {}) => app.inject({ method, url: `/api/boards/${b.summary.id}/blobs/${key}`, headers: { ...headers(actor), 'content-type': 'image/png', ...extra }, ...(payload ? { payload } : {}) });
+  it('@03-04-02 uploaded image owner reread preserves hash and cross-board keys confer no access', async () => {
+    const data = syntheticCanaries().imageBytes; const key = blobKey(data);
+    expect((await image('PUT', key, 'editor', board, data)).statusCode).toBe(200);
+    const response = await image('GET', key); expect(response.statusCode).toBe(200); expect(response.rawPayload).toEqual(data); expect(blobKey(response.rawPayload)).toBe(key);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    const deny = await image('GET', key, 'owner', foreign); expect(deny.statusCode).toBe(404); expect(deny.rawPayload.includes(data)).toBe(false);
+    expect((await image('GET', key)).rawPayload).toEqual(data);
+    expect((await image('PUT', key, 'nonMember', foreign, data)).statusCode).toBe(200);
+    expect((await image('GET', key, 'nonMember', foreign)).rawPayload).toEqual(data);
+    expect((await app.inject({ url: `/api/boards/${board.summary.id}/blobs`, headers: headers('viewer') })).json()).toEqual([key]);
+  });
 
   it('@03-04-01 editor update round-trips through reader pull and replay converges', async () => {
     const update = edit();
