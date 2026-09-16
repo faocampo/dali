@@ -1,0 +1,134 @@
+import { randomBytes, randomUUID, createHash } from 'node:crypto';
+import * as Y from 'yjs';
+import type { Page } from '@playwright/test';
+import type { GfxController } from '@blocksuite/affine/std/gfx';
+import type { MindmapElementModel } from '@blocksuite/affine/model';
+import { syntheticCanaries } from './access-fixtures';
+import type { FastifyInstance } from 'fastify';
+import { test, expect } from './fixtures';
+import { createOidcProvider } from './oidc-provider';
+import { buildApp } from '../server/app';
+import { openDatabase, type AccountDatabase } from '../server/storage/database';
+let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
+const origin = 'http://127.0.0.1:5499';
+let accountId: string;
+test.use({ expectErrors: ['the server responded with a status of 400', 'the server responded with a status of 401', 'the server responded with a status of 403', 'the server responded with a status of 404', 'the server responded with a status of 409', 'the server responded with a status of 503'] });
+test.beforeEach(async ({ page, baseURL }) => {
+  const registration = { clientId: 'synthetic-actions', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
+  provider = await createOidcProvider({ clients: [registration] }); database = openDatabase(':memory:');
+  app = await buildApp({ database, config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000', DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]' } });
+  app.get('/*', async (request, reply) => { const response = await fetch(baseURL! + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
+  await app.listen({ host: '127.0.0.1', port: 5499 });
+  await page.goto(origin); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  accountId = (await (await page.request.get(origin + '/api/session')).json()).accountId;
+});
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); await app?.close(); database?.close(); await provider?.close(); });
+test("@03-11-01 selected local copy entry requires deliberate selection", async ({ page }) => {
+  await expect(page.getByRole("button", { name: "Copy local boards", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Copy local boards", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Copy local boards" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy selected boards", exact: true })).toBeDisabled();
+});
+
+async function seedLocal(page: Page, titles = ['Legacy map canary', 'Unselected canary']) {
+  const response = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' }, data: { title: 'Fixture source', operationId: randomUUID() } });
+  const board = await response.json();
+  await page.goto(origin + '/?board=' + board.summary.id);
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
+  await page.keyboard.type('Root canary'); await page.keyboard.press('Enter');
+  await page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    const map = gfx.surface!.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel;
+    const branch = map.addNode(map.tree.id, undefined, 'after', { text: 'Branch canary' });
+    map.addNode(branch, undefined, 'after', { text: 'Hidden canary' });
+    map.addNode(map.tree.id, undefined, 'after', { text: 'Sibling canary' });
+    gfx.surface!.updateElement(branch, { fontSize: 27, fontWeight: '700', color: '#234567' });
+    map.toggleCollapse(map.getNode(branch)!, { layout: true }); gfx.doc.captureSync();
+  });
+  const image = syntheticCanaries().imageBytes;
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'canary.png', mimeType: 'image/png', buffer: image });
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect.poll(() => database.prepare('SELECT count(*) AS n FROM board_blobs WHERE board_id=?').get(board.summary.id)).toEqual({ n: 1 });
+  const content = (database.prepare('SELECT update_bytes FROM board_documents WHERE board_id=? AND doc_id=?').get(board.summary.id, board.contentDocId) as { update_bytes: Buffer }).update_bytes;
+  const ids = titles.map(() => randomUUID()); const root = new Y.Doc({ guid: 'djai-storyboard' });
+  const pages = new Y.Array(); root.getMap('meta').set('pages', pages);
+  pages.push(ids.map((id, i) => ({ id, title: titles[i], createDate: 1000 + i, updatedDate: 2000 + i, tags: [] })));
+  ids.forEach(id => root.getMap('spaces').set(id, new Y.Doc({ guid: id })));
+  const rows = [{ id: 'djai-storyboard', bytes: [...Y.encodeStateAsUpdate(root)] }, ...ids.map(id => ({ id, bytes: [...content] }))]; root.destroy();
+  const key = createHash('sha256').update(image).digest('base64url') + '=';
+  await page.goto(origin);
+  await page.evaluate(async ({ rows, image, key }) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => { const req = indexedDB.open('djai-storyboard', 1); req.onupgradeneeded = () => req.result.createObjectStore('collection', { keyPath: 'id' }); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
+    await new Promise<void>((resolve, reject) => { const tx = db.transaction('collection', 'readwrite'); rows.forEach(row => tx.objectStore('collection').put({ id: row.id, updates: [{ timestamp: 1000, update: new Uint8Array(row.bytes) }] })); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); db.close();
+    for (const [name, store, value] of [['djai-storyboard_blob', 'blob', new Uint8Array(image).buffer], ['djai-storyboard_blob_mime', 'blob_mime', 'image/png']] as const) {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => { const req = indexedDB.open(name, 1); req.onupgradeneeded = () => req.result.createObjectStore(store); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
+      await new Promise<void>((resolve, reject) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(value, key); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); }); db.close();
+    }
+    localStorage.setItem('djai-design.board-catalog.v1', JSON.stringify({}));
+  }, { rows, image: [...image], key });
+  database.prepare('DELETE FROM boards WHERE id=?').run(board.summary.id);
+  return { ids, key, image };
+}
+async function originalState(page: Page) {
+  return page.evaluate(async () => {
+    const result: unknown[] = [];
+    for (const name of ['djai-storyboard', 'djai-storyboard_blob', 'djai-storyboard_blob_mime']) {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => { const req = indexedDB.open(name); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
+      for (const store of db.objectStoreNames) {
+        const values = await new Promise<unknown[]>((resolve, reject) => { const req = db.transaction(store, 'readonly').objectStore(store).getAll(); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
+        result.push([name, store, JSON.stringify(values, (_key, value: unknown) => value instanceof ArrayBuffer ? [...new Uint8Array(value)] : value instanceof Uint8Array ? [...value] : value)]);
+      }
+      db.close();
+    }
+    return { result, catalog: localStorage.getItem('djai-design.board-catalog.v1') };
+  });
+}
+test('@03-11-01 selected map and image publish privately with unchanged original bytes and membership', async ({ page }) => {
+  const local = await seedLocal(page); const before = await originalState(page);
+  await expect(page.getByRole('button', { name: 'Copy local boards', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Copy local boards', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Copy local boards' });
+  await dialog.getByRole('checkbox', { name: 'Legacy map canary', exact: true }).check();
+  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
+  await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
+  const copies = database.prepare('SELECT * FROM boards').all() as { id: string; title: string; owner_id: string }[];
+  expect(copies).toHaveLength(1); expect(copies[0]).toMatchObject({ title: 'Legacy map canary', owner_id: accountId });
+  expect(database.prepare('SELECT * FROM board_grants').all()).toEqual([]); expect(database.prepare('SELECT * FROM pending_grants').all()).toEqual([]);
+  const blob = database.prepare('SELECT bytes FROM board_blobs WHERE board_id=?').get(copies[0]!.id) as { bytes: Buffer };
+  expect(blob.bytes).toEqual(local.image); expect(await originalState(page)).toEqual(before);
+  await dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true }).click();
+  await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  const model = await page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    const map = gfx.surface!.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel;
+    return { count: map.children.size, collapsed: [...map.children.values()].some(detail => detail.collapsed), text: JSON.stringify(gfx.doc.spaceDoc.toJSON()) };
+  });
+  expect(model.count).toBe(4); expect(model.collapsed).toBe(true);
+  for (const text of ['Root canary', 'Branch canary', 'Hidden canary', 'Sibling canary']) expect(model.text).toContain(text);
+  expect(await originalState(page)).toEqual(before);
+});
+
+for (const failure of ['upload', 'commit', 'missing-image'] as const) test(`@03-11-01 ${failure} retains originals and publishes only a complete reconciled copy`, async ({ page }) => {
+  const local = await seedLocal(page);
+  if (failure === 'missing-image') await page.evaluate(async key => {
+    const req = indexedDB.open('djai-storyboard_blob'); const db = await new Promise<IDBDatabase>(resolve => { req.onsuccess = () => resolve(req.result); });
+    await new Promise<void>(resolve => { const tx = db.transaction('blob', 'readwrite'); tx.objectStore('blob').delete(key); tx.oncomplete = () => resolve(); }); db.close();
+  }, local.key);
+  const before = await originalState(page); const attempts: string[] = [];
+  const routePattern = failure === 'upload' ? '**/api/imports/*/blobs/*' : '**/api/imports/*/commit';
+  if (failure !== 'missing-image') await page.route(routePattern, route => { attempts.push(route.request().url()); return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); });
+  await page.getByRole('button', { name: 'Copy local boards', exact: true }).click(); const dialog = page.getByRole('dialog');
+  await dialog.getByRole('checkbox', { name: 'Legacy map canary', exact: true }).check();
+  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
+  await expect(dialog.getByText('Failed', { exact: true })).toBeVisible();
+  expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
+  if (failure !== 'missing-image') {
+    await page.unroute(routePattern); await dialog.getByRole('button', { name: 'Retry failed copies', exact: true }).click();
+    await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
+    expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 1 });
+    expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(attempts).toHaveLength(1);
+    expect(await originalState(page)).toEqual(before);
+  }
+  await dialog.getByRole('button', { name: 'Close local copies', exact: true }).click(); expect(await originalState(page)).toEqual(before);
+});
