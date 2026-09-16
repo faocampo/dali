@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 5
+open_count: 6
 waived_count: 1
 fixed_count: 1
-total_count: 7
-last_updated: 2026-09-16T15:36:52.704Z
+total_count: 8
+last_updated: 2026-09-16T16:00:53.159Z
 ---
 
 # Broken Windows Ledger
@@ -22,6 +22,7 @@ last_updated: 2026-09-16T15:36:52.704Z
 | 5 | 02 | unrun-verify | tests/clipboard-route.ts |  | Firefox and WebKit native OS clipboard integration remains unverified; native serialized payload routing is simulated, while Chromium uses the real clipboard. | open |  | 2026-09-13T00:37:09.126Z |  |
 | 6 | 03 | deviation | server/preflight.test.ts | 13 | Task 03-01 dependency installation began after observed RED but before RED evidence gate and test commit; baseline assertion was independently replayed and verified before GREEN commit. | open |  | 2026-09-16T13:09:29.543Z |  |
 | 7 | 03 | stub | src/App.tsx | 28 | Authorized board transition awaits account canvas mounting in plan 03-06; permission is checked before displaying the canonical board title. | fixed |  | 2026-09-16T14:06:50.521Z | 2026-09-16T15:36:52.704Z |
+| 8 | 03 | unrun-verify | tests/board-sharing.spec.ts |  | Native 200% browser zoom for sharing remains plan 03-12 acceptance; automated 490px viewport geometry is covered. | open |  | 2026-09-16T16:00:53.159Z |  |
 
 ````json
 [
@@ -108,6 +109,18 @@ last_updated: 2026-09-16T15:36:52.704Z
     "reason": "",
     "recorded_at": "2026-09-16T14:06:50.521Z",
     "resolved_at": "2026-09-16T15:36:52.704Z"
+  },
+  {
+    "id": 8,
+    "kind": "unrun-verify",
+    "phase": "03",
+    "file": "tests/board-sharing.spec.ts",
+    "line": null,
+    "description": "Native 200% browser zoom for sharing remains plan 03-12 acceptance; automated 490px viewport geometry is covered.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-16T16:00:53.159Z",
+    "resolved_at": null
   }
 ]
 ````
