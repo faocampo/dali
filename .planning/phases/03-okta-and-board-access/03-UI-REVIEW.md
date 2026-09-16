@@ -1,5 +1,109 @@
 # Phase 3 — UI Review
 
+## Final scoped recheck — `f2769dc`
+
+**Audited:** 2026-09-16. **Current overall: 24/24. Open findings: 0 blockers, 0 warnings. All 13 original findings are resolved within this audit scope.** The 21/24 and initial 12/24 reviews below remain historical audit trails; this section supersedes their current-status language.
+
+HEAD was independently verified as `f2769dc`. The complete delta from `8320dd1` contains only `src/index.css` and `tests/accessibility-access.spec.ts`; no component, permission, operation or recovery logic changed. The iteration-2 appendix of [03-UI-FIX.md](03-UI-FIX.md) (residual fixes and exact-build measured evidence) was read. All ten fresh synthetic library/sharing/action/local-copy/recovery screenshots at 490px and 1404px under ignored `.gsd/acceptance-03-ui-fix-iteration2/` were inspected. No new defect was observed in this bounded recheck.
+
+| Pillar | Current score | Evidence |
+| --- | --- | --- |
+| Copywriting | 4/4 | Prior critical-copy resolutions retained; final delta changes no strings. |
+| Visuals | 4/4 | Ten fresh captures preserve hierarchy, aligned dialog regions and readable controls. |
+| Color | 4/4 | Library heading and rename-input outlines now use the specified accent; corrected ink and field boundaries retained. |
+| Typography | 4/4 | Roles/status use 13px/600; email/updated-time metadata retains 12px/400. |
+| Spacing | 4/4 | Neutral borders explicitly 1px; narrow/wide header gutters 16px/24px; prior dialog geometry and targets retained. |
+| Experience Design | 4/4 | Prior interaction resolutions retained; scoped CSS changes preserve visible focus and do not alter operation/recovery logic. |
+
+### Final residual verification
+
+- **UI-T1 resolved:** [index.css](../../../src/index.css#L1824) (separate identity and role styles, lines 1824–1825) uses first-of-type spans for email and subsequent spans for role/status. This matches the inspected sharing markup, where email is the first span and role/state follow it. Card metadata now receives 13px/600; updated-time `small` retains 12px/400. Fresh library and wide sharing captures show the corrected hierarchy. The measured oracle separately asserts actual owner/row role spans, email spans, card metadata and time text.
+- **UI-C2 resolved:** [index.css](../../../src/index.css#L1827) (scoped focus rules, lines 1827–1828) sets 2px solid `#b4451f` focus-visible outlines on library/session/root-route headings and board-action controls. Both fresh library and rename captures show accent focus, replacing native blue. The additional route selector is limited to the root route surface. Existing sharing/recovery outlines remain visible.
+- **UI-S1 resolved:** [index.css](../../../src/index.css#L1826) (neutral control borders) sets 1px solid `#76736e` on neutral sharing/action/local-copy buttons. The fresh captures show flat consistent borders. Lines 1840–1841 retain 24px header padding above 700px and override both horizontal sides to 16px at 700px and below. The narrow image aligns header/main gutters; desktop retains its wider header inset. Computed-border/gutter assertions cover 490px and 1404px; the exact 700px boundary is established by source rather than a separate screenshot.
+
+### Current disposition of all thirteen findings
+
+| Finding | Current disposition |
+| --- | --- |
+| UI-X1 — sharing pending/uncertain dismissal and reconciliation | Resolved at `8320dd1`; unchanged |
+| UI-W1 — consequential sharing copy | Resolved at `8320dd1`; unchanged |
+| UI-W2 — named irreversible delete/removal copy | Resolved at `8320dd1`; unchanged |
+| UI-W3 — honest uncertainty labels | Resolved at `8320dd1`; unchanged |
+| UI-V1 — sharing visual alignment | Resolved at `8320dd1`; retained in fresh captures |
+| UI-C1 — enabled card contrast | Resolved at `8320dd1`; retained |
+| UI-C2 — boundaries/destructive color/focus | Resolved; final focus correction verified |
+| UI-T1 — typography roles | Resolved; final role/status correction verified |
+| UI-S1 — spacing/borders/gutters | Resolved; final border/gutter correction verified |
+| UI-S2 — menu/import link targets | Resolved at `8320dd1`; unchanged |
+| UI-X2 — create opening and reserved-tab progress | Resolved at `8320dd1`; unchanged |
+| UI-X3 — errors/filter semantics | Resolved at `8320dd1`; unchanged |
+| UI-X4 — deliberate route focus | Resolved at `8320dd1`; final accent styling verified |
+
+**Top priority fixes:** none remaining in this audit. **Recommendation count:** 0 priority fixes, 0 minor recommendations. Registry gate remains inapplicable: no component registry configuration or assets changed.
+
+**Evidence limits retained:** the fixer reports both TypeScript checks and a fresh exact-build production measured suite **3/3 in 25.2s**; the earlier 3/3 run in 25.5s overlaps and is not added to this count. Source/screenshots were independently inspected; this auditor ran no tests, builds, listeners or captures and made no source edits or commits. The full **1507-case** matrix is owned by the acceptance executor and was running at this handoff; no final matrix pass is claimed. Actual-provider acceptance, native 200% browser zoom, OS IME, assistive-technology speech and genuine BFCache restoration remain unverified. A clean scoped UI audit does not close those separate gates.
+
+---
+
+## Historical re-audit — `8320dd1` — 21/24
+
+**Audited:** 2026-09-16. **Current overall: 21/24.** **Open: 0 blockers, 3 warnings.** Ten original findings are resolved; UI-C2, UI-T1 and UI-S1 retain the bounded residuals below. The initial **12/24** audit is preserved afterward as historical evidence and is superseded by this section.
+
+**Baseline:** [03-UI-SPEC.md](03-UI-SPEC.md) (approved typography, color, spacing and interaction clauses). **Source:** HEAD independently verified as `8320dd1`; all production changes in `7c8982c`, `b4877ce` and `8320dd1` were read. [03-UI-FIX.md](03-UI-FIX.md) (fixer's per-finding changes, RED/GREEN evidence and limitations) was read as attributed execution evidence.
+
+**Screenshots:** all ten supplied synthetic captures under ignored `.gsd/acceptance-03-ui-fix/` inspected: library, sharing, rename action, local-copy and recovery at 490px and 1404px. The desktop library now includes the account header, heading, creation controls, filters and grid. Local-copy screenshots depict the empty inventory, and action screenshots depict rename; additional states remain source/test-oracle reviewed. No capture, browser interaction, test, build, listener, source edit or commit was performed by this auditor.
+
+### Current pillar scores
+
+| Pillar | Score | Current evidence |
+| --- | --- | --- |
+| Copywriting | 4/4 | Consequential sharing/delete language, distinct success and unknown-outcome actions corrected. |
+| Visuals | 4/4 | Sharing header/body/footer alignment and explicit light border corrected; five surfaces retain clear hierarchy at both widths. |
+| Color | 3/4 | Enabled text and field borders corrected; native blue focus remains on newly focused headings and rename input. |
+| Typography | 3/4 | Four-size/two-weight surface rules implemented; role/status labels are incorrectly reduced to metadata styling. |
+| Spacing | 3/4 | Main dialog geometry, padding and targets corrected; native button border thickness and narrow header gutter still diverge. |
+| Experience Design | 4/4 | Source and targeted semantic oracles resolve pending/reconciliation dismissal, orphan rows, create navigation and focus findings. |
+
+### Top 3 remaining fixes
+
+1. **WARNING UI-T1 — role/status typography:** In [index.css](../../../src/index.css#L1824) (new typography overrides), `.share-owner > span`, `.share-row > span` and `.board-card__metadata` all receive `400 12px/1.5`. These include Owner/Editor/Viewer and Private/Shared/Active/Pending labels; the fresh library and sharing images visibly show the reduced hierarchy. The **Typography** contract specifies **Control / role label: 13px, 600, 1.5**, while **12px/400** is for metadata/updated time. Separate identity/email/updated-time metadata from role/status selectors, restoring role/status labels to 13px/600. Keep email system text and wrapping. Verify computed styles on actual role spans as well as button/heading samples; the measured test currently checks card buttons and dialog headings, not these role spans.
+2. **WARNING UI-C2 — focus accent:** `synthetic-action-490.png` and `synthetic-action-1404.png` show a native blue outline around Board name; `synthetic-library-490.png` shows blue focus around Your boards. The **Color** contract explicitly reserves `#b4451f` for keyboard focus, and **Spacing Scale** requires 2px focus outlines. This is a contract mismatch, not a preference against native focus. [index.css](../../../src/index.css#L1085) (library focus selector) excludes headings, and board-action dialog has no corresponding focus-visible rule; new surface rules at lines 1804–1838 do not cover these gaps. Add scoped 2px accent focus-visible styles for the newly focusable route headings and board-action controls, preserving visible focus. Existing sharing and recovery accent outlines remain correct. Enabled card-action ink and essential field-boundary contrast from the original finding are resolved.
+3. **WARNING UI-S1 — border thickness and narrow gutter:** The **Spacing Scale** clause explicitly says “Use 1px borders”; the final scoped button rule at [index.css](../../../src/index.css#L1816) (access control styling, lines 1816–1819) sets font/radius/padding/height but leaves native borders on neutral sharing/action/local-copy buttons. Fresh action and local-copy captures show the raised native borders; unlike primary buttons and dialog shells, these controls have no explicit 1px border rule. Normalize those neutral control borders to 1px and the appropriate token, then measure computed border widths. Separately, line 1836 unconditionally sets `.board-library__header` horizontal padding to **24px**, overriding the earlier narrow **16px** rule at line 1543. The **Responsive Layout, Keyboard and Focus** contract says **16px gutters at 700px and below**, and the narrow screenshot shows the header logo inset 24px versus the main content's 16px. Scope 24px to desktop and retain 16px below the contracted breakpoint. Dialog width/padding, zero inherited gap, 44px menu/import targets and arbitrary share/copy padding from the original finding are resolved.
+
+### All thirteen original findings reconciled
+
+| Finding | Current disposition | Evidence and practical limit |
+| --- | --- | --- |
+| UI-X1 | Resolved | Sharing lines 68–118 synchronously guard active requests, preserve original operation ID/method/path/body and hold Close/Escape while busy or uncertain; lines 159–162 retain a retry surface if another successful mutation removes the original grant row. Receipt 401/403/404/409 clears stale owner controls and aborts at lines 75–76. No cancellation-as-success path remains in the reviewed dismissal flow. |
+| UI-W1 | Resolved | Sharing lines 129–165 include owner/link explanation, exact member/Access labels, verified-account helper, pending/active success at 108, and spoken clipboard fallback. The exact critical copy assertions were inspected. |
+| UI-W2 | Resolved | BoardActionDialog line 37 names the board and states everyone/irreversibility; sharing line 163 distinguishes active/pending removal and Keep access. Safe initial-focus source remains present. |
+| UI-W3 | Resolved | Library lines 118–128 and sharing lines 112/145 expose the unconfirmed-outcome message and Check again while reusing the existing operation. Definitive validation failures can reset the request; uncertain failures retain it. |
+| UI-V1 | Resolved | CSS 1804–1812 establishes explicit 1px sharing shell border, zero panel gap and 24px insets; both sharing captures show aligned header/body/footer. |
+| UI-C1 | Resolved | CSS 1823 explicitly sets enabled card actions to `#1b1a18`; all four actions are visibly legible. The inspected measured oracle asserts enabled computed color rather than relying on the earlier sharing-only contrast sample. |
+| UI-C2 | Partially resolved | Essential fields now use `#76736e` and final destructive controls use `#b23b32`; residual native blue focus described above. |
+| UI-T1 | Partially resolved | Dialog body/headings, fields, card actions, Viewer title and header controls have explicit contracted roles; residual role/status spans described above. |
+| UI-S1 | Partially resolved | 458px/640px share/copy widths, 24px padding, 16px row spacing and 8px control radii are source-supported and visually consistent; remaining button-border/gutter values described above. |
+| UI-S2 | Resolved | CSS 1816–1819 sets menu links to 44px; line 1829 makes the imported-board link an inline-flex box. The existing import success link receives that rule without changing its runtime module. |
+| UI-X2 | Resolved | Library line 117 navigates to the acknowledged authorized board. Header lines 41–72 populate safe text-only progress in the gesture-reserved tab and retain a failure message; the source board and blocked-popup fallback remain. |
+| UI-X3 | Resolved | Stable error IDs connect inline title, dialog name, creation and grant/row controls. Library filter container now has the labeled group role. The source preserves drafts and existing alert regions. |
+| UI-X4 | Resolved | Library heading focuses on account entry only, skips explicit focusBoard, and does not depend on refresh/filter state. Auth state and denied/error headings focus on state transitions. Recovery focus restoration remains separately tied to authenticated recovery. |
+
+### Interaction and verification evidence
+
+- [ShareBoardDialog.tsx](../../../src/boards/ShareBoardDialog.tsx#L68) (mutation, receipt and dismissal lifecycle) was traced beyond button presence: active requests use a synchronous Set, uncertain requests retain their Map entry, same-key retries preserve original payload, unrelated rows remain operable, and removed-row pending entries retain reconciliation controls. Dismissal after terminal authorization loss intentionally invalidates inaccessible owner context. Successful reconciliation resumes ordinary dismissal and trigger focus. The reviewed server contract still performs actor/current-resource authorization before returning receipts.
+- [board-sharing.spec.ts](../../../tests/board-sharing.spec.ts) (sharing regression oracles) covers real committed POST/PATCH/DELETE with lost responses, Close/Escape attempts, exact receipts, one mutation, final grants, expired session, changed account, deleted board and unrelated-row removal. [accessibility-access.spec.ts](../../../tests/accessibility-access.spec.ts#L51) (measured layout and style oracle) now checks enabled card buttons, field colors, exact dialog geometry and headings. These targeted checks support resolved findings but omit the three remaining details above.
+- The fixer reports **14/14**, then expanded sharing **18/18**, and final complete measured suite **3/3**. Earlier **94/96**, **41/42**, and **29/30** runs were incomplete passes; failed assertions were subsequently corrected and rerun. This auditor neither sums overlapping runs nor claims a consolidated complete suite. The exclusive acceptance runner owns the final full gate at the new revision.
+- No new shadcn configuration or third-party registry assets were introduced, so the registry gate remains inapplicable. Existing screenshot ignore protections remain in effect.
+- Native browser 200% zoom, native OS IME, assistive-technology speech, genuine BFCache restoration and actual-provider acceptance remain **unverified**. Screenshot dimensions, synthetic composition events and source analysis do not establish them. These evidence limits do not themselves constitute implementation defects.
+
+**Current recommendation count:** 3 priority fixes, 0 additional findings, 0 blockers. Recheck these scoped styling residuals after correction and retain final acceptance as a separate gate.
+
+---
+
+## Historical initial audit — `033ecc0` — 12/24
+
+The following findings and counts describe the initial audit only. Their current dispositions are recorded above.
+
 **Audited:** 2026-09-16
 **Baseline:** [03-UI-SPEC.md](03-UI-SPEC.md) (approved access-interface contract, including Revision 1)
 **Source:** production UI `033ecc0`; test delta `1a55d14`; documentation HEAD `e8e4a71`. HEAD and an empty `git diff 033ecc0 -- src` were independently checked.

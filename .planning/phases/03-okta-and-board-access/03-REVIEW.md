@@ -1,12 +1,16 @@
 ---
 phase: 03-okta-and-board-access
-reviewed: 2026-09-16T21:07:13Z
+reviewed: 2026-09-16T22:03:02Z
 depth: standard
-source_head: 033ecc0dd40665a6abd593d838db2e2f82453868
+source_head: f2769dcea41a6bf610eb4a45f35cb563d5bcc9c1
+reviewed_ui_residual_delta_files: 2
+reviewed_ui_delta_files: 15
+reviewed_sharing_remediation_files: 2
+reviewed_shared_fixture_delta: 995ec47bc0439deacbb0eea4f7f6ae6dd3ecd4dd
 reviewed_acceptance_fixture_delta: 1a55d14dccb645ae2b095326f480dc089a245656
 reviewed_acceptance_fixture_files: 2
 reviewed_final_delta_files: 4
-resolved_total_findings: 8
+resolved_total_findings: 10
 remediation_base: 43bd9c5
 remediation_files_reread: 19
 resolved_prior_findings: 7
@@ -119,19 +123,86 @@ status: clean
 
 **Depth:** standard, with relevant cross-module call traces
 **Cumulative scope:** all 92 configured files
-**Implementation snapshot:** `033ecc0dd40665a6abd593d838db2e2f82453868`
+**Implementation snapshot:** `f2769dcea41a6bf610eb4a45f35cb563d5bcc9c1` (UI residual CSS/test correction; previous cumulative implementation and sharing remediation reviews retained)
 **Remediation rereview:** all 19 files changed in `43bd9c5..12a2184`, read in full, retaining the original complete phase review
 **Final delta:** three source/test files in `033ecc0` and the acceptance document in `7360be0`; checkpoint/tracking deltas reviewed as supporting context
-**Additional test-only review:** `1a55d14dccb645ae2b095326f480dc089a245656` (two files); production implementation remains `033ecc0`
-**Status:** clean — all seven original findings and follow-up CR-07 resolved; no open review findings
+**Additional test-only reviews:** `1a55d14` (two files) and `995ec47` (eight files); sharing source/test delta `7c8982c` (three files)
+**Status:** clean — all seven original findings and follow-up CR-07, CR-08 and CR-09 resolved; no open finding in the pinned scope
 
 ## Narrative Findings (AI reviewer)
 
-The eight original remediation commits address the six initial BLOCKER findings and separate test-reliability WARNING. Follow-up commit `033ecc0` resolves CR-07. Independent source review confirms the corrected contracts and their relevant consumers. No additional defect was proved in the final narrow delta. The clean status applies to this pinned code-review scope; final acceptance remains open.
+The eight original remediation commits address the six initial BLOCKER findings and separate test-reliability WARNING. Follow-up commit `033ecc0` resolves CR-07. Independent source review confirms the corrected contracts and their relevant consumers. The subsequent sharing delta `7c8982c` introduced two proved recovery-path defects. Independent rereview of both complete changed files in `b4877ce` confirms both are resolved as detailed below. No new defect was proved in this bounded remediation. Final acceptance remains open.
 
 This rereview used source and test-oracle inspection. The reviewer ran no tests, build, browser or listening service; the acceptance executor owns those processes. The supplied fix report records both typechecks, 102 unit tests, 110 server tests, production build and 86 affected Chromium cases passing. Those execution results remain attributed to the fix executor. For the final CR-07 correction, the parent additionally reports both typechecks and 6/6 production Chromium cases passing in 29.1s; the semantic assertions were independently inspected, with no reviewer rerun.
 
 Actual-provider registration and membership/claim-policy validation, native OS zoom, IME and assistive-technology acceptance remain **pending**. Full configured browser/access acceptance awaits final executor evidence. Phase 4 durability/deployment and Phase 5 live collaboration/20-user acceptance remain outside this review.
+
+
+
+
+## UI residual delta review at f2769dc
+
+Reviewed the two-file CSS/test delta against the previously read full files and their component markup. All 92 cumulative paths remain in scope, and all ten code-review findings remain resolved. **No new BLOCKER or WARNING was proved.**
+
+- `src/index.css:1824-1825` distinguishes first-span email metadata (12px/400) from subsequent role/status spans and card access metadata (13px/600). The selectors match the current ShareBoardDialog span ordering; retained missing-row reconciliation sections have no conflicting span layout.
+- Lines 1826-1828 add explicit 1px neutral borders to secondary dialog buttons and 2px accent focus outlines to route headings and board-action controls. Primary buttons retain their accent boundary. Existing target minima, focus lifecycle and modal behavior remain intact.
+- The media query at line 1841 restores 16px library-header inline gutters at widths up to 700px while preserving the 24px wider layout. It follows the desktop rule, so the responsive override wins.
+- `tests/accessibility-access.spec.ts` adds computed font, border, focus and responsive-padding assertions at both existing viewport widths. Existing overflow, target geometry, contrast, modal dimensions, focus restoration, IME nonmutation and recovery/history checks remain. Keyboard Tab followed by heading focus establishes keyboard-visible outline styling; it does not replace the separately reviewed initial route-focus assertions.
+- Execution remains fixer-attributed: both typechecks and the complete measured suite 3/3 in 25.2s. The independent UI auditor owns fresh screenshot evaluation. This reviewer ran no test, build, listener or browser operation.
+- The 1507-case full gate is pending executor evidence. Selection is not completion. No server, session, authorization or persistence implementation changed in this delta. Actual-provider/native acceptance remains pending; later committed corrections require a separate review.
+
+## Final UI package review at 8320dd1
+
+Read the approved `03-UI-SPEC.md`, baseline `03-UI-REVIEW.md`, all fifteen changed source/test files in full and relevant navigation/journal consumers. All paths already belong to the cumulative 92-file list; no new file or dropped scope. The uncommitted `03-UI-FIX.md` was read as an attributed execution report, while code conclusions use committed `8320dd1` exclusively.
+
+**Independent result:** No new BLOCKER or WARNING was proved in this delta. All ten previously recorded code-review findings remain resolved.
+
+- `src/boards/BoardLibrary.tsx:83-126` preserves the original create ID/title through uncertainty, validates the acknowledged account-bound summary and checks its lifetime before navigating to the encoded board ID. Uncertain outcomes retain disabled draft input and Check again; confirmed validation failures can correct the draft. The new regression checks the real committed private board, unchanged original POST payload, receipt identity, single operation and actual native editor destination.
+- `src/header/Header.tsx:41-65` writes progress/failure text through DOM textContent into the gesture-reserved blank tab. It checks the tab remains blank before changing that content, catches inaccessible user-navigated tabs and retains existing account/generation checks on completion. The held-response two-New test verifies progress before releasing the response, distinct private destinations and unchanged source bytes. Blocked-popup reconciliation assertions remain.
+- Route headings in `src/App.tsx`, `src/auth/AuthBoundary.tsx` and `src/boards/BoardLibrary.tsx` use explicit refs/tabIndex and transition effects. Library filter/refresh changes do not retrigger initial heading focus. Existing focusBoard completion and recovery-control restoration remain separate. Tests add focused auth-error/logout/changed-account/denied headings and verify filter/refresh retain their own focus.
+- `src/boards/BoardActionDialog.tsx:37-41` includes the named irreversible deletion warning and stable field/submit error descriptions. `src/header/BoardTitleMenu.tsx:30-40` connects inline rename errors while preserving draft, composition and acknowledgment handling. Library filter controls now have the specified group role.
+- `src/index.css:1803-1838` scopes dialog/body/control typography, neutral enabled card-action ink, field boundaries, destructive controls, dialog dimensions/insets and menu/import-link targets. Existing overflow containers, reduced-motion rules, card previews and canvas styles remain. Computed-style and geometry tests add actual action/font/border/dimension assertions and extend target selection to links. This source review does not independently establish screenshot appearance or every native accessibility condition.
+- The journal test change preserves the meaningful invariant: first-board journal empty before leaving; exactly two document snapshots for that first board after departure; exact retained records unchanged while the second board's work is acknowledged; no second-board records remaining. `suspendAccessScope` captures both complete documents and `preserveBeforeNavigation` awaits their preservation, explaining those retained departure records. The helper reads complete records despite its narrower TypeScript return annotation; equality therefore compares complete stored records. This does not blanket-allow pending work.
+- Other test edits adapt to the authorized auto-open workflow and add error associations, menu/import-link target sizes, safe deletion copy/color and Viewer title weight without removing source-integrity or role-denial assertions. No global error suppression or source authorization change was introduced.
+
+**Attributed execution evidence:** The fix report records 102/102 unit and 110/110 server tests; both final TypeScript checks; sharing 18/18 at `b4877ce`; and the final complete measured suite 3/3 in 23.5s. It explicitly records intermediate 94/96, 41/42 and 29/30 runs and their subsequent corrections. Its 114 distinct production cases span overlapping focused selections, not one consolidated pass. This reviewer inspected the semantic assertions but ran none of these commands. Ten synthetic captures were reported inspected by the fixer; this reviewer did not perform a separate screenshot audit.
+
+The complete final browser matrix remains owned by the acceptance executor and pending final evidence. Later fixture corrections or source commits need their own pinned delta review. Actual-provider, native 200% zoom, OS IME, assistive-technology speech and genuine BFCache restoration remain pending.
+
+## Resolved critical findings in sharing follow-up
+
+### CR-08: original BLOCKER — denied receipt reconciliation traps the sharing dialog — resolved
+
+**File:** `src/boards/ShareBoardDialog.tsx:73-78,109-116,124` at `7c8982c`.
+
+**Issue and code evidence:** Reconciliation treats every non-OK receipt response as a transient error and retains the operation. That retained entry disables Close and suppresses Escape. In contrast, ordinary load and mutation authorization failures invoke invalidation and close at lines 30 and 89. Server receipt handling reauthorizes grant operations against current grants capability (`server/boards/routes.ts:46-64`). Thus a missing board or denied current authority is terminal for this dialog, but its receipt path cannot leave uncertainty.
+
+**Reproduction:** Make a grant mutation commit while losing its response and failing its first receipt lookup. Delete the board through another authorized Owner session, then choose Check again in the stale dialog. Receipt authorization returns 404; the unresolved entry remains, and Close/Escape remain blocked. A simulated current-authority 403 follows the same defect. This reproduction requires no owner-transfer product feature. Global session handling covers 401 and identity-change 409 (`src/auth/session.ts:155-159`), but does not rescue 403/404.
+
+**Fix:** Handle terminal receipt authorization/resource failures through the same refresh/invalidation and close path as direct mutation denial, returning without resending the mutation. Preserve transient retry identity for transport/5xx failures. Add an uncertain-operation regression followed by actual board deletion (or injected denied capability), asserting dialog invalidation, protected-state removal and no second mutation.
+
+### CR-09: original BLOCKER — another row's refresh removes an unresolved deletion's recovery control — resolved
+
+**File:** `src/boards/ShareBoardDialog.tsx:102,114-116,146-156` at `7c8982c`.
+
+**Issue and code evidence:** Pending operations survive independently in a Map, but their Check again controls exist only inside the current `access.grants.map`. A successful operation on a different row calls `load()`, which replaces that list. When an unresolved DELETE has already committed, that refresh removes its row and its only receipt-recovery button. Its operation remains in the Map, keeping Close/Escape blocked. The retained removal confirmation also has both buttons disabled. Per-row isolation allows the second operation, and its PATCH uses its own grant revision (`server/boards/grants.ts:94-106`), so the first deletion does not prevent this interleaving.
+
+**Reproduction:** Start with grants A and B. Commit DELETE A, hide its mutation response and fail its first receipt lookup. Change B's role and save successfully. The authoritative refresh removes A; no A recovery control remains, while the dialog stays pending. This also occurs if B was already in flight and completes after A becomes uncertain.
+
+**Fix:** Render unresolved operation recovery independently of the authoritative grant list, retaining the original immutable operation identity and a readable target description. Alternatively reconcile all pending operations before removing their recovery UI. Do not discard an uncertain operation merely because a grant disappears. Add a two-row regression with lost DELETE A acknowledgment and successful PATCH B, then restore receipt lookup and verify A can reconcile, each mutation ran once with its original ID, server grants are exact, and Close/Escape become usable.
+
+**CR-08 closure evidence at `b4877ce`:** `src/boards/ShareBoardDialog.tsx:75-77` handles receipt 401/403/404/409 by clearing operation state, aborting the dialog lifetime and invoking parent refresh/close before throwing. The outer catch observes the aborted lifetime and cannot retry the mutation or restore stale error state. Concurrent requests share that lifetime; abort cancels them. Transient failures still retain their original operation for reconciliation. Tests at `tests/board-sharing.spec.ts:106-126` cause genuine server receipt responses after synthetic session expiry, account reassignment or database board deletion, and assert exact 401/409/404, removed dialog, a single POST and unchanged stored receipt/grants. The deletion is injected at the repository boundary; the test does not claim a second-session UI deletion. The identical 403 branch is source-verified.
+
+**CR-09 closure evidence at `b4877ce`:** The operation captures its recipient at creation (`src/boards/ShareBoardDialog.tsx:86`), and lines 159-162 render missing-row operations independently of the authoritative grants list. Each recovery button uses the retained method/path/body and the existing Map entry's ID, with per-key busy protection and an associated visible error. Filtering excludes currently rendered grant rows, avoiding duplicate recovery controls/description IDs. Successful reconciliation deletes only that operation and clears the removal confirmation through the existing completion path. The two-row test at `tests/board-sharing.spec.ts:128-147` commits DELETE A with lost acknowledgment, saves B, checks recovery remains reachable after B's authoritative Editor state appears, then reconciles A. It asserts Close enabled, exactly one DELETE, one stored operation and exact remaining B/editor grant state. Existing three-method tests retain original-ID, mutation-count and dismissal/focus assertions.
+
+**Independent conclusion:** Both control-flow defects are resolved. No introduced gap was proved in the narrow remediation. The reviewer performed source/oracle inspection only. The fixer reports both bugs RED before the change, both static checks passing and the complete 18/18 production sharing suite passing in 53.2s; execution remains attributed to that fixer.
+
+## Bounded sharing and shared-fixture review
+
+- Reviewed `7c8982c` sharing component and complete sharing tests, the accessibility locator delta, and receipt authorization, grant revision and global session consumers. Immutable operation method/path/body/ID survive retries; per-key active request guards prevent duplicate concurrent requests. Transient uncertainty preserves identity and blocks premature close. Approved pending-member, owner/link, success and clipboard-failure copy and associated error descriptions are present. No additional copy/ARIA defect was proved in this bounded delta.
+- Reviewed all eight file deltas in `995ec47`. The shared proxy extracts the previously reviewed HTTP/HMR behavior and six isolated suites install its socket cleanup before closing their servers. The empty-library case now uses its own real synthetic OIDC/database service and updates all requests to that origin; original empty/create/foreign-target/nonmutation assertions remain. Recovery waits for exactly one native root after authentication and reload while retaining exact model and image-byte comparisons. No fixture defect or weakened oracle was proved.
+- Parent-reported evidence: all three sharing methods demonstrated RED before correction; 14/14 production sharing cases passed in 47s with both typechecks. Fixture evidence is 107/108 dev followed by the corrected focused 4/4, not a complete full-matrix pass. These are executor-attributed results; that review found the two recovery gaps above, subsequently closed at `b4877ce`.
+- The review pins these commits. Concurrent UI fixer edits and subsequent commits require a separate delta review. No current working-tree change is treated as final acceptance evidence.
 
 ## Final follow-up finding resolved
 
@@ -212,10 +283,10 @@ The two-file test-only commit `1a55d14` was read in full and traced into the unc
 - The fix report's “requires human verification” label is role-mandated wording. Its automated semantic assertions directly address the original defects. Independent source review establishes corrected control flow/contracts, while execution results remain attributed to the fix executor. Neither establishes actual-provider or native OS acceptance.
 - Final delta `033ecc0` was reviewed in all three affected source/test files, retaining the full 92-file scope. The accepted `docs/access-acceptance.md` change from `7360be0` describes the implemented writable-board/private-copy archive flow, retry/reconciliation and private evidence handling.
 - The `7360be0` checkpoint and tracking changes correctly attribute 2/2 smoke, 102 unit, 110 server and 110 access results to `12a2184`. They explicitly record that the full browser matrix had **not started** at that handoff, distinguish 1452 selected cases from executed cases, and keep Plan 12, Phase 3 and actual-provider/native acceptance open. The launcher termination is not represented as a failed access suite or completed final gate. No inconsistency was found against the supplied gate facts.
-- The full suite is reported rerunning at the reviewed fixture delta with 1462 selected cases. Its final pass/fail/skip counts must be recorded against that run; the earlier checkpoint's 1452 count is historical.
-- At this inspection HEAD was `d65a469dd7caa80a8d9a2b0a87b8ed3d9ac10918`, whose only change after reviewed test commit `1a55d14` is the independently owned `03-SECURITY.md` report. Production source remains `033ecc0`; the two current fixture files match `1a55d14`. No further source/test delta awaited review. The security report's claims and subsequent final acceptance artifacts require their owners' evidence reconciliation.
+- The full suite previously selected 1462 cases. Its final pass/fail/skip counts must be recorded against the final executor run and implementation; neither selection nor focused passes establishes completion. The earlier checkpoint's 1452 count is historical.
+- The earlier inspection at `d65a469` included a security-report-only follow-up. This bounded review now pins fixture `995ec47`, sharing `7c8982c`, its remediation `b4877ce` and final UI package `8320dd1`; later UI changes, security report reconciliation and final acceptance artifacts remain assigned to their owners and require current evidence.
 - Untracked planning/operator and image assets remain outside the pinned source scope and were preserved.
 - This reviewer changed only this report and performed no implementation/test edits, commits or runtime validation during rereview.
 
 _Reviewer: gsd-code-reviewer_
-_Reviewed: 2026-09-16T21:07:13Z_
+_Reviewed: 2026-09-16T22:03:02Z_

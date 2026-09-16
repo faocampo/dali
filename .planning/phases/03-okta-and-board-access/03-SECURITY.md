@@ -8,7 +8,8 @@ threats_closed: 31
 asvs_level: 1
 block_on: high
 created: "2026-09-16"
-source_head: 033ecc0dd40665a6abd593d838db2e2f82453868
+source_head: 8320dd1eae58b28444237f464b8cb7a1d4d19156
+style_delta_head: f2769dc
 documentation_head: 23db4248aebcfdb98d6eb75ac5c24bfd83ec8d2b
 ---
 
@@ -98,3 +99,22 @@ The explicit thumbnail PUT endpoint flag in `03-06-SUMMARY.md` maps to T-03-05/0
 ## Post-audit fixture delta
 
 The independent code reviewer inspected test-only commit `1a55d14`, retaining the complete 92-file scope, and reported no findings. Development HMR WebSocket forwarding preserves protected routes and strict identity-context error collection. The exact handled stale-source console cancellation allowance applies only after injected revocation; pre-denial checks, no-pageerror assertions and protected UI/blob/canary-removal predicates remain. Production mitigation code is unchanged from `033ecc0`. The reported 16 focused development passes are attributed to the executor; the complete browser matrix remains pending. This delta does not change the 31 source-mitigation dispositions.
+
+## UI and navigation security delta
+
+The typed security auditor independently checked the full affected source through `8320dd1` and commits `995ec47`, `7c8982c`, `b4877ce` and `8320dd1`. All 31 dispositions remain CLOSED, with zero blocking or non-blocking open threats, no accepted risks and no new unregistered flags. Server authorization, session state, canvas scope/runtime, operation services, dependencies and five-project selection are unchanged from the original audit.
+
+| Threat | Current boundary evidence | Delta result |
+|---|---|---|
+| T-03-01 | `tests/access-fixtures.ts:21,40,72`; `server/app.ts:50` | Ordinary signed login retained; test-only asset proxy restricts upgrades to development HMR. |
+| T-03-03 | `src/auth/AuthBoundary.tsx:16,27,51` | Validated session and absolute expiry precede protected content; focus adds no identity bypass. |
+| T-03-12 | `src/App.tsx:63,76,77,81` | Expected account and generation authorization still precede runtime mount; denial and cleanup remove it. |
+| T-03-13 | `src/header/Header.tsx:41,54,67`; `src/boards/BoardLibrary.tsx:85` | Reserved tab uses safe textContent, cleared opener and distinct operation; completion is current-account/generation bound. Library opens only the acknowledged authorized destination. |
+| T-03-19 | `src/boards/ShareBoardDialog.tsx:68,73,91,117,159`; `BoardActionDialog.tsx:14,21,37` | Original operation payload/ID survives uncertainty and removed rows; safe focus and named confirmations retained. |
+| T-03-24 | `src/boards/ShareBoardDialog.tsx:24,75`; `src/auth/session.ts:107,132` | Terminal receipt denial clears stale owner state without mutation retry; existing restore/generation barriers retained. |
+| T-03-28 | `tests/access-fixtures.ts:23,69,79` | Synthetic fixtures, teardown and strict error collection retained; bounded 20-file added-line privacy scan found no examined private-data patterns. |
+| T-03-30 | `tests/board-sharing.spec.ts:76,108,128`; `board-access.spec.ts:26`; `board-library.spec.ts:76` | Exact original receipt, one mutation, current authorization, source isolation and recovery remain observable; 189-denial matrix and 30 application routes unchanged. |
+
+The remaining 23 threat implementations are unchanged and retain the source evidence above. No tests, builds, browsers or listeners were run by the auditor. The final full matrix and actual-provider/native acceptance remain separate gates. Historical raw pre-install provenance timing remains unverified; dependency files and the earlier 58-tarball integrity result are unchanged.
+
+Subsequent commit `f2769dc` changes only scoped styling and its measured test in `src/index.css` and `tests/accessibility-access.spec.ts`. Independent code and UI reviews inspected the full delta and found no open findings. It changes no identity, permission, operation, recovery or network logic; the 31 mitigation dispositions remain applicable.
