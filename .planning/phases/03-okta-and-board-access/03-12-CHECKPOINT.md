@@ -2,15 +2,41 @@
 phase: 03-okta-and-board-access
 plan: "12"
 status: incomplete
-automated_task: pending-review-remediation-and-final-browser-gate
+automated_task: pending-ui-remediation-and-full-browser-gate
 actual_provider: not-run-human-needed
 ---
 
 # Phase 3 Plan 12 acceptance checkpoint
 
-This record is an incomplete automated handoff. Plan 12 and Phase 3 remain open, including task 03-12-01. The seven original review findings were remediated through `12a2184`; independent rereview subsequently identified an enabled Viewer File → Import board action whose writable-only listener cannot run. The orchestrator requested another pause after the successful access rerun so that this narrow menu issue can be corrected before the full browser matrix. The operator-controlled identity environment has not been supplied or accepted; no operator acceptance is requested at this stage.
+This record is an incomplete automated handoff. Plan 12 and Phase 3 remain open, including task 03-12-01. All eight code-review findings were corrected through `033ecc0`; subsequent independent code and security reviews are recorded separately. The full browser matrix has now started twice and exposed dev-fixture compatibility failures. Test-only corrections are committed through `995ec47`. The orchestrator requested a pause for the 13 findings in the independent UI audit before restarting the full gate. The operator-controlled identity environment has not been supplied or accepted; no operator acceptance is requested at this stage.
 
 ## Current continuation evidence
+
+The seven-command gate ran sequentially on synthetic services. Implementation remained at `033ecc0`; fixture correction `1a55d14` preceded the second run. Both runs reached the full browser command. Selection is **1462 tests in 44 files**: dev 342, production Chromium 336, Firefox 336, WebKit 336, access 112. Unexecuted cases are recorded explicitly below; selection is not execution evidence.
+
+| Scope | At `033ecc0` | At fixture revision `1a55d14` |
+| --- | --- | --- |
+| Both typechecks | Passed | Passed |
+| Exact production two-case smoke | 2 passed, 25.6s | 2 passed, 24.1s |
+| Unit suite | 102 passed, 11 files, 1.08s | 102 passed, 11 files, 1.04s |
+| Server suite | 110 passed, 7 files, 6.51s | 110 passed, 7 files, 6.75s |
+| Production build | Passed, 8.24s | Passed, 8.66s |
+| Access project | 112 passed, 3.8m | 112 passed, 3.8m |
+| Full 1462-case matrix | Interrupted after 50 completed dev cases: 24 passed, 26 failed; 1412 unrun | Interrupted after 75 completed dev cases: 31 passed, 44 failed; 1387 unrun |
+
+Neither interrupted matrix is a passing gate. Runtime output and error contexts were retained outside public history. All completed access/smoke runs had zero skips; no required case was excluded from the configured full matrix. Existing build warnings remain.
+
+### Proven fixture corrections
+
+- `1a55d14`: the isolated final-acceptance HTTP proxy omitted Vite's HMR upgrade. Dev collectors reported WebSocket handshake HTTP 200. The fixture now forwards the real upgrade and cleans up sockets; collectors remain active. A separate injected image-revocation case caught the native image component's handled `Account source is stale` cancellation. The test checks no such error before injection, bounds any occurrence to the revoked phase, rejects unhandled page errors and retains zero protected editor/blob/title oracles. Focused dev evidence: initial 15 passed / 1 cancellation-expectation failure in 40.6s, then 16 passed in 41.0s.
+- `995ec47`: six older suites had independent HTTP-only proxies with the same HMR defect. All now share `proxyApplicationAssets` and explicit socket cleanup. The empty-library case uses a fresh synthetic repository because the preceding dev-only account-workspace conformance suite grants the Viewer a board. Its empty state, create/reopen, denied-target and unchanged-authoritative-library assertions remain intact.
+- The 108-case affected dev run passed 107 and failed one recovery readiness assertion in 3.4m. Native root mounting briefly exposed two roots during opening; an exact singleton wait now precedes visibility after both authentication and reload. The first four-case retry passed three and found the same transition at the later reload (25.1s); the final adjacent recovery rerun passed all four in 24.3s, retaining exact native model and image hash/bytes. This is focused recovery evidence, not a new 108-case or full-matrix pass.
+
+Both typechecks passed again before `995ec47`. No production, project-selection, schema or dependency file changed in these fixture commits; no oracle was removed. The shared-proxy mechanism uses the Node.js [HTTP upgrade contract](https://nodejs.org/api/http.html#event-upgrade) (raw upgraded socket handling). The handled cancellation trace was confirmed in the installed native image component's `refreshData(...).catch(console.error)` path.
+
+Current synthetic 490px and 1404px recovery/library/sharing screenshots are retained in ignored `.gsd/acceptance-03-12/current-dev/`. The implementation is unchanged since those captures; forthcoming UI changes require refreshed screenshots. All synthetic listeners were stopped before the exclusive slot was released. Task 03-12-01 remains incomplete; finish the UI remediation and then execute the exact smoke and entire seven-command gate from the new revision. Actual-provider and native evidence gaps below remain unchanged.
+
+## Earlier continuation at `12a2184`
 
 All results in this section were executed at implementation/test revision `12a2184` using fresh synthetic services. No source or test files changed in this continuation. The operator checklist now documents editable ZIP restoration through the authenticated private-copy flow.
 
@@ -133,8 +159,10 @@ Descriptor-less prohibitions remain **flagged-unverified** where the workflow ha
 
 ## Handoff and self-check
 
-The browser/build slot was released after the current 110-case access suite completed. Current automatic task completion is 0/1; plan completion remains 0/2 because the automated task still requires the Viewer Import correction and full matrix, followed by the actual-provider checkpoint. Overall tracking remains 2/13 phases and 25/26 plans complete.
+The browser/build slot was released after the current fixture corrections and focused dev recovery checks. Current automatic task completion is 0/1; plan completion remains 0/2 because the automated task still requires UI remediation and the complete matrix, followed by the actual-provider checkpoint. Overall tracking remains 2/13 phases and 25/26 plans complete.
 
 All named implementation/test/checklist files and six task commits were verified present. No tracked files were deleted. Unrelated assets and milestone lock were preserved. Independent review findings take precedence over earlier passing focused tests; a passing subset cannot close the final acceptance task.
 
 Continuation self-check: current implementation commit, both exact smoke cases, all 110 access case results and all six refreshed screenshots were verified present. No implementation/test mutation or required skip was introduced. Parent-owned review artifacts remain untouched.
+
+Latest continuation self-check: `1a55d14` and `995ec47`, the exact smoke and 112-case access logs, both interrupted matrix logs, focused dev results and six current-dev screenshots were verified present. No tracked files were deleted. Parent-owned audit artifacts were preserved. The previously quoted 110-case self-check remains historical.

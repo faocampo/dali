@@ -132,7 +132,7 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
 
-**Plans**: 11/12 executed; plan 03-12 remains incomplete. Its receipt authorization/accessibility fixes, exact two-case smoke and 100-case access suite are recorded in the checkpoint. Independent review remediation precedes the unrun full browser matrix. Native 200% zoom, native OS/assistive-technology observations and actual-provider acceptance remain final-phase obligations.
+**Plans**: 11/12 executed; plan 03-12 remains incomplete. The exact two-case smoke and 112-case access suite passed; two interrupted full-matrix attempts exposed dev fixture issues corrected through 995ec47 with focused evidence. Independent UI remediation precedes a fresh complete 1462-case browser matrix. Native 200% zoom, native OS/assistive-technology observations and actual-provider acceptance remain final-phase obligations. See the checkpoint for exact results and unrun counts.
 
 Plans:
 **Wave 1**

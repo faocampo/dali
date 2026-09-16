@@ -4,10 +4,10 @@ current_phase: 03
 current_phase_name: Okta and Board Access
 current_plan: 12
 status: executing
-stopped_at: Plan 03-12 access suite passed 110 cases; Viewer Import correction and full browser gate pending
-last_updated: "2026-09-16T20:39:04.000Z"
+stopped_at: Plan 03-12 fixture corrections verified; UI remediation and full browser gate pending
+last_updated: "2026-09-16T21:22:00.908Z"
 last_activity: 2026-09-16
-last_activity_desc: Plan 03-12 continuation passed 110 access cases; Viewer Import correction and 1452-case browser matrix pending
+last_activity_desc: Plan 03-12 passed 112 access cases; dev fixture corrections verified, UI remediation and full 1462-case matrix pending
 progress:
   total_phases: 13
   completed_phases: 2
@@ -30,8 +30,8 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-15).
 Phase: 03 (Okta and Board Access) — EXECUTING
 Current Plan: 12
 Total Plans in Phase: 12
-Status: Executing — plan 03-12 incomplete; review remediation then full final gate
-Last activity: 2026-09-16 — At implementation revision 12a2184, exact two-case smoke passed in 25.5s and 110 access cases passed in 3.7m. Both typechecks, production build, 102 unit tests and 110 server tests passed. Independent rereview found an inert Viewer Import menu action; the orchestrator held the full 1452-case browser matrix for its correction. Native 200% zoom, native OS/assistive-technology details and actual-provider acceptance remain final-phase obligations. See 03-12-CHECKPOINT.md for exact evidence and limits.
+Status: Executing — plan 03-12 incomplete; UI remediation then full final gate
+Last activity: 2026-09-16 — Implementation 033ecc0 passed the exact smoke, both typechecks, production build, 102 unit, 110 server and 112 access tests. Full 1462-case browser runs exposed dev HMR proxy, shared fixture state and recovery-readiness issues; test-only corrections are committed through 995ec47 with focused evidence. Neither interrupted matrix passed. Independent UI findings require remediation before the final gate restarts. Native 200% zoom, native OS/assistive-technology details and actual-provider acceptance remain final-phase obligations. See 03-12-CHECKPOINT.md for exact counts and limits.
 
 Progress: [██░░░░░░░░] 15% (2/13 phases complete; 25/26 plans complete)
 
@@ -123,7 +123,7 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ### Pending Todos
 
-- Correct the Viewer Import menu action, then complete the full plan 03-12 browser matrix and independent final audits. Plans 03-01 through 03-11 are complete. Actual-provider acceptance remains pending; shared requirements remain open. Retain dormant seeds and recorded earlier TDD process deviations in WINDOWS.md.
+- Resolve the independent UI findings, then complete the full plan 03-12 browser matrix and final audits. Plans 03-01 through 03-11 are complete. Actual-provider acceptance remains pending; shared requirements remain open. Retain dormant seeds and recorded earlier TDD process deviations in WINDOWS.md.
 
 ### Blockers/Concerns
 
@@ -139,10 +139,10 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ## Session Continuity
 
-Last session: 2026-09-16T20:39:04.000Z
-Stopped at: Plan 03-12 access suite passed 110 cases; Viewer Import correction and full browser gate pending
+Last session: 2026-09-16T21:22:00.842Z
+Stopped at: Plan 03-12 fixture corrections verified; UI remediation and full browser gate pending
 Resume file: .planning/phases/03-okta-and-board-access/03-12-CHECKPOINT.md
-Next action: $gsd-execute-phase 3 — correct the Viewer Import menu action, then complete plan 03-12 automatic verification and actual-provider acceptance.
+Next action: $gsd-execute-phase 3 — resolve UI findings, then complete plan 03-12 automatic verification and actual-provider acceptance.
 
 ## Phase 1 verification outcome
 

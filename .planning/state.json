@@ -71,8 +71,8 @@
   ],
   "next": {
     "command": "$gsd-execute-phase 3",
-    "label": "Correct Viewer Import menu, then complete plan 03-12 final gate",
-    "reason": "Plan 03-12 access suite passed 110 cases; 1452-case browser matrix held for Viewer Import correction; 2/13 phases accepted and 25/26 plans complete; actual-provider acceptance pending"
+    "label": "Resolve UI findings, then complete plan 03-12 final gate",
+    "reason": "112 access cases passed; interrupted 1462-case matrix exposed corrected dev fixtures; UI remediation and complete matrix pending; 2/13 phases accepted and 25/26 plans complete; actual-provider pending"
   },
-  "updated_at": "2026-09-16T20:39:04.000Z"
+  "updated_at": "2026-09-16T21:22:01.636696+00:00"
 }
