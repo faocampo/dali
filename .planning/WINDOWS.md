@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 7
+open_count: 8
 waived_count: 1
 fixed_count: 1
-total_count: 9
-last_updated: 2026-09-16T17:51:23.432Z
+total_count: 10
+last_updated: 2026-09-16T19:01:59.856Z
 ---
 
 # Broken Windows Ledger
@@ -24,6 +24,7 @@ last_updated: 2026-09-16T17:51:23.432Z
 | 7 | 03 | stub | src/App.tsx | 28 | Authorized board transition awaits account canvas mounting in plan 03-06; permission is checked before displaying the canonical board title. | fixed |  | 2026-09-16T14:06:50.521Z | 2026-09-16T15:36:52.704Z |
 | 8 | 03 | unrun-verify | tests/board-sharing.spec.ts |  | Native 200% browser zoom for sharing remains plan 03-12 acceptance; automated 490px viewport geometry is covered. | open |  | 2026-09-16T16:00:53.159Z |  |
 | 9 | 03 | unrun-verify | tests/session-recovery.spec.ts |  | Native 200% browser zoom and actual OS IME or screen-reader speech for recovery remain plan 03-12 acceptance; automated 490px geometry, keyboard focus, constructed composition and reduced motion are covered. | open |  | 2026-09-16T17:51:23.432Z |  |
+| 10 | 03 | unrun-verify | tests/local-board-import.spec.ts |  | Native 200% browser zoom and assistive-technology speech for local copy remain plan 03-12 acceptance; automated 490px geometry, keyboard focus and reduced motion passed. | open |  | 2026-09-16T19:01:59.856Z |  |
 
 ````json
 [
@@ -133,6 +134,18 @@ last_updated: 2026-09-16T17:51:23.432Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-16T17:51:23.432Z",
+    "resolved_at": null
+  },
+  {
+    "id": 10,
+    "kind": "unrun-verify",
+    "phase": "03",
+    "file": "tests/local-board-import.spec.ts",
+    "line": null,
+    "description": "Native 200% browser zoom and assistive-technology speech for local copy remain plan 03-12 acceptance; automated 490px geometry, keyboard focus and reduced motion passed.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-16T19:01:59.856Z",
     "resolved_at": null
   }
 ]
