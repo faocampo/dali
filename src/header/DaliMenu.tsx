@@ -70,7 +70,8 @@ export function DaliMenu({ onOpenBoards, onExport, onNewBoard, role, onBoardActi
         {category === 'File' && <>
           <a role="menuitem" tabIndex={-1} href={newBoardUrl()} target="_blank" rel="noopener noreferrer" onClick={event => { if (onNewBoard) { event.preventDefault(); onNewBoard(); } close(); }}><MenuIcon name="new" /><span className="dali-menu-label">New</span></a>
           <button role="menuitem" tabIndex={-1} disabled={!onOpenBoards} onClick={() => run(() => onOpenBoards?.())}><MenuIcon name="boards" /><span className="dali-menu-label">All boards</span></button>
-          <button role="menuitem" tabIndex={-1} onClick={() => command('import')}><MenuIcon name="import" /><span className="dali-menu-label">Import board</span></button>
+          <button role="menuitem" tabIndex={-1} disabled={role === 'viewer'} aria-describedby={role === 'viewer' ? 'viewer-import-reason' : undefined} onClick={() => command('import')}><MenuIcon name="import" /><span className="dali-menu-label">Import board</span></button>
+          {role === 'viewer' && <p id="viewer-import-reason">Board import requires Owner or Editor access.</p>}
           {onBoardAction && role !== 'viewer' && <><button role="menuitem" tabIndex={-1} onClick={() => run(() => onBoardAction('rename'))}>Rename board</button><button role="menuitem" tabIndex={-1} onClick={() => run(() => onBoardAction('duplicate'))}>Duplicate board</button></>}
           {onBoardAction && role === 'owner' && <button role="menuitem" tabIndex={-1} onClick={() => run(() => onBoardAction('delete'))}>Delete board</button>}
           <button role="menuitem" tabIndex={-1} onClick={() => run(onExport)}><MenuIcon name="export" /><span className="dali-menu-label">Export board</span></button>

@@ -45,14 +45,25 @@ test('@CR-01 rejected malformed root still opens in the native account editor', 
   await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Reopen canary');
   expect(sourceState(board.summary.id)).toEqual(before);
 });
-test('@CR-02 editable download restores a private copy through the file picker', async ({ page }) => {
+for (const sourceRole of ['owner', 'editor']) test(`@CR-02 @CR-07 ${sourceRole} editable download restores a private copy through the file picker`, async ({ page }) => {
   const board = await create(page, 'Archive canary'); await page.goto(origin + '/?board=' + board.summary.id);
   await expect(page.locator('affine-edgeless-root')).toBeVisible();
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Archive topic'); await page.keyboard.press('Escape');
   await page.locator('affine-edgeless-root').evaluate(el => { const surface = (el as HTMLElement & { gfx: GfxController }).gfx.surface!; const map = surface.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel; map.addNode(map.tree.id, undefined, 'after', { text: 'Archive child' }); });
   const image = syntheticCanaries().imageBytes;
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: image });
+  await expect.poll(async () => {
+    const response = await page.request.get(`${origin}/api/boards/${board.summary.id}/editable-export`, { headers: { 'X-Dali-Account': accountId } });
+    return response.ok() ? (await response.json()).manifest.length : 0;
+  }).toBe(1);
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  if (sourceRole === 'editor') {
+    await page.context().clearCookies(); await page.goto(origin + '/auth/start'); await page.getByRole('link', { name: 'Synthetic Editor', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+    accountId = (await (await page.request.get(origin + '/api/session')).json()).accountId;
+    database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, accountId, 'editor');
+    await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  }
   const native = () => page.locator('affine-edgeless-root').evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx; const map = gfx.surface!.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel;
     const text = (id?: string) => id ? (gfx.surface!.getElementById(id) as ShapeElementModel).text?.toString() : null;

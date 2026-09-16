@@ -51,6 +51,25 @@ async function ownerRead(id: string) {
   const response = await ownerRequest!.get(origin + '/api/boards/' + id + '/editable-export', { headers: { 'X-Dali-Account': ownerId } });
   expect(response.status()).toBe(200); return response.json();
 }
+test('@CR-07 Viewer import is disabled with an accessible reason and keyboard navigation preserves source', async ({ page }) => {
+  const board = await create(page, 'Viewer import canary'); await page.goto(origin + '/?board=' + board.summary.id);
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Protected import source'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await role(page, board.summary.id, 'viewer'); const before = await localState(page); const server = await ownerRead(board.summary.id);
+  let choosers = 0; let imports = 0; page.on('filechooser', () => { choosers++; }); page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/imports')) imports++; });
+  await page.getByRole('button', { name: 'Main Menu', exact: true }).focus(); await page.keyboard.press('Enter');
+  await expect(page.getByRole('menuitem', { name: 'File', exact: true })).toBeFocused(); await page.keyboard.press('ArrowRight');
+  const item = page.getByRole('menuitem', { name: 'Import board', exact: true });
+  await expect(item).toBeDisabled(); await expect(item).toHaveAccessibleDescription('Board import requires Owner or Editor access.');
+  await expect(page.getByText('Board import requires Owner or Editor access.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeFocused(); await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: 'All boards', exact: true })).toBeFocused(); await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: 'Export board', exact: true })).toBeFocused(); await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('menuitem', { name: 'All boards', exact: true })).toBeFocused();
+  await item.evaluate(element => (element as HTMLButtonElement).click());
+  await expect(item).toBeVisible(); expect(choosers).toBe(0); expect(imports).toBe(0);
+  await expect(page.getByRole('dialog', { name: 'Import board', exact: true })).toHaveCount(0);
+  expect(await localState(page)).toEqual(before); expect(await ownerRead(board.summary.id)).toEqual(server);
+});
 test('@CR-06 immediate rename updates all download names and decoded archive metadata', async ({ page }) => {
   const board = await create(page, 'Synthetic old'); await page.goto(origin + '/?board=' + board.summary.id);
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Rename export canary'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
