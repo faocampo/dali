@@ -152,12 +152,18 @@ for (const width of [390, 1280]) test(`View menu and Grid submenu fit a ${width}
   await page.goto('/');
   await openView(page);
   for (const grid of [false, true]) {
-    if (grid) await page.getByRole('menuitem', { name: 'Grid', exact: true }).click();
+    if (grid) {
+      const item = page.getByRole('menuitem', { name: 'Grid', exact: true });
+      expect(await item.evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
+      await item.click();
+    }
     const bounds = (await page.locator('.dali-menu-popup').boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
     await expect(page.getByRole(grid ? 'menuitemradio' : 'menuitemcheckbox', { name: grid ? '80 px' : 'Object dimensions', exact: true })).toBeInViewport();
     if (test.info().project.name === 'prod') await page.screenshot({ path: test.info().outputPath(`view-${width}-${grid ? 'grid' : 'menu'}.png`) });
   }
+  await page.getByRole('menuitemradio', { name: 'Lines', exact: true }).click();
+  await expect(root(page)).toHaveAttribute('data-grid-style', 'lines');
 });
 
 test('malformed or unavailable preference storage preserves working session controls', async ({ page }) => {
