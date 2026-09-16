@@ -1623,6 +1623,8 @@ djai-image-visual-edit {
 .drawing-palette h2 { font-size: 15px; margin: 0 0 12px; }
 .drawing-palette-options { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .drawing-palette-options button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 76px; padding: 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+.drawing-palette-options--shapes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.drawing-palette-options--shapes button { min-height: 48px; }
 .drawing-palette-options button:hover { background: #f0ebfa; }
 .drawing-palette-options button:focus-visible { outline: 2px solid #6841ae; outline-offset: -2px; background: #f0ebfa; }
 .drawing-palette p { font-size: 12px; line-height: 1.5; color: #625d55; margin: 12px 0 0; }

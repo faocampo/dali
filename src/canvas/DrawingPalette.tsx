@@ -55,13 +55,14 @@ export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost;
         event.preventDefault();
         const buttons = Array.from(popup.current?.querySelectorAll<HTMLButtonElement>('button') ?? []);
         const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-        const offset = event.key === 'ArrowDown' ? 2 : event.key === 'ArrowUp' ? -2 : event.key === 'ArrowLeft' ? -1 : 1;
+        const columns = kind === 'Shapes' ? 4 : 2;
+        const offset = event.key === 'ArrowDown' ? columns : event.key === 'ArrowUp' ? -columns : event.key === 'ArrowLeft' ? -1 : 1;
         buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + offset + buttons.length) % buttons.length]?.focus();
       }
     }}>
       <h2>{kind}</h2>
-      <div className="drawing-palette-options">
-        {kind === 'Shapes' ? shapes.map(item => <button key={item.name} onClick={() => pick(() => item.shape.startsWith('dali:') ? gfx.tool.setTool(ClassicalShapeTool, { shapeName: ShapeType.Rect, geometry: item.shape }) : gfx.tool.setTool(ShapeTool, { shapeName: item.shape as ShapeName }))}><Glyph path={item.path} /><span>{item.name}</span></button>) : modes.flatMap(item => [false, true].map(arrow => <button key={`${item.name}-${arrow}`} onClick={() => pick(() => {
+      <div className={`drawing-palette-options${kind === 'Shapes' ? ' drawing-palette-options--shapes' : ''}`}>
+        {kind === 'Shapes' ? shapes.map(item => <button key={item.name} aria-label={item.name} title={item.name} onClick={() => pick(() => item.shape.startsWith('dali:') ? gfx.tool.setTool(ClassicalShapeTool, { shapeName: ShapeType.Rect, geometry: item.shape }) : gfx.tool.setTool(ShapeTool, { shapeName: item.shape as ShapeName }))}><Glyph path={item.path} /></button>) : modes.flatMap(item => [false, true].map(arrow => <button key={`${item.name}-${arrow}`} onClick={() => pick(() => {
           host.std.get(EditPropsStore).recordLastProps('connector', { frontEndpointStyle: PointStyle.None, rearEndpointStyle: arrow ? PointStyle.Arrow : PointStyle.None });
           gfx.tool.setTool(ConnectorTool, { mode: item.mode });
         })}><Glyph path={item.path + (arrow ? 'M15 4H21V10' : '')} /><span>{item.name} {arrow ? 'arrow' : 'line'}</span></button>))}
