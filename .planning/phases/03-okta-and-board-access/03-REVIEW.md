@@ -1,8 +1,10 @@
 ---
 phase: 03-okta-and-board-access
-reviewed: 2026-09-16T20:52:09Z
+reviewed: 2026-09-16T21:07:13Z
 depth: standard
 source_head: 033ecc0dd40665a6abd593d838db2e2f82453868
+reviewed_acceptance_fixture_delta: 1a55d14dccb645ae2b095326f480dc089a245656
+reviewed_acceptance_fixture_files: 2
 reviewed_final_delta_files: 4
 resolved_total_findings: 8
 remediation_base: 43bd9c5
@@ -120,6 +122,7 @@ status: clean
 **Implementation snapshot:** `033ecc0dd40665a6abd593d838db2e2f82453868`
 **Remediation rereview:** all 19 files changed in `43bd9c5..12a2184`, read in full, retaining the original complete phase review
 **Final delta:** three source/test files in `033ecc0` and the acceptance document in `7360be0`; checkpoint/tracking deltas reviewed as supporting context
+**Additional test-only review:** `1a55d14dccb645ae2b095326f480dc089a245656` (two files); production implementation remains `033ecc0`
 **Status:** clean — all seven original findings and follow-up CR-07 resolved; no open review findings
 
 ## Narrative Findings (AI reviewer)
@@ -190,6 +193,16 @@ LocalBoardCopy stages the snapshot with server-reserved destination IDs, regener
 
 Community's fault injection targets `dali-account-recovery-v1`. It asserts the injected failure occurred, pending state remained, the server stayed unchanged, preservation failed visibly, and retry/reopen recovered the pending model. Error collection remains enabled. These are test-reliability repairs, separate from product defects.
 
+## Acceptance-fixture delta review
+
+The two-file test-only commit `1a55d14` was read in full and traced into the unchanged error collector, configured HTTP dev/production origins and native image cancellation path. No introduced defect or weakened protected-state oracle was found.
+
+- `tests/access-fixtures.ts:35-63` forwards actual `vite-hmr` WebSocket upgrades to the configured fixture asset origin, preserving request headers, upstream upgrade response headers and buffered data in both directions. It rejects other upgrade protocols, destroys sockets on transport failure/non-upgrade response, tracks both peers and destroys them before service closure. The configured origins are loopback HTTP, matching `node:http`. Production assets do not request HMR; protected API routing and OIDC authorization remain unchanged. The identity-context console/page-error collector is still strict.
+- `tests/board-access.spec.ts:155-197` permits the specific `console: Error: Account source is stale` cancellation only after marking the injected denial phase. Before adding that allowance it asserts no stale cancellation, no unexpected collected error and no pageerror. It retains loading/missing-image/retry checks and the original denied heading, removed editor, removed blob-image and absent canary-text predicates. After denial it again asserts no pageerror and checks every observed stale console message occurred in the marked phase.
+- The source trace supports classifying that message as a handled cancellation: native `ImageEdgelessBlock.refreshData` calls `refreshData(this).catch(console.error)`; its helper awaits resource refresh; `BoardBlobSource.assertCurrent` revokes URLs and throws the stated error on disposed/aborted/stale scope. This allowance does not establish real-provider revocation; the test injects the protected-resource denial response. Existing server/role suites retain real grant-removal checks.
+- The automatic fixture at `tests/fixtures.ts` continues to collect all errors and reject unmatched messages after the test. No global suppression or listener removal was introduced. The expected message is a specific console prefix under the existing substring-matching contract, rather than an allowance for arbitrary stale errors or pageerrors.
+- The parent reports both typechecks and 16 focused dev cases passing in 41s. These execution claims are attributed to the executor; this reviewer ran no tests or services. The first full dev run exposed fixture HMR handshake errors, and the complete 1462-case matrix is reported rerunning. Selection and focused passes do not establish full-matrix completion.
+
 ## Coverage, evidence limits and deltas
 
 - The original standard-depth review read all 92 listed files. This rereview preserves the full scope and rereads all 19 remediation files, plus relevant consumers and native ZIP-transformer code. No scope was dropped.
@@ -199,10 +212,10 @@ Community's fault injection targets `dali-account-recovery-v1`. It asserts the i
 - The fix report's “requires human verification” label is role-mandated wording. Its automated semantic assertions directly address the original defects. Independent source review establishes corrected control flow/contracts, while execution results remain attributed to the fix executor. Neither establishes actual-provider or native OS acceptance.
 - Final delta `033ecc0` was reviewed in all three affected source/test files, retaining the full 92-file scope. The accepted `docs/access-acceptance.md` change from `7360be0` describes the implemented writable-board/private-copy archive flow, retry/reconciliation and private evidence handling.
 - The `7360be0` checkpoint and tracking changes correctly attribute 2/2 smoke, 102 unit, 110 server and 110 access results to `12a2184`. They explicitly record that the full browser matrix had **not started** at that handoff, distinguish 1452 selected cases from executed cases, and keep Plan 12, Phase 3 and actual-provider/native acceptance open. The launcher termination is not represented as a failed access suite or completed final gate. No inconsistency was found against the supplied gate facts.
-- The full suite is now reported running by the acceptance executor after the CR-07 fix. Its final selection/result counts must be recorded against that later run; the earlier checkpoint's 1452 count is historical, not a claim about the final corrected suite.
-- At final inspection HEAD remained `033ecc0dd40665a6abd593d838db2e2f82453868`. No further tracked source/test/document delta was present outside this review artifact. Subsequent test corrections and final acceptance documentation require delta reconciliation.
+- The full suite is reported rerunning at the reviewed fixture delta with 1462 selected cases. Its final pass/fail/skip counts must be recorded against that run; the earlier checkpoint's 1452 count is historical.
+- At this inspection HEAD was `d65a469dd7caa80a8d9a2b0a87b8ed3d9ac10918`, whose only change after reviewed test commit `1a55d14` is the independently owned `03-SECURITY.md` report. Production source remains `033ecc0`; the two current fixture files match `1a55d14`. No further source/test delta awaited review. The security report's claims and subsequent final acceptance artifacts require their owners' evidence reconciliation.
 - Untracked planning/operator and image assets remain outside the pinned source scope and were preserved.
 - This reviewer changed only this report and performed no implementation/test edits, commits or runtime validation during rereview.
 
 _Reviewer: gsd-code-reviewer_
-_Reviewed: 2026-09-16T20:52:09Z_
+_Reviewed: 2026-09-16T21:07:13Z_
