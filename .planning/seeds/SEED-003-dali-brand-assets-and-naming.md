@@ -46,3 +46,8 @@ Effort and the exact asset-to-surface mapping remain for implementation planning
 ## Notes
 
 Captured as deferred branding work. The trigger does not change the current approved phase sequence.
+
+
+### Requested partial delivery — 2026-09-15
+
+The user explicitly requested the color symbol for application headers and supplied favicon assets. Quick task [260915-u2a](../quick/260915-u2a-refine-dal-branding-connector-labels-sel/260915-u2a-SUMMARY.md) (branding, connector labels and shapes) delivers these assets plus the page title/description. The broader product-copy and brand-surface inventory remains under this seed's final UI/UX trigger.

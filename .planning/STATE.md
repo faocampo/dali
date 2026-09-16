@@ -5,10 +5,10 @@ current_phase_name: Okta and Board Access
 current_plan: Not started
 status: planning
 stopped_at: Phase 2 complete, ready to plan Phase 3
-last_updated: "2026-09-15T23:46:50.021Z"
+last_updated: "2026-09-16T01:08:41.682Z"
 last_activity: 2026-09-15
-last_activity_desc: Completed quick task 260915-s9s — grid, distances and dimensions in View
-state_head: 4bdee55772e06375453b559b77cbb348b91355ff
+last_activity_desc: Completed quick task 260915-u2a — branding, connector labels and classical shapes
+state_head: d86078f08431211609be867ac1c26887fa78c335
 progress:
   total_phases: 13
   completed_phases: 2
@@ -32,7 +32,7 @@ Phase: 3 — Okta and Board Access
 Current Plan: Not started
 Total Plans in Phase: TBD
 Status: Ready to plan
-Last activity: 2026-09-15 — Completed quick task 260915-s9s: grid, distances and dimensions in View. Phase 3 remains ready to plan.
+Last activity: 2026-09-15 — Completed quick task 260915-u2a: branding, connector labels, useful inspectors and 16 editable shape choices. Phase 3 remains ready to plan.
 
 Progress: [██░░░░░░░░] 15% (2/13 phases complete)
 
@@ -140,9 +140,10 @@ Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted
 | 260915-interactions | Transparency, connector creation, tooltips, keyboard focus and text bounds | 2026-09-15 | See summary | — | [Quick task](quick/260915-canvas-interactions/SUMMARY.md) |
 | 8 | Replace canvas and library header logos with supplied Dalí SVG; verified narrow and desktop rendering, typecheck and production build | 2026-09-15 | 7cab9ea | — | — |
 | 260915-s9s | View menu grid styles, distances and object dimensions | 2026-09-15 | 4bdee55 | — | [260915-s9s-add-view-menu-grid-styles-object-dimensi](./quick/260915-s9s-add-view-menu-grid-styles-object-dimensi/) |
+| 260915-u2a | Refine Dalí branding, connector labels, selection panels and classical shapes | 2026-09-15 | d86078f | — | [260915-u2a-refine-dal-branding-connector-labels-sel](./quick/260915-u2a-refine-dal-branding-connector-labels-sel/) |
 
 Phase 2 was tested and approved on 2026-09-15. Canonical phase verification records the acceptance revision; subsequent quick tasks retain separate validation provenance. Quick task 260915-s9s passed 79 unit tests and 51 distinct browser/project cases across focused runs, with TypeScript checks and production build passing.
 
-### Quick follow-up awaiting decision
+### Drawing palette follow-up complete
 
-260915-drawing-palettes: consolidated five-category menu and native shape/line palettes implemented. Additional stars, arrow shapes, and polygons await the user's choice of full shape support versus grouped outlines. See [summary](quick/260915-drawing-palettes/SUMMARY.md). This separate follow-up does not block the approved Phase 2 capability.
+260915-u2a delivers editable stars, arrows and classical polygons, expanding Shapes to 16 choices. It also updates the supplied symbol/favicon assets, reflows connector labels with preserved Undo/Redo, and removes informational-only selection inspectors. Validation: 79 unit tests and 119 distinct browser/project cases passed across focused runs, with TypeScript and production build passing. See [summary](quick/260915-u2a-refine-dal-branding-connector-labels-sel/260915-u2a-SUMMARY.md) (implementation and validation evidence).
