@@ -87,6 +87,29 @@ test('@CR-02 editable download restores a private copy through the file picker',
   const copiedNative = await native(); expect(copiedNative.hierarchy).toEqual(originalNative.hierarchy); expect(copiedNative.ids.every(id => !originalNative.ids.includes(id))).toBe(true);
   expect(sourceState(board.summary.id)).toEqual(before);
 });
+for (const failure of ['failed', 'held']) test(`@CR-03 active duplicate preserves visible pending edits with ${failure} pushes`, async ({ page }) => {
+  const board = await create(page, 'Pending source'); await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Acknowledged A'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  const acknowledged = sourceState(board.summary.id); let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; }); let pushes = 0;
+  const pattern = '**/api/boards/' + board.summary.id + '/docs/*/push';
+  await page.route(pattern, async route => { pushes++; if (failure === 'held') { await gate; return route.continue(); } return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); });
+  await page.locator('affine-edgeless-root').evaluate(el => { const gfx = (el as HTMLElement & { gfx: GfxController }).gfx; const map = gfx.surface!.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel; map.addNode(map.tree.id, undefined, 'after', { text: 'Visible pending B' }); gfx.doc.captureSync(); });
+  const texts = () => page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.surface!.elementModels.filter(model => model.type === 'shape').map(model => (model as ShapeElementModel).text?.toString()).sort());
+  const visible = await texts(); expect(visible).toEqual(['Acknowledged A', 'Visible pending B']);
+  await expect.poll(() => pushes).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Main Menu', exact: true }).click(); await page.getByRole('menuitem', { name: 'File', exact: true }).click(); await page.getByRole('menuitem', { name: 'Duplicate board', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Duplicate board', exact: true }).getByRole('button', { name: 'Duplicate board', exact: true }).click();
+  if (failure === 'failed') {
+    await expect(page.getByRole('dialog', { name: 'Duplicate board', exact: true }).getByRole('alert')).toContainText('pending changes');
+    expect(new URL(page.url()).searchParams.get('board')).toBe(board.summary.id); expect(await texts()).toEqual(visible); expect(sourceState(board.summary.id)).toEqual(acknowledged);
+    expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 });
+    await page.unroute(pattern); await page.getByRole('dialog', { name: 'Duplicate board', exact: true }).getByRole('button', { name: 'Duplicate board', exact: true }).click();
+  } else { await expect(page.getByRole('dialog', { name: 'Duplicate board', exact: true })).toContainText('Copying board'); expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); release(); }
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  const copy = database.prepare('SELECT id FROM boards WHERE id<>?').get(board.summary.id) as { id: string }; expect(copy).toBeTruthy();
+  await card(page, copy.id).getByRole('link').click(); await page.waitForURL('**/?board=' + copy.id); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect(await texts()).toEqual(visible);
+  await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect(await texts()).toEqual(visible);
+});
 for (const changed of ['role', 'account']) test(`@CR-02 archive import rejects stale ${changed} before publication`, async ({ page }) => {
   const board = await create(page, 'Archive access canary'); await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
   await fileAction(page, 'Export board'); const pending = page.waitForEvent('download'); await page.getByRole('dialog', { name: 'Export board', exact: true }).getByRole('button', { name: 'Download', exact: true }).click();

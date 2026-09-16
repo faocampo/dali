@@ -35,6 +35,38 @@ export function suspendAccessScope(_reason: string): void {
   abort?.abort();
 }
 export async function preserveCanvasRuntime() { await Promise.all(capture); await journal?.preserve(); }
+/** Copying an open board requires acknowledgment of its visible native state. */
+export async function synchronizeActiveBoard(accountId: string, boardId: string): Promise<(() => void) | undefined> {
+  if (!current || current.scope.accountId !== accountId || current.scope.boardId !== boardId) return;
+  const runtime = current; const expected = runtime.scope; const localJournal = journal;
+  const assertCurrent = () => {
+    if (current !== runtime || scope?.generation !== expected.generation || scope.phase !== 'active' || !scope.canWrite) throw new Error('Board access changed. Reopen the board before copying.');
+  };
+  assertCurrent();
+  const controller = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined;
+  const same = (left: Uint8Array, right: Uint8Array) => left.length === right.length && left.every((byte, index) => byte === right[index]);
+  try {
+    await Promise.race([
+      (async () => {
+        if (!localJournal) throw new Error('Pending changes are unavailable');
+        for (let attempt = 0; attempt < 3; attempt++) {
+          assertCurrent(); if (controller.signal.aborted) throw new Error('Copy synchronization timed out');
+          const root = Y.encodeStateAsUpdate(runtime.workspace.doc); const content = Y.encodeStateAsUpdate(runtime.store.spaceDoc);
+          await localJournal.capture('document', runtime.descriptor.rootDocId, root);
+          await localJournal.capture('document', runtime.descriptor.contentDocId, content);
+          await localJournal.preserve(); assertCurrent();
+          await replayJournal(runtime.descriptor, accountId, controller.signal); assertCurrent();
+          if (same(root, Y.encodeStateAsUpdate(runtime.workspace.doc)) && same(content, Y.encodeStateAsUpdate(runtime.store.spaceDoc))) return;
+        }
+        throw new Error('The board is still changing');
+      })(),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('Copy synchronization timed out')); }, 10000); }),
+    ]);
+    assertCurrent(); return assertCurrent;
+  } catch {
+    throw new Error('The pending changes could not be saved. Your source is still open. Retry copying when saving is available.');
+  } finally { clearTimeout(timer); controller.abort(); }
+}
 export function disposeCanvasRuntime(expectedGeneration = scope?.generation): void {
   if (!scope || scope.generation !== expectedGeneration) return;
   const old = current; current = null; pending = null;

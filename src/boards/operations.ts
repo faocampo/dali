@@ -19,6 +19,7 @@ import {
 import { validSummary, type BoardDescriptor } from './BoardLibrary';
 import * as Y from 'yjs';
 import { createAccountWorkspace, createStagingWorkspace } from '../canvas/account/board-workspace';
+import { synchronizeActiveBoard } from '../canvas/runtime';
 
 export function validateBoardTitle(draft: string, acknowledged: string): string {
   const title = draft.trim() || acknowledged;
@@ -65,13 +66,16 @@ export function regenerateSurfaceIdentities<T>(snapshot: T): T {
 export class AccountBoardAction {
   readonly operationId = crypto.randomUUID();
   private payload?: { title?: string; revision: number; operationId: string };
+  private assertActive?: () => void;
   constructor(readonly accountId: string, readonly boardId: string, readonly kind: 'rename' | 'delete' | 'duplicate') {}
   private async request(path: string, init: RequestInit = {}) {
+    this.assertActive?.();
     let response: Response;
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 10000);
     try { response = await fetch(path, { ...init, signal: controller.signal, cache: 'no-store', headers: { 'X-Dali-Account': this.accountId, 'X-Dali-Request': '1', 'Content-Type': 'application/json', ...init.headers } }); }
     catch { throw new BoardActionError("We couldn't confirm this change. Check again before retrying.", true); }
     finally { clearTimeout(timer); }
+    this.assertActive?.();
     if (!response.ok) {
       const error = await response.json().catch(() => ({})) as { code?: string };
       throw new BoardActionError(error.code === 'TITLE_TOO_LONG' ? 'Use a board name of 200 characters or fewer.' : ['SOURCE_CHANGED', 'BOARD_CHANGED'].includes(error.code ?? '') ? 'This board changed. Try again with a fresh copy.' : response.status >= 500 ? "We couldn't confirm this change. Check again before retrying." : 'This change could not be saved. Refresh board access and try again.', response.status >= 500);
@@ -92,6 +96,7 @@ export class AccountBoardAction {
       try { return await (await this.request(path, { method: this.kind === 'rename' ? 'PATCH' : 'DELETE', body: JSON.stringify(this.payload) })).json(); }
       catch (cause) { if (cause instanceof BoardActionError && cause.uncertain) { const known = await this.check(); if (known.status === 'completed') return known.result!; } throw cause; }
     }
+    this.assertActive = await synchronizeActiveBoard(this.accountId, this.boardId);
     const exported = await (await this.request(path + '/editable-export')).json() as { descriptor: BoardDescriptor; root: string; content: string; manifest: string[] };
     const copyTitle = validateBoardTitle(title ?? exported.descriptor.summary.title, exported.descriptor.summary.title);
     const reserved = previous.status === 'staging' ? previous : await (await this.request(path + '/duplicate', { method: 'POST', body: JSON.stringify({ operationId: this.operationId, revision: exported.descriptor.revision, title: copyTitle }) })).json() as { status: string; result: BoardDescriptor };
