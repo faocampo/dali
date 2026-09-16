@@ -251,3 +251,22 @@ test('@03-10-03 failed replay stays pending without resume and retries committed
   await expect(page.getByText('Editing resumed.', { exact: true })).toBeVisible(); expect(await model(page)).toContain('Replay retry canary');
   const independent = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } }); expect(independent.status()).toBe(200);
 });
+test('@03-10-03 native topic focus returns only after replay acknowledgment and composition stays blocked while paused', async ({ page }) => {
+  await board(page); await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Native focus canary');
+  await expire(page); const pending = await records(page);
+  await page.getByRole('dialog').evaluate(el => { el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '未' })); el.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'insertCompositionText', data: '未承認' })); el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '未承認' })); });
+  await page.keyboard.press('Escape'); expect(await records(page)).toEqual(pending);
+  let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let received = false;
+  await page.route('**/docs/*/push', async route => { const response = await route.fetch(); expect(response.status()).toBe(200); received = true; await barrier; await route.fulfill({ response }); });
+  await page.clock.setFixedTime(new Date()); await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click(); await expect.poll(() => received).toBe(true);
+  await expect(page.getByText('Editing resumed.', { exact: true })).toHaveCount(0); await expect(page.locator('editor-host')).toHaveCount(0);
+  release(); await expect(page.getByText('Editing resumed.', { exact: true })).toBeVisible(); await expect(page.locator('edgeless-shape-text-editor [contenteditable="true"]')).toBeVisible();
+  expect(await page.locator('edgeless-shape-text-editor').evaluate(el => el.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press('End'); await page.keyboard.type(' resumed'); await page.keyboard.press('Escape'); expect(await model(page)).toContain('Native focus canary resumed');
+});
+test('@03-10-03 long authentication error stays bounded and retries deliberate sign-in', async ({ page }) => {
+  await page.setViewportSize({ width: 490, height: 240 }); await page.goto(origin + '/?authError=' + 'synthetic-long-error-'.repeat(80));
+  await expect(page.getByRole('heading', { name: "We couldn't sign you in.", exact: true })).toBeVisible();
+  await expect(page.locator('editor-host')).toHaveCount(0); expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(490);
+  await page.getByRole('button', { name: 'Sign in again', exact: true }).click(); await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+});

@@ -1,17 +1,66 @@
 import { getActiveAccessScope, getRecoveryBoard, preserveCanvasRuntime, suspendAccessScope } from '../canvas/runtime';
+import type { BlockComponent, EditorHost } from '@blocksuite/affine/std';
+import type { GfxController } from '@blocksuite/affine/std/gfx';
+import type { ShapeElementModel } from '@blocksuite/affine/model';
 export type SessionDescriptor = { accountId: string; displayName: string; email: string; expiresAt: number };
 export type SessionPhase = 'loading' | 'authenticated' | 'preserving' | 'auth-paused' | 'preservation-failed' | 'recovering' | 'access-denied' | 'identity-changed' | 'signed-out' | 'error';
-export type SessionState = { phase: SessionPhase; member: SessionDescriptor | null; intent: 'expiry' | 'logout'; revision: number };
-let state: SessionState = { phase: 'loading', member: null, intent: 'expiry', revision: 0 };
+export type SessionState = { phase: SessionPhase; member: SessionDescriptor | null; intent: 'expiry' | 'logout'; revision: number; notice: string };
+let state: SessionState = { phase: 'loading', member: null, intent: 'expiry', revision: 0, notice: '' };
 const listeners = new Set<() => void>();
 let preservation: Promise<void> | undefined;
 let transition = 0;
+type FocusToken = { accountId: string; boardId: string; label?: string; tag?: string; elements: string[]; editing: boolean };
+let focusToken: FocusToken | undefined;
+function captureFocus() {
+  const scope = getActiveAccessScope(); if (scope?.phase !== 'active') return;
+  let active = document.activeElement; while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+  const root = document.querySelector('affine-edgeless-root') as (HTMLElement & { gfx: GfxController }) | null;
+  focusToken = { accountId: scope.accountId, boardId: scope.boardId, elements: root?.gfx.selection.selectedElements.map(element => element.id) ?? [],
+    editing: !!document.querySelector('edgeless-shape-text-editor'), label: active?.getAttribute('aria-label') ?? undefined, tag: active?.tagName.toLowerCase() };
+}
+export function restoreRecoveryFocus() {
+  let token: FocusToken | null;
+  try { token = JSON.parse(sessionStorage.getItem('dali-recovery-focus') ?? 'null'); } catch { return () => {}; }
+  if (!token || token.accountId !== state.member?.accountId) return () => {};
+  const captured = token; let stopped = false; let frame = 0; let restoring = false;
+  const attempt = async () => {
+    const scope = getActiveAccessScope();
+    if (stopped || restoring || scope?.phase !== 'active' || !scope.canWrite || scope.accountId !== captured.accountId || scope.boardId !== captured.boardId) return;
+    const host = document.querySelector<EditorHost>('editor-host');
+    const root = host?.querySelector<BlockComponent & { gfx: GfxController }>('affine-edgeless-root');
+    if (!host || !root?.querySelector('.edgeless-mount-point') || host.store.readonly) return;
+    restoring = true;
+    try {
+      const current = () => !stopped && getActiveAccessScope() === scope && host.isConnected && !host.store.readonly;
+      if (captured.editing && captured.elements.length) {
+        const { mountShapeTextEditor } = await import('@blocksuite/affine/gfx/shape');
+        const shape = root.gfx.surface?.getElementById(captured.elements[0]!);
+        if (!current()) return;
+        if (shape?.type === 'shape') {
+          root.gfx.viewport.setCenter(shape.x + shape.w / 2, shape.y + shape.h / 2);
+          mountShapeTextEditor(shape as ShapeElementModel, root);
+        }
+      } else {
+        const target = captured.label && captured.tag && /^[a-z-]+$/.test(captured.tag) ? document.querySelector<HTMLElement>(`${captured.tag}[aria-label="${CSS.escape(captured.label)}"]`) : null;
+        if (!current()) return;
+        if (target) target.focus();
+        else { root.gfx.selection.set({ elements: captured.elements.filter(id => !!root.gfx.surface?.getElementById(id)), editing: false }); host.tabIndex = -1; host.focus(); }
+      }
+      if (!current()) return;
+      sessionStorage.removeItem('dali-recovery-focus'); sessionStorage.removeItem('dali-recovery-account');
+      observer.disconnect(); set({ notice: 'Editing resumed.' });
+    } finally { restoring = false; }
+  };
+  const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => { void attempt(); }); };
+  const observer = new MutationObserver(schedule); observer.observe(document.documentElement, { childList: true, subtree: true }); schedule();
+  return () => { stopped = true; observer.disconnect(); cancelAnimationFrame(frame); };
+}
 export const getSessionState = () => state;
 export const subscribeSession = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 function set(value: Partial<SessionState>) { state = { ...state, ...value }; listeners.forEach(listener => listener()); }
 export function acceptSession(member: SessionDescriptor, broadcast = false) {
   const previous = sessionStorage.getItem('dali-recovery-account');
-  set({ member, intent: 'expiry', phase: previous && previous !== member.accountId ? 'identity-changed' : 'authenticated', revision: state.revision + 1 });
+  set({ member, intent: 'expiry', phase: previous && previous !== member.accountId ? 'identity-changed' : 'authenticated', revision: state.revision + 1, notice: '' });
   if (broadcast) {
     try {
       const last = localStorage.getItem('dali-last-account'); localStorage.setItem('dali-last-account', member.accountId);
@@ -25,6 +74,7 @@ export function recoveryBoard(accountId: string): { boardId: string; title: stri
 function rememberRecovery() {
   if (state.member) sessionStorage.setItem('dali-recovery-account', state.member.accountId);
   const board = getRecoveryBoard(); if (board) sessionStorage.setItem('dali-recovery-board', JSON.stringify(board));
+  if (focusToken) sessionStorage.setItem('dali-recovery-focus', JSON.stringify(focusToken));
 }
 export function openCurrentBoards() {
   sessionStorage.removeItem('dali-recovery-account'); sessionStorage.removeItem('dali-recovery-board');
@@ -35,8 +85,9 @@ export async function interruptSession(intent: 'expiry' | 'logout' = 'expiry') {
   if (intent === 'logout') { transition++; set({ intent }); }
   if (preservation) return preservation;
   transition++;
+  captureFocus();
   suspendAccessScope(intent);
-  set({ phase: 'preserving', intent: state.intent === 'logout' ? 'logout' : intent });
+  set({ phase: 'preserving', notice: '', intent: state.intent === 'logout' ? 'logout' : intent });
   preservation = (async () => {
     try {
       rememberRecovery();
@@ -56,6 +107,7 @@ let revalidating: Promise<void> | undefined;
 export async function revalidateSession() {
   if (revalidating || state.intent === 'logout' || state.phase === 'signed-out') return revalidating;
   const expectedTransition = ++transition;
+  captureFocus();
   suspendAccessScope('revalidate'); set({ phase: 'preserving' });
   revalidating = (async () => {
     try {
