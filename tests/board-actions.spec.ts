@@ -10,6 +10,8 @@ import { syntheticCanaries } from './access-fixtures';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
 import * as Y from 'yjs';
+import { fileAction } from './app-menu';
+import { unzipSync, zipSync } from 'fflate';
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 let accountId: string; const origin = 'http://127.0.0.1:5499';
 test.use({ expectErrors: ['the server responded with a status of 400', 'the server responded with a status of 401', 'the server responded with a status of 403', 'the server responded with a status of 404', 'the server responded with a status of 409', 'the server responded with a status of 503'] });
@@ -42,6 +44,71 @@ test('@CR-01 rejected malformed root still opens in the native account editor', 
   await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Reopen canary');
   expect(sourceState(board.summary.id)).toEqual(before);
+});
+test('@CR-02 editable download restores a private copy through the file picker', async ({ page }) => {
+  const board = await create(page, 'Archive canary'); await page.goto(origin + '/?board=' + board.summary.id);
+  await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Archive topic'); await page.keyboard.press('Escape');
+  await page.locator('affine-edgeless-root').evaluate(el => { const surface = (el as HTMLElement & { gfx: GfxController }).gfx.surface!; const map = surface.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel; map.addNode(map.tree.id, undefined, 'after', { text: 'Archive child' }); });
+  const image = syntheticCanaries().imageBytes;
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: image });
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  const native = () => page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx; const map = gfx.surface!.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel;
+    const text = (id?: string) => id ? (gfx.surface!.getElementById(id) as ShapeElementModel).text?.toString() : null;
+    return { ids: gfx.surface!.elementModels.map(model => model.id), hierarchy: [...map.children].map(([id, detail]) => ({ ...detail, parent: text(detail.parent), text: text(id) })).sort((a, b) => a.text!.localeCompare(b.text!)) };
+  });
+  const originalNative = await native();
+  await fileAction(page, 'Export board'); const pending = page.waitForEvent('download'); await page.getByRole('dialog', { name: 'Export board', exact: true }).getByRole('button', { name: 'Download', exact: true }).click();
+  const download = await pending; const chunks: Buffer[] = []; for await (const chunk of (await download.createReadStream())!) chunks.push(Buffer.from(chunk));
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  const before = sourceState(board.summary.id);
+  const archiveBytes = Buffer.concat(chunks); const missing = unzipSync(archiveBytes); for (const key of Object.keys(missing)) if (key.startsWith('assets/')) delete missing[key];
+  const badPicker = page.waitForEvent('filechooser'); await fileAction(page, 'Import board'); await (await badPicker).setFiles({ name: 'missing.bs.zip', mimeType: 'application/zip', buffer: Buffer.from(zipSync(missing)) });
+  await page.getByRole('button', { name: 'Import private copy', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Import board', exact: true }).getByRole('alert')).toContainText('image');
+  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(sourceState(board.summary.id)).toEqual(before);
+  await page.getByRole('button', { name: 'Close import', exact: true }).click();
+  const picker = page.waitForEvent('filechooser'); await fileAction(page, 'Import board');
+  await (await picker).setFiles({ name: download.suggestedFilename(), mimeType: 'application/zip', buffer: archiveBytes });
+  await expect(page.getByRole('button', { name: 'Import private copy', exact: true })).toBeVisible();
+  await page.route('**/api/imports/*/blobs/*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+  await page.getByRole('button', { name: 'Import private copy', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Import board', exact: true }).getByRole('alert')).toContainText('Try again');
+  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(sourceState(board.summary.id)).toEqual(before);
+  await page.unroute('**/api/imports/*/blobs/*'); await page.getByRole('button', { name: 'Import private copy', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Open imported board', exact: true })).toBeVisible();
+  expect(sourceState(board.summary.id)).toEqual(before);
+  const rows = database.prepare('SELECT * FROM boards WHERE id<>?').all(board.summary.id) as { id: string; owner_id: string; content_doc_id: string }[];
+  expect(rows).toHaveLength(1); expect(rows[0]!.owner_id).toBe(accountId); expect(rows[0]!.content_doc_id).not.toBe(board.contentDocId);
+  expect((database.prepare('SELECT bytes FROM board_blobs WHERE board_id=?').get(rows[0]!.id) as { bytes: Buffer }).bytes).toEqual(image);
+  await page.getByRole('link', { name: 'Open imported board', exact: true }).click(); await page.waitForURL('**/?board=' + rows[0]!.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  expect(await page.locator('editor-host').evaluate(el => JSON.stringify((el as EditorHost).store.spaceDoc.toJSON()))).toContain('Archive topic');
+  const copiedNative = await native(); expect(copiedNative.hierarchy).toEqual(originalNative.hierarchy); expect(copiedNative.ids.every(id => !originalNative.ids.includes(id))).toBe(true);
+  expect(sourceState(board.summary.id)).toEqual(before);
+});
+for (const changed of ['role', 'account']) test(`@CR-02 archive import rejects stale ${changed} before publication`, async ({ page }) => {
+  const board = await create(page, 'Archive access canary'); await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  await fileAction(page, 'Export board'); const pending = page.waitForEvent('download'); await page.getByRole('dialog', { name: 'Export board', exact: true }).getByRole('button', { name: 'Download', exact: true }).click();
+  const chunks: Buffer[] = []; for await (const chunk of (await (await pending).createReadStream())!) chunks.push(Buffer.from(chunk));
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  const picker = page.waitForEvent('filechooser'); await fileAction(page, 'Import board'); await (await picker).setFiles({ name: 'access.bs.zip', mimeType: 'application/zip', buffer: Buffer.concat(chunks) });
+  if (changed === 'role') {
+    database.prepare('INSERT INTO members(id,issuer,subject,email,canonical_email,display_name) VALUES(?,?,?,?,?,?)').run('synthetic-next-owner', provider.issuer, 'next-owner', 'next@example.org', 'next@example.org', 'Next Owner');
+    database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run('synthetic-next-owner', board.summary.id);
+    database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, accountId, 'viewer');
+  } else {
+    let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; }); let entered = false;
+    await page.route('**/api/boards/' + board.summary.id, async route => { const response = await route.fetch(); entered = true; await gate; await route.fulfill({ response }); });
+    await page.getByRole('button', { name: 'Import private copy', exact: true }).click(); await expect.poll(() => entered).toBe(true);
+    const second = await page.context().newPage(); await page.context().clearCookies(); await second.goto(origin + '/auth/start');
+    await second.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(second.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible(); release(); await second.close();
+  }
+  const before = sourceState(board.summary.id);
+  if (changed === 'role') { await page.getByRole('button', { name: 'Import private copy', exact: true }).click(); await expect(page.getByRole('dialog', { name: 'Import board', exact: true }).getByRole('alert')).toContainText('access changed'); }
+  else await expect(page.locator('affine-edgeless-root')).toHaveCount(0);
+  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 });
+  expect(database.prepare('SELECT count(*) AS n FROM import_staging').get()).toEqual({ n: 0 }); expect(sourceState(board.summary.id)).toEqual(before);
 });
 test('@03-08-01 Unicode rename blank bounds acknowledgment and named safe-focus deletion', async ({ page }) => {
   const board = await create(page); await page.reload();

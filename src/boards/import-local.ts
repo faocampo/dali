@@ -7,6 +7,7 @@ import { createStagingWorkspace } from '../canvas/account/board-workspace';
 import { regenerateSurfaceIdentities } from './operations';
 import { validSummary, type BoardDescriptor } from './BoardLibrary';
 import { getSessionState } from '../auth/session';
+import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
 
 export type LocalBoard = { id: string; title: string; updatedAt: number };
 type StoredDoc = { id: string; updates: { update: Uint8Array }[] };
@@ -64,14 +65,43 @@ async function captureLocal(id: string) {
 }
 
 export class LocalCopyOutcomeUnknown extends Error {}
+/** Archive conversion uses only a memory workspace; no legacy storage is opened. */
+export async function captureArchive(file: File, schema: Store['schema']) {
+  if (file.size > 32 * 1024 * 1024) throw new Error('Choose a board archive smaller than 32 MB.');
+  const workspace = createLegacyReader(); workspace.meta.initialize();
+  const stores: Store[] = [];
+  try {
+    const imported = await ZipTransformer.importDocs(workspace, schema, file);
+    for (const store of imported) if (store) stores.push(store);
+    if (stores.length !== 1) throw new Error('Choose an archive containing exactly one board.');
+    const store = stores[0]!; store.load(); validateMindmapDocument(store);
+    const reader = store.getTransformer();
+    let snapshot;
+    try { snapshot = reader.docToSnapshot(store); } finally { reader[Symbol.dispose](); }
+    if (!snapshot || JSON.stringify(snapshot).length > 8 * 1024 * 1024) throw new Error('This board exceeds the copy limit.');
+    const blobs = new Map<string, Blob>(); let total = 0;
+    for (const { model } of store.getBlocksByFlavour('affine:image')) {
+      const key = (model.props as { sourceId: string }).sourceId;
+      const blob = await workspace.blobSync.get(key);
+      if (!blob || !['image/png', 'image/jpeg'].includes(blob.type)) throw new Error('An archive image is missing or unsupported. Choose a complete backup.');
+      const hash = encode(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))).replace(/\+/g, '-').replace(/\//g, '_');
+      if (hash !== key || (total += blob.size) > 256 * 1024 * 1024) throw new Error('The archive images could not be verified.');
+      blobs.set(key, blob);
+    }
+    return { snapshot, schema, blobs };
+  } finally { workspace.forceStop(); stores.forEach(store => store.dispose()); workspace.dispose(); workspace.doc.destroy(); }
+}
 export class LocalBoardCopy {
-  constructor(readonly accountId: string, readonly source: LocalBoard, readonly operationId: string = crypto.randomUUID()) {}
+  constructor(readonly accountId: string, readonly source: LocalBoard, readonly operationId: string = crypto.randomUUID(),
+    private capture?: () => ReturnType<typeof captureLocal>, private assertScope?: () => void, private authorize?: () => Promise<void>) {}
   private assertAccount() {
+    this.assertScope?.();
     const session = getSessionState();
     if (session.phase !== 'authenticated' || session.member?.accountId !== this.accountId || session.member.expiresAt <= Date.now()) throw new Error('Sign in with the original account to resume this copy.');
   }
   private async request(path: string, init?: RequestInit) {
     this.assertAccount();
+    await this.authorize?.(); this.assertAccount();
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 10000);
     try {
       const response = await fetch(path, { ...init, signal: controller.signal, cache: 'no-store', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Dali-Request': '1', 'X-Dali-Account': this.accountId, ...init?.headers } });
@@ -88,7 +118,7 @@ export class LocalBoardCopy {
       return result;
     };
     const known = await check(); if (known.status === 'completed') return validate(known.result!);
-    const captured = await captureLocal(this.source.id); this.assertAccount();
+    const captured = await (this.capture ? this.capture() : captureLocal(this.source.id)); this.assertAccount();
     const manifest = [...captured.blobs.keys()];
     const reserved = known.status === 'staging' ? known : await (await this.request('/api/imports', { method: 'POST', body: JSON.stringify({ operationId: this.operationId, title: this.source.title, manifest }) })).json() as { status: string; result: BoardDescriptor };
     if (reserved.status === 'completed') return validate(reserved.result!);

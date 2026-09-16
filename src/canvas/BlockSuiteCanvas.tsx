@@ -7,12 +7,11 @@ import { ObjectContextMenu } from './ObjectContextMenu';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { importLocalImages, installImageInputs, type ImageImportRequest } from './image-input';
-import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
 import type { EditorHost } from '@blocksuite/affine/std';
-import type { Store } from '@blocksuite/affine/store';
 import { mountEdgelessEditor, type EdgelessEditorHandle } from './blocksuite-editor';
 import { getActiveAccessScope, subscribeAccessScope, type CanvasRuntime } from './runtime';
-import { getLegacyCanvasRuntime } from './legacy-runtime';
+import { captureArchive, LocalBoardCopy, LocalCopyOutcomeUnknown } from '../boards/import-local';
+import { accessScopeCurrent } from './account/mutation-guard';
 import { insertSticky } from './sticky';
 import { insertText } from './text';
 import { insertMindmap } from './mindmap';
@@ -23,7 +22,6 @@ import { widenResizeHandles } from './resize-affordance';
 import { EdgelessToolbarDragHandle } from './EdgelessToolbarDragHandle';
 import { SelectionInspector } from './SelectionInspector';
 import { LayersInspector } from './LayersInspector';
-import { deferBoardRemoval, requestBoardOpen, setActiveBoardId } from '../boards/preferences';
 import { FrameBorderOverlay } from './FrameBorderOverlay';
 import { installArrangementShortcuts } from './arrangement';
 import type { ResourceController } from '@blocksuite/affine/components/resource';
@@ -163,6 +161,13 @@ function AccountImagesAndPreview({ host, runtime }: { host: EditorHost; runtime:
 function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const archiveDialog = useRef<HTMLDialogElement>(null);
+  const [archive, setArchive] = useState<File>();
+  const [importBusy, setImportBusy] = useState(false);
+  const [importUnknown, setImportUnknown] = useState(false);
+  const [importedId, setImportedId] = useState<string>();
+  const archiveCopy = useRef<LocalBoardCopy>();
+  useEffect(() => { if (archive) archiveDialog.current?.showModal(); }, [archive]);
   const store = host.std.store;
   useEffect(() => {
     const command = (event: Event) => {
@@ -226,49 +231,33 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
       const file = event.target.files?.[0];
       event.target.value = '';
       if (!file) return;
-      if (getActiveAccessScope()) { setActionError('Open your boards to import a copy into your account.'); return; }
-
-      // Import REPLACES the board. There is one board in this app, and the
-      // alternative -- keeping both -- would leave the imported one invisible,
-      // since the runtime opens the first doc it finds. Replacing is not
-      // undoable, so anything but an untouched board gets asked first.
-      if (!boardIsEmpty(store)) {
-        const proceed = window.confirm(
-          'Importing replaces the board you have open. This cannot be undone. Continue?'
-        );
-        if (!proceed) return;
-      }
-
-      const { workspace } = await getLegacyCanvasRuntime();
-      const imported = await ZipTransformer.importDocs(workspace, store.schema, file);
-      const restored = imported.find((doc) => !!doc);
-      if (!restored) throw new Error('That file did not contain a board.');
-
-      // The imported doc arrives with a fresh id (replaceIdMiddleware). Flush
-      // it before reloading: reload tears down the current sync engines, and an
-      // unflushed import would come back as an empty board.
-      const replacedId = store.id;
-      await workspace.waitForSynced();
-
-      // In a multi-board workspace, "first doc" is no longer the active-board
-      // rule. Point the next runtime at the imported replacement explicitly.
-      setActiveBoardId(restored.id);
-      // Removing the currently mounted store makes BlockSuite's live view read
-      // a page root that no longer exists. Defer cleanup to startup, before the
-      // replacement editor is mounted.
-      deferBoardRemoval(replacedId);
-      requestBoardOpen();
-
-      // Reload rather than re-mounting onto the new store: the runtime memoises
-      // one workspace and one document per page load, and a reload is the
-      // honest way to land on the imported board with all of that rebuilt.
-      window.location.reload();
+      const scope = getActiveAccessScope(); if (!scope || !accessScopeCurrent(scope, true)) return;
+      setActionError(null); setImportedId(undefined); setImportUnknown(false); setArchive(file);
+      archiveCopy.current = new LocalBoardCopy(scope.accountId, { id: crypto.randomUUID(), title: file.name.replace(/(?:\.bs)?\.zip$/i, '') || 'Imported board', updatedAt: Date.now() }, crypto.randomUUID(),
+        () => captureArchive(file, store.schema), () => { if (!accessScopeCurrent(scope, true)) throw new Error('Board access changed. Reopen the board before importing.'); }, async () => {
+          const response = await fetch('/api/boards/' + encodeURIComponent(scope.boardId), { cache: 'no-store', signal: AbortSignal.timeout(10000), headers: { 'X-Dali-Account': scope.accountId } });
+          if (!response.ok) throw new Error('Board access changed. Reopen the board before importing.');
+          const descriptor = await response.json();
+          if (descriptor.summary?.accountId !== scope.accountId || descriptor.summary?.id !== scope.boardId || !['owner', 'editor'].includes(descriptor.summary?.role)) throw new Error('Board access changed. Reopen the board before importing.');
+        });
     },
     [store]
   );
 
   return (
     <>
+    {archive && <dialog ref={archiveDialog} className="board-action-dialog" aria-label="Import board" onCancel={event => { if (importBusy || importUnknown) event.preventDefault(); else setArchive(undefined); }}>
+      <h2>Import board</h2><p>{archive.name}</p><p>Create a private copy in your account. Your open board stays available.</p>
+      {actionError && <p role="alert">{actionError}</p>}
+      {importBusy && <p role="status">Importing board…</p>}
+      {importedId ? <a href={'/?board=' + encodeURIComponent(importedId)}>Open imported board</a> : <button disabled={importBusy} onClick={async () => {
+        setImportBusy(true); setActionError(null);
+        try { const result = await archiveCopy.current!.run(); if (alive.current) { setImportedId(result.summary.id); setImportUnknown(false); } }
+        catch (cause) { if (alive.current) { setImportUnknown(cause instanceof LocalCopyOutcomeUnknown); setActionError(cause instanceof Error ? cause.message : 'The archive could not be imported. Try again.'); } }
+        finally { if (alive.current) setImportBusy(false); }
+      }}>{importUnknown ? 'Check import again' : 'Import private copy'}</button>}
+      <button disabled={importBusy || importUnknown} onClick={() => { setArchive(undefined); document.querySelector<HTMLButtonElement>('.dali-menu-trigger')?.focus(); }}>Close import</button>
+    </dialog>}
     <div
       data-testid="board-action-menu"
       role="toolbar"
@@ -367,22 +356,6 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
       />
     </>
   );
-}
-
-/**
- * True when the board holds nothing the user would mind losing.
- *
- * `affine:page` and `affine:surface` are structural -- every board has them
- * even when blank -- so they do not count as content.
- */
-function boardIsEmpty(store: Store): boolean {
-  const surface = store.getBlocksByFlavour('affine:surface')[0];
-  const elements =
-    (surface?.model as { elementModels?: unknown[] } | undefined)?.elementModels?.length ?? 0;
-  if (elements > 0) return false;
-  return store
-    .getAllModels()
-    .every((model) => model.flavour === 'affine:page' || model.flavour === 'affine:surface');
 }
 
 function ControlButton({
