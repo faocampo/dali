@@ -101,7 +101,10 @@ export function MindMapInspector({ host }: { host: EditorHost }) {
     <fieldset disabled={disabled}>
       <legend>Topic text</legend>
       <label>Font size <input key={`${topic.shape.id}-${topic.shape.fontSize}`} type="number" min="8" max="96"
-        defaultValue={topic.shape.fontSize} onBlur={event => run(host => formatMindmapTopic(host, { fontSize: Number(event.target.value) }))} /></label>
+        defaultValue={topic.shape.fontSize} onBlur={event => {
+          const fontSize = Number(event.target.value);
+          if (fontSize !== topic.shape.fontSize) run(host => formatMindmapTopic(host, { fontSize }));
+        }} /></label>
       <label>Font weight <select value={topic.shape.fontWeight}
         onChange={event => run(host => formatMindmapTopic(host, { fontWeight: event.target.value }))}>
         <option value="400">Regular</option><option value="600">Semibold</option><option value="700">Bold</option>

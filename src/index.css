@@ -3,6 +3,9 @@
  */
 
 .mindmap-panel { box-sizing: border-box; overflow-wrap: anywhere; font-size: 15px; font-weight: 400; line-height: 1.5; }
+.selection-inspector.mindmap-panel { display: flex; flex-direction: column; max-height: min(calc(100% - 24px), max(140px, calc(100% - 180px))); overflow: hidden; }
+.mindmap-panel .selection-inspector__head { flex: 0 0 auto; }
+.mindmap-panel .selection-inspector__body { min-height: 0; overflow-y: auto; }
 .mindmap-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .mindmap-panel h2, .mindmap-empty h2 { font-size: 20px; line-height: 1.2; font-weight: 600; margin: 0; }
 .mindmap-panel .mindmap-actions, .mindmap-panel fieldset { margin: 16px 0 0; }
@@ -699,6 +702,10 @@ djai-image-visual-edit {
 
 .djai-save__status {
   display: inline-flex;
+  box-sizing: border-box;
+  width: 100px;
+  min-height: 44px;
+  justify-content: center;
   align-items: center;
   gap: 0.4rem;
   padding: 0.42rem 0.55rem;
@@ -1754,6 +1761,11 @@ djai-image-visual-edit {
 .board-account > div { position: absolute; right: 0; top: 100%; width: min(260px, calc(100vw - 32px)); padding: 16px; box-sizing: border-box; background: var(--board-surface); border: 1px solid var(--board-line); border-radius: 12px; box-shadow: 0 8px 24px #0002; }
 .board-account p { overflow-wrap: anywhere; }
 @media (max-width: 600px) { .djai-header-actions { width: 100%; justify-content: flex-end; } .board-title-inline input { max-width: 48vw; } }
+@media (max-width: 400px) {
+  .djai-header-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; }
+  .djai-header-actions > *, .djai-header-actions .djai-save__status { box-sizing: border-box; min-width: 0; width: 100%; }
+  .djai-header-actions .board-account summary { box-sizing: border-box; padding-inline: 8px; }
+}
 /* Session interruption keeps its action reachable in narrow and short viewports. */
 .session-recovery {
   box-sizing: border-box;

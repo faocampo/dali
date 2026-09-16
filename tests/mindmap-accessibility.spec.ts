@@ -51,7 +51,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
 }
 
 for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
-  for (const scale of [1, 2]) test(`@02-05-03 responsive focus targets ${viewport.width}px CSS zoom ${scale}x`, async ({ page }) => {
+  for (const scale of [1, 2]) for (const changed of [false, true]) test(`@02-05-03 responsive focus targets ${viewport.width}px CSS zoom ${scale}x${changed ? ' with changed font size' : ''}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await create(page);
     // CSS zoom is layout magnification evidence, not real browser/OS zoom.
@@ -75,9 +75,15 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await size.focus(); await expect(size).toBeFocused();
     await page.keyboard.press('Tab'); await expect(page.getByRole('combobox', { name: 'Font weight' })).toBeFocused();
     await page.keyboard.press('Shift+Tab'); await expect(size).toBeFocused();
+    if (changed) await size.fill('24');
+    const headerBefore = await page.locator('.djai-header').boundingBox();
+    expect(await page.getByRole('button', { name: 'Close mind-map controls', exact: true }).evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
     await page.getByRole('button', { name: 'Close mind-map controls', exact: true }).click();
     await expect(panel).toHaveCount(0);
     await expect(page.locator('editor-host')).toBeFocused();
+    expect(await page.locator('.djai-header').boundingBox()).toEqual(headerBefore);
+    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    expect(await page.locator('affine-edgeless-root').evaluate(el => ((el as HTMLElement & { gfx: GfxController }).gfx.selection.selectedElements[0] as unknown as { fontSize: number }).fontSize)).toBe(changed ? 24 : 20);
     await page.keyboard.press('Escape'); await page.keyboard.press('Tab');
     expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
   });
