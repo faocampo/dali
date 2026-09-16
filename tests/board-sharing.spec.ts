@@ -103,6 +103,47 @@ for (const method of ['POST', 'PATCH', 'DELETE']) test(`@UI-X1 ${method} retains
   } finally { release(); }
 });
 
+test.describe('receipt authorization loss', () => {
+test.use({ expectErrors: ['401 (Unauthorized)', '404 (Not Found)', '409 (Conflict)', '503 (Service Unavailable)'] });
+for (const loss of ['expired', 'identity', 'deleted'] as const) test(`@UI-X1 receipt ${loss} invalidates uncertain sharing without a second mutation`, async ({ page }) => {
+  const id = seed('Receipt authorization'); await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Share board' }); let check = false; let posts = 0; let receiptStatus = 0; let operationId = '';
+  await page.route('**/api/operations/*', async route => { if (!check) return route.fulfill({ status: 503, json: {} }); const response = await route.fetch(); receiptStatus = response.status(); await route.fulfill({ response }); });
+  await page.route('**/grants', async route => { if (route.request().method() !== 'POST') return route.continue(); posts++; operationId = route.request().postDataJSON().operationId; await route.fetch(); await route.fulfill({ status: 503, json: {} }); });
+  await dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' }).fill('waiting@example.org'); await dialog.getByRole('option', { name: /waiting@example.org/ }).click(); await dialog.getByRole('button', { name: 'Grant access', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Check again', exact: true })).toBeVisible();
+  const receipt = database.prepare('SELECT * FROM operations WHERE operation_id=?').get(operationId);
+  if (loss === 'expired') database.prepare('UPDATE sessions SET expires_at=0 WHERE member_id=?').run(accountId);
+  else if (loss === 'identity') database.prepare('UPDATE sessions SET member_id=? WHERE member_id=?').run('synthetic-other', accountId);
+  else database.prepare('DELETE FROM boards WHERE id=?').run(id);
+  const grants = database.prepare('SELECT * FROM pending_grants WHERE board_id=?').all(id);
+  check = true; await dialog.getByRole('button', { name: 'Check again', exact: true }).click();
+  await expect.poll(() => receiptStatus).toBe(loss === 'expired' ? 401 : loss === 'identity' ? 409 : 404);
+  await expect(dialog).toHaveCount(0); expect(posts).toBe(1);
+  expect(database.prepare('SELECT * FROM operations WHERE operation_id=?').get(operationId)).toEqual(receipt);
+  expect(database.prepare('SELECT * FROM pending_grants WHERE board_id=?').all(id)).toEqual(grants);
+});
+});
+
+test('@UI-X1 uncertain removed row remains reconcilable after another row saves', async ({ page }) => {
+  const id = seed('Independent rows');
+  for (const email of ['first@example.org', 'second@example.org']) database.prepare('INSERT INTO pending_grants(board_id,issuer,canonical_email,role) VALUES(?,?,?,?)').run(id, provider.issuer, email, 'viewer');
+  await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
+  const first = dialog.locator('[data-grant-id]').filter({ hasText: 'first@example.org' }); const second = dialog.locator('[data-grant-id]').filter({ hasText: 'second@example.org' });
+  let check = false; let deletes = 0; let operationId = '';
+  await page.route('**/api/operations/*', route => check ? route.continue() : route.fulfill({ status: 503, json: {} }));
+  await page.route('**/grants/*', async route => { if (route.request().method() !== 'DELETE') return route.continue(); deletes++; operationId = route.request().postDataJSON().operationId; await route.fetch(); await route.fulfill({ status: 503, json: {} }); });
+  await first.getByRole('button', { name: 'Remove access' }).click(); await dialog.getByRole('alertdialog').getByRole('button', { name: 'Remove access', exact: true }).click();
+  await expect(first.getByRole('button', { name: 'Check again' })).toBeVisible();
+  await second.getByLabel('Access role').selectOption('editor'); await second.getByRole('button', { name: 'Save access' }).click();
+  await expect(second.locator('span').getByText('Editor', { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Check again', exact: true })).toBeVisible();
+  check = true; await dialog.getByRole('button', { name: 'Check again', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'Close', exact: true })).toBeEnabled(); expect(deletes).toBe(1);
+  expect(database.prepare('SELECT * FROM operations WHERE operation_id=?').all(operationId)).toHaveLength(1);
+  expect(database.prepare('SELECT canonical_email,role FROM pending_grants WHERE board_id=?').all(id)).toEqual([{ canonical_email: 'second@example.org', role: 'editor' }]);
+});
+
 test('@03-07-01 owner grants pending Viewer access and revokes with acknowledgment', async ({ page }) => {
   const id = seed('Sharing board'); await refresh(page);
   await expect(card(page, id).getByRole('button', { name: 'Share board' })).toBeVisible();

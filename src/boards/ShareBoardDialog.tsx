@@ -5,7 +5,7 @@ import type { BoardSummary } from './BoardLibrary';
 type Recipient = { memberId?: string; email: string; displayName: string };
 type Grant = Recipient & { id: string; role: 'editor' | 'viewer'; status: 'active' | 'pending'; revision: number };
 type Access = { revision: number; owner: Recipient; grants: Grant[] };
-type Operation = { id: string; method: string; path: string; body: object };
+type Operation = { id: string; method: string; path: string; body: object; recipient?: string };
 export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSummary; onClose: () => void; onChanged: (state?: Access) => void }) {
   const dialog = useRef<HTMLDialogElement>(null); const input = useRef<HTMLInputElement>(null);
   const lifetime = useRef(new AbortController()); const sequence = useRef(0); const loadSequence = useRef(0);
@@ -72,6 +72,9 @@ export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSu
     const controller = lifetime.current;
     const reconcile = async (operation: Operation) => {
       const response = await fetch('/api/operations/' + operation.id, { headers, cache: 'no-store', signal: controller.signal });
+      if ([401, 403, 404, 409].includes(response.status)) {
+        operations.current.clear(); controller.abort(); onChanged(); onClose(); throw new Error('Access is no longer available.');
+      }
       if (!response.ok) throw new Error('Unable to check access. Try again.');
       const result = await response.json() as { status: string; result?: Access };
       if (!['completed', 'unknown'].includes(result.status)) throw new Error('Access is still being checked. Try again.');
@@ -80,7 +83,7 @@ export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSu
     try {
       let operation = operations.current.get(key); let completed: Access | undefined;
       if (operation) completed = await reconcile(operation);
-      else { operation = { id: crypto.randomUUID(), method, path: target, body }; operations.current.set(key, operation); }
+      else { operation = { id: crypto.randomUUID(), method, path: target, body, recipient: access?.grants.find(row => row.id === key)?.email }; operations.current.set(key, operation); }
       if (!completed) {
         const timeout = new AbortController(); const abort = () => timeout.abort();
         const timer = window.setTimeout(abort, 10000); controller.signal.addEventListener('abort', abort, { once: true });
@@ -153,6 +156,10 @@ export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSu
           {errors[row.id] && <p id={'share-error-' + row.id} role="alert">{errors[row.id]}</p>}
         </div>)}
       </>}
+      {[...operations.current].filter(([key]) => key !== 'new' && !access?.grants.some(row => row.id === key)).map(([key, operation]) => <section className="share-row" key={key} aria-label={'Pending access change for ' + (operation.recipient ?? 'recipient')}>
+        <p>{operation.recipient}</p><p id={'share-error-' + key} role={errors[key] ? 'alert' : 'status'}>{errors[key] || 'Checking access change…'}</p>
+        <button disabled={busy[key]} aria-describedby={'share-error-' + key} onClick={() => void mutate(key, operation.method, operation.path, operation.body)}>Check again</button>
+      </section>)}
       {confirm && <section className="share-confirm" role="alertdialog" aria-label="Remove access" aria-describedby="revoke-description"><p id="revoke-description">{confirm.status === 'pending' ? `Remove pending access for ${confirm.email}? This grant will no longer activate after sign-in.` : `Remove access for ${confirm.displayName || confirm.email}? They will lose permission to open this board.`}</p><button ref={keep} disabled={busy[confirm.id] || operations.current.has(confirm.id)} onClick={() => { setConfirm(undefined); input.current?.focus(); }}>Keep access</button><button className="access-destructive" disabled={busy[confirm.id] || operations.current.has(confirm.id)} onClick={() => void mutate(confirm.id, 'DELETE', path + '/' + confirm.id, { revision: confirm.revision })}>Remove access</button></section>}
     </div>
     <footer className="export-footer"><div role="status">{notice}</div><button onClick={() => { void navigator.clipboard.writeText(link).then(() => { setLinkFallback(false); setNotice('Board link copied.'); }).catch(() => { setLinkFallback(true); setNotice("We couldn't copy the link. Select and copy the board address below."); }); }}>Copy board link</button>{linkFallback && <label>Board link<input readOnly value={link} onFocus={event => event.target.select()} /></label>}</footer>
