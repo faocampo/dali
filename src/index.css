@@ -1714,3 +1714,23 @@ djai-image-visual-edit {
   .dali-submenu:has(.dali-menu-switch), .dali-submenu:has(.dali-grid-menu) { width: auto; }
   .dali-menu-categories { width: 120px; }
 }
+/* Owner-managed board access uses the existing theme and native modal layer. */
+.share-dialog { position: fixed; inset: 0; margin: auto; width: min(620px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--board-ink); background: var(--board-surface); }
+.share-dialog:not([open]) { display: none; }
+.share-dialog::backdrop { background: rgb(28 26 24 / .3); }
+.share-dialog .djai-panel-head { flex: 0 0 auto; }
+.share-dialog__body { min-height: 0; overflow-y: auto; padding: 16px 20px; scroll-padding: 12px; overflow-wrap: anywhere; }
+.share-dialog input, .share-dialog select { max-width: 100%; min-width: 0; min-height: 44px; box-sizing: border-box; color: inherit; background: var(--board-surface); border: 1px solid var(--board-line); border-radius: 6px; padding: 8px; }
+.share-dialog input { width: 100%; }
+.share-dialog button { min-height: 44px; white-space: normal; }
+.share-dialog label { display: grid; gap: 4px; margin-block: 8px; }
+.share-dialog [role=listbox] { max-height: 220px; overflow-y: auto; margin: 8px 0; padding: 0; list-style: none; }
+.share-dialog [role=option] { min-height: 44px; padding: 10px; cursor: pointer; overflow-wrap: anywhere; }
+.share-dialog [role=option][aria-selected=true] { background: var(--board-line); }
+.share-owner, .share-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-block: 12px; border-bottom: 1px solid var(--board-line); }
+.share-owner strong, .share-row strong, .share-owner > span:first-of-type, .share-row > span:first-of-type { flex-basis: 100%; overflow-wrap: anywhere; }
+.share-row label { flex: 1 1 100px; }
+.share-dialog .export-footer { flex: 0 0 auto; flex-wrap: wrap; padding: 12px 20px; }
+.share-dialog .export-footer label { width: 100%; }
+.share-confirm { border: 2px solid var(--board-line); padding: 12px; margin-block: 12px; }
+.share-dialog :focus-visible { outline: 2px solid var(--affine-primary-color); outline-offset: 2px; }

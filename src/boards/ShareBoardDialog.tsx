@@ -8,7 +8,7 @@ type Access = { revision: number; owner: Recipient; grants: Grant[] };
 type Operation = { id: string; method: string; path: string; body: object };
 export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSummary; onClose: () => void; onChanged: (state?: Access) => void }) {
   const dialog = useRef<HTMLDialogElement>(null); const input = useRef<HTMLInputElement>(null);
-  const lifetime = useRef(new AbortController()); const sequence = useRef(0);
+  const lifetime = useRef(new AbortController()); const sequence = useRef(0); const loadSequence = useRef(0);
   const operations = useRef(new Map<string, Operation>());
   const [access, setAccess] = useState<Access>(); const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState(''); const [results, setResults] = useState<Recipient[]>([]);
@@ -23,12 +23,13 @@ export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSu
   const headers = { 'X-Dali-Account': board.accountId, 'X-Dali-Request': '1', 'Content-Type': 'application/json' };
   const path = '/api/boards/' + encodeURIComponent(board.id) + '/grants';
   const load = async () => {
+    const current = ++loadSequence.current;
     try {
       const response = await fetch(path, { headers, signal: lifetime.current.signal, cache: 'no-store' });
       if ([401, 403, 404, 409].includes(response.status)) { onChanged(); onClose(); return; }
       if (!response.ok) throw new Error();
       const state = await response.json() as Access;
-      if (!lifetime.current.signal.aborted) { setAccess(state); setLoadError(''); onChanged(state); }
+      if (!lifetime.current.signal.aborted && current === loadSequence.current) { setAccess(state); setLoadError(''); onChanged(state); }
     } catch { if (!lifetime.current.signal.aborted) setLoadError("We couldn't load access. Try again."); }
   };
   useEffect(() => {
@@ -99,7 +100,7 @@ export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSu
       operations.current.delete(key); await load();
       setNotice('Access updated.'); setDrafts(value => { const next = { ...value }; delete next[key]; return next; });
       if (key === 'new') { setSelected(undefined); setQuery(''); setRole('viewer'); }
-      if (method === 'DELETE') { setConfirm(undefined); input.current?.focus(); }
+      if (operation.method === 'DELETE') { setConfirm(undefined); input.current?.focus(); }
     } catch (cause) { if (!controller.signal.aborted) setErrors(value => ({ ...value, [key]: cause instanceof Error ? cause.message : "We couldn't update access. Try again." })); }
     finally { if (!controller.signal.aborted) setBusy(value => ({ ...value, [key]: false })); }
   };
@@ -119,7 +120,7 @@ export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSu
       {loadError && <div role="alert">{loadError}<button onClick={() => void load()}>Try again</button></div>}
       {!access && !loadError && <p role="status">Loading access…</p>}
       <label htmlFor="share-member">Internal member or email</label>
-      <input ref={input} id="share-member" role="combobox" aria-autocomplete="list" aria-expanded={expanded && results.length > 0} aria-controls="share-results" aria-activedescendant={expanded && results[highlight] ? 'share-result-' + highlight : undefined} aria-describedby="share-reason" value={query} maxLength={254} onChange={event => { setQuery(event.target.value); setSelected(undefined); setExpanded(false); }} onKeyDown={event => {
+      <input ref={input} id="share-member" disabled={operations.current.has('new')} role="combobox" aria-autocomplete="list" aria-expanded={expanded && results.length > 0} aria-controls="share-results" aria-activedescendant={expanded && results[highlight] ? 'share-result-' + highlight : undefined} aria-describedby="share-reason" value={query} maxLength={254} onChange={event => { setQuery(event.target.value); setSelected(undefined); setExpanded(false); }} onKeyDown={event => {
         if (event.nativeEvent.isComposing) return;
         if (event.key === 'Escape' && expanded) { event.preventDefault(); event.stopPropagation(); setExpanded(false); }
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setExpanded(true); setHighlight(value => Math.max(0, Math.min(results.length - 1, value + (event.key === 'ArrowDown' ? 1 : -1)))); }
@@ -129,16 +130,17 @@ export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSu
       {searchError && <p role="alert">We couldn't search members. <button onClick={() => setSearchVersion(value => value + 1)}>Try search again</button></p>}
       {expanded && <ul id="share-results" role="listbox" aria-label="Internal members">{results.map((recipient, index) => <li id={'share-result-' + index} key={recipient.memberId ?? recipient.email} role="option" aria-selected={highlight === index} onMouseDown={event => event.preventDefault()} onClick={() => choose(recipient)}>{recipient.displayName} — {recipient.email} {recipient.memberId ? '' : '— Pending member sign-in'}</li>)}</ul>}
       <p id="share-reason">{duplicate ? 'This recipient already has access. Use their access row.' : selected ? (selected.memberId ? 'Established internal member' : 'Pending member sign-in') : !query ? 'Search for a member or enter an internal email.' : searching ? 'Checking recipient…' : !results.length ? 'No matching members. Enter an eligible internal email.' : 'Select a recipient to grant access.'}</p>
-      <label>New recipient role<select value={role} onChange={event => setRole(event.target.value as 'viewer' | 'editor')}><option value="viewer">Viewer</option><option value="editor">Editor</option></select></label>
+      <label>New recipient role<select disabled={operations.current.has('new')} value={role} onChange={event => setRole(event.target.value as 'viewer' | 'editor')}><option value="viewer">Viewer</option><option value="editor">Editor</option></select></label>
       <button className="djai-primary" disabled={!access || !selected || !!duplicate || busy.new} onClick={() => void mutate('new', 'POST', path, { revision: access!.revision, ...(selected!.memberId ? { memberId: selected!.memberId } : { email: selected!.email }), role })}>{busy.new ? 'Granting access…' : 'Grant access'}</button>
       {errors.new && <p role="alert">{errors.new}</p>}
       {access && <><div className="share-owner"><strong>{access.owner.displayName}</strong><span>{access.owner.email}</span><span>Owner</span></div>
         {access.grants.length === 0 && <p>Only you have access</p>}
         {access.grants.map(row => <div className="share-row" data-grant-id={row.id} key={row.id} aria-busy={busy[row.id] || false}>
           <strong>{row.displayName}</strong><span>{row.email}</span><span>{row.role === 'editor' ? 'Editor' : 'Viewer'}</span><span>{row.status === 'pending' ? 'Pending member sign-in' : 'Active'}</span>
-          <label>Access role<select aria-label="Access role" value={drafts[row.id] ?? row.role} disabled={busy[row.id]} onChange={event => setDrafts(value => ({ ...value, [row.id]: event.target.value as 'viewer' | 'editor' }))}><option value="viewer">Viewer</option><option value="editor">Editor</option></select></label>
-          <button disabled={busy[row.id]} onClick={() => void mutate(row.id, 'PATCH', path + '/' + row.id, { revision: row.revision, role: drafts[row.id] ?? row.role })}>{busy[row.id] ? 'Saving access…' : 'Save access'}</button>
-          <button disabled={busy[row.id]} onClick={() => setConfirm(row)}>Revoke access</button>
+          <label>Access role<select aria-label="Access role" value={drafts[row.id] ?? row.role} disabled={busy[row.id] || operations.current.has(row.id)} onChange={event => setDrafts(value => ({ ...value, [row.id]: event.target.value as 'viewer' | 'editor' }))}><option value="viewer">Viewer</option><option value="editor">Editor</option></select></label>
+          <button disabled={busy[row.id] || operations.current.has(row.id)} onClick={() => void mutate(row.id, 'PATCH', path + '/' + row.id, { revision: row.revision, role: drafts[row.id] ?? row.role })}>{busy[row.id] ? 'Saving access…' : 'Save access'}</button>
+          <button disabled={busy[row.id] || operations.current.has(row.id)} onClick={() => setConfirm(row)}>Revoke access</button>
+          {errors[row.id] && operations.current.has(row.id) && <button disabled={busy[row.id]} onClick={() => { const operation = operations.current.get(row.id)!; void mutate(row.id, operation.method, operation.path, operation.body); }}>Check access</button>}
           {errors[row.id] && <p role="alert">{errors[row.id]}</p>}
         </div>)}
       </>}

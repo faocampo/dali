@@ -4,6 +4,7 @@ import * as oidc from 'openid-client';
 import type { AuthConfig } from '../app.js';
 import type { AccountDatabase } from '../storage/database.js';
 import { validateInternalIdentity } from './identity-policy.js';
+import { activatePendingGrants } from '../boards/grants.js';
 import { expiresAt, currentSession, requireExpectedMember, requireMutation, SESSION_COOKIE } from './session-store.js';
 /** Only local board/new intents survive sign-in; arbitrary URLs never do. */
 export function localReturnIntent(value: string | null): string {
@@ -51,9 +52,14 @@ export async function registerOidcRoutes(app: FastifyInstance, config: AuthConfi
       if (!database.prepare('SELECT id FROM sessions WHERE id=? AND expires_at>?').get(request.session.sessionId, now())) {
         throw new Error('Login session no longer valid');
       }
-      const member = database.prepare(`INSERT INTO members(id,issuer,subject,email,canonical_email,display_name) VALUES(?,?,?,?,?,?)
-        ON CONFLICT(issuer,subject) DO UPDATE SET email=excluded.email,canonical_email=excluded.canonical_email,display_name=excluded.display_name
-        RETURNING id`).get(randomUUID(), identity.issuer, identity.subject, identity.email, identity.canonicalEmail, identity.displayName) as { id: string };
+      const member = database.transaction(() => {
+        const previous = database.prepare('SELECT canonical_email,email_history FROM members WHERE issuer=? AND subject=?').get(identity.issuer, identity.subject) as { canonical_email: string; email_history: string } | undefined;
+        const history = [...new Set([...(previous ? JSON.parse(previous.email_history) as string[] : []), ...(previous ? [previous.canonical_email] : []), identity.canonicalEmail])];
+        const established = database.prepare(`INSERT INTO members(id,issuer,subject,email,canonical_email,display_name,email_history) VALUES(?,?,?,?,?,?,?)
+          ON CONFLICT(issuer,subject) DO UPDATE SET email=excluded.email,canonical_email=excluded.canonical_email,display_name=excluded.display_name,email_history=excluded.email_history
+          RETURNING id`).get(randomUUID(), identity.issuer, identity.subject, identity.email, identity.canonicalEmail, identity.displayName, JSON.stringify(history)) as { id: string };
+        activatePendingGrants(database, identity, established.id); return established;
+      })();
       await request.session.regenerate(); request.session.memberId = member.id; request.session.expiresAt = expiry;
       request.session.cookie.expires = new Date(expiry); await request.session.save();
       return reply.redirect(transaction.return_to);
