@@ -4,7 +4,7 @@ import * as Y from 'yjs';
 import type { AuthConfig } from '../app.js';
 import { currentSession, requireExpectedMember, requireMutation } from '../auth/session-store.js';
 import { runMigrations, type AccountDatabase } from '../storage/database.js';
-import { requireBoardCapability, type BoardRow } from './routes.js';
+import { requireBoardCapability, operationReceipt, type BoardRow } from './routes.js';
 import { referencedImageKeys, validateDocument, DOCUMENT_LIMITS, type BeforeCommit } from './documents.js';
 import { BlobRepository, imageHash, validateImageBytes, IMAGE_LIMITS } from './blobs.js';
 
@@ -43,8 +43,7 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
   });
   const stageFor = (member: string, id: string) => database.prepare('SELECT * FROM import_staging WHERE member_id=? AND operation_id=?').get(member, id) as Stage | undefined;
   app.get<{ Params: { operationId: string } }>('/api/imports/:operationId', async (request, reply) => {
-    const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
-    const known = previous(member!.accountId, request.params.operationId); return known ? { status: known.status, result: JSON.parse(known.result) } : { status: 'unknown' };
+    return operationReceipt(database, request, reply, request.params.operationId, now, true);
   });
   app.put<{ Params: { operationId: string }; Body: { root: string; content: string; manifest: string[] } }>('/api/imports/:operationId/document', {
     bodyLimit: 24 * 1024 * 1024,
@@ -98,7 +97,8 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
     return database.transaction(() => {
       const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
       const old = previous(member!.accountId, request.params.operationId);
-      if (old?.status === 'completed') return JSON.parse(old.result);
+      if (old && !['import', 'duplicate'].includes(old.kind)) return reply.code(409).send({ code: 'OPERATION_CONFLICT' });
+      if (old?.status === 'completed') return operationReceipt(database, request, reply, request.params.operationId, now, true)?.result;
       const stage = stageFor(member!.accountId, request.params.operationId); if (!stage) return reply.code(404).send({ code: 'STAGING_UNAVAILABLE' });
       if (stage.source_id) {
         const source = requireBoardCapability(database, request, reply, stage.source_id, 'duplicate', now); if (!source) return;

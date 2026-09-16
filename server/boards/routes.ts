@@ -6,7 +6,7 @@ import { currentSession, requireExpectedMember, requireMutation } from '../auth/
 import { runMigrations, type AccountDatabase } from '../storage/database.js';
 import { registerDocumentRoutes, type BeforeCommit } from './documents.js';
 import { registerBlobRoutes, validateImageBytes } from './blobs.js';
-import { registerGrantRoutes } from './grants.js';
+import { registerGrantRoutes, grantState } from './grants.js';
 import { registerActionRoutes } from './actions.js';
 
 export type BoardRole = 'owner' | 'editor' | 'viewer';
@@ -41,6 +41,33 @@ function summary(database: AccountDatabase, board: BoardRow, accountId: string):
 export function descriptor(database: AccountDatabase, board: BoardRow, accountId: string) {
   return { summary: summary(database, board, accountId), rootDocId: board.root_doc_id, contentDocId: board.content_doc_id,
     capabilities: boardCapabilities.filter(capability => canBoard(board.role, capability)), revision: board.revision };
+}
+/** Receipts acknowledge an actor's operation; their resource data uses current authority. */
+export function operationReceipt(database: AccountDatabase, request: FastifyRequest, reply: FastifyReply, operationId: string, now: () => number, importsOnly = false) {
+  const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
+  const operation = database.prepare('SELECT kind,status,board_id,result FROM operations WHERE member_id=? AND operation_id=?')
+    .get(member!.accountId, operationId) as { kind: string; status: string; board_id: string; result: string } | undefined;
+  if (!operation || (importsOnly && !['import', 'duplicate'].includes(operation.kind))) return { status: 'unknown' };
+  // A completed delete has no resource left to authorize and contains only its acknowledgment.
+  if (operation.kind === 'delete' && operation.status === 'completed') return { status: operation.status, result: { deleted: true, boardId: operation.board_id } };
+  const stored = JSON.parse(operation.result);
+  if (operation.status === 'staging') {
+    const stage = database.prepare('SELECT source_id FROM import_staging WHERE member_id=? AND operation_id=?').get(member!.accountId, operationId) as { source_id: string | null } | undefined;
+    if (!stage) return { status: 'unknown' };
+    if (stage.source_id && !requireBoardCapability(database, request, reply, stage.source_id, 'duplicate', now)) return;
+    return { status: operation.status, result: stored };
+  }
+  // A finished copy belongs to its destination owner independently of the source's later role.
+  const boardId = ['import', 'duplicate'].includes(operation.kind) ? stored.summary?.id : operation.board_id;
+  const grant = operation.kind.startsWith('["grant",');
+  const board = requireBoardCapability(database, request, reply, boardId, grant ? 'grants' : 'read', now); if (!board) return;
+  if (grant) return { status: operation.status, result: grantState(database, boardId) };
+  const current = descriptor(database, board, member!.accountId);
+  // Preserve receipt ordering for exact idempotent acknowledgments, while the current role
+  // remains the sole source of capability membership (including upgrades and downgrades).
+  const prior: BoardCapability[] = Array.isArray(stored.capabilities) ? stored.capabilities : [];
+  current.capabilities = [...prior.filter(capability => current.capabilities.includes(capability)), ...current.capabilities.filter(capability => !prior.includes(capability))];
+  return { status: operation.status, result: current };
 }
 /** Root and content are separately persisted; a root has exactly one bound subdocument. */
 function seedDocuments(database: AccountDatabase, board: BoardRow) {
@@ -129,10 +156,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
     })();
   });
   app.get<{ Params: { operationId: string } }>('/api/operations/:operationId', async (request, reply) => {
-    const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
-    const operation = database.prepare('SELECT status,result FROM operations WHERE member_id=? AND operation_id=?')
-      .get(member!.accountId, request.params.operationId) as { status: string; result: string } | undefined;
-    return operation ? { status: operation.status, result: JSON.parse(operation.result) as unknown } : { status: 'unknown' };
+    return operationReceipt(database, request, reply, request.params.operationId, now);
   });
   app.post<{ Body: { title?: string; operationId: string } }>('/api/boards', {
     schema: { body: { type: 'object', required: ['operationId'], properties: {
