@@ -3,6 +3,22 @@ import { test, expect } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { syntheticCanaries } from './access-fixtures';
 import { fileAction } from './app-menu';
+import type { Page } from '@playwright/test';
+
+async function expectAcknowledgedJournal(page: Page) {
+  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  expect(await page.evaluate(async () => (await indexedDB.databases()).map(db => db.name))).toEqual(['dali-account-recovery-v1']);
+  await expect.poll(() => page.evaluate(() => new Promise<number>((resolve, reject) => {
+    const request = indexedDB.open('dali-account-recovery-v1', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result; const transaction = db.transaction('journal', 'readonly');
+      const count = transaction.objectStore('journal').count();
+      transaction.oncomplete = () => { db.close(); resolve(count.result); };
+      transaction.onabort = transaction.onerror = () => { db.close(); reject(transaction.error); };
+    };
+  }))).toBe(0);
+}
 
 test('@03-06-02 two New commands create distinct private tabs and preserve the source board', async ({ page, context, baseURL }) => {
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
@@ -25,7 +41,7 @@ test('@03-06-02 two New commands create distinct private tabs and preserve the s
   }
   expect(new Set([board.summary.id, ...destinations]).size).toBe(3);
   expect(new URL(page.url()).searchParams.get('board')).toBe(board.summary.id);
-  await expect(page.getByRole('heading', { name: 'Preserved source title' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Preserved source title');
   expect(await (await context.request.post(`/api/boards/${board.summary.id}/docs/${board.contentDocId}/pull`, { headers: { ...headers, 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0]) })).body()).toEqual(sourceBytes);
   expect(errors).toEqual([]);
 });
@@ -50,7 +66,7 @@ test('@03-06-02 blocked popup retry reconciles one committed destination without
   const after = await (await context.request.get('/api/boards', { headers })).json(); expect(after).toHaveLength(before.length + 1);
   const href = await link.getAttribute('href'); expect(href).toMatch(/^\/\?board=/);
   expect(new URL(page.url()).searchParams.get('board')).toBe(board.summary.id);
-  await expect(page.getByRole('heading', { name: 'Popup source canary' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Popup source canary');
   const copy = await (await context.request.get('/api/boards/' + new URL(href!, baseURL!).searchParams.get('board'), { headers })).json();
   expect(copy.summary).toMatchObject({ role: 'owner', access: 'private', accountId: member.accountId });
 });
@@ -131,7 +147,7 @@ test('@03-06-01 loading blank board gates mutations and native history publishes
   await expect.poll(count).toBe(0);
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('dali:board-command', { detail: 'redo' })));
   await expect.poll(count).toBe(1);
-  expect(await page.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  await expectAcknowledgedJournal(page);
 });
 
 test.describe('native source authorization rejection', () => {
@@ -197,10 +213,10 @@ test('@03-03-01 BOARD-01 empty creates server-confirmed default and named cards 
   await page.getByRole('textbox', { name: 'Board name' }).fill('  Named synthetic board  ');
   await page.getByRole('button', { name: 'New board', exact: true }).click();
   const card = page.getByRole('link', { name: 'Open Named synthetic board', exact: true }); await expect(card).toBeVisible();
-  await card.click(); await expect(page.getByRole('heading', { name: 'Named synthetic board', exact: true })).toBeVisible();
-  await expect(page.locator('affine-editor-container')).toHaveCount(0);
-  expect(await page.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
-  await page.getByRole('link', { name: 'Back to your boards' }).click();
+  await card.click(); await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Named synthetic board');
+  await expect(page.locator('editor-host')).toBeVisible();
+  await expectAcknowledgedJournal(page);
+  await fileAction(page, 'All boards');
   await expect(page.getByRole('link', { name: 'Open Named synthetic board', exact: true })).toBeVisible();
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, Origin: baseURL!, 'X-Dali-Request': '1' };

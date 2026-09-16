@@ -5,7 +5,7 @@ import { beginBlobWrite, finishBlobWrite } from '../save-status';
 export type BlobSourceOptions = Omit<SourceOptions, 'onPendingDocument'> & {
   onPendingBlob?: (key: string, value: Blob) => unknown | Promise<unknown>;
 };
-/** No caches or shadow fallback: authorization failures throw through BlobEngine. */
+/** Pending durable images belong to this source's account/board/generation lifetime. */
 export class BoardBlobSource implements BlobSource {
   readonly name = 'account-board-images';
   readonly readonly: boolean;

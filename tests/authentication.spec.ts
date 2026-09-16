@@ -90,10 +90,20 @@ test('@03-02-02 absolute UI expiry clears account content and offers deliberate 
 });
 
 for (const intent of ['?board=synthetic-board', '?new=1']) {
-  test(`@03-02-02 D-01 signed provider restores ${intent}`, async ({ page }) => {
+  test(`@03-02-02 D-01 signed provider restores ${intent}`, async ({ page, context }) => {
     await page.goto(`/${intent}`); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-    await expect(page.getByRole('heading', { name: intent.startsWith('?board=') ? "You don't have access to this board" : 'Your boards' })).toBeVisible();
-    expect(new URL(page.url()).search).toBe(intent);
+    if (intent.startsWith('?board=')) {
+      await expect(page.getByRole('heading', { name: "You don't have access to this board" })).toBeVisible();
+      expect(new URL(page.url()).search).toBe(intent);
+    } else {
+      await expect(page.locator('editor-host')).toBeVisible();
+      await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Untitled board');
+      const id = new URL(page.url()).searchParams.get('board'); expect(id).toBeTruthy();
+      const member = await (await context.request.get('/api/session')).json();
+      const descriptor = await context.request.get('/api/boards/' + id, { headers: { 'X-Dali-Account': member.accountId } });
+      expect(descriptor.status()).toBe(200);
+      expect((await descriptor.json()).summary).toMatchObject({ id, accountId: member.accountId, role: 'owner', access: 'private', title: 'Untitled board' });
+    }
   });
 }
 
