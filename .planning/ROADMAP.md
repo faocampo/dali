@@ -132,7 +132,7 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
 
-**Plans**: 11/12 executed; signed authentication, private library, protected resources, native account workspace/editor, internal sharing, board actions, compact account header, native Viewer guards, permitted presentation exports, durable account-isolated interruption recovery and explicit private local-board copies verified. Continue with plan 03-12 final verification and operator acceptance. Native 200% zoom and actual-provider acceptance remain final-phase obligations.
+**Plans**: 11/12 executed; plan 03-12 remains incomplete. Its receipt authorization/accessibility fixes, exact two-case smoke and 100-case access suite are recorded in the checkpoint. Independent review remediation precedes the unrun full browser matrix. Native 200% zoom, native OS/assistive-technology observations and actual-provider acceptance remain final-phase obligations.
 
 Plans:
 **Wave 1**
