@@ -98,7 +98,7 @@ test('@03-03-02 UI-HOME-populated BOARD-02 roles pending and all filter ordering
   for (const [name, ids] of [['All', [a, b, c, d, p]], ['Mine', [a, b, p]], ['Shared with me', [c, d]]] as const) {
     await page.getByRole('button', { name, exact: true }).click(); await refresh(page);
     await expect(page.locator('[data-board-id]')).toHaveCount(ids.length);
-    expect(await page.locator('[data-board-id]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-board-id')))).toEqual(ordered([...ids]));
+    await expect.poll(() => page.locator('[data-board-id]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-board-id')))).toEqual(ordered([...ids]));
     await expect(card(page, foreign)).toHaveCount(0);
   }
   await page.getByRole('button', { name: 'All', exact: true }).click();
