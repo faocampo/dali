@@ -1,0 +1,168 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { randomBytes } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import type { FastifyInstance } from 'fastify';
+import { buildApp, expiresAt, readConfig, localReturnIntent } from '../app.js';
+import { openDatabase, runMigrations, type AccountDatabase } from '../storage/database.js';
+import { createOidcProvider, IDENTITY_COOKIE, type ProviderFaults } from '../../tests/oidc-provider.js';
+
+describe('@03-02-02 trusted callbacks and absolute sessions', () => {
+  let provider: Awaited<ReturnType<typeof createOidcProvider>>;
+  let app: FastifyInstance; let database: AccountDatabase; let env: Record<string, string>;
+  let clock: number; let directory: string;
+  const cookieOf = (response: { headers: Record<string, unknown> }) => {
+    const values = response.headers['set-cookie'];
+    return (Array.isArray(values) ? values[0] : values)?.split(';')[0] as string;
+  };
+  beforeEach(async () => {
+    clock = Date.now(); directory = await mkdtemp(join(tmpdir(), 'dali-auth-'));
+    const registration = { clientId: 'synthetic-app', clientSecret: randomBytes(32).toString('hex'), redirectUri: 'http://127.0.0.1:5499/auth/callback' };
+    provider = await createOidcProvider({ clients: [registration] });
+    env = { DALI_ORIGIN: 'http://127.0.0.1:5499', DALI_DATABASE_PATH: join(directory, 'accounts.sqlite'),
+      DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000',
+      DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId,
+      DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri,
+      DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]',
+      DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]', DALI_EMAIL_CASE_FOLD: 'false' };
+    database = openDatabase(env.DALI_DATABASE_PATH!);
+    app = await buildApp({ config: env, database, now: () => clock });
+  });
+  afterEach(async () => { vi.unstubAllEnvs(); await app?.close(); database?.close(); await provider?.close(); await rm(directory, { recursive: true, force: true }); });
+  const begin = async (returnTo = '/', identity = 'owner') => {
+    const start = await app.inject({ method: 'GET', url: `/auth/start?returnTo=${encodeURIComponent(returnTo)}` });
+    expect(start.statusCode).toBe(302);
+    const authorize = await fetch(start.headers.location!, { redirect: 'manual', headers: { cookie: `${IDENTITY_COOKIE}=${identity}` } });
+    expect(authorize.status).toBe(302);
+    const callback = new URL(authorize.headers.get('location')!);
+    return { cookie: cookieOf(start), callback: callback.pathname + callback.search, start };
+  };
+  const finish = (flow: { cookie: string; callback: string }) => app.inject({ method: 'GET', url: flow.callback, headers: { cookie: flow.cookie } });
+  const signIn = async () => { const flow = await begin(); const response = await finish(flow); expect(response.headers.location).toBe('/'); return { ...flow, response, authenticated: cookieOf(response) }; };
+  const session = (cookie: string) => app.inject({ method: 'GET', url: '/api/session', headers: { cookie } });
+  const members = () => database.prepare('SELECT * FROM members ORDER BY id').all();
+  const count = () => (database.prepare('SELECT count(*) AS n FROM sessions WHERE member_id IS NOT NULL').get() as { n: number }).n;
+
+  it('production rejects ambient test-auth enablement', async () => {
+    vi.stubEnv('DALI_TEST_AUTH', 'true');
+    let rejected = false;
+    try { const invalid = await buildApp({ config: { ...env, NODE_ENV: 'production' }, database }); await invalid.close(); }
+    catch (error) { rejected = error instanceof Error && error.message === 'Test authentication is forbidden'; }
+    expect(rejected, 'production startup rejects ambient authentication switches').toBe(true);
+  });
+  it('signed code+PKCE rotates persistent cookie and exposes only minimal identity', async () => {
+    const flow = await signIn(); expect(flow.authenticated).not.toBe(flow.cookie);
+    const result = await session(flow.authenticated);
+    expect(result.statusCode).toBe(200); expect(result.headers['cache-control']).toBe('private, no-store');
+    expect(result.json()).toEqual({ accountId: expect.any(String), email: 'owner@example.org', displayName: 'Synthetic Owner', expiresAt: clock + 86400000 });
+    const set = String(flow.response.headers['set-cookie']);
+    expect(set).toContain('HttpOnly'); expect(set).toContain('SameSite=Lax'); expect(set).toContain('Path=/'); expect(set).toContain('Expires='); expect(set).not.toContain('Domain=');
+    expect((await session(flow.cookie)).statusCode).toBe(401);
+    expect((await finish(flow)).headers.location).toBe('/?authError=signin'); expect(count()).toBe(1);
+  });
+  const faults: [string, ProviderFaults][] = [
+    ['issuer', { issuer: 'https://foreign.example.org' }], ['audience', { audience: 'foreign-client' }],
+    ['signature', { signature: true }], ['nonce', { nonce: 'other-nonce' }], ['state', { state: 'other-state' }],
+    ['expired token', { clockOffsetSeconds: -3600 }], ['missing issuer', { omitClaims: ['iss'] }],
+    ['missing subject', { omitClaims: ['sub'] }], ['missing nonce', { omitClaims: ['nonce'] }],
+    ['missing expiration', { omitClaims: ['exp'] }], ['missing membership', { omitClaims: ['membership'] }],
+    ['external membership', { claims: { membership: 'external' } }], ['missing email', { omitClaims: ['email'] }],
+    ['unverified email', { claims: { email_verified: false } }], ['string verified', { claims: { email_verified: 'true' } }],
+    ['missing verification', { omitClaims: ['email_verified'] }], ['external email', { claims: { email: 'owner@external.example.net' } }],
+    ['missing display name', { omitClaims: ['name'] }], ['UserInfo subject', { userInfoSubject: 'other-subject' }],
+  ];
+  it.each(faults)('AUTH-01 empty rejects %s without session or identity mutation', async (_label, fault) => {
+    await signIn(); const before = members(); const sessionCount = count();
+    provider.setFaults(fault); const flow = await begin(); const response = await finish(flow);
+    expect(response.headers.location).toBe('/?authError=signin');
+    expect((await session(flow.cookie)).statusCode).toBe(401);
+    expect(count()).toBe(sessionCount); expect(members()).toEqual(before);
+    expect(response.body).not.toContain('owner@example.org'); expect(response.body).not.toContain(env.DALI_OIDC_CLIENT_SECRET);
+    expect((await finish(flow)).headers.location).toBe('/?authError=signin');
+  });
+  it.each(['state', 'code'])('missing %s consumes the transaction and rejects replay', async field => {
+    const flow = await begin(); const url = new URL(flow.callback, env.DALI_ORIGIN); url.searchParams.delete(field);
+    expect((await finish({ ...flow, callback: url.pathname + url.search })).headers.location).toBe('/?authError=signin');
+    expect((await finish(flow)).headers.location).toBe('/?authError=signin'); expect(count()).toBe(0); expect(members()).toEqual([]);
+  });
+  it('browser-bound transaction denies another cookie jar and incorrect PKCE', async () => {
+    const flow = await begin(); const other = await begin();
+    expect((await finish({ ...flow, cookie: other.cookie })).headers.location).toBe('/?authError=signin');
+    database.prepare('UPDATE login_transactions SET verifier=? WHERE state=?').run('a'.repeat(43), new URL(flow.callback, env.DALI_ORIGIN).searchParams.get('state'));
+    expect((await finish(flow)).headers.location).toBe('/?authError=signin'); expect(count()).toBe(0); expect(members()).toEqual([]);
+  });
+  it('expired transaction denies at its exact millisecond boundary', async () => {
+    const flow = await begin(); clock += 600000;
+    expect((await finish(flow)).headers.location).toBe('/?authError=signin'); expect(count()).toBe(0); expect(members()).toEqual([]);
+  });
+  it('concurrent callback replay creates exactly one session', async () => {
+    const flow = await begin(); const results = await Promise.all([finish(flow), finish(flow)]);
+    expect(results.map(r => r.headers.location).sort()).toEqual(['/', '/?authError=signin']); expect(count()).toBe(1); expect(members()).toHaveLength(1);
+  });
+  it('AUTH-01 encoding preserves issuer+subject identity across metadata changes and separates reused email', async () => {
+    const first = (await session((await signIn()).authenticated)).json();
+    provider.setFaults({ claims: { email: 'Changed+Alias@EXAMPLE.ORG', name: 'Changed Name' } });
+    const updated = (await session((await signIn()).authenticated)).json(); expect(updated.accountId).toBe(first.accountId); expect(updated.email).toBe('Changed+Alias@EXAMPLE.ORG');
+    provider.setFaults({ claims: { sub: 'different-subject', email: 'Changed+Alias@EXAMPLE.ORG' } });
+    const separate = (await session((await signIn()).authenticated)).json(); expect(separate.accountId).not.toBe(first.accountId);
+    expect(members()).toHaveLength(2);
+  });
+  it.each([-1, 0, 1])('AUTH-01 precision session at expiry %+d milliseconds fails closed at boundary', async offset => {
+    const flow = await signIn(); const expiry = (await session(flow.authenticated)).json().expiresAt;
+    clock = expiry + offset; expect((await session(flow.authenticated)).statusCode).toBe(offset < 0 ? 200 : 401);
+  });
+  it('persistent SQL session survives a new app instance without rolling expiry', async () => {
+    const flow = await signIn(); const before = (await session(flow.authenticated)).json();
+    await app.close(); database.close(); database = openDatabase(env.DALI_DATABASE_PATH!);
+    clock += 1000; app = await buildApp({ config: env, database, now: () => clock });
+    const restored = await session(flow.authenticated); expect(restored.json()).toEqual(before); expect(restored.headers['set-cookie']).toBeUndefined();
+  });
+  it.each(['0', '-1', 'NaN', 'Infinity', '1.5', '9007199254740992', '2678400001'])('AUTH-01 precision rejects invalid lifetime %s', async value => {
+    expect(() => readConfig({ ...env, DALI_SESSION_TTL_MS: value })).toThrow();
+  });
+  it('AUTH-01 precision rejects invalid clocks and overflowing time arithmetic', () => {
+    for (const now of [NaN, Infinity, -1, 1.5, Number.MAX_SAFE_INTEGER, 8640000000000000]) expect(() => expiresAt(now, 1000)).toThrow();
+    expect(expiresAt(clock, 1)).toBe(clock + 1);
+  });
+  it.each(['DALI_OIDC_ISSUER', 'DALI_INTERNAL_CLAIM', 'DALI_INTERNAL_VALUES_JSON', 'DALI_INTERNAL_EMAIL_DOMAINS_JSON', 'DALI_SESSION_SECRET'])('AUTH-01 empty incomplete %s gives a recoverable secret-free error', async key => {
+    const invalid = await buildApp({ config: { ...env, [key]: '' } });
+    try { const response = await invalid.inject('/api/session'); expect(response.statusCode).toBe(503); expect(response.json()).toEqual({ code: 'AUTH_CONFIGURATION' });
+      expect((await invalid.inject('/auth/start')).headers.location).toBe('/?authError=configuration'); }
+    finally { await invalid.close(); }
+  });
+  it('missing configuration fails closed and can recover on valid startup', async () => {
+    const invalid = await buildApp({ config: {} });
+    try { expect((await invalid.inject('/api/session')).statusCode).toBe(503); } finally { await invalid.close(); }
+    expect((await session((await signIn()).authenticated)).statusCode).toBe(200);
+  });
+  it('AUTH-01 idempotency exact-origin local logout denies forgery and stale account, then remains harmless', async () => {
+    const flow = await signIn(); const account = (await session(flow.authenticated)).json(); const before = members();
+    const headers = { cookie: flow.authenticated, origin: env.DALI_ORIGIN!, 'x-dali-request': '1', 'x-dali-account': account.accountId, 'content-type': 'application/json' };
+    for (const change of [{ origin: 'https://foreign.example.org' }, { 'x-dali-request': '' }, { 'content-type': 'text/plain' }, { 'x-dali-account': 'stale-account' }]) {
+      const response = await app.inject({ method: 'POST', url: '/auth/logout', headers: { ...headers, ...change }, payload: '{}' });
+      expect([403, 409]).toContain(response.statusCode); expect((await session(flow.authenticated)).statusCode).toBe(200); expect(members()).toEqual(before);
+    }
+    expect((await app.inject({ method: 'GET', url: '/api/session', headers: { cookie: flow.authenticated, 'x-dali-account': 'stale-account' } })).statusCode).toBe(409);
+    for (let i = 0; i < 2; i++) expect((await app.inject({ method: 'POST', url: '/auth/logout', headers, payload: '{}' })).statusCode).toBe(204);
+    expect((await session(flow.authenticated)).statusCode).toBe(401); expect(members()).toEqual(before);
+  });
+  it.each(['/?board=synthetic-board', '/?new=1', '//foreign.example.org', 'https://foreign.example.org', '/?board=../secret', '/?signedOut=1'])('D-01 retains only validated local intent %s', async value => {
+    const flow = await begin(value); expect((await finish(flow)).headers.location).toBe(localReturnIntent(value));
+    if (value === '/?board=synthetic-board' || value === '/?new=1') expect(localReturnIntent(value)).toBe(value);
+    else expect(localReturnIntent(value)).toBe('/');
+  });
+  it('production configuration requires HTTPS, bounded policy and registers no fixture route', async () => {
+    expect(() => readConfig({ ...env, NODE_ENV: 'production' })).toThrow();
+    expect(() => readConfig({ ...env, DALI_INTERNAL_VALUES_JSON: '[]' })).toThrow();
+    expect(() => readConfig({ ...env, DALI_OIDC_CALLBACK_URL: 'https://foreign.example.org/auth/callback' })).toThrow();
+    for (const path of ['/auth/test', '/api/test/login', '/auth/fixture']) expect((await app.inject(path)).statusCode).toBe(404);
+    await expect(buildApp({ config: { ...env, DALI_TEST_AUTH: 'true' }, database })).rejects.toThrow();
+  });
+  it('migrations are idempotent and failed additive migration rolls back its table and ledger', () => {
+    runMigrations(database); expect(database.prepare('SELECT version FROM schema_migrations').all()).toEqual([{ version: 1 }]);
+    expect(() => runMigrations(database, [{ version: 2, sql: 'CREATE TABLE synthetic_probe(id TEXT); INSERT INTO missing_table VALUES(1)' }])).toThrow();
+    expect(database.prepare("SELECT name FROM sqlite_master WHERE name='synthetic_probe'").get()).toBeUndefined();
+    expect(database.prepare('SELECT version FROM schema_migrations').all()).toEqual([{ version: 1 }]);
+  });
+});
