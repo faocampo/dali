@@ -132,7 +132,7 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
 
-**Plans**: 2/12 executed; signed application authentication verified, continue with plan 03-03 across the remaining dependency waves.
+**Plans**: 4/12 executed; signed authentication, private library and protected document/image resources verified. Continue with plan 03-05 account workspace conformance across the remaining dependency waves.
 
 Plans:
 **Wave 1**
@@ -149,7 +149,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 03-04-PLAN.md — Save and retrieve board-bound documents and images.
+- [x] 03-04-PLAN.md — Save and retrieve board-bound documents and images.
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -372,7 +372,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 |-------|----------------|--------|-----------|
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
-| 3. Okta and Board Access | 3/12 | In Progress|  |
+| 3. Okta and Board Access | 4/12 | In Progress|  |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
 | 6. Follow Me | 0/TBD | Not started | - |

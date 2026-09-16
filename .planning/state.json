@@ -71,8 +71,8 @@
   ],
   "next": {
     "command": "$gsd-execute-phase 3",
-    "label": "Execute plan 03-04 board-scoped documents and images",
-    "reason": "Phase 03 executing; plans 03-01 through 03-03 complete; 2/13 phases and 17/26 plans complete"
+    "label": "Execute plan 03-05 account workspace conformance",
+    "reason": "Phase 03 executing; plans 03-01 through 03-04 complete; 2/13 phases and 18/26 plans complete"
   },
-  "updated_at": "2026-09-16T14:09:14.483Z"
+  "updated_at": "2026-09-16T14:32:54.340Z"
 }
