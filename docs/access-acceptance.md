@@ -41,6 +41,10 @@ The agent executes reachable automation after private setup. The operator perfor
 | A8 | Make pending synthetic text/image changes, trigger expiry, then sign back in with the same account. Repeat with a different account and with revoked/write-downgraded access. | Editing pauses and preservation precedes redirect. Same-account fresh write authorization replays image bytes before referencing text/document updates exactly once. Other identity or lost write access retains isolated pending work and sends no replay. |
 | A9 | Choose Account → Sign out of Dalí, reload, then deliberately choose Sign in again. | Pending work is preserved first; `POST /api/logout` destroys the Dali session. Signed-out page remains stable until the deliberate action. The provider's session is retained. |
 
+## Restoring an editable recovery archive
+
+An editable recovery archive can be restored through Main Menu → File → Import board while an authorized writable board is open. Select the downloaded `.bs.zip`, confirm **Import private copy**, and use **Open imported board** after publication succeeds. The import creates a new private account board with fresh identities and complete referenced images; the open source board remains available. A failed item retains its retry; an uncertain response offers **Check import again** to reconcile the existing attempt. Keep recovery archives and their contents in the operator-controlled evidence store.
+
 ## Native observations remaining
 
 Automated viewport, DOM focus, keyboard, composition-event routing and contrast checks have separate executable oracles. Record only these additional observations where the automation environment cannot provide them:

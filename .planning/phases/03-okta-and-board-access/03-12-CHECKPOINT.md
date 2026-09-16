@@ -8,7 +8,24 @@ actual_provider: not-run-human-needed
 
 # Phase 3 Plan 12 acceptance checkpoint
 
-This record is an incomplete automated handoff. Plan 12 and Phase 3 remain open, including task 03-12-01. The phase orchestrator requested a pause after the access rerun because independent code review found production defects that need remediation before the full browser matrix. Reported areas are root metadata validation, pending-edit duplication, rename/export title propagation, account archive import, Viewer view commands and post-action library filter/order. Detailed findings and remediation ownership remain with the orchestrator. The operator-controlled identity environment has not been supplied or accepted; no operator acceptance is requested at this stage.
+This record is an incomplete automated handoff. Plan 12 and Phase 3 remain open, including task 03-12-01. The seven original review findings were remediated through `12a2184`; independent rereview subsequently identified an enabled Viewer File → Import board action whose writable-only listener cannot run. The orchestrator requested another pause after the successful access rerun so that this narrow menu issue can be corrected before the full browser matrix. The operator-controlled identity environment has not been supplied or accepted; no operator acceptance is requested at this stage.
+
+## Current continuation evidence
+
+All results in this section were executed at implementation/test revision `12a2184` using fresh synthetic services. No source or test files changed in this continuation. The operator checklist now documents editable ZIP restoration through the authenticated private-copy flow.
+
+| Command / scope | Result |
+| --- | --- |
+| `npm run typecheck` | Passed for exact smoke and blocking chain. |
+| Exact two-file production `@03-12-smoke` command from the plan | 2 passed, 25.5s, zero failures/skips. |
+| `npm run typecheck:server` | Passed. |
+| `npm test` | 102 passed, 11 files, 1.12s. |
+| `npm run test:server` | 110 passed, 7 files, 6.64s. |
+| `npm run build` | Passed, 3899 modules, 8.04s; existing mixed-import/chunk-size warnings retained. |
+| `npm run test:access` | 110 passed, 3.7m, zero failures/skips. |
+| `npm run test:browser` | Not started: held by orchestrator for the Viewer Import menu correction. Refreshed selection is 1452 cases in 44 files: dev 340, production Chromium 334, Firefox 334, WebKit 334, access 110. Selection is not execution evidence. |
+
+The exact seven-command gate was started sequentially. Only its outer shell was paused while the access child finished, then terminated after the passing result to prevent automatic browser-matrix startup. This launcher termination does not change the access result and does not establish a completed final gate. All synthetic listeners were confirmed stopped before releasing the slot. Current 490px and 1404px recovery/library/sharing screenshots are retained in ignored `.gsd/acceptance-03-12/current-access/`. Earlier evidence below retains its original revision/count scope.
 
 ## Changes and observed regressions
 
@@ -116,6 +133,8 @@ Descriptor-less prohibitions remain **flagged-unverified** where the workflow ha
 
 ## Handoff and self-check
 
-The browser/build slot was released after the 100-case access suite completed. Its outer chained launcher was deliberately stopped before `test:browser`; the launcher termination is not a failed access test or a completed final gate. Current automatic task completion is 0/1; plan completion remains 0/2 because the automated task still requires production review remediation and the full matrix, followed by the actual-provider checkpoint. Overall tracking remains 2/13 phases and 25/26 plans complete.
+The browser/build slot was released after the current 110-case access suite completed. Current automatic task completion is 0/1; plan completion remains 0/2 because the automated task still requires the Viewer Import correction and full matrix, followed by the actual-provider checkpoint. Overall tracking remains 2/13 phases and 25/26 plans complete.
 
 All named implementation/test/checklist files and six task commits were verified present. No tracked files were deleted. Unrelated assets and milestone lock were preserved. Independent review findings take precedence over earlier passing focused tests; a passing subset cannot close the final acceptance task.
+
+Continuation self-check: current implementation commit, both exact smoke cases, all 110 access case results and all six refreshed screenshots were verified present. No implementation/test mutation or required skip was introduced. Parent-owned review artifacts remain untouched.
