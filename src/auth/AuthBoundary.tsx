@@ -22,22 +22,30 @@ export function AuthBoundary({ children }: { children: (session: SessionDescript
   }, [state]);
   useEffect(() => {
     if (state !== 'ready' || !member) return;
-    const timer = window.setTimeout(() => { setMember(null); setState('expired'); }, Math.min(Math.max(member.expiresAt - Date.now(), 0), 2147483647));
+    let timer: number;
+    const check = () => {
+      const remaining = member.expiresAt - Date.now();
+      if (remaining <= 0) { setMember(null); setState('expired'); }
+      else timer = window.setTimeout(check, Math.min(remaining, 2147483647));
+    };
+    check();
     return () => window.clearTimeout(timer);
   }, [state, member]);
   const signOut = async () => {
     if (!member) return;
-    const response = await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-Dali-Request': '1', 'X-Dali-Account': member.accountId }, body: '{}' });
-    if (!response.ok) { setMember(null); setState('error'); return; }
-    setMember(null); setState('signed-out'); window.history.replaceState(null, '', '/?signedOut=1');
+    try {
+      const response = await fetch('/api/logout', { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Dali-Request': '1', 'X-Dali-Account': member.accountId }, body: '{}' });
+      if (!response.ok) { setMember(null); setState('error'); return; }
+      setMember(null); setState('signed-out'); window.history.replaceState(null, '', '/?signedOut=1');
+    } catch { setMember(null); setState('error'); }
   };
   if (state === 'ready' && member) return children(member, signOut);
-  return <main className="djai-loading" style={{ padding: 24, gap: 16, flexDirection: 'column', textAlign: 'center' }}>
+  return <main className="djai-loading" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16, flexDirection: 'column', textAlign: 'center', fontSize: 15 }}>
     {state === 'loading' ? <p role="status">Signing you in…</p> : <>
-      <h1 style={{ fontSize: 20 }}>{state === 'signed-out' ? "You're signed out of Dalí" : state === 'expired' ? 'Session expired — sign in to continue.' : "We couldn't sign you in."}</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 600 }}>{state === 'signed-out' ? "You're signed out of Dalí" : state === 'expired' ? 'Session expired — sign in to continue.' : "We couldn't sign you in."}</h1>
       <p role={state === 'error' ? 'alert' : undefined}>{state === 'signed-out' ? 'Your Dalí session has ended.' : state === 'error' ? 'Try signing in again.' : 'Sign in to continue.'}</p>
-      <button className="djai-button" style={{ minHeight: 44 }} onClick={start}>{state === 'expired' ? 'Sign in to continue' : 'Sign in again'}</button>
+      <button className="djai-primary" style={{ minHeight: 44, fontSize: 13, fontWeight: 600 }} onClick={start}>{state === 'expired' ? 'Sign in to continue' : 'Sign in again'}</button>
     </>}
   </main>;
 }

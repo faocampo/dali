@@ -14,7 +14,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   let clock: number; let directory: string;
   const cookieOf = (response: { headers: Record<string, unknown> }) => {
     const values = response.headers['set-cookie'];
-    return (Array.isArray(values) ? values[0] : values)?.split(';')[0] as string;
+    return (Array.isArray(values) ? values.at(-1) : values)?.split(';')[0] as string;
   };
   beforeEach(async () => {
     clock = Date.now(); directory = await mkdtemp(join(tmpdir(), 'dali-auth-'));
@@ -140,11 +140,11 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     const flow = await signIn(); const account = (await session(flow.authenticated)).json(); const before = members();
     const headers = { cookie: flow.authenticated, origin: env.DALI_ORIGIN!, 'x-dali-request': '1', 'x-dali-account': account.accountId, 'content-type': 'application/json' };
     for (const change of [{ origin: 'https://foreign.example.org' }, { 'x-dali-request': '' }, { 'content-type': 'text/plain' }, { 'x-dali-account': 'stale-account' }]) {
-      const response = await app.inject({ method: 'POST', url: '/auth/logout', headers: { ...headers, ...change }, payload: '{}' });
+      const response = await app.inject({ method: 'POST', url: '/api/logout', headers: { ...headers, ...change }, payload: '{}' });
       expect([403, 409]).toContain(response.statusCode); expect((await session(flow.authenticated)).statusCode).toBe(200); expect(members()).toEqual(before);
     }
     expect((await app.inject({ method: 'GET', url: '/api/session', headers: { cookie: flow.authenticated, 'x-dali-account': 'stale-account' } })).statusCode).toBe(409);
-    for (let i = 0; i < 2; i++) expect((await app.inject({ method: 'POST', url: '/auth/logout', headers, payload: '{}' })).statusCode).toBe(204);
+    for (let i = 0; i < 2; i++) expect((await app.inject({ method: 'POST', url: '/api/logout', headers, payload: '{}' })).statusCode).toBe(204);
     expect((await session(flow.authenticated)).statusCode).toBe(401); expect(members()).toEqual(before);
   });
   it.each(['/?board=synthetic-board', '/?new=1', '//foreign.example.org', 'https://foreign.example.org', '/?board=../secret', '/?signedOut=1'])('D-01 retains only validated local intent %s', async value => {
@@ -158,6 +158,36 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     expect(() => readConfig({ ...env, DALI_OIDC_CALLBACK_URL: 'https://foreign.example.org/auth/callback' })).toThrow();
     for (const path of ['/auth/test', '/api/test/login', '/auth/fixture']) expect((await app.inject(path)).statusCode).toBe(404);
     await expect(buildApp({ config: { ...env, DALI_TEST_AUTH: 'true' }, database })).rejects.toThrow();
+    const production = await buildApp({ config: { ...env, NODE_ENV: 'production',
+      DALI_ORIGIN: 'https://app.example.org', DALI_OIDC_CALLBACK_URL: 'https://app.example.org/auth/callback', DALI_OIDC_ISSUER: 'https://identity.example.org' }, database });
+    try {
+      for (const path of ['/auth/test', '/api/test/login', '/auth/fixture']) expect((await production.inject(path)).statusCode).toBe(404);
+      expect((await production.inject('/api/session')).statusCode).toBe(401);
+    } finally { await production.close(); }
+  });
+  it('HTTPS origin issues Secure host-only persistent cookies', async () => {
+    const secure = await buildApp({ config: { ...env, DALI_ORIGIN: 'https://app.example.org',
+      DALI_OIDC_CALLBACK_URL: 'https://app.example.org/auth/callback' }, database });
+    try {
+      const response = await secure.inject('/auth/start'); expect(response.statusCode).toBe(302);
+      expect(String(response.headers['set-cookie'])).toContain('Secure'); expect(String(response.headers['set-cookie'])).not.toContain('Domain=');
+      expect(String(response.headers['set-cookie'])).toContain('HttpOnly'); expect(String(response.headers['set-cookie'])).toContain('SameSite=Lax');
+    } finally { await secure.close(); }
+  });
+  it('identical subject from another trusted issuer retains a separate member key', async () => {
+    const first = (await session((await signIn()).authenticated)).json(); expect(first.accountId).toEqual(expect.any(String));
+    const second = await createOidcProvider({ clients: [{ clientId: env.DALI_OIDC_CLIENT_ID!, clientSecret: env.DALI_OIDC_CLIENT_SECRET!, redirectUri: env.DALI_OIDC_CALLBACK_URL! }] });
+    try {
+      await app.close(); app = await buildApp({ config: { ...env, DALI_OIDC_ISSUER: second.issuer }, database, now: () => clock });
+      const other = (await session((await signIn()).authenticated)).json(); expect(other.accountId).not.toBe(first.accountId);
+      expect(other.email).toBe(first.email); expect(members()).toHaveLength(2);
+    } finally { await second.close(); }
+  });
+  it('malformed operator values never appear in configuration errors', () => {
+    for (const setting of [{ DALI_OIDC_ISSUER: 'synthetic-private-value' }, { DALI_INTERNAL_VALUES_JSON: 'synthetic-private-value' }]) {
+      expect(() => readConfig({ ...env, ...setting })).toThrow('Authentication configuration unavailable');
+      try { readConfig({ ...env, ...setting }); } catch (error) { expect(String(error)).not.toContain('synthetic-private-value'); }
+    }
   });
   it('migrations are idempotent and failed additive migration rolls back its table and ledger', () => {
     runMigrations(database); expect(database.prepare('SELECT version FROM schema_migrations').all()).toEqual([{ version: 1 }]);
