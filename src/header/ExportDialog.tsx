@@ -1,7 +1,8 @@
 /**
  * Accessible export settings and artifact download status.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { getActiveAccessScope, subscribeAccessScope } from '../canvas/runtime';
 import { EXPORT_FORMATS, exportBoardFile, type ExportFormat } from '../canvas/export-board';
 import {
   presentationScopeAvailability,
@@ -13,7 +14,9 @@ import { createPortal } from 'react-dom';
 import { DEFAULT_EXPORT_OPTIONS, type ExportScale } from '../canvas/export-plan';
 
 export function ExportDialog({ onClose }: { onClose: () => void }) {
-  const [format, setFormat] = useState<ExportFormat>('board');
+  const access = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
+  const editable = access?.phase === 'active' && access.canWrite && access.role !== 'viewer';
+  const [format, setFormat] = useState<ExportFormat>(() => editable ? 'board' : 'png');
   const [scope, setScope] = useState<PresentationScope>('board');
   const [scale, setScale] = useState<ExportScale>(1);
   const [padding, setPadding] = useState('0');
@@ -61,7 +64,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
       </> : <>
       <div className="export-settings">
       <Section label="Format">
-        {EXPORT_FORMATS.map((f) => (
+        {EXPORT_FORMATS.filter(f => f.id !== 'board' || editable).map((f) => (
           <label key={f.id} className="djai-radio">
             <input
               type="radio"
@@ -154,7 +157,7 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         type="button"
         className="djai-primary"
         onClick={download}
-        disabled={exporting || (format === 'png' && !plan.valid)}
+        disabled={exporting || (format === 'board' && !editable) || (format === 'png' && !plan.valid)}
       >
         {exporting ? 'Preparing…' : 'Download'}
       </button>

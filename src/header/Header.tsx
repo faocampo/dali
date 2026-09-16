@@ -127,13 +127,13 @@ export function Header({
                 >
                   Retry saving
                 </button>
-                <button
+                {board?.summary.role !== 'viewer' && <button
                   type="button"
                   className="djai-primary"
-                  onClick={() => void exportBoardFile()}
+                  onClick={() => void exportBoardFile().catch(cause => setRetryError(cause instanceof Error ? cause.message : 'The backup could not be downloaded.'))}
                 >
                   Download backup
-                </button>
+                </button>}
               </div>
             </div>
           )}

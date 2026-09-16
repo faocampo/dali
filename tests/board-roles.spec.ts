@@ -9,6 +9,9 @@ import { createOidcProvider } from './oidc-provider';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
 import { syntheticCanaries } from './access-fixtures';
+import { fileAction } from './app-menu';
+import { PDFDocument, PDFRawStream, PDFName, decodePDFRawStream } from 'pdf-lib';
+import { unzipSync, strFromU8 } from 'fflate';
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 let accountId: string; const origin = 'http://127.0.0.1:5499';
 let ownerRequest: APIRequestContext | undefined; let ownerId: string;
@@ -58,6 +61,7 @@ test('@03-09-01 Viewer native keyboard clipboard drop and history preserve model
   const before = await localState(page); const server = sourceState(board.summary.id); const owner = await ownerRead(board.summary.id);
   await page.locator('affine-edgeless-root').evaluate(el => { const gfx = (el as HTMLElement & { gfx: GfxController }).gfx; const map = gfx.surface!.elementModels.find(el => el.type === 'mindmap') as MindmapElementModel; gfx.selection.set({ elements: [map.tree.id], editing: false }); });
   for (const key of ['Tab', 'Enter', 'Delete', 'Backspace', 'ControlOrMeta+d', 'ControlOrMeta+z', 'ControlOrMeta+Shift+z', 'ControlOrMeta+b']) {
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.keyboard.press(key); expect(await localState(page), key).toEqual(before); expect(sourceState(board.summary.id), key).toEqual(server); expect(await ownerRead(board.summary.id)).toEqual(owner);
   }
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -85,6 +89,9 @@ test('@03-09-01 Viewer native keyboard clipboard drop and history preserve model
   const zoom = await page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.viewport.zoom);
   await page.mouse.move(600, 400); await page.mouse.wheel(0, -150);
   await expect.poll(() => page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.viewport.zoom)).not.toBe(zoom);
+  const center = await page.locator('affine-edgeless-root').evaluate(el => ({ ...(el as HTMLElement & { gfx: GfxController }).gfx.viewport.center }));
+  await page.mouse.move(600, 400); await page.mouse.down({ button: 'middle' }); await page.mouse.move(680, 460, { steps: 5 }); await page.mouse.up({ button: 'middle' });
+  await expect.poll(() => page.locator('affine-edgeless-root').evaluate(el => ({ ...(el as HTMLElement & { gfx: GfxController }).gfx.viewport.center }))).not.toEqual(center);
   expect(await localState(page)).toEqual(before); expect(sourceState(board.summary.id)).toEqual(server);
 });
 for (const access of ['owner', 'editor'] as const) test(`@03-09-01 ${access} native creation typing styling collection history and clipboard remain writable`, async ({ page, context }) => {
@@ -135,4 +142,86 @@ test('@03-09-01 Viewer native shape drawing image properties groups connectors a
     await page.mouse.click(800, 550); await page.keyboard.press(key); await page.mouse.move(800, 550); await page.mouse.down(); await page.mouse.move(900, 620, { steps: 5 }); await page.mouse.up();
     expect(await localState(page), key).toEqual(before); expect(sourceState(board.summary.id), key).toEqual(server);
   }
+});
+async function exportSeed(page: Page) {
+  const board = await create(page, 'Export canary'); await page.goto(origin + '/?board=' + board.summary.id);
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Map text canary'); await page.keyboard.press('Escape');
+  const png = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 80; const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#00ff00'; ctx.fillRect(0, 0, 80, 80); return canvas.toDataURL().split(',')[1]!; });
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'green-canary.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64') });
+  await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
+  const ids = await page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx; const surface = gfx.surface!;
+    const map = surface.elementModels.find(el => el.type === 'mindmap') as MindmapElementModel; const root = map.tree.element as ShapeElementModel;
+    root.fillColor = '#0000ff'; root.color = '#000000';
+    const image = gfx.doc.getBlocksByFlavour('affine:image')[0]!.model as ImageBlockModel;
+    gfx.doc.updateBlock(image, { xywh: `[${root.x + root.w + 40},${root.y},80,80]` });
+    const frame = gfx.doc.addBlock('affine:frame', { xywh: `[${root.x - 20},${root.y - 20},${root.w + 160},${Math.max(root.h, 80) + 40}]` }, surface.id);
+    surface.addElement({ type: 'shape', shapeType: 'rect', shapeStyle: 'General', filled: true, fillColor: '#ff0000', strokeWidth: 0, xywh: `[${root.x + root.w + 350},${root.y},100,100]` });
+    return { frame, image: image.id, map: map.id };
+  });
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible(); return { board, ids };
+}
+async function downloadBytes(page: Page) {
+  const downloading = page.waitForEvent('download'); await page.getByRole('dialog').getByRole('button', { name: 'Download', exact: true }).click();
+  const file = await downloading; expect(await file.failure()).toBeNull(); const parts: Buffer[] = [];
+  for await (const part of (await file.createReadStream())!) parts.push(Buffer.from(part));
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click(); return Buffer.concat(parts);
+}
+const colors = (bytes: Uint8Array, stride: number) => {
+  const result = { red: 0, green: 0, blue: 0, dark: 0 };
+  for (let i = 0; i < bytes.length; i += stride) { const [r, g, b] = [bytes[i]!, bytes[i + 1]!, bytes[i + 2]!]; if (stride === 4 && bytes[i + 3]! < 128) continue;
+    if (r > 240 && g < 20 && b < 20) result.red++; if (r < 20 && g > 240 && b < 20) result.green++; if (r < 20 && g < 20 && b > 240) result.blue++; if (r < 70 && g < 70 && b < 70) result.dark++;
+  } return result;
+};
+test('@03-09-02 Viewer decoded PNG and PDF preserve authorized map text image and board frame selection scopes', async ({ page }) => {
+  const { board, ids } = await exportSeed(page); await role(page, board.summary.id, 'viewer');
+  const before = await localState(page); const server = await ownerRead(board.summary.id);
+  for (const format of ['png', 'pdf']) for (const scope of ['board', 'frame', 'selection']) {
+    await page.locator('affine-edgeless-root').evaluate((el, id) => (el as HTMLElement & { gfx: GfxController }).gfx.selection.set({ elements: [id], editing: false }), scope === 'selection' ? ids.image : ids.frame);
+    await fileAction(page, 'Export board'); await expect(page.getByRole('radio', { name: 'Editable board file' })).toHaveCount(0);
+    await page.getByRole('radio', { name: format === 'png' ? 'PNG image' : 'PDF document' }).check();
+    await page.locator(`input[name="export-scope"][value="${scope}"]`).check();
+    if (format === 'png') { await page.getByRole('radio', { name: '2×', exact: true }).check(); await page.getByRole('checkbox', { name: 'Transparent background' }).check(); }
+    const artifact = await downloadBytes(page); let decoded: ReturnType<typeof colors>;
+    if (format === 'png') {
+      const pixels = await page.evaluate(async base64 => { const img = new Image(); img.src = 'data:image/png;base64,' + base64; await img.decode(); const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height; const ctx = canvas.getContext('2d')!; ctx.drawImage(img, 0, 0); return [...ctx.getImageData(0, 0, canvas.width, canvas.height).data]; }, artifact.toString('base64'));
+      decoded = colors(Uint8Array.from(pixels), 4);
+    } else {
+      const pdf = await PDFDocument.load(artifact); expect(pdf.getPageCount()).toBeGreaterThan(0);
+      const images = pdf.context.enumerateIndirectObjects().map(([, value]) => value).filter((value): value is PDFRawStream => value instanceof PDFRawStream && value.dict.get(PDFName.of('Subtype')) === PDFName.of('Image') && value.dict.get(PDFName.of('ColorSpace')) === PDFName.of('DeviceRGB'));
+      expect(images.length).toBeGreaterThan(0); decoded = colors(Uint8Array.from(images.flatMap(image => [...decodePDFRawStream(image).decode()])), 3);
+    }
+    expect(decoded.green, `${format}/${scope} image`).toBeGreaterThan(1000);
+    if (scope !== 'selection') { expect(decoded.blue, 'map fill').toBeGreaterThan(1000); expect(decoded.dark, 'map text pixels').toBeGreaterThan(20); } else expect(decoded.blue).toBe(0);
+    if (scope === 'board') expect(decoded.red).toBeGreaterThan(1000); else expect(decoded.red).toBe(0);
+    expect(await localState(page)).toEqual(before); expect(await ownerRead(board.summary.id)).toEqual(server);
+  }
+});
+for (const access of ['owner', 'editor'] as const) test(`@03-09-02 ${access} editable archive retains map and image while server revoked role yields no artifact`, async ({ page }) => {
+  const { board } = await exportSeed(page); if (access === 'editor') await role(page, board.summary.id, access);
+  await fileAction(page, 'Export board'); const archive = unzipSync(await downloadBytes(page));
+  expect(Object.keys(archive).filter(key => key.startsWith('assets/'))).toHaveLength(1);
+  expect(Object.entries(archive).filter(([key]) => key.endsWith('.snapshot.json')).map(([, value]) => strFromU8(value)).join('')).toContain('Map text canary');
+  await fileAction(page, 'Export board');
+  if (access === 'owner') { database.prepare('INSERT INTO members(id,issuer,subject,email,canonical_email,display_name) VALUES(?,?,?,?,?,?)').run('synthetic-next-owner', provider.issuer, 'next-owner', 'next@example.org', 'next@example.org', 'Next Owner'); database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run('synthetic-next-owner', board.summary.id); }
+  database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?) ON CONFLICT(board_id,member_id) DO UPDATE SET role=excluded.role').run(board.summary.id, accountId, 'viewer');
+  const downloads: string[] = []; page.on('download', file => downloads.push(file.suggestedFilename()));
+  await page.getByRole('dialog').getByRole('button', { name: 'Download', exact: true }).click(); await expect(page.getByRole('dialog').getByRole('alert')).toContainText('access'); expect(downloads).toEqual([]);
+});
+test('@03-09-02 denied image and identity change during image resolution produce no artifact', async ({ page }) => {
+  const { board } = await exportSeed(page); await role(page, board.summary.id, 'viewer');
+  const downloads: string[] = []; page.on('download', file => downloads.push(file.suggestedFilename()));
+  const pattern = '**/api/boards/' + board.summary.id + '/blobs/*';
+  await page.route(pattern, route => route.fulfill({ status: 404, contentType: 'application/json', body: '{"code":"IMAGE_UNAVAILABLE"}' }));
+  await fileAction(page, 'Export board'); await page.getByRole('dialog').getByRole('button', { name: 'Download', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('image'); expect(downloads).toEqual([]);
+  await page.unroute(pattern); await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; }); let entered = false;
+  await page.route(pattern, async route => { const authorized = await route.fetch(); entered = true; await gate; await route.fulfill({ response: authorized }); });
+  await fileAction(page, 'Export board'); await page.getByRole('dialog').getByRole('button', { name: 'Download', exact: true }).click();
+  await expect.poll(() => entered).toBe(true);
+  // A second tab signs in another account while authorized image bytes are in flight.
+  const second = await page.context().newPage(); await page.context().clearCookies(); await second.goto(origin + '/auth/start');
+  await second.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(second.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  release(); await expect(page.getByRole('dialog').getByRole('alert')).toContainText('access'); expect(downloads).toEqual([]); await second.close();
 });

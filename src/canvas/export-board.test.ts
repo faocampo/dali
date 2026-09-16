@@ -16,7 +16,7 @@ it('@03-09-02 direct editable service denies Viewer before producing any artifac
 });
 it('@03-09-02 rendering completion after identity changes produces no download', async () => {
   state.scope = { ...state.scope, role: 'viewer', canWrite: false, phase: 'active' };
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true })));
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) })));
   vi.stubGlobal('document', { createElement: () => ({ style: {}, click: state.clicks, remove: vi.fn() }), body: { append: vi.fn() } });
   state.render.mockImplementation(async () => {
     state.scope = { ...state.scope, generation: state.scope.generation + 1 };

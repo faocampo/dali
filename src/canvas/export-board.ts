@@ -4,8 +4,9 @@
  * Pulled out of the toolbar so the header's Export dialog and the rail's
  * export button run exactly the same code path rather than two copies.
  */
-import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
+import { createAssetsArchive } from '@blocksuite/affine/widgets/linked-doc';
 import { getCanvasRuntime } from './runtime';
+import { accessScopeCurrent } from './account/mutation-guard';
 import type { ExportPlan, ExportScale } from './export-plan';
 import {
   renderBoardPresentation,
@@ -140,10 +141,42 @@ export async function exportBoardFile(
   format: ExportFormat = 'board',
   options: PresentationExportOptions = { scope: 'visible' }
 ): Promise<PresentationExportResult | void> {
-  const { workspace, store } = await getCanvasRuntime();
-  const catalog = { title: (await getCanvasRuntime()).descriptor.summary.title };
+  const { store, scope, descriptor } = await getCanvasRuntime();
+  const assertCurrent = () => {
+    if (!accessScopeCurrent(scope, format === 'board')) throw new Error(format === 'board' ? 'Editable download requires current Owner or Editor access.' : 'Board access changed. Reopen the board before exporting.');
+  };
+  const authorize = async () => {
+    assertCurrent();
+    const response = await fetch(`/api/boards/${encodeURIComponent(scope.boardId)}${format === 'board' ? '/editable-export' : ''}`, {
+      credentials: 'same-origin', cache: 'no-store', headers: { 'X-Dali-Account': scope.accountId },
+    });
+    assertCurrent();
+    if (!response.ok) throw new Error('Export access could not be confirmed. Reopen the board and try again.');
+    // Consume the response before the final synchronous generation check.
+    await response.arrayBuffer(); assertCurrent();
+  };
+  await authorize();
+  const catalog = { title: descriptor.summary.title };
   if (format === 'board') {
-    await ZipTransformer.exportDocs(workspace, store.schema, [store]);
+    // The upstream convenience exporter downloads internally and tolerates
+    // missing assets. Build its compatible archive here so all assets and the
+    // final authorization check finish before the only download dispatch.
+    const job = store.getTransformer();
+    try {
+      const snapshot = job.docToSnapshot(store);
+      if (!snapshot) throw new Error('The board could not be prepared for export.');
+      snapshot.meta.title = catalog.title;
+      const ids = [...job.assetsManager.getPathBlobIdMap().values()];
+      for (const id of ids) {
+        await job.assetsManager.readFromBlob(id); assertCurrent();
+        if (!job.assets.has(id)) throw new Error('An image is missing. Restore the image and retry.');
+      }
+      const zip = await createAssetsArchive(job.assets, ids);
+      await zip.file(`${safeFilename(catalog.title)}-${snapshot.meta.id}.snapshot.json`, JSON.stringify(snapshot));
+      const blob = await zip.generate();
+      await authorize(); assertCurrent();
+      downloadBlob(blob, `${safeFilename(catalog.title)}.bs.zip`);
+    } finally { job[Symbol.dispose](); }
     return;
   }
 
@@ -156,7 +189,10 @@ export async function exportBoardFile(
   try {
     const title = safeFilename(catalog?.title ?? 'Untitled board');
     if (format === 'png') {
-      downloadBlob(await canvasBlob(render.canvas), `${title}.png`);
+      assertCurrent();
+      const blob = await canvasBlob(render.canvas);
+      await authorize(); assertCurrent();
+      downloadBlob(blob, `${title}.png`);
       return {
         format,
         width: render.canvas.width,
@@ -168,6 +204,7 @@ export async function exportBoardFile(
     }
 
     const pdf = await canvasPdf(render.canvas);
+    await authorize(); assertCurrent();
     downloadBlob(pdf.blob, `${title}.pdf`);
     return {
       format,
