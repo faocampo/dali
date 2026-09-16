@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Okta and Board Access
-current_plan: 9
+current_plan: 10
 status: executing
-stopped_at: Completed 03-08-PLAN.md; continue with 03-09 role enforcement
-last_updated: "2026-09-16T16:40:12.320Z"
+stopped_at: Completed 03-09-PLAN.md; continue with 03-10 session recovery
+last_updated: "2026-09-16T17:06:42.013Z"
 last_activity: 2026-09-16
-last_activity_desc: Plan 03-08 board actions and header verified and committed; ready for plan 03-09
-state_head: bcc45c2
+last_activity_desc: Plan 03-09 native Viewer guards and permitted exports verified and committed; ready for plan 03-10
+state_head: 73cbc406ec890d4cc397be02f480196f66aac60b
 progress:
   total_phases: 13
   completed_phases: 2
   total_plans: 26
-  completed_plans: 22
+  completed_plans: 23
   percent: 15
 ---
 
@@ -29,18 +29,18 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-15).
 ## Current Position
 
 Phase: 03 (Okta and Board Access) — EXECUTING
-Current Plan: 9
+Current Plan: 10
 Total Plans in Phase: 12
-Status: Executing — plan 03-09 next
-Last activity: 2026-09-16 — Plan 03-08 verified and committed; 95 unit tests, 107 server tests and 14 distinct production action/header/menu/New browser cases passed. Native 200% zoom and actual-provider acceptance remain final-phase obligations.
+Status: Executing — plan 03-10 next
+Last activity: 2026-09-16 — Plan 03-09 verified and committed; 102 unit tests, 22 focused server tests and final 38 production role/image/map export cases passed, with 42 earlier native editing/arrangement/image-import/formatting cases. Native 200% zoom and actual-provider acceptance remain final-phase obligations.
 
-Progress: [██░░░░░░░░] 15% (2/13 phases complete; 22/26 plans complete)
+Progress: [██░░░░░░░░] 15% (2/13 phases complete; 23/26 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 22
+- Total plans completed: 23
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -51,7 +51,7 @@ Progress: [██░░░░░░░░] 15% (2/13 phases complete; 22/26 plan
 | — | 0 | — | — |
 | 1 | 5 | - | - |
 | 2 | 9 | - | - |
-| 3 | 8 | 195min | 24min |
+| 3 | 9 | 221min | 25min |
 
 **Recent Trend:**
 
@@ -81,6 +81,7 @@ Progress: [██░░░░░░░░] 15% (2/13 phases complete; 22/26 plan
 | Phase 03 P06 | 28min | 2 tasks | 35 files |
 | Phase 03 P07 | 24min | 2 tasks | 9 files |
 | Phase 03 P08 | 34min | 2 tasks | 13 files |
+| Phase 03 P09 | 26min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -115,10 +116,11 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 - [Phase 03]: Authorized native runtime freezes AccessScope for plans 09/10; New uses gesture-reserved tabs and operation reconciliation; previews publish after acknowledged edits with transactional capability checks.
 - [Phase 03]: Plan 03-07 uses monotonic board-derived grant revisions and issuer-scoped observed email history for stable-account activation; header trigger remains plan 03-08.
 - [Phase 03]: Plan 03-08 uses source-bound staged private copies and field-specific native surface ID remapping; inline names reconcile through SQL authority.
+- [Phase 03]: Native mutation guards consume immutable active account/board/generation scope; supported downloads revalidate server capability immediately before dispatch.
 
 ### Pending Todos
 
-- Continue Phase 3 with plan 03-09 from phases/03-okta-and-board-access/03-PLAN-INDEX.md (four remaining plans and interface contracts). Plan 03-08 actions, isolated private duplication and compact authenticated header are verified. Plans 03-09 and 03-10 share the next wave and execute sequentially in this runtime. Actual-provider acceptance remains pending; shared requirements remain open. Retain dormant seeds and recorded earlier TDD process deviations in WINDOWS.md.
+- Continue Phase 3 with plan 03-10 from phases/03-okta-and-board-access/03-PLAN-INDEX.md (three remaining plans and interface contracts). Plan 03-09 native Viewer guards, scoped presentation exports and final download authorization are verified. Plan 03-10 completes wave 9 sequentially in this runtime. Actual-provider acceptance remains pending; shared requirements remain open. Retain dormant seeds and recorded earlier TDD process deviations in WINDOWS.md.
 
 ### Blockers/Concerns
 
@@ -134,10 +136,10 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ## Session Continuity
 
-Last session: 2026-09-16T16:40:12.284Z
-Stopped at: Completed 03-08-PLAN.md; continue with 03-09 role enforcement
+Last session: 2026-09-16T17:06:41.977Z
+Stopped at: Completed 03-09-PLAN.md; continue with 03-10 session recovery
 Resume file: None
-Next action: $gsd-execute-phase 3 — continue with plan 03-09 role enforcement, then plan 03-10 session recovery, dependent plans and final requirement verification.
+Next action: $gsd-execute-phase 3 — continue with plan 03-10 session recovery, dependent plans and final requirement verification.
 
 ## Phase 1 verification outcome
 
