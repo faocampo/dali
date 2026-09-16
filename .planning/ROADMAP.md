@@ -145,7 +145,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-03-PLAN.md — Create private boards and browse the authorized library.
+- [x] 03-03-PLAN.md — Create private boards and browse the authorized library.
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -372,7 +372,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 |-------|----------------|--------|-----------|
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
-| 3. Okta and Board Access | 2/12 | In Progress|  |
+| 3. Okta and Board Access | 3/12 | In Progress|  |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
 | 6. Follow Me | 0/TBD | Not started | - |

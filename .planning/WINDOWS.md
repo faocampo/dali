@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 5
+open_count: 6
 waived_count: 1
 fixed_count: 0
-total_count: 6
-last_updated: 2026-09-16T13:09:29.543Z
+total_count: 7
+last_updated: 2026-09-16T14:06:50.521Z
 ---
 
 # Broken Windows Ledger
@@ -21,6 +21,7 @@ last_updated: 2026-09-16T13:09:29.543Z
 | 4 | 02 | unrun-verify | tests/mindmap-keyboard.spec.ts |  | Native OS IME text production remains for phase verification; constructed composition events verify topic routing and external-field isolation. | open |  | 2026-09-12T23:48:17.294Z |  |
 | 5 | 02 | unrun-verify | tests/clipboard-route.ts |  | Firefox and WebKit native OS clipboard integration remains unverified; native serialized payload routing is simulated, while Chromium uses the real clipboard. | open |  | 2026-09-13T00:37:09.126Z |  |
 | 6 | 03 | deviation | server/preflight.test.ts | 13 | Task 03-01 dependency installation began after observed RED but before RED evidence gate and test commit; baseline assertion was independently replayed and verified before GREEN commit. | open |  | 2026-09-16T13:09:29.543Z |  |
+| 7 | 03 | stub | src/App.tsx | 28 | Authorized board transition awaits account canvas mounting in plan 03-06; permission is checked before displaying the canonical board title. | open |  | 2026-09-16T14:06:50.521Z |  |
 
 ````json
 [
@@ -94,6 +95,18 @@ last_updated: 2026-09-16T13:09:29.543Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-16T13:09:29.543Z",
+    "resolved_at": null
+  },
+  {
+    "id": 7,
+    "kind": "stub",
+    "phase": "03",
+    "file": "src/App.tsx",
+    "line": 28,
+    "description": "Authorized board transition awaits account canvas mounting in plan 03-06; permission is checked before displaying the canonical board title.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-16T14:06:50.521Z",
     "resolved_at": null
   }
 ]
