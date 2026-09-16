@@ -26,6 +26,7 @@ async function transaction<T>(mode: IDBTransactionMode, action: (store: IDBObjec
   } finally { db.close(); }
 }
 export async function pendingRecords(accountId: string, boardId: string): Promise<JournalRecord[]> {
+  if (!(await indexedDB.databases()).some(db => db.name === databaseName)) return [];
   const records = await transaction<JournalRecord[]>('readonly', store => store.getAll());
   return records.filter(record => record.accountId === accountId && record.boardId === boardId)
     .sort((a, b) => a.generation - b.generation || a.sequence - b.sequence || a.id.localeCompare(b.id));
@@ -61,7 +62,7 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
   if (descriptor.summary.accountId !== accountId) throw new SourceAccessError(409);
   const records = (await pendingRecords(accountId, descriptor.summary.id)).filter(record => !blobsOnly || record.kind === 'blob');
   if (!records.length) return false;
-  if (descriptor.summary.role === 'viewer') throw new SourceAccessError(403);
+  if (descriptor.summary.role === 'viewer' || !descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
   const ordered = [...records.filter(r => r.kind === 'blob'), ...records.filter(r => r.kind === 'document')];
   for (const record of ordered) {
     if (signal.aborted) throw new Error('Recovery interrupted');

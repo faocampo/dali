@@ -41,7 +41,8 @@ export class BoardDocSource implements DocSource {
   async push(docId: string, data: Uint8Array) {
     this.assertCurrent(docId, true);
     const copy = new Uint8Array(data); const token = await this.options.onPendingDocument?.(docId, copy);
-    await this.options.beforeDocumentWrite?.();
+    try { await this.options.beforeDocumentWrite?.(); }
+    catch (error) { if (error instanceof SourceAccessError) this.options.onAuthorizationLost?.(error); throw error; }
     const response = await this.request(docId, 'push', copy);
     const result: unknown = await response.json(); this.assertCurrent(docId, true);
     if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true) throw new Error('Document commit unconfirmed');

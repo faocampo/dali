@@ -4,7 +4,7 @@ import type { AccountWorkspaceOptions, BoardWorkspace } from './account/board-wo
 import { reportDocEngineStatus, resetSaveStatus } from './save-status';
 import * as Y from 'yjs';
 import { AccountJournal, acknowledgeRecord, replayJournal } from './account/outbox';
-import { interruptSession } from '../auth/session';
+import { interruptSession, revalidateSession } from '../auth/session';
 
 export type BoardRole = BoardSummary['role'];
 export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed' }>;
@@ -18,6 +18,7 @@ let abort: AbortController | undefined;
 let capture: Promise<unknown>[] = [];
 const listeners = new Set<() => void>();
 export const getActiveAccessScope = (): AccessScope | null => scope;
+export const getRecoveryBoard = () => current ? { accountId: current.scope.accountId, boardId: current.descriptor.summary.id, title: current.descriptor.summary.title } : null;
 export function subscribeAccessScope(listener: () => void): () => void { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function publish(value: AccessScope) { scope = Object.freeze(value); listeners.forEach(listener => listener()); }
 export function nextAccessGeneration() { return ++generation; }
@@ -66,7 +67,10 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     onPendingBlob: (key, value) => scopedJournal.capture('blob', key, value),
     onAcknowledged: token => typeof token === 'string' ? acknowledgeRecord(token) : Promise.resolve(),
     beforeDocumentWrite: () => replayJournal(options.descriptor, options.accountId, requestAbort.signal, true).then(() => undefined),
-    onAuthorizationLost: error => { if (isCurrent()) { suspendAccessScope('authorization'); void interruptSession(); } if (error.status !== 401) options.onAuthorizationLost?.(error); },
+    onAuthorizationLost: error => {
+      if (isCurrent()) { suspendAccessScope('authorization'); if (error.status === 401) void interruptSession(); else if (error.status === 409) void revalidateSession(); }
+      if (![401, 409].includes(error.status)) options.onAuthorizationLost?.(error);
+    },
   })).then(workspace => {
     if (!isCurrent()) { workspace.dispose(); throw new Error('Board access changed'); }
     const store = workspace.getDoc(options.descriptor.contentDocId)!.getStore();

@@ -9,12 +9,15 @@ import { openDatabase, type AccountDatabase } from '../server/storage/database';
 import { syntheticCanaries } from './access-fixtures';
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 let accountId: string; const origin = 'http://127.0.0.1:5499';
-test.use({ expectErrors: ['the server responded with a status of 401', 'the server responded with a status of 403', 'the server responded with a status of 404', 'the server responded with a status of 409', 'the server responded with a status of 503'] });
+let beforeCommit: (() => Promise<void>) | undefined;
+const expectedAccessErrors = ['the server responded with a status of 401', 'the server responded with a status of 403', 'the server responded with a status of 404', 'the server responded with a status of 409', 'the server responded with a status of 503'];
+test.use({ expectErrors: expectedAccessErrors });
 test.beforeEach(async ({ page, baseURL }) => {
   await page.clock.install();
+  beforeCommit = undefined;
   const registration = { clientId: 'synthetic-recovery', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
   provider = await createOidcProvider({ clients: [registration] }); database = openDatabase(':memory:');
-  app = await buildApp({ database, config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000', DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]' } });
+  app = await buildApp({ database, beforeCommit: () => beforeCommit?.() ?? Promise.resolve(), config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000', DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]' } });
   app.get('/*', async (request, reply) => { const response = await fetch(baseURL! + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
   await app.listen({ host: '127.0.0.1', port: 5499 });
   await page.goto(origin); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
@@ -143,6 +146,79 @@ for (const access of ['viewer', 'revoked'] as const) test(`@03-10-02 ${access} r
   expect(writes).toBe(0); expect(await records(page)).toEqual(pending); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(serverBefore);
   await page.getByRole('button', { name: 'Discard pending changes', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('Recovery canary'); await expect(page.getByRole('button', { name: 'Keep pending changes', exact: true })).toBeFocused();
-  await page.getByRole('button', { name: 'Discard pending changes', exact: true }).click(); expect(await records(page)).toEqual([]);
+  await page.getByRole('dialog').getByRole('button', { name: 'Discard pending changes', exact: true }).click(); await expect(page.getByRole('status')).toHaveText('Pending changes discarded.'); expect(await records(page)).toEqual([]);
   await owner.close();
+});
+for (const fallback of [false, true]) test(`@03-10-02 cross-tab logout preserves pending edits with ${fallback ? 'storage fallback' : 'BroadcastChannel'}`, async ({ page, context }) => {
+  if (fallback) { await context.addInitScript(() => Object.defineProperty(window, 'BroadcastChannel', { value: undefined })); await page.reload(); }
+  const descriptor = await board(page); const other = await context.newPage(); await other.goto(origin);
+  await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible(); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: {} })); await text(page, 'Stale tab pending canary');
+  const before = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
+  await other.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
+  await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible();
+  await expect(page.locator('editor-host')).toHaveCount(0); expect((await records(page)).length).toBeGreaterThan(0);
+  expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before);
+  const signal = await page.evaluate(() => JSON.parse(localStorage.getItem('dali-session-signal')!)); expect(Object.keys(signal).sort()).toEqual(['id', 'kind']);
+  await page.reload(); await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible(); await other.close();
+});
+test('@03-10-02 explicit logout quota failure retains tab and only sends logout after retry', async ({ page }) => {
+  await board(page); await text(page, 'Logout pending canary');
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await page.evaluate(() => { const put = IDBObjectStore.prototype.put; Object.assign(window, { restoreJournal: () => { IDBObjectStore.prototype.put = put; } }); IDBObjectStore.prototype.put = function (...args) { if (this.transaction.db.name.startsWith('dali-account-recovery')) throw new DOMException('Synthetic quota', 'QuotaExceededError'); return put.apply(this, args); }; });
+  let logout = 0; page.on('request', request => { if (request.url().endsWith('/api/logout')) logout++; });
+  await page.locator('summary').filter({ hasText: /^Account$/ }).click(); await page.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry preservation', exact: true })).toBeVisible(); expect(logout).toBe(0);
+  await page.evaluate(() => (window as unknown as { restoreJournal(): void }).restoreJournal());
+  await page.getByRole('button', { name: 'Retry preservation', exact: true }).click();
+  await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible(); expect(logout).toBe(1);
+  expect((await records(page)).length).toBeGreaterThan(0); expect((await page.request.get(origin + '/api/session')).status()).toBe(401);
+});
+for (const resource of ['document', 'image', 'thumbnail'] as const) test.describe(`delayed ${resource}`, () => {
+  // Pinned native image loading logs this exact cancellation when its authorized request is aborted.
+  if (resource === 'image') test.use({ expectErrors: [...expectedAccessErrors, 'AbortError: signal is aborted without reason'] });
+  test(`@03-10-02 delayed ${resource} from old cookie identity cannot render after account switch`, async ({ page, context }) => {
+  const descriptor = await board(page); await text(page, 'Delayed identity canary');
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'canary.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes }); await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  if (resource === 'thumbnail') {
+    const thumbnail = await page.request.put(origin + '/api/boards/' + descriptor.summary.id + '/thumbnail', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': 'image/png' }, data: syntheticCanaries().imageBytes }); expect(thumbnail.status()).toBe(200);
+  }
+  const before = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
+  let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let received = false;
+  const pattern = resource === 'document' ? '**/docs/*/pull' : resource === 'image' ? '**/blobs/*' : '**/thumbnail';
+  await page.route(pattern, async route => { const response = await route.fetch(); expect(response.status()).toBe(200); expect(route.request().headers()['x-dali-account']).toBe(accountId); received = true; await barrier; await route.fulfill({ response }).catch(() => {}); });
+  await page.goto(resource === 'thumbnail' ? origin : origin + '/?board=' + descriptor.summary.id); await expect.poll(() => received).toBe(true);
+  await context.clearCookies({ name: 'dali_fixture_identity' }); const other = await context.newPage(); await other.goto(origin + '/auth/start');
+  await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await expect(page.getByText("You're signed in with a different account. Return to your boards or sign in with the previous account to recover its pending changes.", { exact: true })).toBeVisible();
+  release(); await page.unrouteAll({ behavior: 'ignoreErrors' });
+  await expect(page.locator('editor-host')).toHaveCount(0); await expect(page.locator('.board-card')).toHaveCount(0); await expect(page.getByText('Delayed identity canary')).toHaveCount(0);
+  expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before);
+  const denied = await page.request.post(origin + '/api/boards/' + descriptor.summary.id + '/docs/' + descriptor.contentDocId + '/push', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0, 0]) });
+  expect(denied.status()).toBe(409); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before); await other.close();
+  });
+});
+test('@03-10-02 role revocation at replay commit retains journal and unchanged document bytes', async ({ page, browser }) => {
+  const descriptor = await board(page);
+  const other = await browser.newContext(); const otherPage = await other.newPage(); await otherPage.goto(origin); await otherPage.getByRole('link', { name: 'Synthetic Editor', exact: true }).click();
+  await expect(otherPage.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible(); const otherId = (await (await other.request.get(origin + '/api/session')).json()).accountId;
+  await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: {} })); await text(page, 'Commit barrier canary'); await expire(page); await page.unrouteAll({ behavior: 'ignoreErrors' });
+  const pending = await records(page); const before = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id); let crossed = 0;
+  beforeCommit = async () => { crossed++; database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run(otherId, descriptor.summary.id); };
+  await page.clock.setFixedTime(new Date()); await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
+  await expect(page.getByText('Your access has changed. Pending changes have not been applied. Return to your boards or contact the board owner.', { exact: true })).toBeVisible();
+  expect(crossed).toBeGreaterThan(0); expect(await records(page)).toEqual(pending); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before); await other.close();
+});
+test('@03-10-02 late session response cannot override simultaneous logout and account switch', async ({ page, context }) => {
+  const descriptor = await board(page); const other = await context.newPage(); await other.goto(origin); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: {} })); await text(page, 'Session race canary');
+  const before = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
+  let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let received = false;
+  await page.route('**/api/session', async route => { const response = await route.fetch(); received = true; await barrier; await route.fulfill({ response }).catch(() => {}); });
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))); await expect.poll(() => received).toBe(true);
+  await other.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click(); await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible();
+  await context.clearCookies({ name: 'dali_fixture_identity' }); await other.getByRole('button', { name: 'Sign in again', exact: true }).click(); await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await other.getByRole('button', { name: 'Back to your boards', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  release(); await page.unrouteAll({ behavior: 'ignoreErrors' }); await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible();
+  await expect(page.locator('editor-host')).toHaveCount(0); expect((await records(page)).length).toBeGreaterThan(0); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before); await other.close();
 });

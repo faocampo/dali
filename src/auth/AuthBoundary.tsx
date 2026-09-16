@@ -1,9 +1,10 @@
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
-import { acceptSession, getSessionState, interruptSession, setSessionPhase, startSignIn, subscribeSession, type SessionDescriptor } from './session';
+import { acceptSession, getSessionState, interruptSession, openCurrentBoards, setSessionPhase, startSignIn, subscribeSession, watchSession, type SessionDescriptor } from './session';
 export type { SessionDescriptor } from './session';
 export function AuthBoundary({ children }: { children: (session: SessionDescriptor, signOut: () => Promise<void>) => ReactNode }) {
   const state = useSyncExternalStore(subscribeSession, getSessionState);
   const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(watchSession, []);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('signedOut')) { setSessionPhase('signed-out'); return; }
@@ -15,7 +16,7 @@ export function AuthBoundary({ children }: { children: (session: SessionDescript
       if (!response.ok) throw new Error('Sign-in unavailable');
       const member = await response.json() as SessionDescriptor;
       if (!member.accountId || !member.email || !member.displayName || !Number.isSafeInteger(member.expiresAt)) throw new Error('Invalid session');
-      if (!controller.signal.aborted) acceptSession(member);
+      if (!controller.signal.aborted && getSessionState().phase === 'loading') acceptSession(member, true);
     }).catch(() => { if (!controller.signal.aborted) setSessionPhase('error'); });
     return () => controller.abort();
   }, []);
@@ -39,6 +40,6 @@ export function AuthBoundary({ children }: { children: (session: SessionDescript
   </>;
   return <>
     {state.member && ['authenticated', 'preserving', 'preservation-failed'].includes(state.phase) && <div hidden={interrupted} style={interrupted ? { display: 'none' } : { display: 'contents' }}>{children(state.member, signOut)}</div>}
-    {interrupted ? <dialog ref={dialog} className="session-recovery" aria-labelledby="session-heading" onCancel={event => event.preventDefault()}>{content}</dialog> : state.phase !== 'authenticated' && <main className="session-recovery">{state.phase === 'loading' ? <p role="status">Signing you in…</p> : content}</main>}
+    {interrupted ? <dialog ref={dialog} className="session-recovery" aria-labelledby="session-heading" onCancel={event => event.preventDefault()}>{content}</dialog> : state.phase !== 'authenticated' && <main className="session-recovery">{['loading', 'recovering'].includes(state.phase) ? <p role="status">{state.phase === 'loading' ? 'Signing you in…' : 'Checking your account and board access…'}</p> : state.phase === 'identity-changed' ? <><p role="alert">You're signed in with a different account. Return to your boards or sign in with the previous account to recover its pending changes.</p><button onClick={openCurrentBoards}>Back to your boards</button><button onClick={() => { void signOut(); }}>Sign out of Dalí</button></> : content}</main>}
   </>;
 }
