@@ -46,13 +46,21 @@ function seedDocuments(database: AccountDatabase, board: BoardRow) {
   const content = new Y.Doc({ guid: board.content_doc_id });
   try {
     root.getMap('spaces').set(board.content_doc_id, content);
+    const metadata = new Y.Map<unknown>();
+    metadata.set('id', board.content_doc_id); metadata.set('title', board.title);
+    metadata.set('createDate', board.created_at); metadata.set('tags', new Y.Array<string>());
+    root.getMap('meta').set('pages', Y.Array.from([metadata]));
     const pageId = randomUUID(); const surfaceId = randomUUID();
     const page = new Y.Map<unknown>();
     page.set('sys:id', pageId); page.set('sys:flavour', 'affine:page'); page.set('sys:version', 2);
     page.set('sys:children', Y.Array.from([surfaceId])); page.set('prop:title', new Y.Text(board.title));
     const surface = new Y.Map<unknown>();
     surface.set('sys:id', surfaceId); surface.set('sys:flavour', 'affine:surface'); surface.set('sys:version', 5);
-    surface.set('sys:children', new Y.Array()); surface.set('prop:elements', new Y.Map());
+    // Pinned BlockSuite 0.22.4 SurfaceBlockSchema uses Boxed<Y.Map> (MIT).
+    // Keep the native wire representation; a raw Y.Map cannot hydrate a surface.
+    const elements = new Y.Map<unknown>();
+    elements.set('type', '$blocksuite:internal:native$'); elements.set('value', new Y.Map());
+    surface.set('sys:children', new Y.Array()); surface.set('prop:elements', elements);
     content.getMap('blocks').set(pageId, page); content.getMap('blocks').set(surfaceId, surface);
     const insert = database.prepare('INSERT INTO board_documents(board_id,doc_id,update_bytes) VALUES(?,?,?)');
     insert.run(board.id, board.root_doc_id, Buffer.from(Y.encodeStateAsUpdate(root)));

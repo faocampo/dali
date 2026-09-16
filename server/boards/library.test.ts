@@ -85,7 +85,17 @@ describe('@03-03-02 authorized SQL library', () => {
       Y.applyUpdate(root, bytes(board.rootDocId)); Y.applyUpdate(content, bytes(board.contentDocId));
       expect([...root.getMap('spaces').keys()]).toEqual([board.contentDocId]);
       expect((root.getMap('spaces').get(board.contentDocId) as Y.Doc).guid).toBe(board.contentDocId);
+      const pages = root.getMap('meta').get('pages') as Y.Array<Y.Map<unknown>>;
+      expect(pages).toBeInstanceOf(Y.Array);
+      expect(pages.length).toBe(1);
+      expect(pages.get(0)).toBeInstanceOf(Y.Map);
+      expect(pages.get(0).toJSON()).toMatchObject({ id: board.contentDocId, title: board.summary.title, tags: [] });
+      expect(pages.get(0).get('createDate')).toEqual(expect.any(Number));
       blocks.push([...content.getMap('blocks').keys()]); expect(blocks.at(-1)).toHaveLength(2);
+      const surface = [...content.getMap<Y.Map<unknown>>('blocks').values()].find(block => block.get('sys:flavour') === 'affine:surface')!;
+      const elements = surface.get('prop:elements') as Y.Map<unknown>;
+      expect(elements.get('type')).toBe('$blocksuite:internal:native$');
+      expect(elements.get('value')).toBeInstanceOf(Y.Map);
       expect(database.prepare('SELECT * FROM board_documents WHERE board_id=? AND doc_id=?').get(a.summary.id, b.contentDocId)).toBeUndefined();
       root.destroy(); content.destroy();
     }

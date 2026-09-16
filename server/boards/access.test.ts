@@ -157,7 +157,14 @@ describe('protected board resources', () => {
     const root = new Y.Doc(); Y.applyUpdate(root, bytes(board.rootDocId));
     root.getMap('meta').set('pages', Y.Array.from([new Y.Map([['id', board.contentDocId], ['title', 'Bound page']])]));
     expect((await requestDoc('push', Y.encodeStateAsUpdate(root), 'editor', board.rootDocId)).statusCode).toBe(200);
-    expect((await requestDoc('pull', new Uint8Array([0]), 'viewer', board.rootDocId)).rawPayload).toEqual(bytes(board.rootDocId));
+    // Pull re-encodes normalized Yjs state; deleted metadata can be GC-compacted.
+    // Compare successful read semantics/vector; denial checks below retain bytes.
+    const readRoot = new Y.Doc(); const storedRoot = new Y.Doc();
+    Y.applyUpdate(readRoot, (await requestDoc('pull', new Uint8Array([0]), 'viewer', board.rootDocId)).rawPayload);
+    Y.applyUpdate(storedRoot, bytes(board.rootDocId));
+    expect(readRoot.getMap('meta').toJSON()).toEqual(storedRoot.getMap('meta').toJSON());
+    expect(Y.encodeStateVector(readRoot)).toEqual(Y.encodeStateVector(storedRoot));
+    readRoot.destroy(); storedRoot.destroy();
     database.prepare('INSERT INTO board_thumbnails(board_id,bytes,mime) VALUES(?,?,?)').run(board.summary.id, syntheticCanaries().imageBytes, 'image/png');
     const prior = snapshot(); clock++;
     expect((await requestDoc('push', edit(), 'editor')).statusCode).toBe(200);
