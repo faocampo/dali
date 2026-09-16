@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 4
+open_count: 5
 waived_count: 1
 fixed_count: 0
-total_count: 5
-last_updated: 2026-09-13T00:37:09.126Z
+total_count: 6
+last_updated: 2026-09-16T13:09:29.543Z
 ---
 
 # Broken Windows Ledger
@@ -20,6 +20,7 @@ last_updated: 2026-09-13T00:37:09.126Z
 | 3 | 02 | unrun-verify | tests/mindmap-accessibility.spec.ts |  | Real 200 percent browser zoom remains for phase verification; desktop and narrow CSS zoom at 100 and 200 percent are automated separately. | open |  | 2026-09-12T23:48:17.167Z |  |
 | 4 | 02 | unrun-verify | tests/mindmap-keyboard.spec.ts |  | Native OS IME text production remains for phase verification; constructed composition events verify topic routing and external-field isolation. | open |  | 2026-09-12T23:48:17.294Z |  |
 | 5 | 02 | unrun-verify | tests/clipboard-route.ts |  | Firefox and WebKit native OS clipboard integration remains unverified; native serialized payload routing is simulated, while Chromium uses the real clipboard. | open |  | 2026-09-13T00:37:09.126Z |  |
+| 6 | 03 | deviation | server/preflight.test.ts | 13 | Task 03-01 dependency installation began after observed RED but before RED evidence gate and test commit; baseline assertion was independently replayed and verified before GREEN commit. | open |  | 2026-09-16T13:09:29.543Z |  |
 
 ````json
 [
@@ -81,6 +82,18 @@ last_updated: 2026-09-13T00:37:09.126Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-13T00:37:09.126Z",
+    "resolved_at": null
+  },
+  {
+    "id": 6,
+    "kind": "deviation",
+    "phase": "03",
+    "file": "server/preflight.test.ts",
+    "line": 13,
+    "description": "Task 03-01 dependency installation began after observed RED but before RED evidence gate and test commit; baseline assertion was independently replayed and verified before GREEN commit.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-16T13:09:29.543Z",
     "resolved_at": null
   }
 ]
