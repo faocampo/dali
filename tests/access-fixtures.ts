@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import { randomBytes } from 'node:crypto';
+import { request as httpRequest } from 'node:http';
+import type { Duplex } from 'node:stream';
 import { buildApp } from '../server/app.js';
 import { openDatabase } from '../server/storage/database.js';
 import { createOidcProvider } from './oidc-provider.js';
@@ -28,9 +30,36 @@ export async function acceptanceService(baseURL: string) {
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',
   } });
   app.get('/*', async (request, reply) => { const response = await fetch(baseURL + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
+  // Dev assets retain Vite's HMR client. Forward its upgrade as well as HTTP
+  // assets so the isolated origin exercises dev without hiding runtime errors.
+  const upgradeSockets = new Set<Duplex>();
+  app.server.on('upgrade', (request, socket, head) => {
+    if (request.headers['sec-websocket-protocol'] !== 'vite-hmr') { socket.destroy(); return; }
+    const target = new URL(request.url ?? '/', baseURL);
+    upgradeSockets.add(socket);
+    const upstream = httpRequest(target, { headers: { ...request.headers, host: target.host } });
+    socket.on('error', () => upstream.destroy());
+    socket.on('close', () => { upgradeSockets.delete(socket); upstream.destroy(); });
+    upstream.on('error', () => socket.destroy());
+    upstream.on('response', response => { response.resume(); socket.destroy(); });
+    upstream.on('upgrade', (response, peer, buffered) => {
+      upgradeSockets.add(peer);
+      peer.on('error', () => socket.destroy());
+      peer.on('close', () => { upgradeSockets.delete(peer); socket.destroy(); });
+      const headers = response.rawHeaders.reduce<string[]>((lines, value, index, all) => {
+        if (index % 2 === 0) lines.push(`${value}: ${all[index + 1]}`);
+        return lines;
+      }, []);
+      socket.write(`HTTP/1.1 ${response.statusCode} ${response.statusMessage}\r\n${headers.join('\r\n')}\r\n\r\n`);
+      if (buffered.length) socket.write(buffered);
+      if (head.length) peer.write(head);
+      socket.pipe(peer).pipe(socket);
+    });
+    upstream.end();
+  });
   await app.listen({ host: '127.0.0.1', port: 5499 });
   return { origin, database, provider, setBarrier(value?: () => Promise<void>) { barrier = value; },
-    async close() { await app.close(); database.close(); await provider.close(); } };
+    async close() { for (const socket of upgradeSockets) socket.destroy(); await app.close(); database.close(); await provider.close(); } };
 }
 
 /** Every identity traverses the application's ordinary OIDC boundary in its own cookie jar. */

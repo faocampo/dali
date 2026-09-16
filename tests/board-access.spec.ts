@@ -152,7 +152,12 @@ test('@03-06-01 loading blank board gates mutations and native history publishes
 
 test.describe('native source authorization rejection', () => {
 test.use({ expectErrors: ['401 (Unauthorized)', '404 (Not Found)', 'SourceAccessError: Board access changed'] });
-test('@03-06-01 image loading missing retry and lost authorization clear protected pixels', async ({ page, context, baseURL }) => {
+test('@03-06-01 image loading missing retry and lost authorization clear protected pixels', async ({ page, context, baseURL, expectErrors, pageErrors }) => {
+  let revocationInjected = false;
+  const staleCancellationPhases: boolean[] = [];
+  page.on('console', message => {
+    if (message.type() === 'error' && message.text().startsWith('Error: Account source is stale')) staleCancellationPhases.push(revocationInjected);
+  });
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
@@ -175,10 +180,19 @@ test('@03-06-01 image loading missing retry and lost authorization clear protect
   phase = 'ready'; await page.getByRole('button', { name: 'Retry images' }).click();
   await expect(page.locator('affine-edgeless-image img')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Retry images' })).toHaveCount(0); expect(reads).toBeGreaterThanOrEqual(2);
-  phase = 'denied'; await page.reload();
+  expect(staleCancellationPhases).toEqual([]);
+  expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]);
+  expect(pageErrors.filter(error => error.startsWith('pageerror:'))).toEqual([]);
+  // Native ImageEdgelessBlock.refreshData catches and logs an in-flight read
+  // rejected by scope disposal. Permit only that console cancellation after
+  // the intentional revoke, while retaining the global runtime collector.
+  expectErrors.push('console: Error: Account source is stale');
+  revocationInjected = true; phase = 'denied'; await page.reload();
   await expect(page.getByRole('heading', { name: "You don't have access to this board" })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0); await expect(page.locator('img[src^="blob:"]')).toHaveCount(0);
   expect(await page.locator('body').innerText()).not.toContain('Image access canary');
+  expect(staleCancellationPhases.every(inRevokedPhase => inRevokedPhase)).toBe(true);
+  expect(pageErrors.filter(error => error.startsWith('pageerror:'))).toEqual([]);
 });
 });
 
