@@ -47,6 +47,18 @@ export default function BlockSuiteCanvas({ runtime }: { runtime: CanvasRuntime }
 
   // Wider grab zones on the resize handles, for as long as the canvas is up.
   useEffect(() => widenResizeHandles(), []);
+  useEffect(() => {
+    if (!host) return;
+    const command = (event: Event) => {
+      if (!accessScopeCurrent(runtime.scope)) return;
+      const gfx = host.std.get(GfxControllerIdentifier); if (gfx.viewport.locked) return;
+      const action = (event as CustomEvent<string>).detail;
+      if (action === 'fit') gfx.fitToScreen();
+      if (action === 'reset-zoom') gfx.viewport.smoothZoom(1);
+    };
+    window.addEventListener('dali:board-command', command);
+    return () => window.removeEventListener('dali:board-command', command);
+  }, [host, runtime]);
 
   useEffect(() => {
     const el = ref.current;
@@ -172,11 +184,8 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   useEffect(() => {
     const command = (event: Event) => {
       const action = (event as CustomEvent<string>).detail;
-      const gfx = host.std.get(GfxControllerIdentifier);
       if (action === 'history-state') window.dispatchEvent(new CustomEvent('dali:history-state', { detail: { undo: store.history.canUndo && !store.readonly, redo: store.history.canRedo && !store.readonly } }));
       if (action === 'import') importRef.current?.click();
-      if (action === 'fit') gfx.fitToScreen();
-      if (action === 'reset-zoom') gfx.viewport.smoothZoom(1);
       if (action === 'undo' && !store.readonly) store.undo();
       if (action === 'redo' && !store.readonly) store.redo();
       if (action === 'layers') onOpenLayers();

@@ -51,6 +51,20 @@ async function ownerRead(id: string) {
   const response = await ownerRequest!.get(origin + '/api/boards/' + id + '/editable-export', { headers: { 'X-Dali-Account': ownerId } });
   expect(response.status()).toBe(200); return response.json();
 }
+test('@CR-04 Viewer menu zoom and fit navigate without native or server mutations', async ({ page }) => {
+  const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id);
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Viewer fit canary'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await role(page, board.summary.id, 'viewer'); const before = await localState(page); const server = await ownerRead(board.summary.id);
+  const viewport = () => page.locator('affine-edgeless-root').evaluate(el => { const v = (el as HTMLElement & { gfx: GfxController }).gfx.viewport; return { zoom: v.zoom, center: { ...v.center } }; });
+  await page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.viewport.setZoom(0.5));
+  const view = async () => { await page.getByRole('button', { name: 'Main Menu', exact: true }).click(); await page.getByRole('menuitem', { name: 'View', exact: true }).click(); };
+  await view(); await page.getByRole('menuitem', { name: 'Reset zoom to 100%', exact: true }).click(); await expect.poll(async () => (await viewport()).zoom).toBe(1);
+  await page.mouse.move(600, 400); await page.mouse.down({ button: 'middle' }); await page.mouse.move(900, 650, { steps: 5 }); await page.mouse.up({ button: 'middle' }); const moved = await viewport();
+  await view(); await page.getByRole('menuitem', { name: 'Fit to screen', exact: true }).click(); await expect.poll(viewport).not.toEqual(moved);
+  await view(); await expect(page.getByRole('menuitem', { name: 'Layers', exact: true })).toBeDisabled(); await expect(page.getByText('Layer editing requires Owner or Editor access.', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape'); await page.getByRole('menuitem', { name: 'Edit', exact: true }).click(); await expect(page.getByRole('menuitem', { name: 'Undo', exact: true })).toBeDisabled(); await expect(page.getByRole('menuitem', { name: 'Redo', exact: true })).toBeDisabled();
+  expect(await localState(page)).toEqual(before); expect(await ownerRead(board.summary.id)).toEqual(server);
+});
 test('@03-09-01 Viewer native keyboard clipboard drop and history preserve model and server while navigation works', async ({ page, context }) => {
   const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id);
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Role map canary'); await page.keyboard.press('Enter');

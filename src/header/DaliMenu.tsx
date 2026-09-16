@@ -78,7 +78,8 @@ export function DaliMenu({ onOpenBoards, onExport, onNewBoard, role, onBoardActi
         {category === 'View' && <ViewMenu>
           <button role="menuitem" tabIndex={-1} onClick={() => command('fit')}><MenuIcon name="fit" /><span className="dali-menu-label">Fit to screen</span></button>
           <button role="menuitem" tabIndex={-1} onClick={() => command('reset-zoom')}><MenuIcon name="zoom" /><span className="dali-menu-label">Reset zoom to 100%</span></button>
-          <button role="menuitem" tabIndex={-1} onClick={() => command('layers')}><MenuIcon name="layers" /><span className="dali-menu-label">Layers</span></button>
+          <button role="menuitem" tabIndex={-1} disabled={role === 'viewer'} aria-describedby={role === 'viewer' ? 'viewer-layers-reason' : undefined} onClick={() => command('layers')}><MenuIcon name="layers" /><span className="dali-menu-label">Layers</span></button>
+          {role === 'viewer' && <p id="viewer-layers-reason">Layer editing requires Owner or Editor access.</p>}
         </ViewMenu>}
         {category === 'Edit' && <>
           <button role="menuitem" tabIndex={-1} disabled={!history.undo} onClick={() => command('undo')}><MenuIcon name="undo" /><span className="dali-menu-label">Undo</span></button>
