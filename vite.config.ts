@@ -22,6 +22,8 @@ const base = process.env.DEPLOY_BASE ?? '/';
 export default defineConfig(() => {
   return {
     base,
+    server: { proxy: { '/api': 'http://127.0.0.1:5495', '/auth': 'http://127.0.0.1:5495' } },
+    preview: { proxy: { '/api': 'http://127.0.0.1:5497', '/auth': 'http://127.0.0.1:5497' } },
   //  3. BlockSuite styles edgeless notes / the outline fragment with
   //     vanilla-extract `*.css.ts` files. Vite's dep optimizer externalizes those,
   //     so without @vanilla-extract/vite-plugin the browser is handed the raw
