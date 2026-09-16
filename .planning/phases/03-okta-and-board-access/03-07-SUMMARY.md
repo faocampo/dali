@@ -60,6 +60,7 @@ The four implementation/test commits were measured from the persisted plan ledge
 | `npm run test:server -- server/boards/grants.test.ts server/auth/oidc.test.ts` | Intermediate gate: 72 passed, 7.37 seconds |
 | `npm run test:server` | 101 passed, 7.94 seconds; ran before the last duplicate-convergence test was added. That added test passes in the final 16-case focused run. |
 | `npm test` | 95 passed, 1.25 seconds |
+| Parent independent wave gate at `7209505`: build, unit and full server suites | Production build passed; 95 unit and 102 server tests passed. Full server runner: 7.74 seconds (8.1 seconds wall). This includes the final convergence case. |
 
 No required automated case is skipped in the final focused or full gates. The intentionally targeted RED run selected one test; its unselected tests are not acceptance omissions. Browser fixture uses signed OIDC login through the ordinary application boundary and retains the existing automatic runtime-error collector. Expected synthetic HTTP failures are explicitly listed in the fixture. The user's local board and development port were untouched.
 
@@ -94,6 +95,7 @@ Both tasks had a committed intentional assertion failure before their implementa
 - **Native 200% browser zoom remains unrun**, recorded as WINDOWS entry 8 for plan 03-12 acceptance. The automated 490px geometry test proves narrow viewport behavior. Native screen-reader speech and OS IME text production were not claimed; programmatic roles, focus and composition-event routing were tested.
 - Actual-provider mapping and private operator acceptance remain plan 03-12-02. Synthetic evidence does not complete AUTH-01 or the shared BOARD requirements; all remain open until phase acceptance.
 - Build warnings about existing chunk size/dynamic imports and Node's localStorage warning remain unchanged and out of scope.
+- The state helper reset accepted phase counts to zero; tracking was repaired to preserve 2/13 accepted phases, 21/26 completed plans and next plan 03-08.
 
 ## Known stubs and threat review
 
