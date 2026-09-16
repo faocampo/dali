@@ -104,7 +104,7 @@ export function Header({
 
       <nav className="djai-header-actions">
         {board && <span className="board-role">{board.summary.role[0]!.toUpperCase() + board.summary.role.slice(1)}{board.summary.role === 'viewer' ? ' · View only' : ''}</span>}
-        {board?.summary.role === 'owner' && <button className="djai-ghost" onClick={() => setSharing(true)}>Share board</button>}
+        {board?.summary.role === 'owner' && <button className="djai-ghost" onClick={event => { event.currentTarget.focus(); setSharing(true); }}>Share board</button>}
         {member && <details className="board-account"><summary>Account</summary><div><p>{member.displayName}</p><p>{member.email}</p><button onClick={() => { void signOut?.(); }}>Sign out of Dalí</button></div></details>}
         <div className="djai-save">
           <button
