@@ -10,7 +10,7 @@
 
 Dali will deliver the approved canvas workflows through small sequential phases, each with an end-to-end capability that can be demonstrated. Core canvas editing and image portability come first, followed immediately by daily mind maps. Authenticated board access, durable recovery, and real-time collaboration establish shared use before facilitation, reusable planning content, mockups, technical diagrams, and the Gantt widget complete the initial release.
 
-All 42 v1 requirements are approved; the phase allocation and order below are user-approved. All phase success criteria are future acceptance obligations. Implementation and runtime verification have yet to begin.
+All 42 v1 requirements are approved; the phase allocation and order below are user-approved. Phases 1 and 2 retain their recorded implementation evidence and user acceptance. Remaining phase success criteria are future acceptance obligations.
 
 ## Phases
 
@@ -120,7 +120,7 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
 
 ### Phase 3: Okta and Board Access
 
-**Goal**: Internal members can find and work on authorized boards through Okta, with owner-controlled access enforced for board content and images.
+**Goal**: As an internal member, I want to sign in through Okta, find my authorized boards and work within owner-controlled permissions, so that board content and images are available only to their owners and members granted access.
 **Mode:** mvp
 **Depends on**: Phase 2
 **Requirements**: AUTH-01, BOARD-01, BOARD-02, BOARD-03, BOARD-04
@@ -132,7 +132,54 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
 
-**Plans**: TBD
+**Plans**: 0/12 executed; 12 checked plans across 11 waves, ready to execute.
+
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Verify dependency provenance and prepare the authenticated test harness.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — Sign in through OIDC and retain an expiring Dali session.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-03-PLAN.md — Create private boards and browse the authorized library.
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 03-04-PLAN.md — Save and retrieve board-bound documents and images.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 03-05-PLAN.md — Prove the production account workspace before migrating editor entry.
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 03-06-PLAN.md — Open account boards in the established canvas shell.
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 03-07-PLAN.md — Manage active and pending internal access.
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 03-08-PLAN.md — Rename, duplicate and delete boards through role-aware controls.
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 03-09-PLAN.md — Enforce native read-only editing and permitted viewer exports.
+- [ ] 03-10-PLAN.md — Preserve interrupted work and isolate account recovery.
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 03-11-PLAN.md — Copy selected browser-local work into private account boards.
+
+**Wave 11** *(blocked on Wave 10 completion)*
+
+- [ ] 03-12-PLAN.md — Verify all access boundaries and record actual-provider acceptance.
+
 **UI hint**: yes
 
 ### Phase 4: Durable Boards and Recovery
@@ -325,7 +372,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 |-------|----------------|--------|-----------|
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
-| 3. Okta and Board Access | 0/TBD | Not started | - |
+| 3. Okta and Board Access | 0/12 | Ready to execute | - |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
 | 6. Follow Me | 0/TBD | Not started | - |
@@ -346,7 +393,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 - [config.json](config.json) (fine granularity and enabled research, plan-check, and verification settings).
 - [research/SUMMARY.md](research/SUMMARY.md) (research findings and risks, including the final scope update that supersedes the earlier phase proposal).
 
-*Last updated: 2026-09-15 — Phase 2 complete following user testing and approval; Phase 3 ready to plan.*
+*Last updated: 2026-09-16 — Phase 3 research, UI contract and 12 implementation plans checked; ready to execute. Phase 1 and 2 acceptance is preserved.*
 
 ## Backlog
 
