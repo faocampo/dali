@@ -67,7 +67,7 @@ export async function buildApp(options: { config: Record<string, string | undefi
     cookie: { path: '/', httpOnly: true, sameSite: 'lax', secure: config.secure },
     rolling: false, saveUninitialized: false, store: new SqliteSessionStore(database, now) });
   await registerOidcRoutes(app, config, database, now);
-  registerBoardRoutes(app, config, database, now); return app;
+  registerBoardRoutes(app, config, database, now, options.beforeCommit); return app;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   readConfig(process.env); const app = await buildApp({ config: process.env });

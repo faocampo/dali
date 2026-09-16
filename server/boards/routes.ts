@@ -4,6 +4,7 @@ import * as Y from 'yjs';
 import type { AuthConfig } from '../app.js';
 import { currentSession, requireExpectedMember, requireMutation } from '../auth/session-store.js';
 import { runMigrations, type AccountDatabase } from '../storage/database.js';
+import { registerDocumentRoutes, type BeforeCommit } from './documents.js';
 
 export type BoardRole = 'owner' | 'editor' | 'viewer';
 export type BoardCapability = 'read' | 'image' | 'presentation-export' | 'write' | 'rename' | 'editable-export' | 'duplicate' | 'grants' | 'delete';
@@ -57,7 +58,7 @@ function seedDocuments(database: AccountDatabase, board: BoardRow) {
     insert.run(board.id, board.content_doc_id, Buffer.from(Y.encodeStateAsUpdate(content)));
   } finally { root.destroy(); content.destroy(); }
 }
-export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, database: AccountDatabase, now: () => number) {
+export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, database: AccountDatabase, now: () => number, beforeCommit?: BeforeCommit) {
   runMigrations(database, [{ version: 2, sql: `
     CREATE TABLE boards (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES members(id), title TEXT NOT NULL,
       root_doc_id TEXT NOT NULL UNIQUE, content_doc_id TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, revision INTEGER NOT NULL DEFAULT 1);
@@ -71,6 +72,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
     CREATE TABLE operations (member_id TEXT NOT NULL REFERENCES members(id), operation_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
       board_id TEXT, result TEXT NOT NULL, PRIMARY KEY(member_id,operation_id));
   ` }, { version: 3, sql: `CREATE TABLE board_thumbnails (board_id TEXT PRIMARY KEY REFERENCES boards(id) ON DELETE CASCADE, bytes BLOB NOT NULL, mime TEXT NOT NULL CHECK(mime='image/png'));` }]);
+  registerDocumentRoutes(app, config, database, now, beforeCommit);
   app.get<{ Querystring: { filter?: string } }>('/api/boards', async (request, reply) => {
     const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
     const filter = request.query.filter ?? 'all';
