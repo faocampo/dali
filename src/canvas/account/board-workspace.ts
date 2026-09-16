@@ -57,7 +57,9 @@ export class BoardWorkspace implements Workspace {
     this.storeExtensions = new StoreExtensionManager(storeExtensions).get('store');
     const sourceOptions = { ...options, boardId: d.summary.id, rootDocId: d.rootDocId, contentDocId: d.contentDocId,
       readonly: this.readonly, signal: this.abort.signal, onAuthorizationLost: (error: Parameters<NonNullable<SourceOptions['onAuthorizationLost']>>[0]) => {
-        this.dispose(); options.onAuthorizationLost?.(error);
+        // Runtime must freeze/capture buffered updates before destroying native documents.
+        if (options.onAuthorizationLost) options.onAuthorizationLost(error);
+        else this.dispose();
       } };
     this.source = new BoardDocSource(sourceOptions);
     this.blobs = new BoardBlobSource(sourceOptions);

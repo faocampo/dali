@@ -30,7 +30,7 @@ async function board(page: Page) {
 async function text(page: Page, value: string) {
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type(value); await page.keyboard.press('Escape');
 }
-async function model(page: Page) { return page.locator('editor-host').evaluate(el => JSON.stringify((el as EditorHost).store.spaceDoc.toJSON())); }
+async function model(page: Page) { return page.locator('editor-host').evaluate(el => JSON.stringify((el as EditorHost).store.spaceDoc.toJSON(), (_key, value: unknown) => value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b))) : value)); }
 async function expire(page: Page) { await page.clock.fastForward(86400001); }
 test('@03-10-01 quota failure blocks navigation until real pending work is secured', async ({ page }) => {
   await board(page);
@@ -54,10 +54,38 @@ test('@03-10-01 full redirect restores unacknowledged image hash and map text ex
   await text(page, 'Pending map canary'); const before = await model(page);
   expect(database.prepare('SELECT * FROM board_blobs WHERE board_id=?').all(descriptor.summary.id)).toHaveLength(0);
   await expire(page); await page.unrouteAll({ behavior: 'ignoreErrors' });
+  await page.clock.setFixedTime(new Date());
   await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
   await expect(page.locator('affine-edgeless-root')).toBeVisible();
   expect(await model(page)).toBe(before);
   const blob = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/blobs/' + encodeURIComponent(createHash('sha256').update(bytes).digest('base64url') + '='), { headers: { 'X-Dali-Account': accountId } });
   expect(blob.status()).toBe(200); expect(await blob.body()).toEqual(bytes);
   await page.reload(); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect(await model(page)).toBe(before);
+});
+test('@03-10-01 interrupted acknowledgment replays idempotently against committed server bytes', async ({ page }) => {
+  const descriptor = await board(page); let committed = 0;
+  await page.route('**/docs/*/push', async route => { const response = await route.fetch(); expect(response.status()).toBe(200); committed++; await route.fulfill({ status: 503, json: { code: 'ACK_INTERRUPTED' } }); });
+  await text(page, 'Committed once canary'); const before = await model(page);
+  await expect.poll(() => committed).toBeGreaterThan(0);
+  await expire(page); await page.unrouteAll({ behavior: 'ignoreErrors' }); await page.clock.setFixedTime(new Date());
+  await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click(); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  expect(await model(page)).toBe(before);
+  const independent = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } });
+  expect(independent.status()).toBe(200);
+  const saved = await independent.json(); await page.reload(); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  const reopened = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } });
+  expect((await reopened.json()).content).toBe(saved.content); expect(await model(page)).toBe(before);
+});
+test('@03-10-01 real 401 freezes and preserves native buffered text before disposal', async ({ page }) => {
+  const descriptor = await board(page);
+  let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/docs/*/push', async route => { await barrier; await route.continue(); });
+  await text(page, '401 buffered canary');
+  database.prepare('UPDATE sessions SET expires_at=0').run(); release();
+  await expect(page.getByRole('heading', { name: 'Session expired — sign in to continue.', exact: true })).toBeVisible();
+  await page.unrouteAll({ behavior: 'ignoreErrors' });
+  await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click(); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  expect(await model(page)).toContain('401 buffered canary');
+  const response = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } });
+  expect(response.status()).toBe(200);
 });

@@ -1,51 +1,44 @@
-import { useEffect, useState, type ReactNode } from 'react';
-export type SessionDescriptor = { accountId: string; displayName: string; email: string; expiresAt: number };
-const start = () => window.location.assign(`/auth/start?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+import { useEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
+import { acceptSession, getSessionState, interruptSession, setSessionPhase, startSignIn, subscribeSession, type SessionDescriptor } from './session';
+export type { SessionDescriptor } from './session';
 export function AuthBoundary({ children }: { children: (session: SessionDescriptor, signOut: () => Promise<void>) => ReactNode }) {
-  const [member, setMember] = useState<SessionDescriptor | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'signed-out' | 'error' | 'expired'>(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.has('signedOut') ? 'signed-out' : params.has('authError') ? 'error' : 'loading';
-  });
+  const state = useSyncExternalStore(subscribeSession, getSessionState);
+  const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    if (state !== 'loading') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('signedOut')) { setSessionPhase('signed-out'); return; }
+    if (params.has('authError')) { setSessionPhase('error'); return; }
     const controller = new AbortController();
     void fetch('/api/session', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal }).then(async response => {
       if (controller.signal.aborted) return;
-      if (response.status === 401) { start(); return; }
+      if (response.status === 401) { startSignIn(); return; }
       if (!response.ok) throw new Error('Sign-in unavailable');
-      const data = await response.json() as SessionDescriptor;
-      if (!data.accountId || !data.email || !data.displayName || !Number.isSafeInteger(data.expiresAt)) throw new Error('Invalid session');
-      if (!controller.signal.aborted) { setMember(data); setState('ready'); }
-    }).catch(() => { if (!controller.signal.aborted) setState('error'); });
+      const member = await response.json() as SessionDescriptor;
+      if (!member.accountId || !member.email || !member.displayName || !Number.isSafeInteger(member.expiresAt)) throw new Error('Invalid session');
+      if (!controller.signal.aborted) acceptSession(member);
+    }).catch(() => { if (!controller.signal.aborted) setSessionPhase('error'); });
     return () => controller.abort();
-  }, [state]);
+  }, []);
   useEffect(() => {
-    if (state !== 'ready' || !member) return;
+    if (state.phase !== 'authenticated' || !state.member) return;
     let timer: number;
     const check = () => {
-      const remaining = member.expiresAt - Date.now();
-      if (remaining <= 0) { setMember(null); setState('expired'); }
+      const remaining = state.member!.expiresAt - Date.now();
+      if (remaining <= 0) void interruptSession();
       else timer = window.setTimeout(check, Math.min(remaining, 2147483647));
     };
-    check();
-    return () => window.clearTimeout(timer);
-  }, [state, member]);
-  const signOut = async () => {
-    if (!member) return;
-    try {
-      const response = await fetch('/api/logout', { method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Dali-Request': '1', 'X-Dali-Account': member.accountId }, body: '{}' });
-      if (!response.ok) { setMember(null); setState('error'); return; }
-      setMember(null); setState('signed-out'); window.history.replaceState(null, '', '/?signedOut=1');
-    } catch { setMember(null); setState('error'); }
-  };
-  if (state === 'ready' && member) return children(member, signOut);
-  return <main className="djai-loading" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16, flexDirection: 'column', textAlign: 'center', fontSize: 15 }}>
-    {state === 'loading' ? <p role="status">Signing you in…</p> : <>
-      <h1 style={{ fontSize: 20, fontWeight: 600 }}>{state === 'signed-out' ? "You're signed out of Dalí" : state === 'expired' ? 'Session expired — sign in to continue.' : "We couldn't sign you in."}</h1>
-      <p role={state === 'error' ? 'alert' : undefined}>{state === 'signed-out' ? 'Your Dalí session has ended.' : state === 'error' ? 'Try signing in again.' : 'Sign in to continue.'}</p>
-      <button className="djai-primary" style={{ minHeight: 44, fontSize: 13, fontWeight: 600 }} onClick={start}>{state === 'expired' ? 'Sign in to continue' : 'Sign in again'}</button>
-    </>}
-  </main>;
+    check(); return () => window.clearTimeout(timer);
+  }, [state.phase, state.member]);
+  const interrupted = ['preserving', 'auth-paused', 'preservation-failed'].includes(state.phase);
+  useEffect(() => { if (interrupted && dialog.current && !dialog.current.open) dialog.current.showModal(); }, [interrupted]);
+  const signOut = () => interruptSession('logout');
+  const content = <>
+    <h1 id="session-heading">{state.phase === 'signed-out' ? "You're signed out of Dalí" : interrupted ? 'Session expired — sign in to continue.' : "We couldn't sign you in."}</h1>
+    {state.phase === 'preserving' ? <p role="status">Securing pending changes…</p> : state.phase === 'preservation-failed' ? <p role="alert">Pending changes could not be secured for sign-in. Keep this tab open and retry preservation.</p> : <p>{state.phase === 'signed-out' ? 'Your Dalí session has ended.' : interrupted ? 'Editing is paused. Pending changes are kept for this account while you sign in.' : 'Try signing in again.'}</p>}
+    {state.phase === 'preservation-failed' ? <button className="djai-primary" onClick={() => { void interruptSession(state.intent); }}>Retry preservation</button> : <button className="djai-primary" disabled={state.phase === 'preserving'} onClick={startSignIn}>{interrupted ? 'Sign in to continue' : 'Sign in again'}</button>}
+  </>;
+  return <>
+    {state.member && ['authenticated', 'preserving', 'preservation-failed'].includes(state.phase) && <div hidden={interrupted} style={interrupted ? { display: 'none' } : { display: 'contents' }}>{children(state.member, signOut)}</div>}
+    {interrupted ? <dialog ref={dialog} className="session-recovery" aria-labelledby="session-heading" onCancel={event => event.preventDefault()}>{content}</dialog> : state.phase !== 'authenticated' && <main className="session-recovery">{state.phase === 'loading' ? <p role="status">Signing you in…</p> : content}</main>}
+  </>;
 }

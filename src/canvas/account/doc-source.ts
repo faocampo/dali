@@ -6,6 +6,8 @@ export type SourceOptions = {
   onAuthorizationLost?: (error: SourceAccessError) => void;
   onPendingDocument?: (docId: string, data: Uint8Array) => unknown | Promise<unknown>;
   onAcknowledged?: (token: unknown) => void | Promise<void>;
+  durableLocalBlobs?: boolean;
+  beforeDocumentWrite?: () => Promise<void>;
 };
 export class SourceAccessError extends Error {
   constructor(readonly status: number) { super('Board access changed'); this.name = 'SourceAccessError'; }
@@ -39,6 +41,7 @@ export class BoardDocSource implements DocSource {
   async push(docId: string, data: Uint8Array) {
     this.assertCurrent(docId, true);
     const copy = new Uint8Array(data); const token = await this.options.onPendingDocument?.(docId, copy);
+    await this.options.beforeDocumentWrite?.();
     const response = await this.request(docId, 'push', copy);
     const result: unknown = await response.json(); this.assertCurrent(docId, true);
     if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true) throw new Error('Document commit unconfirmed');

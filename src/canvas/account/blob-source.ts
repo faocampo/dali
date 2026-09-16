@@ -1,5 +1,6 @@
 import type { BlobSource } from '@blocksuite/affine/sync';
 import { SourceAccessError, type SourceOptions } from './doc-source';
+import { beginBlobWrite, finishBlobWrite } from '../save-status';
 
 export type BlobSourceOptions = Omit<SourceOptions, 'onPendingDocument'> & {
   onPendingBlob?: (key: string, value: Blob) => unknown | Promise<unknown>;
@@ -10,6 +11,7 @@ export class BoardBlobSource implements BlobSource {
   readonly readonly: boolean;
   private disposed = false;
   private urls = new Set<string>();
+  private pending = new Map<string, Blob>();
   constructor(private options: BlobSourceOptions) {
     this.readonly = options.readonly ?? false;
     options.signal?.addEventListener('abort', this.dispose, { once: true });
@@ -39,6 +41,8 @@ export class BoardBlobSource implements BlobSource {
     return response;
   }
   async get(key: string): Promise<Blob | null> {
+    this.assertCurrent();
+    if (this.pending.has(key)) return this.pending.get(key)!;
     const response = await this.request('GET', key); if (!response) return null;
     if (!['image/png', 'image/jpeg'].includes(response.headers.get('content-type')?.split(';')[0] ?? '')) throw new Error('Invalid image response');
     const blob = await response.blob(); this.assertCurrent(); return blob;
@@ -47,9 +51,16 @@ export class BoardBlobSource implements BlobSource {
     this.assertCurrent(true);
     if (!['image/png', 'image/jpeg'].includes(value.type) || value.size > 16 * 1024 * 1024 || !value.size) throw new Error('Invalid image');
     const token = await this.options.onPendingBlob?.(key, value);
-    const response = await this.request('PUT', key, value); const result: unknown = await response!.json(); this.assertCurrent(true);
-    if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true || !('key' in result) || result.key !== key) throw new Error('Image commit unconfirmed');
-    await this.options.onAcknowledged?.(token); return key;
+    const upload = async () => {
+      const response = await this.request('PUT', key, value); const result: unknown = await response!.json(); this.assertCurrent(true);
+      if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true || !('key' in result) || result.key !== key) throw new Error('Image commit unconfirmed');
+      await this.options.onAcknowledged?.(token); this.pending.delete(key);
+    };
+    if (this.options.durableLocalBlobs && token) {
+      this.assertCurrent(true); this.pending.set(key, value); beginBlobWrite();
+      void upload().then(() => finishBlobWrite(), error => finishBlobWrite(error));
+    } else await upload();
+    return key;
   }
   async delete(key: string) { await this.request('DELETE', key); this.assertCurrent(true); this.revokeURLs(); }
   async list(): Promise<string[]> {
@@ -63,5 +74,5 @@ export class BoardBlobSource implements BlobSource {
   }
   revokeURL(url: string) { if (this.urls.delete(url)) URL.revokeObjectURL(url); }
   private revokeURLs() { for (const url of this.urls) URL.revokeObjectURL(url); this.urls.clear(); }
-  dispose = () => { this.disposed = true; this.revokeURLs(); this.options.signal?.removeEventListener('abort', this.dispose); };
+  dispose = () => { this.disposed = true; this.revokeURLs(); this.pending.clear(); this.options.signal?.removeEventListener('abort', this.dispose); };
 }
