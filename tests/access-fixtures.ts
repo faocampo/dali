@@ -1,5 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
+import { randomBytes } from 'node:crypto';
+import { buildApp } from '../server/app.js';
+import { openDatabase } from '../server/storage/database.js';
+import { createOidcProvider } from './oidc-provider.js';
 import type { APIResponse, Browser, BrowserContext } from '@playwright/test';
 import { test, expect } from './fixtures.js';
 
@@ -10,6 +14,24 @@ export const accessIdentityLabels: Record<AccessIdentity, string> = {
   owner: 'Synthetic Owner', editor: 'Synthetic Editor', viewer: 'Synthetic Viewer', nonMember: 'Synthetic Non-member',
 };
 export { test, expect };
+
+/** Isolated final-acceptance service; all identities still use signed OIDC. */
+export async function acceptanceService(baseURL: string) {
+  const origin = 'http://127.0.0.1:5499';
+  const registration = { clientId: 'synthetic-acceptance', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
+  const provider = await createOidcProvider({ clients: [registration] });
+  const database = openDatabase(':memory:');
+  let barrier: (() => Promise<void>) | undefined;
+  const app = await buildApp({ database, beforeCommit: () => barrier?.() ?? Promise.resolve(), config: {
+    DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000',
+    DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret,
+    DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',
+  } });
+  app.get('/*', async (request, reply) => { const response = await fetch(baseURL + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
+  await app.listen({ host: '127.0.0.1', port: 5499 });
+  return { origin, database, provider, setBarrier(value?: () => Promise<void>) { barrier = value; },
+    async close() { await app.close(); database.close(); await provider.close(); } };
+}
 
 /** Every identity traverses the application's ordinary OIDC boundary in its own cookie jar. */
 export async function createIdentityContexts(browser: Browser, baseURL: string) {
