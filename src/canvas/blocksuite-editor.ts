@@ -20,6 +20,7 @@ import { signal } from '@preact/signals-core';
 import { viewExtensions } from './extensions';
 import { getCanvasRuntime } from './runtime';
 import { installShapeTextTypography } from './shape-text-editor';
+import { installMutationGuard, installReadOnlyInputs } from './account/mutation-guard';
 
 export type EdgelessEditorHandle = {
   host: EditorHost;
@@ -30,7 +31,8 @@ export async function mountEdgelessEditor(
   container: HTMLElement
 ): Promise<EdgelessEditorHandle> {
   installShapeTextTypography();
-  const { store } = await getCanvasRuntime();
+  const { store, scope } = await getCanvasRuntime();
+  const disposeGuard = installMutationGuard(store, scope);
 
   const viewManager = new ViewExtensionManager(viewExtensions);
   // 'edgeless' scope is what swaps affine-page-root for affine-edgeless-root
@@ -72,6 +74,7 @@ export async function mountEdgelessEditor(
   });
 
   const host = std.render();
+  const disposeInputs = installReadOnlyInputs(host, store, scope);
 
   // ViewportElementExtension('.affine-edgeless-viewport') (affine-block-root's
   // edgeless view scope) resolves the viewport via `std.host.closest(selector)`,
@@ -134,6 +137,8 @@ export async function mountEdgelessEditor(
       // it here as well would run every lifecycle watcher's unmounted() hook
       // twice.
       viewport.remove();
+      disposeInputs();
+      disposeGuard();
     },
   };
 }

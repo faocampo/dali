@@ -4,14 +4,14 @@ import { Tooltips } from './Tooltips';
 import { installCanvasAffordances } from './canvas-affordances';
 import { ViewportControls } from './ViewportControls';
 import { ObjectContextMenu } from './ObjectContextMenu';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { importLocalImages, installImageInputs, type ImageImportRequest } from './image-input';
 import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
 import type { EditorHost } from '@blocksuite/affine/std';
 import type { Store } from '@blocksuite/affine/store';
 import { mountEdgelessEditor, type EdgelessEditorHandle } from './blocksuite-editor';
-import { getActiveAccessScope, type CanvasRuntime } from './runtime';
+import { getActiveAccessScope, subscribeAccessScope, type CanvasRuntime } from './runtime';
 import { getLegacyCanvasRuntime } from './legacy-runtime';
 import { insertSticky } from './sticky';
 import { insertText } from './text';
@@ -31,6 +31,8 @@ import { renderBoardPresentation } from './presentation-export';
 
 export default function BlockSuiteCanvas({ runtime }: { runtime: CanvasRuntime }) {
   const ref = useRef<HTMLDivElement>(null);
+  const scope = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
+  const writable = scope?.canWrite && scope.phase === 'active';
   const [error, setError] = useState<Error | null>(null);
   // The mounted host is what the image picker needs; it only exists after a
   // successful mount, so the control is rendered from it rather than always.
@@ -91,15 +93,15 @@ export default function BlockSuiteCanvas({ runtime }: { runtime: CanvasRuntime }
   return (
     <div ref={ref} style={{ position: 'absolute', inset: 0 }}>
       {!host && <p role="status" className="mindmap-opening">Opening board…</p>}
-      {host && <BoardControls host={host} onOpenLayers={() => setLayersOpen(true)} />}
+      {host && (writable ? <BoardControls host={host} onOpenLayers={() => setLayersOpen(true)} /> : <ViewportControls host={host} />)}
       {host && <AccountImagesAndPreview host={host} runtime={runtime} />}
       {host && <Tooltips />}
-      {host && <ConnectorQuickAdd host={host} />}
+      {host && writable && <ConnectorQuickAdd host={host} />}
       {host && <FrameBorderOverlay host={host} />}
       {host && <CanvasMeasurements host={host} />}
-      {host && <MindMapInspector host={host} />}
-      {host && <ObjectContextMenu host={host} />}
-      {host && (layersOpen
+      {host && writable && <MindMapInspector host={host} />}
+      {host && writable && <ObjectContextMenu host={host} />}
+      {host && writable && (layersOpen
         ? <LayersInspector host={host} onClose={() => setLayersOpen(false)} />
         : <SelectionInspector host={host} />)}
     </div>
