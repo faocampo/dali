@@ -190,7 +190,11 @@ test('@03-03-02 protected previews reject denied and delayed generations and rev
   await refresh(page); await expect(card(page, id)).toHaveCount(0); expect(await page.locator('body').innerText()).not.toContain(foreign.boardText);
 });
 test('@03-03-02 UI-HOME-partial denied preview keeps the authorized open action usable', async ({ page }) => {
-  const canary = syntheticCanaries(); const id = seed('Missing preview board', { image: canary.imageBytes });
+  const canary = syntheticCanaries();
+  const created = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' }, data: { title: 'Missing preview board', operationId: randomUUID() } });
+  expect(created.status()).toBe(201);
+  const id = (await created.json()).summary.id as string;
+  database.prepare('INSERT INTO board_thumbnails(board_id,bytes,mime) VALUES(?,?,?)').run(id, canary.imageBytes, 'image/png');
   await page.route('**/api/boards/' + id + '/thumbnail', async route => {
     database.prepare('DELETE FROM board_thumbnails WHERE board_id=?').run(id);
     await route.fallback();

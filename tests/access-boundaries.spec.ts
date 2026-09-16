@@ -104,7 +104,7 @@ test('@03-12-smoke independent role/resource canaries preserve owner state on ev
     const accounts = Object.fromEntries(await Promise.all(Object.entries(contexts).map(async ([role, context]) => [role, (await (await context.request.get('/api/session')).json()).accountId as string])));
     expect(new Set(Object.values(accounts)).size).toBe(4);
     const headers = (role: AccessIdentity, mime = 'application/json') => ({ Origin: service.origin, 'X-Dali-Request': '1', 'X-Dali-Account': accounts[role]!, 'Content-Type': mime });
-    const boards = [];
+    const boards: { d: { summary: { id: string }; rootDocId: string; contentDocId: string }; canary: ReturnType<typeof syntheticCanaries>; key: string; role: 'owner' | 'nonMember'; operationId: string }[] = [];
     for (const role of ['owner', 'nonMember'] as const) {
       const canary = syntheticCanaries(); const operationId = randomUUID();
       const response = await contexts[role].request.post('/api/boards', { headers: headers(role), data: { operationId, title: canary.boardText } });
@@ -115,13 +115,14 @@ test('@03-12-smoke independent role/resource canaries preserve owner state on ev
     }
     const own = boards[0]!; const foreign = boards[1]!; const id = own.d.summary.id;
     for (const role of ['editor', 'viewer'] as const) service.database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(id, accounts[role], role);
-    const ownerRead = async () => {
-      const root = await contexts.owner.request.post(`/api/boards/${id}/docs/${own.d.rootDocId}/pull`, { headers: headers('owner', 'application/octet-stream'), data: Buffer.from([0]) });
-      const content = await contexts.owner.request.post(`/api/boards/${id}/docs/${own.d.contentDocId}/pull`, { headers: headers('owner', 'application/octet-stream'), data: Buffer.from([0]) });
-      const blob = await contexts.owner.request.get(`/api/boards/${id}/blobs/${encodeURIComponent(own.key)}`, { headers: headers('owner') });
-      const thumbnail = await contexts.owner.request.get(`/api/boards/${id}/thumbnail`, { headers: headers('owner') });
-      const metadata = await contexts.owner.request.get(`/api/boards/${id}`, { headers: headers('owner') });
-      const grants = await contexts.owner.request.get(`/api/boards/${id}/grants`, { headers: headers('owner') });
+    const ownerRead = async (target = own) => {
+      const targetId = target.d.summary.id; const requester = contexts[target.role].request;
+      const root = await requester.post(`/api/boards/${targetId}/docs/${target.d.rootDocId}/pull`, { headers: headers(target.role, 'application/octet-stream'), data: Buffer.from([0]) });
+      const content = await requester.post(`/api/boards/${targetId}/docs/${target.d.contentDocId}/pull`, { headers: headers(target.role, 'application/octet-stream'), data: Buffer.from([0]) });
+      const blob = await requester.get(`/api/boards/${targetId}/blobs/${encodeURIComponent(target.key)}`, { headers: headers(target.role) });
+      const thumbnail = await requester.get(`/api/boards/${targetId}/thumbnail`, { headers: headers(target.role) });
+      const metadata = await requester.get(`/api/boards/${targetId}`, { headers: headers(target.role) });
+      const grants = await requester.get(`/api/boards/${targetId}/grants`, { headers: headers(target.role) });
       for (const response of [root, content, blob, thumbnail, metadata, grants]) expect(response.status()).toBe(200);
       const docs = [await root.body(), await content.body()];
       return { documentBytes: Buffer.concat(docs), stateVector: Buffer.concat(docs.map(bytes => Buffer.from(Y.encodeStateVectorFromUpdate(bytes)))), imageBytes: Buffer.concat([await blob.body(), await thumbnail.body()]), metadata: await metadata.json(), grants: await grants.json() };
@@ -149,8 +150,14 @@ test('@03-12-smoke independent role/resource canaries preserve owner state on ev
     ];
     let denials = 0;
     const deny = async (role: AccessIdentity, entry: Entry, status: number, override?: Record<string, string>) => {
-      await expectDeniedWithoutChange({ ownerRead, status, canaryText: own.canary.boardText, canaryImage: own.canary.imageBytes,
-        attempt: () => contexts[role].request.fetch(entry.path, { method: entry.method, headers: override ?? headers(role, entry.mime), ...(entry.method !== 'GET' ? { data: entry.data ?? {} } : {}) }) }); denials++;
+      const target = entry.path.includes(foreign.d.summary.id) ? foreign : own;
+      await expectDeniedWithoutChange({ ownerRead: () => ownerRead(target), status, canaryText: target.canary.boardText, canaryImage: target.canary.imageBytes,
+        attempt: async () => {
+          const response = await contexts[role].request.fetch(entry.path, { method: entry.method, headers: override ?? headers(role, entry.mime), ...(entry.method !== 'GET' ? { data: entry.data ?? {} } : {}) });
+          const bytes = await response.body();
+          for (const board of boards) { expect(bytes.toString()).not.toContain(board.canary.boardText); expect(bytes.includes(board.canary.imageBytes)).toBe(false); }
+          return response;
+        } }); denials++;
     };
     for (const role of ['owner', 'editor', 'viewer', 'nonMember'] as const) {
       for (const entry of matrix()) {
