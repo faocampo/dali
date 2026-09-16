@@ -7,6 +7,13 @@ import { requireBoardCapability, type BoardRow } from './routes.js';
 
 export const DOCUMENT_LIMITS = { update: 8 * 1024 * 1024, vector: 64 * 1024, objects: 10000 };
 export type BeforeCommit = () => Promise<void>;
+export function referencedImageKeys(doc: Y.Doc): Set<string> {
+  const keys = new Set<string>();
+  doc.getMap('blocks').forEach(value => {
+    if (value instanceof Y.Map && value.get('sys:flavour') === 'affine:image' && typeof value.get('prop:sourceId') === 'string') keys.add(value.get('prop:sourceId') as string);
+  });
+  return keys;
+}
 export function documentBytes(database: AccountDatabase, board: BoardRow, docId: string): Buffer | undefined {
   if (docId !== board.root_doc_id && docId !== board.content_doc_id) return;
   return (database.prepare('SELECT update_bytes FROM board_documents WHERE board_id=? AND doc_id=?').get(board.id, docId) as { update_bytes: Buffer } | undefined)?.update_bytes;
@@ -20,7 +27,7 @@ export function validateDocument(doc: Y.Doc, board: BoardRow, docId: string) {
       doc.getSubdocs().size !== 1) throw new Error('Invalid root binding');
     // Workspace metadata may describe only the already bound content document.
     const meta = doc.getMap('meta'); const pages = meta.get('pages');
-    if (pages !== undefined && (!(pages instanceof Y.Array) || pages.toArray().some(p => !p || p.id !== board.content_doc_id))) throw new Error('Invalid metadata binding');
+    if (pages !== undefined && (!(pages instanceof Y.Array) || pages.length > 1 || pages.toArray().some(p => (p instanceof Y.Map ? p.get('id') : p?.id) !== board.content_doc_id))) throw new Error('Invalid metadata binding');
     if ([...doc.share.keys()].some(key => !['spaces', 'meta'].includes(key))) throw new Error('Invalid root');
   } else {
     if (docId !== board.content_doc_id || doc.getSubdocs().size || [...doc.share.keys()].some(key => !['blocks', 'meta'].includes(key))) throw new Error('Invalid content binding');
@@ -67,6 +74,7 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
       const doc = new Y.Doc({ guid: docId }); let merged: Buffer;
       try {
         Y.applyUpdate(doc, stored); Y.applyUpdate(doc, request.body); validateDocument(doc, latest, docId);
+        if (docId === latest.content_doc_id) for (const key of referencedImageKeys(doc)) if (!database.prepare('SELECT 1 FROM board_blobs WHERE board_id=? AND blob_key=?').get(boardId, key)) throw new Error('Unbound image');
         merged = Buffer.from(Y.encodeStateAsUpdate(doc));
         if (merged.length > DOCUMENT_LIMITS.update) return reply.code(413).send({ code: 'PAYLOAD_REJECTED' });
       } catch { return reply.code(400).send({ code: 'INVALID_DOCUMENT' }); }

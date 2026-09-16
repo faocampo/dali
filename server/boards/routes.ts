@@ -5,6 +5,7 @@ import type { AuthConfig } from '../app.js';
 import { currentSession, requireExpectedMember, requireMutation } from '../auth/session-store.js';
 import { runMigrations, type AccountDatabase } from '../storage/database.js';
 import { registerDocumentRoutes, type BeforeCommit } from './documents.js';
+import { registerBlobRoutes } from './blobs.js';
 
 export type BoardRole = 'owner' | 'editor' | 'viewer';
 export type BoardCapability = 'read' | 'image' | 'presentation-export' | 'write' | 'rename' | 'editable-export' | 'duplicate' | 'grants' | 'delete';
@@ -73,6 +74,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
       board_id TEXT, result TEXT NOT NULL, PRIMARY KEY(member_id,operation_id));
   ` }, { version: 3, sql: `CREATE TABLE board_thumbnails (board_id TEXT PRIMARY KEY REFERENCES boards(id) ON DELETE CASCADE, bytes BLOB NOT NULL, mime TEXT NOT NULL CHECK(mime='image/png'));` }]);
   registerDocumentRoutes(app, config, database, now, beforeCommit);
+  registerBlobRoutes(app, config, database, now, beforeCommit);
   app.get<{ Querystring: { filter?: string } }>('/api/boards', async (request, reply) => {
     const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
     const filter = request.query.filter ?? 'all';
