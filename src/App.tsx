@@ -11,10 +11,12 @@ import { discardRecords, pendingRecords } from './canvas/account/outbox';
 import { getSessionState, interruptSession, preserveBeforeNavigation, recoveryBoard, subscribeSession } from './auth/session';
 
 function RecoveryDenied({ accountId, boardId }: { accountId: string; boardId: string }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { heading.current?.focus(); }, [accountId, boardId]);
   const dialog = useRef<HTMLDialogElement>(null); const safe = useRef<HTMLButtonElement>(null);
   const [error, setError] = useState(false); const [discarded, setDiscarded] = useState(false);
   const title = recoveryBoard(accountId)?.title ?? 'this board';
-  return <section className="session-recovery"><h1>Your access has changed</h1><p role="alert">Your access has changed. Pending changes have not been applied. Return to your boards or contact the board owner.</p>
+  return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>Your access has changed</h1><p role="alert">Your access has changed. Pending changes have not been applied. Return to your boards or contact the board owner.</p>
     <a href="/">Back to your boards</a>
     {discarded ? <p role="status">Pending changes discarded.</p> : <button onClick={() => { dialog.current?.showModal(); safe.current?.focus(); }}>Discard pending changes</button>}
     <dialog ref={dialog} className="session-recovery" aria-labelledby="discard-heading"><h2 id="discard-heading">Discard pending changes for “{title}”?</h2><p>This removes this account's recovery copy. Browser-local originals stay unchanged.</p>
@@ -45,6 +47,8 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   const [runtime, setRuntime] = useState<CanvasRuntime>();
   const [retry, setRetry] = useState(0);
   const [hasRecovery, setHasRecovery] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { if (['expired', 'denied', 'error'].includes(state)) heading.current?.focus(); }, [state, target]);
   const rename = useRef<AccountBoardAction>();
   const renameBoard = async (title: string) => {
     if (rename.current) {
@@ -77,10 +81,10 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
     return () => { suspendAccessScope('navigation'); queueMicrotask(() => { controller.abort(); disposeCanvasRuntime(generation); }); };
   }, [member.accountId, target, retry]);
   if (state === 'loading') return <p role="status">Opening board…</p>;
-  if (state === 'expired') return <section><h1>Session expired — sign in to continue.</h1><a href={'/auth/start?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search)}>Sign in to continue</a></section>;
+  if (state === 'expired') return <section><h1 ref={heading} tabIndex={-1}>Session expired — sign in to continue.</h1><a href={'/auth/start?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search)}>Sign in to continue</a></section>;
   if (state === 'denied' && hasRecovery) return <RecoveryDenied accountId={member.accountId} boardId={target} />;
-  if (state === 'denied') return <section><h1>You don't have access to this board</h1><p>Ask the board owner to grant access to your internal account.</p><a href="/">Back to your boards</a></section>;
-  if (state === 'error') return <section><p role="alert">We couldn't open this board. Try again.</p><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/">Back to your boards</a></section>;
+  if (state === 'denied') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>You don't have access to this board</h1><p>Ask the board owner to grant access to your internal account.</p><a href="/">Back to your boards</a></section>;
+  if (state === 'error') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>We couldn't open this board.</h1><p role="alert">We couldn't open this board. Try again.</p><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/">Back to your boards</a></section>;
   return <div className="djai-app" data-board-id={board!.summary.id}>
     <Header boardTitle={board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={board!.summary.role === 'viewer' ? undefined : renameBoard} />
     <main className="djai-canvas-area"><BlockSuiteCanvas runtime={runtime!} /></main>

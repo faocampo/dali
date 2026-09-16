@@ -34,11 +34,11 @@ export function BoardActionDialog({ board, kind, onClose, onComplete }: {
   return createPortal(<dialog ref={panel} className="board-action-dialog" aria-labelledby="board-action-heading" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
     <form onSubmit={event => { event.preventDefault(); void submit(); }}>
       <h2 id="board-action-heading">{heading}</h2><p>{board.title}</p>
-      {kind === 'delete' ? <p>Delete this board and its documents, images and sharing access?</p> : <label>Board name<input aria-label="Board name" value={draft} disabled={busy || uncertain} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.nativeEvent.isComposing && event.key === 'Enter') event.preventDefault(); }} /></label>}
+      {kind === 'delete' ? <p>Delete “{board.title}”? This removes the board and its access grants for everyone. This cannot be undone.</p> : <label>Board name<input aria-label="Board name" aria-describedby={error ? 'board-action-error' : undefined} value={draft} disabled={busy || uncertain} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.nativeEvent.isComposing && event.key === 'Enter') event.preventDefault(); }} /></label>}
       {busy && <p role="status">{kind === 'rename' ? 'Saving name…' : kind === 'delete' ? 'Deleting board…' : 'Copying board…'}</p>}
-      {error && <p role="alert">{error}</p>}
+      {error && <p id="board-action-error" role="alert">{error}</p>}
       <div className="board-action-dialog__actions"><button ref={initial} type="button" disabled={busy} onClick={onClose}>{kind === 'rename' ? 'Keep name' : 'Keep board'}</button>
-        <button type="submit" disabled={busy}>{uncertain ? 'Check again' : kind === 'rename' ? 'Save name' : heading}</button></div>
+        <button className={kind === 'delete' ? 'access-destructive' : undefined} aria-describedby={error ? 'board-action-error' : undefined} type="submit" disabled={busy}>{uncertain ? 'Check again' : kind === 'rename' ? 'Save name' : heading}</button></div>
     </form>
   </dialog>, document.body);
 }

@@ -83,7 +83,7 @@ test('interrupted mounting and rapid board switching keep the final board isolat
   const secondTitle = 'Synthetic switch ' + crypto.randomUUID();
   await page.getByRole('textbox', { name: 'Board name', exact: true }).fill(secondTitle);
   await page.getByRole('button', { name: 'New board', exact: true }).click();
-  await page.getByRole('link', { name: 'Open ' + secondTitle, exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue(secondTitle);
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
   const second = await notes(page);
   const secondUrl = page.url();

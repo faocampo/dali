@@ -11,6 +11,7 @@ test('Main Menu supports arrow navigation, nested Escape, View actions and outsi
   await expect(page.getByRole('menuitem', { name: 'File', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeFocused();
+  expect((await page.getByRole('menuitem', { name: 'New', exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await page.keyboard.press('End');
   await expect(page.getByRole('menuitem', { name: 'Export board', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
@@ -20,6 +21,9 @@ test('Main Menu supports arrow navigation, nested Escape, View actions and outsi
   await page.getByRole('menuitem', { name: 'Reset zoom to 100%', exact: true }).click();
   await expect(page.getByRole('button', { name: /Reset zoom to 100%, current/ })).toHaveText('100%');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.click(); await page.getByRole('menuitem', { name: 'Help', exact: true }).click();
+  expect((await page.getByRole('menuitem', { name: 'Upstream source', exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   await trigger.click();
   await page.mouse.click(600, 400);
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');

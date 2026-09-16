@@ -90,6 +90,7 @@ for (const sourceRole of ['owner', 'editor']) test(`@CR-02 @CR-07 ${sourceRole} 
   expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(sourceState(board.summary.id)).toEqual(before);
   await page.unroute('**/api/imports/*/blobs/*'); await page.getByRole('button', { name: 'Import private copy', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Open imported board', exact: true })).toBeVisible();
+  expect((await page.getByRole('link', { name: 'Open imported board', exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(sourceState(board.summary.id)).toEqual(before);
   const rows = database.prepare('SELECT * FROM boards WHERE id<>?').all(board.summary.id) as { id: string; owner_id: string; content_doc_id: string }[];
   expect(rows).toHaveLength(1); expect(rows[0]!.owner_id).toBe(accountId); expect(rows[0]!.content_doc_id).not.toBe(board.contentDocId);
@@ -174,12 +175,15 @@ test('@03-08-01 Unicode rename blank bounds acknowledgment and named safe-focus 
   let dialog = await open(); const title = '👩🏽‍💻'.repeat(200);
   await dialog.getByRole('textbox').fill(title + '界'); await dialog.getByRole('button', { name: 'Save name' }).click();
   await expect(dialog.getByRole('alert')).toContainText('200'); await expect(dialog.getByRole('textbox')).toHaveValue(title + '界');
+  await expect(dialog.getByRole('textbox')).toHaveAttribute('aria-describedby', 'board-action-error');
   await dialog.getByRole('textbox').fill(title); await dialog.getByRole('button', { name: 'Save name' }).click(); await expect(dialog).not.toBeVisible();
   await expect(card(page, board.summary.id).getByRole('link', { name: 'Open ' + title, exact: true })).toBeVisible();
   dialog = await open(); await dialog.getByRole('textbox').fill('   '); await dialog.getByRole('button', { name: 'Save name' }).click(); await expect(dialog).not.toBeVisible();
   expect((await (await page.request.get(origin + '/api/boards/' + board.summary.id, { headers: headers() })).json()).summary.title).toBe(title);
   await card(page, board.summary.id).getByRole('button', { name: 'Delete board' }).click(); dialog = page.getByRole('dialog', { name: 'Delete board' });
   await expect(dialog).toContainText(title); await expect(dialog.getByRole('button', { name: 'Keep board' })).toBeFocused();
+  await expect(dialog).toContainText(`Delete “${title}”? This removes the board and its access grants for everyone. This cannot be undone.`);
+  await expect(dialog.getByRole('button', { name: 'Delete board', exact: true })).toHaveCSS('color', 'rgb(178, 59, 50)');
   await dialog.getByRole('button', { name: 'Keep board' }).click(); await expect(card(page, board.summary.id).getByRole('button', { name: 'Delete board' })).toBeFocused();
   await card(page, board.summary.id).getByRole('button', { name: 'Delete board' }).click(); await dialog.getByRole('button', { name: 'Delete board', exact: true }).click();
   await expect(card(page, board.summary.id)).toHaveCount(0); await expect(page.getByRole('button', { name: 'New board', exact: true })).toBeFocused();
@@ -305,6 +309,7 @@ test('@03-08-02 inline loading guards repeated commits and uncertain failure ret
   await page.unroute('**/api/boards/' + board.summary.id); await input.fill('Corrected draft'); await input.press('Tab');
   await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Corrected draft' });
   await input.fill('界'.repeat(201)); await input.press('Enter'); await expect(input).toHaveValue('界'.repeat(201)); await expect(page.getByRole('alert')).toContainText('200');
+  await expect(input).toHaveAttribute('aria-describedby', 'board-title-error');
   await input.press('Escape'); await expect(input).toHaveValue('Corrected draft');
 });
 test('@03-08-02 Viewer readable title account controls and Main Menu preserve role restrictions at 490px', async ({ page }) => {
@@ -314,6 +319,7 @@ test('@03-08-02 Viewer readable title account controls and Main Menu preserve ro
   database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, accountId, 'viewer');
   await page.setViewportSize({ width: 490, height: 800 }); await page.goto(origin + '/?board=' + board.summary.id);
   await expect(page.locator('affine-edgeless-root')).toBeVisible(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: title, exact: true })).toHaveCSS('font-weight', '600');
   await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveCount(0); await expect(page.getByText('Viewer · View only', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: 'Share board' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Main Menu', exact: true }).click(); await page.getByRole('menuitem', { name: 'File', exact: true }).click();
   await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeVisible(); await expect(page.getByRole('menuitem', { name: 'Duplicate board' })).toHaveCount(0); await expect(page.getByRole('menuitem', { name: 'Delete board' })).toHaveCount(0);

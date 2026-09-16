@@ -5,19 +5,22 @@ import { acceptanceService, syntheticCanaries } from './access-fixtures';
 import { fileAction } from './app-menu';
 import type { Page } from '@playwright/test';
 
-async function expectAcknowledgedJournal(page: Page) {
-  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
-  expect(await page.evaluate(async () => (await indexedDB.databases()).map(db => db.name))).toEqual(['dali-account-recovery-v1']);
-  await expect.poll(() => page.evaluate(() => new Promise<number>((resolve, reject) => {
+async function journalRecords(page: Page) {
+  return page.evaluate(() => new Promise<{ boardId: string; kind: string }[]>((resolve, reject) => {
     const request = indexedDB.open('dali-account-recovery-v1', 1);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
       const db = request.result; const transaction = db.transaction('journal', 'readonly');
-      const count = transaction.objectStore('journal').count();
-      transaction.oncomplete = () => { db.close(); resolve(count.result); };
+      const records = transaction.objectStore('journal').getAll();
+      transaction.oncomplete = () => { db.close(); resolve(records.result); };
       transaction.onabort = transaction.onerror = () => { db.close(); reject(transaction.error); };
     };
-  }))).toBe(0);
+  }));
+}
+async function expectAcknowledgedJournal(page: Page, retained: unknown[] = []) {
+  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  expect(await page.evaluate(async () => (await indexedDB.databases()).map(db => db.name))).toEqual(['dali-account-recovery-v1']);
+  await expect.poll(() => journalRecords(page)).toEqual(retained);
 }
 
 test('@03-06-02 two New commands create distinct private tabs and preserve the source board', async ({ page, context, baseURL }) => {
@@ -31,8 +34,11 @@ test('@03-06-02 two New commands create distinct private tabs and preserve the s
   const sourceBytes = await (await context.request.post(`/api/boards/${board.summary.id}/docs/${board.contentDocId}/pull`, { headers: { ...headers, 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0]) })).body();
   const destinations: string[] = []; const errors: string[] = [];
   for (let index = 0; index < 2; index++) {
+    let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+    await page.route('**/api/boards', async route => { if (route.request().method() !== 'POST') return route.continue(); const response = await route.fetch(); await gate; await route.fulfill({ response }); });
     const opened = context.waitForEvent('page'); await fileAction(page, 'New'); const tab = await opened;
     tab.on('pageerror', error => errors.push(error.message));
+    try { await expect(tab.getByRole('status')).toHaveText('Creating board…'); expect(tab.url()).toBe('about:blank'); } finally { release(); }
     await expect(tab.locator('editor-host'), 'each New command opens an authorized native board').toBeVisible();
     const id = new URL(tab.url()).searchParams.get('board')!; destinations.push(id);
     const result = await (await context.request.get('/api/boards/' + id, { headers })).json();
@@ -227,13 +233,19 @@ test('@03-03-01 BOARD-01 empty creates server-confirmed default and named cards 
   await page.goto(service.origin); await page.getByRole('link', { name: 'Synthetic Viewer', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Create your first board' })).toBeVisible();
   await page.getByRole('button', { name: 'New board', exact: true }).click();
-  await expect(page.getByRole('link', { name: 'Open Untitled board', exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Untitled board');
+  const firstId = new URL(page.url()).searchParams.get('board');
+  await expectAcknowledgedJournal(page); await fileAction(page, 'All boards');
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeFocused();
+  const retained = await journalRecords(page); expect(retained).toHaveLength(2);
+  expect(retained.every(row => row.boardId === firstId && row.kind === 'document')).toBe(true);
   await page.getByRole('textbox', { name: 'Board name' }).fill('  Named synthetic board  ');
   await page.getByRole('button', { name: 'New board', exact: true }).click();
-  const card = page.getByRole('link', { name: 'Open Named synthetic board', exact: true }); await expect(card).toBeVisible();
-  await card.click(); await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Named synthetic board');
+  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Named synthetic board');
   await expect(page.locator('editor-host')).toBeVisible();
-  await expectAcknowledgedJournal(page);
+  const secondId = new URL(page.url()).searchParams.get('board'); expect(secondId).not.toBe(firstId);
+  await expectAcknowledgedJournal(page, retained);
+  expect((await journalRecords(page)).filter(row => row.boardId === secondId)).toEqual([]);
   await fileAction(page, 'All boards');
   await expect(page.getByRole('link', { name: 'Open Named synthetic board', exact: true })).toBeVisible();
   const member = await (await context.request.get(service.origin + '/api/session')).json();
@@ -241,7 +253,7 @@ test('@03-03-01 BOARD-01 empty creates server-confirmed default and named cards 
   const before = await (await context.request.get(service.origin + '/api/boards', { headers })).json();
   await page.evaluate(() => localStorage.setItem('djai-design.active-board', 'remembered-foreign-target'));
   for (const target of ['missing-target', '']) {
-    await page.goto(service.origin + '/?board=' + target); await expect(page.getByRole('heading', { name: "You don't have access to this board" })).toBeVisible();
+    await page.goto(service.origin + '/?board=' + target); await expect(page.getByRole('heading', { name: "You don't have access to this board" })).toBeFocused();
     await expect(page.locator('[data-board-id]')).toHaveCount(0);
   }
   expect(await (await context.request.get(service.origin + '/api/boards', { headers })).json()).toEqual(before);
@@ -286,7 +298,7 @@ test('@03-03-01 uncertain create response reconciles operation before any second
   await page.route('**/api/operations/*', route => { lookups++; return route.continue(); });
   await page.getByRole('textbox', { name: 'Board name' }).fill('Reconciled synthetic board');
   await page.getByRole('button', { name: 'New board', exact: true }).click();
-  await expect(page.getByRole('link', { name: 'Open Reconciled synthetic board', exact: true })).toBeVisible();
+  await expect(page.locator('editor-host')).toBeVisible(); await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Reconciled synthetic board');
   expect(posts).toBe(1); expect(lookups).toBe(1);
 });
 });

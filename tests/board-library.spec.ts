@@ -73,6 +73,31 @@ function seed(title: string, options: { role?: 'owner' | 'editor' | 'viewer'; up
 const refresh = (page: Page) => page.getByRole('button', { name: 'Refresh boards', exact: true }).click();
 const card = (page: Page, id: string) => page.locator('[data-board-id="' + id + '"]');
 
+test('@UI-X2 unknown creation keeps its receipt and opens the acknowledged private board', async ({ page }) => {
+  const posts: { operationId: string; title: string }[] = []; const receipts: string[] = []; let reconcile = false;
+  await page.route('**/api/operations/*', async route => { receipts.push(new URL(route.request().url()).pathname.split('/').at(-1)!); if (!reconcile) return route.fulfill({ status: 503, json: {} }); await route.continue(); });
+  await page.route('**/api/boards', async route => { if (route.request().method() !== 'POST') return route.fallback(); posts.push(route.request().postDataJSON()); await route.fetch(); await route.fulfill({ status: 503, json: {} }); });
+  await page.getByLabel('Board name', { exact: true }).fill('Acknowledged private board'); await page.getByRole('button', { name: 'New board', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText("We couldn't confirm this change. Check again before retrying.");
+  await expect(page.getByLabel('Board name', { exact: true })).toBeDisabled();
+  const original = structuredClone(posts[0]!); expect(posts).toHaveLength(1);
+  const created = database.prepare('SELECT id,owner_id,title FROM boards WHERE title=?').get(original.title) as { id: string; owner_id: string; title: string };
+  expect(created.owner_id).toBe(accountId); expect(database.prepare('SELECT * FROM board_grants WHERE board_id=?').all(created.id)).toEqual([]);
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  reconcile = true; await page.getByRole('button', { name: 'Check again', exact: true }).click();
+  await expect(page).toHaveURL(origin + '/?board=' + created.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue(original.title);
+  expect(posts).toEqual([original]); expect(receipts.every(id => id === original.operationId)).toBe(true);
+  expect(database.prepare('SELECT * FROM operations WHERE operation_id=?').all(original.operationId)).toHaveLength(1);
+});
+
+test('@UI-X4 library heading receives route focus while refresh and filters keep their focus', async ({ page }) => {
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeFocused();
+  await expect(page.getByRole('group', { name: 'Filter boards' })).toBeVisible();
+  const filter = page.getByRole('button', { name: 'Mine', exact: true }); await filter.click(); await expect(page.getByRole('heading', { name: 'Create your first board' })).toBeVisible(); await expect(filter).toBeFocused();
+  await refresh(page); await expect(page.getByRole('heading', { name: 'Create your first board' })).toBeVisible(); await expect(page.getByRole('button', { name: 'Refresh boards', exact: true })).toBeFocused();
+});
+
 test('@03-03-02 UI-HOME-empty every filter has usable copy and no foreign metadata', async ({ page }) => {
   const canary = syntheticCanaries(); seed(canary.boardText, { foreign: true, image: canary.imageBytes });
   for (const name of ['All', 'Mine', 'Shared with me']) {

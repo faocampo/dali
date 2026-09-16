@@ -38,8 +38,17 @@ export function Header({
   const [creations, setCreations] = useState<Creation[]>([]);
   const lifetime = useRef(new AbortController());
   useEffect(() => { lifetime.current = new AbortController(); return () => lifetime.current.abort(); }, []);
+  const showCreationState = (tab: Window | null, message: string) => {
+    if (!tab || tab.closed) return;
+    try {
+      if (tab.location.href !== 'about:blank') return;
+      const status = tab.document.createElement('p'); status.setAttribute('role', 'status'); status.textContent = message;
+      tab.document.title = 'New board'; tab.document.body.replaceChildren(status);
+    } catch { /* A user-navigated tab remains under their control. */ }
+  };
   const completeCreation = async (creation: Creation) => {
     const signal = lifetime.current.signal;
+    showCreationState(creation.tab, 'Creating board…');
     setCreations(values => values.map(value => value.id === creation.id ? { ...value, state: 'pending' } : value));
     try {
       const result = await createAccountBoard(creation.accountId, creation.id, signal);
@@ -49,7 +58,10 @@ export function Header({
       if (creation.tab && !creation.tab.closed) { creation.tab.location.replace(href); setCreations(values => values.filter(value => value.id !== creation.id)); }
       else setCreations(values => values.map(value => value.id === creation.id ? { ...value, href, state: 'ready' } : value));
     } catch {
-      if (!signal.aborted) setCreations(values => values.map(value => value.id === creation.id ? { ...value, state: 'error' } : value));
+      if (!signal.aborted) {
+        showCreationState(creation.tab, "We couldn't confirm this change. Return to the original board and check again before retrying.");
+        setCreations(values => values.map(value => value.id === creation.id ? { ...value, state: 'error' } : value));
+      }
     }
   };
   const newBoard = () => {

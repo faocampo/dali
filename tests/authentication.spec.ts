@@ -46,7 +46,7 @@ test('@03-02-02 D-04 persistent session survives a real browser process restart'
 
 test('@03-02-02 callback rejection stays on a recoverable error and retries real provider sign-in', async ({ page, context }) => {
   await page.goto('/auth/callback?state=invalid&code=invalid');
-  await expect(page.getByRole('heading', { name: "We couldn't sign you in." })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "We couldn't sign you in." })).toBeFocused();
   await expect(page.getByRole('heading', { name: 'Your boards' })).toHaveCount(0);
   expect((await context.request.get('/api/session')).status()).toBe(401);
   await page.reload(); await expect(page.getByRole('button', { name: 'Sign in again' })).toBeVisible();
@@ -61,7 +61,7 @@ test('@03-02-02 signed provider token with tampered nonce is rejected without ac
     return route.continue({ url: url.href });
   });
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-  await expect(page.getByRole('heading', { name: "We couldn't sign you in." })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "We couldn't sign you in." })).toBeFocused();
   expect((await context.request.get('/api/session')).status()).toBe(401);
   await expect(page.getByText('owner@example.org', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Your boards' })).toHaveCount(0);
@@ -109,7 +109,7 @@ for (const intent of ['?board=synthetic-board', '?new=1']) {
 
 test('@03-02-02 AUTH-01 empty configuration error is recoverable without mounting protected content', async ({ page }) => {
   await page.goto('/?authError=configuration');
-  await expect(page.getByRole('heading', { name: "We couldn't sign you in." })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "We couldn't sign you in." })).toBeFocused();
   await expect(page.getByRole('alert')).toHaveText('Try signing in again.');
   await expect(page.getByRole('heading', { name: 'Your boards' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Sign in again' }).click();
@@ -133,7 +133,7 @@ test('@03-02-01 ordinary entry signs in through OIDC and explicit logout stays s
   expect(Object.keys(await session.json()).sort()).toEqual(['accountId', 'displayName', 'email', 'expiresAt']);
   expect(session.headers()['cache-control']).toBe('private, no-store');
   await page.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
-  await expect(page.getByRole('heading', { name: "You're signed out of Dalí" })).toBeVisible();
+  await expect(page.getByRole('heading', { name: "You're signed out of Dalí" })).toBeFocused();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Sign in again' })).toBeVisible();
   expect((await context.request.get('/api/session')).status()).toBe(401);

@@ -114,6 +114,7 @@ test('@03-10-02 different identity receives no previous content or replay even w
   await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
   await page.getByRole('link', { name: 'Synthetic Editor', exact: true }).click();
   await expect(page.getByText("You're signed in with a different account. Return to your boards or sign in with the previous account to recover its pending changes.", { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Account changed', exact: true })).toBeFocused();
   expect(pushes).toBe(0); expect(await records(page)).toEqual(pending);
   await expect(page.locator('editor-host')).toHaveCount(0); await expect(page.getByText('Original identity secret canary')).toHaveCount(0);
   expect((await records(page)).every(record => record.accountId === originalAccount && record.boardId === descriptor.summary.id)).toBe(true);
@@ -194,6 +195,7 @@ for (const resource of ['document', 'image', 'thumbnail'] as const) test.describ
   await context.clearCookies({ name: 'dali_fixture_identity' }); const other = await context.newPage(); await other.goto(origin + '/auth/start');
   await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   await expect(page.getByText("You're signed in with a different account. Return to your boards or sign in with the previous account to recover its pending changes.", { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Account changed', exact: true })).toBeFocused();
   release(); await page.unrouteAll({ behavior: 'ignoreErrors' });
   await expect(page.locator('editor-host')).toHaveCount(0); await expect(page.locator('.board-card')).toHaveCount(0); await expect(page.getByText('Delayed identity canary')).toHaveCount(0);
   expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before);

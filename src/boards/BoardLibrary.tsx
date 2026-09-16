@@ -46,6 +46,8 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
   const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState('');
   const operation = useRef<{ id: string; title: string } | null>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { if (!new URLSearchParams(window.location.search).has('focusBoard')) heading.current?.focus(); }, [member.accountId]);
   const actionFocus = useRef<{ id?: string }>();
   useEffect(() => {
     if (loading || error || !actionFocus.current) return;
@@ -110,24 +112,22 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
       }
       if (!result || !validSummary(result.summary, member.accountId)) throw new Error('Invalid result');
       if (!controller.signal.aborted) {
-        const created = result.summary;
-        setBoards(current => [created, ...current.filter(board => board.id !== created.id)].sort((a, b) => b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
-        setFilter('all'); setRefresh(value => value + 1);
-        setTitle(''); operation.current = null;
+        operation.current = null;
+        window.location.assign('/?board=' + encodeURIComponent(result.summary.id));
       }
     } catch (cause) {
-      if (!controller.signal.aborted) setCreateError(cause instanceof Error && cause.message.startsWith('Use a board') ? cause.message : "We couldn't create this board. Try again.");
+      if (!controller.signal.aborted) setCreateError(operation.current ? "We couldn't confirm this change. Check again before retrying." : cause instanceof Error && cause.message.startsWith('Use a board') ? cause.message : "We couldn't create this board. Try again.");
     } finally { if (!controller.signal.aborted) setBusy(false); }
   };
   return <>
-    <div className="board-library__title-row"><div><h1>Your boards</h1><p>Boards you can access with this account.</p></div></div>
+    <div className="board-library__title-row"><div><h1 ref={heading} tabIndex={-1}>Your boards</h1><p>Boards you can access with this account.</p></div></div>
     <form className="board-library__create" onSubmit={event => { event.preventDefault(); void create(); }}>
-      <label htmlFor="new-board-title">Board name <input id="new-board-title" value={title} onChange={event => setTitle(event.target.value)} disabled={busy || !!operation.current} /></label>
-      <button className="djai-primary" disabled={busy || loading} type="submit">{busy ? 'Creating board…' : 'New board'}</button>
+      <label htmlFor="new-board-title">Board name <input id="new-board-title" aria-describedby={createError ? 'board-create-error' : undefined} value={title} onChange={event => setTitle(event.target.value)} disabled={busy || !!operation.current} /></label>
+      <button className="djai-primary" aria-describedby={createError ? 'board-create-error' : undefined} disabled={busy || loading} type="submit">{busy ? 'Creating board…' : operation.current ? 'Check again' : 'New board'}</button>
     </form>
-    {createError && <p role="alert">{createError}</p>}
+    {createError && <p id="board-create-error" role="alert">{createError}</p>}
     {notice && <p role="status">{notice}</p>}
-    <div className="board-library__filters" aria-label="Filter boards">
+    <div className="board-library__filters" role="group" aria-label="Filter boards">
       {(['all', 'mine', 'shared'] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? 'All' : value === 'mine' ? 'Mine' : 'Shared with me'}</button>)}
       <button onClick={() => setRefresh(value => value + 1)}>Refresh boards</button>
     </div>

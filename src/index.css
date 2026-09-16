@@ -1799,3 +1799,40 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 .local-copy-dialog [role=alert] { color: #b23b32; }
 @media (max-width: 490px) { .local-copy-dialog footer > div { flex-direction: column; } .local-copy-dialog footer button { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .local-copy-dialog, .local-copy-dialog * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* Account chrome follows the access UI contract without changing canvas objects. */
+.share-dialog, .board-action-dialog, .local-copy-dialog { font: 400 15px/1.5 var(--affine-font-family); max-width: calc(100vw - 32px); border: 1px solid #76736e; border-radius: 8px; }
+.share-dialog { box-sizing: border-box; width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); gap: 0; }
+.share-dialog .djai-panel-head, .share-dialog__body, .share-dialog .export-footer,
+.local-copy-dialog header, .local-copy-dialog footer, .local-copy-dialog__body { padding: 24px; }
+.share-dialog .djai-panel-head { border-bottom: 1px solid var(--board-line); }
+.share-dialog .export-footer { border-top: 1px solid var(--board-line); }
+.share-dialog__body, .local-copy-dialog__body { scroll-padding: 16px; }
+.share-dialog h2, .board-action-dialog h2, .local-copy-dialog h2 { font: 600 20px/1.2 var(--affine-font-family); margin: 0 0 16px; }
+.share-dialog .djai-panel-head h2 { margin: 0; }
+.share-dialog h3, .share-dialog strong, .local-copy-dialog strong, .board-action-dialog strong, .board-card__title, .board-title-readable { font: 600 15px/1.5 var(--affine-font-family); }
+.share-dialog p, .board-action-dialog p { margin: 8px 0 16px; }
+.share-dialog label, .board-action-dialog label, .board-library__create label { font: 600 13px/1.5 var(--affine-font-family); }
+.share-dialog button, .share-dialog select, .board-action-dialog button, .board-action-dialog a,
+.local-copy-dialog button, .local-copy-dialog a, .board-card__actions button,
+.board-account summary, .board-account button, .board-role, .djai-header-actions > button,
+.dali-menu-popup [role^='menuitem'] { font: 600 13px/1.5 var(--affine-font-family); border-radius: 8px; padding: 8px 16px; min-height: 44px; }
+.share-dialog input, .share-dialog select, .board-action-dialog input, .board-title-inline input, .board-library input { border: 1px solid #76736e; border-radius: 8px; padding: 8px; }
+.share-dialog input, .board-action-dialog input { font: 400 15px/1.5 var(--affine-font-family); }
+.board-title-inline input { font: 600 15px/1.5 var(--affine-font-family); }
+.board-card__actions button { color: #1b1a18; }
+.share-owner > span, .share-row > span, .board-card__metadata, .board-card__open small { font: 400 12px/1.5 var(--affine-font-family); }
+.share-owner, .share-row, .local-copy-dialog__body section { padding-block: 16px; }
+.share-dialog [role=option], .local-copy-dialog label span { padding: 8px; }
+.share-confirm { padding: 16px; margin-block: 16px; border-width: 1px; }
+.board-action-dialog__actions { gap: 8px; }
+.board-action-dialog a { display: inline-flex; align-items: center; box-sizing: border-box; }
+.share-dialog .access-destructive, .board-action-dialog .access-destructive { color: #b23b32; }
+.board-account > div { border-radius: 8px; }
+.dali-menu-popup, .dali-shortcuts { padding: 8px; }
+.dali-submenu { margin-left: 8px; padding-left: 8px; }
+.dali-shortcuts h2, .dali-shortcuts h3 { font: 600 15px/1.5 var(--affine-font-family); margin: 8px 0; }
+.dali-shortcuts p { margin-bottom: 8px; }
+.board-library__header { padding-inline: 24px; }
+.board-library__title-row { margin-bottom: 24px; }
+.board-library__title-row h1 { margin-bottom: 8px; }

@@ -27,7 +27,7 @@ export function BoardTitleMenu({ title, onRename }: {
       .finally(() => { saving.current = false; setBusy(false); });
   };
   return <div className="board-title-control board-title-inline">
-    <input aria-label="Board name" title={title} value={draft} disabled={busy || uncertain}
+    <input aria-label="Board name" aria-describedby={error ? 'board-title-error' : undefined} title={title} value={draft} disabled={busy || uncertain}
       style={{ width: `${Math.max(12, Math.min(28, draft.length + 2))}ch` }}
       onFocus={() => { cancelled.current = false; }}
       onChange={event => setDraft(event.target.value)} onBlur={save}
@@ -37,7 +37,7 @@ export function BoardTitleMenu({ title, onRename }: {
         if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.blur(); }
         if (event.key === 'Escape') { event.preventDefault(); cancelled.current = true; setDraft(title); setError(null); event.currentTarget.blur(); }
       }} />
-    {error && <p role="alert" className="board-title-error">{error}</p>}
+    {error && <p id="board-title-error" role="alert" className="board-title-error">{error}</p>}
     {busy && <span role="status">Saving name…</span>}
     {uncertain && <button onClick={save} disabled={busy}>Check again</button>}
   </div>;

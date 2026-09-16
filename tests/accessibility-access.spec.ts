@@ -19,7 +19,7 @@ async function create(page: Page, title: string) {
 async function geometry(page: Page, selector: string) {
   const result = await page.locator(selector).evaluate(el => ({
     overflow: document.documentElement.scrollWidth > innerWidth,
-    controls: [...el.querySelectorAll<HTMLElement>('button,input:not([type=checkbox]),select,summary')].filter(node => node.getClientRects().length && !node.closest('[hidden]')).map(node => {
+    controls: [...el.querySelectorAll<HTMLElement>('button,input:not([type=checkbox]),select,summary,a[href]')].filter(node => node.getClientRects().length && !node.closest('[hidden]')).map(node => {
       const r = node.getBoundingClientRect(); return { name: node.getAttribute('aria-label') || node.textContent?.trim() || node.tagName, height: r.height, width: r.width };
     }),
   }));
@@ -62,10 +62,20 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
   await expect(card.getByRole('link', { name: 'Open ' + title, exact: true })).toBeVisible();
   for (const width of [490, 1404]) {
     await page.setViewportSize({ width, height: 900 }); await geometry(page, 'main');
+    const actions = await card.locator('.board-card__actions button').evaluateAll(nodes => nodes.map(node => { const s = getComputedStyle(node); return { color: s.color, size: s.fontSize, weight: s.fontWeight }; }));
+    expect(actions.length).toBe(4); for (const action of actions) expect(action).toEqual({ color: 'rgb(27, 26, 24)', size: '13px', weight: '600' });
+    await expect(page.getByLabel('Board name', { exact: true })).toHaveCSS('border-top-color', 'rgb(118, 115, 110)');
+    await page.getByRole('heading', { name: 'Your boards', exact: true }).evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeInViewport();
     await page.screenshot({ path: testInfo.outputPath(`synthetic-library-${width}.png`) });
     await card.getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
     await expect(dialog.getByRole('combobox', { name: 'Access role', exact: true })).toHaveCount(50);
     await geometry(page, 'dialog');
+    const panel = await dialog.evaluate(el => { const s = getComputedStyle(el); return { width: el.getBoundingClientRect().width, border: s.borderTopWidth, gap: s.gap, size: s.fontSize, weight: s.fontWeight }; });
+    expect(panel).toEqual({ width: Math.min(640, width - 32), border: '1px', gap: '0px', size: '15px', weight: '400' });
+    await expect(dialog.locator('header')).toHaveCSS('padding', '24px'); await expect(dialog.locator('.share-dialog__body')).toHaveCSS('padding', '24px');
+    await expect(dialog.locator('h2')).toHaveCSS('font-size', '20px'); await expect(dialog.locator('h2')).toHaveCSS('font-weight', '600');
+    await expect(dialog.getByRole('combobox', { name: 'Access', exact: true })).toHaveCSS('border-top-color', 'rgb(118, 115, 110)');
     const field = dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email', exact: true }); await expect(field).toBeFocused(); await field.fill('NoSuchMember' + 'x'.repeat(120));
     const before = service.database.prepare('SELECT * FROM board_grants WHERE board_id=? ORDER BY member_id').all(board.summary.id);
     await field.dispatchEvent('compositionstart'); await field.dispatchEvent('keydown', { key: 'Enter', isComposing: true }); await field.dispatchEvent('compositionend');
@@ -83,6 +93,13 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     await testInfo.attach(`contrast-${width}`, { body: JSON.stringify(contrast), contentType: 'application/json' });
     await page.screenshot({ path: testInfo.outputPath(`synthetic-sharing-${width}.png`) });
     await dialog.getByRole('button', { name: 'Close', exact: true }).click(); await expect(card.getByRole('button', { name: 'Share board' })).toBeFocused();
+    await card.getByRole('button', { name: 'Rename board' }).click(); const action = page.getByRole('dialog', { name: 'Rename board' });
+    await geometry(page, 'dialog'); await expect(action).toHaveCSS('font-size', '15px'); await expect(action.getByRole('textbox')).toHaveCSS('border-top-color', 'rgb(118, 115, 110)');
+    await expect(action.getByRole('button', { name: 'Save name' })).toHaveCSS('font-size', '13px'); await expect(action.getByRole('heading')).toHaveCSS('font-weight', '600');
+    await page.screenshot({ path: testInfo.outputPath(`synthetic-action-${width}.png`) }); await action.getByRole('button', { name: 'Keep name' }).click();
+    await page.getByRole('button', { name: 'Copy local boards' }).click(); const copy = page.getByRole('dialog', { name: 'Copy local boards' });
+    await geometry(page, 'dialog'); expect((await copy.boundingBox())!.width).toBe(Math.min(640, width - 32)); await expect(copy.locator('header')).toHaveCSS('padding', '24px');
+    await page.screenshot({ path: testInfo.outputPath(`synthetic-local-copy-${width}.png`) }); await copy.getByRole('button', { name: 'Close local copies', exact: true }).click();
   }
 });
 
