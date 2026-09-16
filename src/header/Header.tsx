@@ -8,7 +8,6 @@ import logo from '../../imgs/svg/dali-symbol-color.svg';
 import { exportBoardFile } from '../canvas/export-board';
 import { getCanvasRuntime } from '../canvas/runtime';
 import { getSaveStatus, subscribeSaveStatus } from '../canvas/save-status';
-import { retryWorkspacePersistence } from '../canvas/workspace';
 import { ExportDialog } from './ExportDialog';
 
 export function Header({
@@ -52,6 +51,7 @@ export function Header({
       </a>
 
       <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} />
+      {!onRenameBoard && <h1 style={{ fontSize: 15 }}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
       <nav className="djai-header-actions">
@@ -67,7 +67,7 @@ export function Header({
             }}
           >
             <span aria-hidden="true" />
-            {saveStatus.label}
+            {saveStatus.state === 'saved' ? 'Saved' : saveStatus.label}
           </button>
           {saveStatus.state === 'failed' && saveHelpOpen && (
             <div className="djai-save__recovery" role="dialog" aria-label="Local save recovery">
@@ -80,7 +80,7 @@ export function Header({
                   onClick={() => {
                     setRetryError(null);
                     void getCanvasRuntime()
-                      .then(({ workspace }) => retryWorkspacePersistence(workspace))
+                      .then(({ workspace }) => { workspace.docSync.forceStop(); workspace.docSync.start(); })
                       .then(() => setSaveHelpOpen(false))
                       .catch((cause: unknown) =>
                         setRetryError(cause instanceof Error ? cause.message : String(cause))

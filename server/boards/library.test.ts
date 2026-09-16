@@ -11,6 +11,7 @@ import { canBoard, boardCapabilities } from './routes.js';
 describe('@03-03-02 authorized SQL library', () => {
   let provider: Awaited<ReturnType<typeof createOidcProvider>>;
   let app: FastifyInstance; let database: AccountDatabase;
+  let barrier: () => Promise<void> = async () => {};
   const origin = 'http://127.0.0.1:5499';
   const actors: Record<string, { cookie: string; accountId: string }> = {};
   const cookieOf = (response: { headers: Record<string, unknown> }) => {
@@ -20,7 +21,8 @@ describe('@03-03-02 authorized SQL library', () => {
   beforeEach(async () => {
     const registration = { clientId: 'synthetic-library', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
     provider = await createOidcProvider({ clients: [registration] }); database = openDatabase(':memory:');
-    app = await buildApp({ database, config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:',
+    barrier = async () => {};
+    app = await buildApp({ database, beforeCommit: () => barrier(), config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:',
       DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000',
       DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret,
       DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership',
@@ -40,6 +42,25 @@ describe('@03-03-02 authorized SQL library', () => {
     const response = await app.inject({ method: 'POST', url: '/api/boards', headers: headers(identity), payload: { title, operationId: randomUUID() } });
     expect(response.statusCode).toBe(201); return response.json();
   };
+  it('@03-06-01 thumbnail publication validates PNG and preserves data on denied writes', async () => {
+    const board = await create(); const foreign = await create('nonMember'); const png = syntheticCanaries().imageBytes;
+    const put = (id = board.summary.id, identity = 'owner', payload = png) => app.inject({ method: 'PUT', url: `/api/boards/${id}/thumbnail`, headers: { ...headers(identity), 'content-type': 'image/png' }, payload });
+    expect((await put()).statusCode).toBe(200);
+    const before = database.prepare('SELECT * FROM board_thumbnails').all();
+    database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, actors.viewer!.accountId, 'viewer');
+    expect((await put(board.summary.id, 'viewer')).statusCode).toBe(403);
+    expect((await put(foreign.summary.id)).statusCode).toBe(404);
+    expect((await put('absent')).statusCode).toBe(404);
+    expect((await put(board.summary.id, 'owner', Buffer.from('invalid'))).statusCode).toBe(400);
+    expect((await put(board.summary.id, 'owner', Buffer.alloc(512 * 1024 + 1))).statusCode).toBe(413);
+    expect(database.prepare('SELECT * FROM board_thumbnails').all()).toEqual(before);
+    const read = await app.inject({ url: `/api/boards/${board.summary.id}/thumbnail`, headers: headers() });
+    expect(read.rawPayload).toEqual(png); expect(read.headers['cache-control']).toBe('private, no-store');
+    database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, actors.editor!.accountId, 'editor');
+    barrier = async () => { database.prepare('DELETE FROM board_grants WHERE board_id=? AND member_id=?').run(board.summary.id, actors.editor!.accountId); };
+    expect((await put(board.summary.id, 'editor')).statusCode).toBe(404);
+    expect(database.prepare('SELECT * FROM board_thumbnails').all()).toEqual(before);
+  });
   it('owner precedence returns one shared card when a redundant grant exists', async () => {
     const board = await create();
     database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, actors.owner!.accountId, 'viewer');

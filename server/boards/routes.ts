@@ -5,7 +5,7 @@ import type { AuthConfig } from '../app.js';
 import { currentSession, requireExpectedMember, requireMutation } from '../auth/session-store.js';
 import { runMigrations, type AccountDatabase } from '../storage/database.js';
 import { registerDocumentRoutes, type BeforeCommit } from './documents.js';
-import { registerBlobRoutes } from './blobs.js';
+import { registerBlobRoutes, validateImageBytes } from './blobs.js';
 
 export type BoardRole = 'owner' | 'editor' | 'viewer';
 export type BoardCapability = 'read' | 'image' | 'presentation-export' | 'write' | 'rename' | 'editable-export' | 'duplicate' | 'grants' | 'delete';
@@ -105,6 +105,24 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
     if (!thumbnail) return reply.code(404).send({ code: 'PREVIEW_UNAVAILABLE' });
     reply.header('X-Dali-Account', currentSession(database, request, now)!.accountId);
     reply.header('X-Content-Type-Options', 'nosniff'); return reply.type(thumbnail.mime).send(thumbnail.bytes);
+  });
+  app.put<{ Params: { boardId: string }; Body: Buffer }>('/api/boards/:boardId/thumbnail', {
+    bodyLimit: 512 * 1024,
+    onRequest: async (request, reply) => { requireMutation(request, reply, config, ['image/png']); },
+    errorHandler: (error, _request, reply) => {
+      const overflow = error instanceof Error && 'code' in error && error.code === 'FST_ERR_CTP_BODY_TOO_LARGE';
+      return reply.code(overflow ? 413 : 400).send({ code: 'PREVIEW_REJECTED' });
+    },
+  }, async (request, reply) => {
+    if (!requireBoardCapability(database, request, reply, request.params.boardId, 'write', now)) return;
+    try { if (!Buffer.isBuffer(request.body)) throw new Error(); validateImageBytes(request.body, 'image/png'); }
+    catch { return reply.code(400).send({ code: 'INVALID_IMAGE' }); }
+    await beforeCommit?.();
+    return database.transaction(() => {
+      const board = requireBoardCapability(database, request, reply, request.params.boardId, 'write', now); if (!board) return;
+      database.prepare("INSERT INTO board_thumbnails(board_id,bytes,mime) VALUES(?,?,'image/png') ON CONFLICT(board_id) DO UPDATE SET bytes=excluded.bytes,mime=excluded.mime").run(board.id, request.body);
+      return { acknowledged: true };
+    })();
   });
   app.get<{ Params: { operationId: string } }>('/api/operations/:operationId', async (request, reply) => {
     const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;

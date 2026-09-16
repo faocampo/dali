@@ -11,7 +11,8 @@ import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
 import type { EditorHost } from '@blocksuite/affine/std';
 import type { Store } from '@blocksuite/affine/store';
 import { mountEdgelessEditor, type EdgelessEditorHandle } from './blocksuite-editor';
-import { getCanvasRuntime } from './runtime';
+import { getActiveAccessScope, type CanvasRuntime } from './runtime';
+import { getLegacyCanvasRuntime } from './legacy-runtime';
 import { insertSticky } from './sticky';
 import { insertText } from './text';
 import { insertMindmap } from './mindmap';
@@ -25,8 +26,10 @@ import { LayersInspector } from './LayersInspector';
 import { deferBoardRemoval, requestBoardOpen, setActiveBoardId } from '../boards/preferences';
 import { FrameBorderOverlay } from './FrameBorderOverlay';
 import { installArrangementShortcuts } from './arrangement';
+import type { ResourceController } from '@blocksuite/affine/components/resource';
+import { renderBoardPresentation } from './presentation-export';
 
-export default function BlockSuiteCanvas() {
+export default function BlockSuiteCanvas({ runtime }: { runtime: CanvasRuntime }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<Error | null>(null);
   // The mounted host is what the image picker needs; it only exists after a
@@ -89,6 +92,7 @@ export default function BlockSuiteCanvas() {
     <div ref={ref} style={{ position: 'absolute', inset: 0 }}>
       {!host && <p role="status" className="mindmap-opening">Opening board…</p>}
       {host && <BoardControls host={host} onOpenLayers={() => setLayersOpen(true)} />}
+      {host && <AccountImagesAndPreview host={host} runtime={runtime} />}
       {host && <Tooltips />}
       {host && <ConnectorQuickAdd host={host} />}
       {host && <FrameBorderOverlay host={host} />}
@@ -100,6 +104,57 @@ export default function BlockSuiteCanvas() {
         : <SelectionInspector host={host} />)}
     </div>
   );
+}
+
+/** Native image state remains scoped to this mounted, authorized editor. */
+function AccountImagesAndPreview({ host, runtime }: { host: EditorHost; runtime: CanvasRuntime }) {
+  const [images, setImages] = useState<{ loading: number; missing: ResourceController[] }>({ loading: 0, missing: [] });
+  const active = () => host.isConnected && getActiveAccessScope()?.generation === runtime.scope.generation && getActiveAccessScope()?.phase === 'active';
+  useEffect(() => {
+    const scan = () => {
+      if (!active()) return;
+      const controllers = runtime.store.getBlocksByFlavour('affine:image').flatMap(({ model }) => {
+        const block = host.std.view.getBlock(model.id) as unknown as { resourceController?: ResourceController } | null;
+        return block?.resourceController ? [block.resourceController] : [];
+      });
+      const missing = controllers.filter(controller => controller.resolvedState$.value.error);
+      const loading = controllers.filter(controller => {
+        const state = controller.resolvedState$.value;
+        return state.loading || (!state.url && !state.error);
+      }).length;
+      setImages(previous => previous.loading === loading && previous.missing.length === missing.length && previous.missing.every((value, index) => value === missing[index]) ? previous : { loading, missing });
+    };
+    const timer = window.setInterval(scan, 150); scan();
+    return () => clearInterval(timer);
+  }, [host, runtime]);
+  useEffect(() => {
+    if (!runtime.scope.canWrite) return;
+    const controller = new AbortController(); let timer = 0; let revision = 0;
+    const publish = async (version: number) => {
+      try {
+        await runtime.workspace.waitForSynced();
+        if (!active() || controller.signal.aborted || version !== revision || !getActiveAccessScope()?.canWrite) return;
+        const { canvas } = await renderBoardPresentation({ scope: 'board', scale: 1 });
+        const preview = document.createElement('canvas');
+        const scale = Math.min(1, 480 / canvas.width, 320 / canvas.height);
+        preview.width = Math.max(1, Math.round(canvas.width * scale)); preview.height = Math.max(1, Math.round(canvas.height * scale));
+        preview.getContext('2d')!.drawImage(canvas, 0, 0, preview.width, preview.height);
+        const blob = await new Promise<Blob | null>(resolve => preview.toBlob(resolve, 'image/png'));
+        if (!blob || blob.size > 512 * 1024 || !active() || controller.signal.aborted || version !== revision || !getActiveAccessScope()?.canWrite) return;
+        await fetch(`/api/boards/${encodeURIComponent(runtime.scope.boardId)}/thumbnail`, { method: 'PUT', cache: 'no-store', signal: controller.signal,
+          headers: { 'X-Dali-Account': runtime.scope.accountId, 'X-Dali-Request': '1', 'Content-Type': 'image/png' }, body: blob });
+      } catch { /* Preview failure does not alter document acknowledgement. */ }
+    };
+    const changed = () => { const version = ++revision; clearTimeout(timer); timer = window.setTimeout(() => { void publish(version); }, 800); };
+    runtime.store.spaceDoc.on('update', changed);
+    return () => { clearTimeout(timer); controller.abort(); runtime.store.spaceDoc.off('update', changed); };
+  }, [host, runtime]);
+  return <div style={{ position: 'absolute', top: 16, left: 88, zIndex: 10, background: 'var(--board-surface)' }}>
+    {images.loading > 0 && <p role="status">Loading images…</p>}
+    {images.missing.length > 0 && <div role="alert"><p>{images.missing.length} image(s) unavailable.</p><button onClick={() => {
+      if (active()) images.missing.forEach(controller => { if (active()) void controller.refreshUrlWith(); });
+    }}>Retry images</button></div>}
+  </div>;
 }
 
 /** Accessible left rail backed by native drawing tools and board actions. */
@@ -169,6 +224,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
       const file = event.target.files?.[0];
       event.target.value = '';
       if (!file) return;
+      if (getActiveAccessScope()) { setActionError('Open your boards to import a copy into your account.'); return; }
 
       // Import REPLACES the board. There is one board in this app, and the
       // alternative -- keeping both -- would leave the imported one invisible,
@@ -181,7 +237,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
         if (!proceed) return;
       }
 
-      const { workspace } = await getCanvasRuntime();
+      const { workspace } = await getLegacyCanvasRuntime();
       const imported = await ZipTransformer.importDocs(workspace, store.schema, file);
       const restored = imported.find((doc) => !!doc);
       if (!restored) throw new Error('That file did not contain a board.');

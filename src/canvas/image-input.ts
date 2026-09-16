@@ -1,6 +1,7 @@
 import type { EditorHost } from '@blocksuite/affine/std';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { getActiveBoardId } from '../boards/preferences';
+import { getActiveAccessScope, type AccessScope } from './runtime';
 
 export const IMAGE_LIMITS = { bytes: 16 * 1024 * 1024, pixels: 16_000_000, dimension: 8192 };
 export class ImageImportError extends Error {
@@ -75,18 +76,24 @@ export interface ImageImportRequest {
 }
 export interface ImageImportResult { ids: string[]; errors: ImageImportError[] }
 
-export function assertImageInputCurrent(host: EditorHost, boardId: string, isCurrent: () => boolean = () => true): void {
+export function assertImageInputCurrent(host: EditorHost, boardId: string, isCurrent: () => boolean = () => true, initiatedScope: AccessScope | null = getActiveAccessScope()): void {
+  const scope = getActiveAccessScope();
+  const authorityMatches = initiatedScope
+    ? scope?.phase === 'active' && scope.canWrite && scope.accountId === initiatedScope.accountId && scope.boardId === initiatedScope.boardId && scope.generation === initiatedScope.generation && new URL(window.location.href).searchParams.get('board') === scope.boardId
+    : !scope && (getActiveBoardId() === null || getActiveBoardId() === boardId);
   if (!isCurrent() || !host.isConnected || host.std.store.id !== boardId ||
-      (getActiveBoardId() !== null && getActiveBoardId() !== boardId)) {
+      !authorityMatches) {
     throw new ImageImportError('The board changed. Open the intended board and choose the image again.');
   }
 }
 
 export async function importLocalImages(host: EditorHost, request: ImageImportRequest): Promise<ImageImportResult> {
+  const initiatedScope = getActiveAccessScope();
+  const initiatedStore = host.std.store;
   const { addImages } = await import('@blocksuite/affine/blocks/image');
   const { MAX_IMAGE_WIDTH } = await import('@blocksuite/affine/model');
   const result: ImageImportResult={ids:[],errors:[]};
-  const assertCurrent=()=>assertImageInputCurrent(host, request.boardId, request.isCurrent);
+  const assertCurrent=()=>assertImageInputCurrent(host, request.boardId, () => host.std.store === initiatedStore && request.isCurrent(), initiatedScope);
   // addImages awaits decode/blob storage internally. Guard its final synchronous
   // mutation, rather than checking only before an asynchronous native call.
   const store=new Proxy(host.std.store, {get(target,key) {

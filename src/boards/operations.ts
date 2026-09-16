@@ -1,6 +1,6 @@
 import { replaceIdMiddleware } from '@blocksuite/affine/shared/adapters';
 import type { Store } from '@blocksuite/affine/store';
-import { getCanvasRuntime, initializeBlankBoard } from '../canvas/runtime';
+import { getLegacyCanvasRuntime, initializeBlankBoard } from '../canvas/legacy-runtime';
 import { validateMindmapDocument } from '../canvas/mindmap-compatibility';
 import { forgetPersistedDoc, updateWorkspaceDocMeta } from '../canvas/workspace';
 import { requestBoardOpen, setActiveBoardId } from './preferences';
@@ -64,7 +64,7 @@ function decodeThumbnail(value?: string): BoardPreviewKind[] | null {
 }
 
 export async function listLocalBoards(): Promise<LocalBoardSummary[]> {
-  const { workspace } = await getCanvasRuntime();
+  const { workspace } = await getLegacyCanvasRuntime();
   const catalog = reconcileBoardCatalog(workspace.meta.docMetas);
   return workspace.meta.docMetas
     .map((meta) => {
@@ -103,7 +103,7 @@ function nextUntitledTitle(titles: string[]): string {
 }
 
 export async function createLocalBoard(templateId: TemplateId = 'blank'): Promise<string> {
-  const { workspace } = await getCanvasRuntime();
+  const { workspace } = await getLegacyCanvasRuntime();
   const catalog = reconcileBoardCatalog(workspace.meta.docMetas);
   const template = boardTemplate(templateId);
   const titles = Object.values(catalog).map(entry => entry.title);
@@ -137,7 +137,7 @@ function nextAvailableTitle(base: string, titles: string[]): string {
 
 export async function renameLocalBoard(id: string, title: string): Promise<void> {
   const clean = displayTitle(title);
-  const { workspace } = await getCanvasRuntime();
+  const { workspace } = await getLegacyCanvasRuntime();
   if (!workspace.meta.getDocMeta(id)) throw new Error('That local board no longer exists.');
   reconcileBoardCatalog(workspace.meta.docMetas);
   updateBoardCatalogEntry(id, { title: clean, updatedAt: Date.now() });
@@ -149,7 +149,7 @@ export async function renameLocalBoard(id: string, title: string): Promise<void>
 }
 
 export async function duplicateLocalBoard(id: string): Promise<string> {
-  const { workspace } = await getCanvasRuntime();
+  const { workspace } = await getLegacyCanvasRuntime();
   const sourceDoc = workspace.getDoc(id);
   const sourceMeta = workspace.meta.getDocMeta(id);
   if (!sourceDoc || !sourceMeta) throw new Error('That local board no longer exists.');
@@ -182,7 +182,7 @@ export async function duplicateLocalBoard(id: string): Promise<string> {
 }
 
 export async function deleteLocalBoard(id: string): Promise<string> {
-  const { workspace } = await getCanvasRuntime();
+  const { workspace } = await getLegacyCanvasRuntime();
   if (!workspace.meta.getDocMeta(id)) throw new Error('That local board no longer exists.');
 
   workspace.removeDoc(id);

@@ -6,8 +6,6 @@
  */
 import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
 import { getCanvasRuntime } from './runtime';
-import { boardCatalogEntry } from '../boards/catalog';
-import { updateWorkspaceDocMeta } from './workspace';
 import type { ExportPlan, ExportScale } from './export-plan';
 import {
   renderBoardPresentation,
@@ -143,8 +141,7 @@ export async function exportBoardFile(
   options: PresentationExportOptions = { scope: 'visible' }
 ): Promise<PresentationExportResult | void> {
   const { workspace, store } = await getCanvasRuntime();
-  const catalog = boardCatalogEntry(store.id, workspace.meta.docMetas);
-  if (catalog) updateWorkspaceDocMeta(workspace, store.id, { title: catalog.title });
+  const catalog = { title: (await getCanvasRuntime()).descriptor.summary.title };
   if (format === 'board') {
     await ZipTransformer.exportDocs(workspace, store.schema, [store]);
     return;
