@@ -62,15 +62,25 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
   await expect(card.getByRole('link', { name: 'Open ' + title, exact: true })).toBeVisible();
   for (const width of [490, 1404]) {
     await page.setViewportSize({ width, height: 900 }); await geometry(page, 'main');
+    await expect(page.locator('.board-library__header')).toHaveCSS('padding-left', width <= 700 ? '16px' : '24px');
+    await expect(page.locator('.board-library__header')).toHaveCSS('padding-right', width <= 700 ? '16px' : '24px');
+    for (const label of await card.locator('.board-card__metadata > span').all()) { await expect(label).toHaveCSS('font-size', '13px'); await expect(label).toHaveCSS('font-weight', '600'); }
+    await expect(card.locator('small')).toHaveCSS('font-size', '12px'); await expect(card.locator('small')).toHaveCSS('font-weight', '400');
     const actions = await card.locator('.board-card__actions button').evaluateAll(nodes => nodes.map(node => { const s = getComputedStyle(node); return { color: s.color, size: s.fontSize, weight: s.fontWeight }; }));
     expect(actions.length).toBe(4); for (const action of actions) expect(action).toEqual({ color: 'rgb(27, 26, 24)', size: '13px', weight: '600' });
     await expect(page.getByLabel('Board name', { exact: true })).toHaveCSS('border-top-color', 'rgb(118, 115, 110)');
     await page.getByRole('heading', { name: 'Your boards', exact: true }).evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeInViewport();
+    await page.keyboard.press('Tab'); await page.getByRole('heading', { name: 'Your boards', exact: true }).focus();
+    await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-color', 'rgb(180, 69, 31)');
+    await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-width', '2px');
     await page.screenshot({ path: testInfo.outputPath(`synthetic-library-${width}.png`) });
     await card.getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
     await expect(dialog.getByRole('combobox', { name: 'Access role', exact: true })).toHaveCount(50);
     await geometry(page, 'dialog');
+    for (const label of await dialog.locator('.share-owner > span:not(:first-of-type), .share-row > span:not(:first-of-type)').all()) { await expect(label).toHaveCSS('font-size', '13px'); await expect(label).toHaveCSS('font-weight', '600'); }
+    for (const email of await dialog.locator('.share-owner > span:first-of-type, .share-row > span:first-of-type').all()) { await expect(email).toHaveCSS('font-size', '12px'); await expect(email).toHaveCSS('font-weight', '400'); }
+    for (const button of await dialog.locator('button:not(.djai-primary)').all()) await expect(button).toHaveCSS('border-top-width', '1px');
     const panel = await dialog.evaluate(el => { const s = getComputedStyle(el); return { width: el.getBoundingClientRect().width, border: s.borderTopWidth, gap: s.gap, size: s.fontSize, weight: s.fontWeight }; });
     expect(panel).toEqual({ width: Math.min(640, width - 32), border: '1px', gap: '0px', size: '15px', weight: '400' });
     await expect(dialog.locator('header')).toHaveCSS('padding', '24px'); await expect(dialog.locator('.share-dialog__body')).toHaveCSS('padding', '24px');
@@ -95,10 +105,13 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     await dialog.getByRole('button', { name: 'Close', exact: true }).click(); await expect(card.getByRole('button', { name: 'Share board' })).toBeFocused();
     await card.getByRole('button', { name: 'Rename board' }).click(); const action = page.getByRole('dialog', { name: 'Rename board' });
     await geometry(page, 'dialog'); await expect(action).toHaveCSS('font-size', '15px'); await expect(action.getByRole('textbox')).toHaveCSS('border-top-color', 'rgb(118, 115, 110)');
+    await expect(action.getByRole('textbox')).toBeFocused(); await expect(action.getByRole('textbox')).toHaveCSS('outline-color', 'rgb(180, 69, 31)'); await expect(action.getByRole('textbox')).toHaveCSS('outline-width', '2px');
+    for (const button of await action.getByRole('button').all()) await expect(button).toHaveCSS('border-top-width', '1px');
     await expect(action.getByRole('button', { name: 'Save name' })).toHaveCSS('font-size', '13px'); await expect(action.getByRole('heading')).toHaveCSS('font-weight', '600');
     await page.screenshot({ path: testInfo.outputPath(`synthetic-action-${width}.png`) }); await action.getByRole('button', { name: 'Keep name' }).click();
     await page.getByRole('button', { name: 'Copy local boards' }).click(); const copy = page.getByRole('dialog', { name: 'Copy local boards' });
     await geometry(page, 'dialog'); expect((await copy.boundingBox())!.width).toBe(Math.min(640, width - 32)); await expect(copy.locator('header')).toHaveCSS('padding', '24px');
+    await expect(copy.getByRole('button', { name: 'Close local copies' })).toHaveCSS('border-top-width', '1px');
     await page.screenshot({ path: testInfo.outputPath(`synthetic-local-copy-${width}.png`) }); await copy.getByRole('button', { name: 'Close local copies', exact: true }).click();
   }
 });

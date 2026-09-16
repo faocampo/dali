@@ -1821,7 +1821,11 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 .share-dialog input, .board-action-dialog input { font: 400 15px/1.5 var(--affine-font-family); }
 .board-title-inline input { font: 600 15px/1.5 var(--affine-font-family); }
 .board-card__actions button { color: #1b1a18; }
-.share-owner > span, .share-row > span, .board-card__metadata, .board-card__open small { font: 400 12px/1.5 var(--affine-font-family); }
+.share-owner > span:first-of-type, .share-row > span:first-of-type, .board-card__open small { font: 400 12px/1.5 var(--affine-font-family); }
+.share-owner > span:not(:first-of-type), .share-row > span:not(:first-of-type), .board-card__metadata { font: 600 13px/1.5 var(--affine-font-family); }
+.share-dialog button:not(.djai-primary), .board-action-dialog button:not(.djai-primary), .local-copy-dialog button:not(.djai-primary) { border: 1px solid #76736e; }
+.board-library h1:focus-visible, .session-recovery h1:focus-visible, #root > div > section > h1:focus-visible,
+.board-action-dialog :is(button, input, a):focus-visible { outline: 2px solid #b4451f; outline-offset: 2px; }
 .share-owner, .share-row, .local-copy-dialog__body section { padding-block: 16px; }
 .share-dialog [role=option], .local-copy-dialog label span { padding: 8px; }
 .share-confirm { padding: 16px; margin-block: 16px; border-width: 1px; }
@@ -1834,5 +1838,6 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 .dali-shortcuts h2, .dali-shortcuts h3 { font: 600 15px/1.5 var(--affine-font-family); margin: 8px 0; }
 .dali-shortcuts p { margin-bottom: 8px; }
 .board-library__header { padding-inline: 24px; }
+@media (max-width: 700px) { .board-library__header { padding-inline: 16px; } }
 .board-library__title-row { margin-bottom: 24px; }
 .board-library__title-row h1 { margin-bottom: 8px; }
