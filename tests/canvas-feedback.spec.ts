@@ -52,7 +52,7 @@ test('mind map creation keys work after canvas selection and menu focus', async 
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
   await page.keyboard.type('Root'); await page.keyboard.press('Enter');
-  await page.getByRole('button', { name: 'Dalí', exact: true }).click(); await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Main Menu', exact: true }).click(); await page.keyboard.press('Escape');
   const center = await page.locator('affine-edgeless-root').evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     const m = gfx.gfxElements.find(m => 'type' in m && m.type === 'shape')!;

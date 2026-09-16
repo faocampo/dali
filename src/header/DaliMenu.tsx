@@ -57,10 +57,10 @@ export function DaliMenu({ onOpenBoards, onExport }: { onOpenBoards?: () => void
     }
   }}>
     <button ref={trigger} type="button" className="djai-ghost dali-menu-trigger" aria-haspopup="menu" aria-expanded={open} onClick={() => { setOpen(!open); setCategory(null); }}>
-      Dalí <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="m3 4 3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+      Main Menu <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="m3 4 3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
     </button>
     {open && <div className="dali-menu-popup">
-      <div role="menu" aria-label="Dalí" className="dali-menu-categories">
+      <div role="menu" aria-label="Main Menu" className="dali-menu-categories">
         {(['File', 'View', 'Edit', 'Settings', 'Help'] as const).map(item => <button key={item} type="button" role="menuitem" tabIndex={-1} data-category={item} aria-haspopup="menu" aria-expanded={category === item}
           onClick={() => setCategory(item)} onKeyDown={event => { if (event.key === 'ArrowRight') { event.preventDefault(); setCategory(item); } }}>
           <MenuIcon name={item} /><span className="dali-menu-label">{item}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12"><path d="m4 3 3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>

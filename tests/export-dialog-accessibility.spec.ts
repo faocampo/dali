@@ -3,7 +3,7 @@ import { test, expect } from './fixtures';
 
 test('export is modal, blocks background focus, and restores its trigger on Escape', async ({ page }) => {
   await page.goto('/');
-  const trigger = page.getByRole('button', { name: 'Dalí', exact: true });
+  const trigger = page.getByRole('button', { name: 'Main Menu', exact: true });
   await fileAction(page, 'Export board');
   const dialog = page.getByRole('dialog', { name: 'Export board', exact: true });
   await expect(dialog).toBeVisible();
@@ -42,7 +42,7 @@ test('PNG dimensions and download remain visible while settings scroll in a shor
 
 test('successful export offers artifact status, export again, and Done', async ({ page }) => {
   await page.goto('/');
-  const trigger = page.getByRole('button', { name: 'Dalí', exact: true });
+  const trigger = page.getByRole('button', { name: 'Main Menu', exact: true });
   await fileAction(page, 'Export board');
   const pending = page.waitForEvent('download');
   await page.getByRole('dialog').getByRole('button', { name: 'Download', exact: true }).click();

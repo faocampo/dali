@@ -49,18 +49,18 @@ test('Edit uses document history and Settings saves viewport visibility', async 
   const count = () => page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.gfxElements.filter(m => 'type' in m && m.type === 'shape').length);
   await expect.poll(count).toBe(1);
   for (const [action, expected] of [['Undo', 0], ['Redo', 1]] as const) {
-    await page.getByRole('button', { name: 'Dalí', exact: true }).click();
+    await page.getByRole('button', { name: 'Main Menu', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Edit', exact: true }).click();
     await page.getByRole('menuitem', { name: action, exact: true }).click();
     await expect.poll(count).toBe(expected);
   }
-  await page.getByRole('button', { name: 'Dalí', exact: true }).click();
+  await page.getByRole('button', { name: 'Main Menu', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Hide viewport controls', exact: true }).click();
   await expect(page.getByRole('toolbar', { name: 'Viewport and history' })).toBeHidden();
   await page.reload();
   await expect(page.getByRole('toolbar', { name: 'Viewport and history' })).toBeHidden();
-  await page.getByRole('button', { name: 'Dalí', exact: true }).click();
+  await page.getByRole('button', { name: 'Main Menu', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Show viewport controls', exact: true }).click();
   await expect(page.getByRole('toolbar', { name: 'Viewport and history' })).toBeVisible();

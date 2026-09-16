@@ -7,7 +7,7 @@ import { fileAction } from './app-menu';
 test.use({ actionTimeout: 15_000 });
 const root = (page: Page) => page.locator('affine-edgeless-root');
 async function openView(page: Page) {
-  await page.getByRole('button', { name: 'Dalí', exact: true }).click();
+  await page.getByRole('button', { name: 'Main Menu', exact: true }).click();
   await page.getByRole('menuitem', { name: 'View', exact: true }).click();
 }
 async function enableMeasurements(page: Page) {
@@ -17,7 +17,7 @@ async function enableMeasurements(page: Page) {
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menuitem', { name: 'View', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Dalí', exact: true })).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('button', { name: 'Main Menu', exact: true })).toHaveAttribute('aria-expanded', 'false');
 }
 async function seedShapes(page: Page) {
   await page.goto('/');
@@ -58,7 +58,7 @@ test('View grid submenu and toggles support keyboard navigation and persist afte
   await page.keyboard.press('ArrowDown'); await page.keyboard.press('Space');
   await expect(page.getByRole('menuitemcheckbox', { name: 'Distances', exact: true })).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Dalí', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Main Menu', exact: true })).toBeFocused();
   await page.reload();
   await expect(root(page)).toHaveAttribute('data-grid-style', 'lines');
   await openView(page);
@@ -185,7 +185,7 @@ test('Escape returns through View menus while Layers stays open', async ({ page 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menuitem', { name: 'View', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Dalí', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Main Menu', exact: true })).toBeFocused();
   await expect(page.getByRole('button', { name: 'Close layers' })).toBeVisible();
 });
 

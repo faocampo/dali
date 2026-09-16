@@ -17,8 +17,8 @@ test('opens the empty canvas with local home navigation', async ({ page }) => {
   await fileAction(page, 'Export board');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Dalí', exact: true })).toBeFocused();
-  for (const name of ['Insert image', 'Add sticky note', 'Add text', 'Layers', 'Dalí']) {
+  await expect(page.getByRole('button', { name: 'Main Menu', exact: true })).toBeFocused();
+  for (const name of ['Insert image', 'Add sticky note', 'Add text', 'Layers', 'Main Menu']) {
     await expect(page.getByRole('button', { name })).toBeVisible();
   }
   await expect(page.locator('affine-edgeless-note')).toHaveCount(0);

@@ -1,10 +1,10 @@
 import { test, expect } from './fixtures';
 import { fileAction } from './app-menu';
 
-test('Dalí menu supports arrow navigation, nested Escape, View actions and outside dismissal', async ({ page }) => {
+test('Main Menu supports arrow navigation, nested Escape, View actions and outside dismissal', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('affine-edgeless-root')).toHaveCount(1);
-  const trigger = page.getByRole('button', { name: 'Dalí', exact: true });
+  const trigger = page.getByRole('button', { name: 'Main Menu', exact: true });
   await expect(page.locator('.board-utilities')).toHaveCount(0);
   await trigger.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'File', exact: true })).toBeFocused();
