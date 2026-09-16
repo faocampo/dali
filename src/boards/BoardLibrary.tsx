@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import logo from '../../imgs/svg/dali-logo-light.svg';
+import logo from '../../imgs/svg/dali-symbol-color.svg';
 import {
   createLocalBoard,
   deleteLocalBoard,

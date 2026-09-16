@@ -45,7 +45,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
       const id = gfx.surface!.addElement({ type: 'shape', xywh: '[10,10,100,80]' });
       gfx.selection.set({ elements: [id], editing: false });
     });
-    await expect(page.getByTestId('selection-inspector')).toBeVisible();
+    await expect(page.getByTestId('selection-inspector')).toHaveCount(0);
     await expect(panel).toHaveCount(0);
   });
 }

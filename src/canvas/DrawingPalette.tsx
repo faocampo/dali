@@ -5,14 +5,17 @@ import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { ShapeTool } from '@blocksuite/affine/gfx/shape';
 import { ConnectorTool } from '@blocksuite/affine/gfx/connector';
 import { ConnectorMode, PointStyle, ShapeType, type ShapeName } from '@blocksuite/affine/model';
+import { classicalShapes, shapeIconPath } from './classical-shape-geometry';
+import { ClassicalShapeTool } from './classical-shapes';
 import { EditPropsStore } from '@blocksuite/affine-shared/services';
 
-const shapes: { name: string; shape: ShapeName; path: string }[] = [
+const shapes: { name: string; shape: ShapeName | string; path: string }[] = [
   { name: 'Square / rectangle', shape: ShapeType.Rect, path: 'M4 4H20V20H4Z' },
   { name: 'Rounded rectangle', shape: 'roundedRect', path: 'M7 4H17Q20 4 20 7V17Q20 20 17 20H7Q4 20 4 17V7Q4 4 7 4Z' },
   { name: 'Circle / ellipse', shape: ShapeType.Ellipse, path: 'M20 12A8 8 0 1 1 4 12A8 8 0 1 1 20 12Z' },
   { name: 'Triangle', shape: ShapeType.Triangle, path: 'M12 3L22 21H2Z' },
   { name: 'Diamond', shape: ShapeType.Diamond, path: 'M12 2L22 12L12 22L2 12Z' },
+  ...classicalShapes.map(shape => ({ name: shape.name, shape: shape.id, path: shapeIconPath(shape.id) })),
 ];
 const modes = [
   { name: 'Straight', mode: ConnectorMode.Straight, path: 'M3 20L21 4' },
@@ -43,7 +46,7 @@ export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost;
       if (position) close();
       else setPosition({ left: Math.min(bounds.right + 12, window.innerWidth - 284), top: Math.max(64, Math.min(bounds.top, window.innerHeight - 430)) });
     }}><span aria-hidden="true">{icon}</span></button>
-    {position && createPortal(<div ref={popup} role="dialog" aria-label={`${kind} palette`} className="drawing-palette" style={position} onBlur={event => {
+    {position && createPortal(<div ref={popup} role="dialog" aria-label={`${kind} palette`} className="drawing-palette" style={{ ...position, maxHeight: `calc(100dvh - ${position.top + 12}px)` }} onBlur={event => {
       if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) close(false);
     }} onKeyDown={event => {
       event.stopPropagation();
@@ -58,7 +61,7 @@ export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost;
     }}>
       <h2>{kind}</h2>
       <div className="drawing-palette-options">
-        {kind === 'Shapes' ? shapes.map(item => <button key={item.name} onClick={() => pick(() => gfx.tool.setTool(ShapeTool, { shapeName: item.shape }))}><Glyph path={item.path} /><span>{item.name}</span></button>) : modes.flatMap(item => [false, true].map(arrow => <button key={`${item.name}-${arrow}`} onClick={() => pick(() => {
+        {kind === 'Shapes' ? shapes.map(item => <button key={item.name} onClick={() => pick(() => item.shape.startsWith('dali:') ? gfx.tool.setTool(ClassicalShapeTool, { shapeName: ShapeType.Rect, geometry: item.shape }) : gfx.tool.setTool(ShapeTool, { shapeName: item.shape as ShapeName }))}><Glyph path={item.path} /><span>{item.name}</span></button>) : modes.flatMap(item => [false, true].map(arrow => <button key={`${item.name}-${arrow}`} onClick={() => pick(() => {
           host.std.get(EditPropsStore).recordLastProps('connector', { frontEndpointStyle: PointStyle.None, rearEndpointStyle: arrow ? PointStyle.Arrow : PointStyle.None });
           gfx.tool.setTool(ConnectorTool, { mode: item.mode });
         })}><Glyph path={item.path + (arrow ? 'M15 4H21V10' : '')} /><span>{item.name} {arrow ? 'arrow' : 'line'}</span></button>))}

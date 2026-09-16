@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { DaliMenu } from './DaliMenu';
 import { BoardTitleMenu } from './BoardTitleMenu';
-import logo from '../../imgs/svg/dali-logo-light.svg';
+import logo from '../../imgs/svg/dali-symbol-color.svg';
 import { exportBoardFile } from '../canvas/export-board';
 import { getCanvasRuntime } from '../canvas/runtime';
 import { getSaveStatus, subscribeSaveStatus } from '../canvas/save-status';

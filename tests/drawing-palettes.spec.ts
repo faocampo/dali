@@ -31,7 +31,7 @@ test('palette keyboard dismissal and narrow viewport containment', async ({ page
   await trigger.click();
   await expect(page.getByRole('button', { name: 'Square / rectangle', exact: true })).toBeFocused();
   await page.keyboard.press('End');
-  await expect(page.getByRole('dialog', { name: 'Shapes palette' }).getByRole('button', { name: 'Diamond', exact: true })).toBeFocused();
+  await expect(page.getByRole('dialog', { name: 'Shapes palette' }).getByRole('button', { name: 'Right triangle', exact: true })).toBeFocused();
   const bounds = await page.getByRole('dialog', { name: 'Shapes palette' }).boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);

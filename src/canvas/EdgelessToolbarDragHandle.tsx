@@ -20,7 +20,7 @@ export function EdgelessToolbarDragHandle({ host }: { host: EditorHost }) {
     { name: 'Lines', key: 'C', type: 'connector', icon: <svg viewBox="0 0 24 24" fill="none"><path d="m5 19 14-14M9 5h10v10" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" /></svg> },
     { name: 'Freehand', key: 'P', type: 'brush', icon: <svg viewBox="0 0 24 24" fill="none"><path d="M3 16c4-16 5 9 10-3s5-3 8-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" /></svg>, run: () => gfx.tool.setTool(BrushTool) },
   ];
-  return tools.map(tool => tool.name === 'Shapes' || tool.name === 'Lines' ? <DrawingPalette key={tool.type} host={host} kind={tool.name} active={active === tool.type} icon={tool.icon} /> : <button key={tool.type} type="button" className="canvas-tool-button"
+  return tools.map(tool => tool.name === 'Shapes' || tool.name === 'Lines' ? <DrawingPalette key={tool.type} host={host} kind={tool.name} active={active === tool.type || (tool.name === 'Shapes' && active === 'dali-shape')} icon={tool.icon} /> : <button key={tool.type} type="button" className="canvas-tool-button"
     aria-label={tool.name} aria-pressed={active === tool.type} title={tool.key ? `${tool.name} (${tool.key})` : tool.name}
     onClick={tool.run}><span aria-hidden="true">{tool.icon}</span></button>);
 }

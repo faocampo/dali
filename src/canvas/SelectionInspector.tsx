@@ -6,7 +6,6 @@ import { Bound } from '@blocksuite/global/gfx';
 import { ImageCropOverlay } from './ImageCropOverlay';
 import {
   summarizeCanvasSelection,
-  mindmapOwner,
   type CanvasSelectionSummary,
 } from './selection-summary';
 import {
@@ -229,11 +228,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     }
   };
 
-  const nativeSelection = host.std.get(GfxControllerIdentifier).selection.selectedElements;
-  const topic = nativeSelection.length === 1 ? nativeSelection[0] : undefined;
-  const map = topic && mindmapOwner(topic);
-  const singleMindmapTopic = !!topic && !!map && topic.id !== map.id;
-  const open = !!selection && !singleMindmapTopic && closedForSelection !== selection.key;
+  const open = selection?.kind === 'image' && closedForSelection !== selection.key;
 
   useEffect(() => {
     if (!open) return;
@@ -254,8 +249,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     return () => document.removeEventListener('keydown', closeOnEscape, true);
   }, [open, selection?.key, cropOpen]);
 
-  if (!selection) return null;
-  if (singleMindmapTopic) return null;
+  if (!selection || selection.kind !== 'image') return null;
 
   const imageActions = !cropOpen && selection.kind === 'image' && quickPosition && (
     <div

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 64 64">
+  <title>Dalí</title>
+  <defs>
+    <linearGradient id="g" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB74B"/><stop offset="0.5" stop-color="#FF4FB8"/><stop offset="1" stop-color="#7248FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="#0A0810"/>
+  <path d="M32 15C47 15 57 22 57 32C57 43 47 49 32 49C17 49 7 43 7 32C7 22 17 15 32 15Z" fill="url(#g)"/>
+  <path d="M32 22C41 22 48 26 48 32C48 39 41 42 32 42C23 42 16 39 16 32C16 26 23 22 32 22Z" fill="#0A0810"/>
+  <ellipse cx="28" cy="29" rx="7" ry="5" fill="#FF78BD" transform="rotate(-18 28 29)"/>
+  <circle cx="45" cy="22" r="2.5" fill="#FFF1A8"/>
+</svg>

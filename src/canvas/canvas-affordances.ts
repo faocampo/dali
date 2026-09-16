@@ -1,3 +1,4 @@
+import { installConnectorLabelReflow } from './connector-labels';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { TextElementModel } from '@blocksuite/affine/model';
@@ -13,6 +14,7 @@ function visit(root: ParentNode, callback: (element: HTMLElement) => void) {
 }
 
 export function installCanvasAffordances(host: EditorHost) {
+  const stopLabelReflow = installConnectorLabelReflow(host);
   const gfx = host.std.get(GfxControllerIdentifier);
   const surface = gfx.surface!;
   let frame = 0;
@@ -91,7 +93,7 @@ export function installCanvasAffordances(host: EditorHost) {
   const tick = () => host.querySelectorAll<HTMLElement>('affine-toolbar-widget,edgeless-selected-rect').forEach(widget => visit(widget.shadowRoot ?? widget, enhance));
   tick();
   const timer = window.setInterval(tick, 150);
-  return () => { disposed = true; cancelAnimationFrame(frame); clearInterval(timer); updated.unsubscribe(); selected.unsubscribe(); };
+  return () => { stopLabelReflow(); disposed = true; cancelAnimationFrame(frame); clearInterval(timer); updated.unsubscribe(); selected.unsubscribe(); };
 }
 
 function colorPixels(color: string, element: HTMLElement): number[] {

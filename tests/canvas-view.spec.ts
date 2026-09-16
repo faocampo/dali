@@ -173,10 +173,10 @@ test('malformed or unavailable preference storage preserves working session cont
   await expect(root(page)).toHaveAttribute('data-grid-style', 'lines');
 });
 
-test('Escape returns through View menus while Properties and Layers stay open', async ({ page }) => {
+test('Escape returns through View menus while Layers stays open', async ({ page }) => {
   await seedShapes(page);
   await enableMeasurements(page);
-  await expect(page.getByRole('button', { name: 'Close properties' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close properties' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Layers', exact: true }).click();
   await openView(page);
   await page.getByRole('menuitem', { name: 'Grid', exact: true }).click();
