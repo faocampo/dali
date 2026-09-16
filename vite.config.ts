@@ -38,6 +38,8 @@ export default defineConfig(() => {
     tsconfigRaw: { compilerOptions: { useDefineForClassFields: false } },
   },
   optimizeDeps: {
+    // The browser conformance harness is a dev entry, outside the production graph.
+    entries: ['index.html', 'tests/account-workspace-harness.ts'],
     // Every BlockSuite subpath we use, pre-bundled explicitly.
     // BlockSuite's root and toolbar packages still import database selection at
     // module scope. Keep these initialization dependencies bundled together
@@ -68,6 +70,10 @@ export default defineConfig(() => {
       '@blocksuite/affine/blocks/surface/store',
       '@blocksuite/affine/blocks/surface/view',
       '@blocksuite/affine/ext-loader',
+      '@blocksuite/affine/global/utils',
+      '@blocksuite/affine/shared/adapters',
+      '@blocksuite/affine/model',
+      'y-protocols/awareness.js',
       '@blocksuite/affine/foundation/store',
       '@blocksuite/affine/foundation/view',
       '@blocksuite/affine/gfx/brush/store',

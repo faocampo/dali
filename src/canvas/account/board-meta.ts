@@ -7,8 +7,9 @@ export class BoardMeta implements WorkspaceMeta {
   readonly docMetaAdded = new Subject<string>();
   readonly docMetaRemoved = new Subject<string>();
   readonly docMetaUpdated = new Subject<void>();
-  constructor(private root: Y.Doc, private contentId: string, private title: string, private writable: () => void) {}
+  constructor(private root: Y.Doc, private contentId: string, private title: string, private readable: () => void, private writable: () => void) {}
   private get pages() {
+    this.readable();
     const pages = this.root.getMap('meta').get('pages');
     if (!(pages instanceof Y.Array) || pages.length !== 1) throw new Error('Invalid board metadata');
     return pages;
@@ -20,7 +21,7 @@ export class BoardMeta implements WorkspaceMeta {
     return [{ ...structuredClone(meta), title: this.title }];
   }
   get docs() { return this.docMetas; }
-  get properties(): DocsPropertiesMeta { return {}; }
+  get properties(): DocsPropertiesMeta { this.readable(); return {}; }
   initialize() { void this.docMetas; }
   getDocMeta(id: string) { return this.docMetas.find(meta => meta.id === id); }
   addDocMeta(_props: DocMeta) { throw new Error('Board metadata is already bound'); }

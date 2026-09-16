@@ -39,7 +39,7 @@ export class BoardDoc implements Doc {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
-    for (const store of this.stores) store.dispose();
+    for (const store of this.stores) { store.readonly = true; store.dispose(); }
     this.stores.clear(); this.isReady = false;
   }
 }
