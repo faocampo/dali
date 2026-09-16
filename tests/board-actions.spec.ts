@@ -133,6 +133,29 @@ for (const changed of ['role', 'account']) test(`@CR-02 archive import rejects s
   expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 });
   expect(database.prepare('SELECT count(*) AS n FROM import_staging').get()).toEqual({ n: 0 }); expect(sourceState(board.summary.id)).toEqual(before);
 });
+test('@CR-05 acknowledged rename follows authoritative recent order including ties', async ({ page }) => {
+  const first = await create(page, 'Older board'); const second = await create(page, 'Newer board');
+  database.prepare('UPDATE boards SET updated_at=1 WHERE id=?').run(first.summary.id); database.prepare('UPDATE boards SET updated_at=2 WHERE id=?').run(second.summary.id); await page.reload();
+  const ids = () => page.locator('[data-board-id]').evaluateAll(rows => rows.map(row => row.getAttribute('data-board-id')));
+  await expect.poll(ids).toEqual([second.summary.id, first.summary.id]);
+  const rename = async (id: string, name: string) => { await card(page, id).getByRole('button', { name: 'Rename board', exact: true }).click(); const dialog = page.getByRole('dialog', { name: 'Rename board', exact: true }); await dialog.getByRole('textbox').fill(name); await dialog.getByRole('button', { name: 'Save name', exact: true }).click(); await expect(dialog).not.toBeVisible(); };
+  await rename(first.summary.id, 'Newest board'); await expect.poll(ids).toEqual([first.summary.id, second.summary.id]);
+  await page.route('**/api/boards/' + second.summary.id, async route => { if (route.request().method() !== 'PATCH') return route.continue(); const response = await route.fetch(); const value = await response.json(); database.prepare('UPDATE boards SET updated_at=? WHERE id=?').run(value.summary.updatedAt, first.summary.id); await route.fulfill({ response }); });
+  await rename(second.summary.id, 'Tied board');
+  const authoritative = await (await page.request.get(origin + '/api/boards?filter=all', { headers: headers() })).json();
+  expect(authoritative[0].updatedAt).toBe(authoritative[1].updatedAt); await expect.poll(ids).toEqual(authoritative.map((row: { id: string }) => row.id));
+});
+test('@CR-05 duplicate retains Shared with me membership without the private owner copy', async ({ page }) => {
+  const board = await create(page, 'Shared source');
+  database.prepare('INSERT INTO members(id,issuer,subject,email,canonical_email,display_name) VALUES(?,?,?,?,?,?)').run('synthetic-source-owner', provider.issuer, 'source-owner', 'source@example.org', 'source@example.org', 'Source Owner');
+  database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run('synthetic-source-owner', board.summary.id); database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, accountId, 'editor');
+  await page.reload(); await page.getByRole('button', { name: 'Shared with me', exact: true }).click(); await expect(card(page, board.summary.id)).toBeVisible();
+  await card(page, board.summary.id).getByRole('button', { name: 'Duplicate board', exact: true }).click(); await page.getByRole('dialog').getByRole('button', { name: 'Duplicate board', exact: true }).click(); await expect(page.getByText('Private copy created.', { exact: true })).toBeVisible();
+  const authoritative = await (await page.request.get(origin + '/api/boards?filter=shared', { headers: headers() })).json();
+  await expect(page.getByRole('button', { name: 'Shared with me', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(() => page.locator('[data-board-id]').evaluateAll(rows => rows.map(row => row.getAttribute('data-board-id')))).toEqual(authoritative.map((row: { id: string }) => row.id));
+  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 2 });
+});
 test('@03-08-01 Unicode rename blank bounds acknowledgment and named safe-focus deletion', async ({ page }) => {
   const board = await create(page); await page.reload();
   const open = async () => { await card(page, board.summary.id).getByRole('button', { name: 'Rename board' }).click(); return page.getByRole('dialog', { name: 'Rename board' }); };

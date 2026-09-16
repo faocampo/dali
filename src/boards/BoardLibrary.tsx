@@ -46,6 +46,13 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
   const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState('');
   const operation = useRef<{ id: string; title: string } | null>(null);
+  const actionFocus = useRef<{ id?: string }>();
+  useEffect(() => {
+    if (loading || error || !actionFocus.current) return;
+    const id = actionFocus.current.id; actionFocus.current = undefined;
+    const target = id ? document.querySelector<HTMLAnchorElement>('[data-board-id="' + CSS.escape(id) + '"] .board-card__open') : null;
+    (target ?? document.querySelector<HTMLButtonElement>('.board-library__create button'))?.focus();
+  }, [boards, loading, error]);
   useEffect(() => {
     const url = new URL(window.location.href); const id = url.searchParams.get('focusBoard');
     if (!id || !boards.some(board => board.id === id)) return;
@@ -137,10 +144,10 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
     {localCopyOpen && <LocalBoardCopyDialog key={member.accountId} member={member} onClose={() => { setLocalCopyOpen(false); setRefresh(value => value + 1); }} />}
     {action && <BoardActionDialog board={action.board} kind={action.kind} onClose={() => setAction(undefined)} onComplete={result => {
       const remaining = boards.filter(row => row.id !== action.board.id);
-      const next = result.deleted ? remaining[0]?.id : result.summary.id;
-      setBoards(result.deleted ? remaining : action.kind === 'duplicate' ? [result.summary, ...boards] : boards.map(row => row.id === result.summary.id ? result.summary : row));
+      const next = result.deleted ? remaining[0]?.id : action.kind === 'duplicate' && filter === 'shared' ? action.board.id : result.summary.id;
+      actionFocus.current = { id: next };
+      setRefresh(value => value + 1);
       setNotice(result.deleted ? 'Board deleted.' : action.kind === 'duplicate' ? 'Private copy created.' : 'Board name saved.'); setAction(undefined);
-      requestAnimationFrame(() => { const target = next ? document.querySelector<HTMLAnchorElement>('[data-board-id="' + CSS.escape(next) + '"] .board-card__open') : document.querySelector<HTMLButtonElement>('.board-library__create button'); target?.focus(); });
     }} />}
     {sharing && <ShareBoardDialog key={sharing.id + member.accountId} board={sharing} onClose={() => setSharing(undefined)} onChanged={state => {
       if (!state) { setRefresh(value => value + 1); return; }
