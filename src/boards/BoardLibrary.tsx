@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SessionDescriptor } from '../auth/AuthBoundary';
 import { ShareBoardDialog } from './ShareBoardDialog';
+import { BoardActionDialog } from './BoardActionDialog';
 
 export type BoardSummary = { id: string; title: string; updatedAt: number; role: 'owner' | 'editor' | 'viewer'; access: 'private' | 'shared'; pendingCount: number; accountId: string; thumbnailUrl?: string };
 export type BoardDescriptor = { summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number };
@@ -31,6 +32,8 @@ function ProtectedPreview({ board }: { board: BoardSummary }) {
   return <span className="board-card__preview">{url ? <img src={url} alt="" onError={() => setUrl(undefined)} /> : 'Preview unavailable'}</span>;
 }
 export function BoardLibrary({ member }: { member: SessionDescriptor }) {
+  const [action, setAction] = useState<{ board: BoardSummary; kind: 'rename' | 'duplicate' | 'delete' }>();
+  const [notice, setNotice] = useState('');
   const [sharing, setSharing] = useState<BoardSummary>();
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [error, setError] = useState(false);
@@ -108,6 +111,7 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
       <button className="djai-primary" disabled={busy || loading} type="submit">{busy ? 'Creating board…' : 'New board'}</button>
     </form>
     {createError && <p role="alert">{createError}</p>}
+    {notice && <p role="status">{notice}</p>}
     <div className="board-library__filters" aria-label="Filter boards">
       {(['all', 'mine', 'shared'] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? 'All' : value === 'mine' ? 'Mine' : 'Shared with me'}</button>)}
       <button onClick={() => setRefresh(value => value + 1)}>Refresh boards</button>
@@ -118,9 +122,16 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
           <ProtectedPreview board={board} /><strong className="board-card__title">{board.title}</strong>
           <small>Edited {new Date(board.updatedAt).toLocaleString()}</small>
         </a><div className="board-card__metadata"><span>{board.access === 'private' ? 'Private' : 'Shared'}</span><span>{board.role[0]!.toUpperCase() + board.role.slice(1)}</span>{board.pendingCount > 0 && <span>Pending member sign-in</span>}</div>
-        <div className="board-card__actions"><details><summary>Full board name</summary><p>{board.title}</p></details>{board.role === 'owner' && <button onClick={() => setSharing(board)}>Share board</button>}</div>
+        <div className="board-card__actions"><details><summary>Full board name</summary><p>{board.title}</p></details>{board.role !== 'viewer' && <><button onClick={() => setAction({ board, kind: 'rename' })}>Rename board</button><button onClick={() => setAction({ board, kind: 'duplicate' })}>Duplicate board</button></>}{board.role === 'owner' && <><button onClick={() => setSharing(board)}>Share board</button><button onClick={() => setAction({ board, kind: 'delete' })}>Delete board</button></>}</div>
       </article>)}
     </div>}
+    {action && <BoardActionDialog board={action.board} kind={action.kind} onClose={() => setAction(undefined)} onComplete={result => {
+      const remaining = boards.filter(row => row.id !== action.board.id);
+      const next = result.deleted ? remaining[0]?.id : result.summary.id;
+      setBoards(result.deleted ? remaining : action.kind === 'duplicate' ? [result.summary, ...boards] : boards.map(row => row.id === result.summary.id ? result.summary : row));
+      setNotice(result.deleted ? 'Board deleted.' : action.kind === 'duplicate' ? 'Private copy created.' : 'Board name saved.'); setAction(undefined);
+      requestAnimationFrame(() => { const target = next ? document.querySelector<HTMLAnchorElement>('[data-board-id="' + CSS.escape(next) + '"] .board-card__open') : document.querySelector<HTMLButtonElement>('.board-library__create button'); target?.focus(); });
+    }} />}
     {sharing && <ShareBoardDialog key={sharing.id + member.accountId} board={sharing} onClose={() => setSharing(undefined)} onChanged={state => {
       if (!state) { setRefresh(value => value + 1); return; }
       setBoards(current => current.map(row => row.id === sharing.id ? { ...row, access: state.grants.length ? 'shared' : 'private', pendingCount: state.grants.filter(grant => grant.status === 'pending').length } : row));

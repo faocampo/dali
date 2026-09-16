@@ -30,12 +30,13 @@ export class BoardMeta implements WorkspaceMeta {
   setDocMeta(id: string, props: Partial<DocMeta>) {
     this.writable();
     if (id !== this.contentId || (props.id !== undefined && props.id !== id)) throw new Error('Document unavailable');
-    const record = this.pages.get(0);
+    const pages = this.pages;
+    const record = pages.get(0);
     this.root.transact(() => {
       if (record instanceof Y.Map) {
         for (const [key, value] of Object.entries(props)) record.set(key, value);
       } else {
-        this.pages.delete(0); this.pages.insert(0, [{ ...record, ...props, id }]);
+        pages.delete(0); pages.insert(0, [{ ...record, ...props, id }]);
       }
     }, this.root.clientID);
     this.docMetaUpdated.next();

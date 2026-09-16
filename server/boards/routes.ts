@@ -7,6 +7,7 @@ import { runMigrations, type AccountDatabase } from '../storage/database.js';
 import { registerDocumentRoutes, type BeforeCommit } from './documents.js';
 import { registerBlobRoutes, validateImageBytes } from './blobs.js';
 import { registerGrantRoutes } from './grants.js';
+import { registerActionRoutes } from './actions.js';
 
 export type BoardRole = 'owner' | 'editor' | 'viewer';
 export type BoardCapability = 'read' | 'image' | 'presentation-export' | 'write' | 'rename' | 'editable-export' | 'duplicate' | 'grants' | 'delete';
@@ -37,7 +38,7 @@ function summary(database: AccountDatabase, board: BoardRow, accountId: string):
     access: counts.active + counts.pending > 0 ? 'shared' : 'private', pendingCount: counts.pending, accountId,
     ...(counts.thumbnail ? { thumbnailUrl: `/api/boards/${encodeURIComponent(board.id)}/thumbnail` } : {}) };
 }
-function descriptor(database: AccountDatabase, board: BoardRow, accountId: string) {
+export function descriptor(database: AccountDatabase, board: BoardRow, accountId: string) {
   return { summary: summary(database, board, accountId), rootDocId: board.root_doc_id, contentDocId: board.content_doc_id,
     capabilities: boardCapabilities.filter(capability => canBoard(board.role, capability)), revision: board.revision };
 }
@@ -85,6 +86,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
   registerDocumentRoutes(app, config, database, now, beforeCommit);
   registerBlobRoutes(app, config, database, now, beforeCommit);
   registerGrantRoutes(app, config, database, now, beforeCommit);
+  registerActionRoutes(app, config, database, now, beforeCommit);
   app.get<{ Querystring: { filter?: string } }>('/api/boards', async (request, reply) => {
     const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
     const filter = request.query.filter ?? 'all';

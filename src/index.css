@@ -1734,3 +1734,9 @@ djai-image-visual-edit {
 .share-dialog .export-footer label { width: 100%; }
 .share-confirm { border: 2px solid var(--board-line); padding: 12px; margin-block: 12px; }
 .share-dialog :focus-visible { outline: 2px solid var(--affine-primary-color); outline-offset: 2px; }
+/* Account actions share the native dialog focus lifecycle and compact shell. */
+.board-action-dialog { width: min(440px, calc(100vw - 32px)); box-sizing: border-box; border: 1px solid var(--border-color, #d4d4d8); border-radius: 16px; padding: 24px; }
+.board-action-dialog p, .board-action-dialog label { overflow-wrap: anywhere; }
+.board-action-dialog input { box-sizing: border-box; display: block; width: 100%; min-width: 0; min-height: 44px; margin-top: 8px; }
+.board-action-dialog__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+.board-action-dialog button, .board-card__actions button { min-height: 44px; }
