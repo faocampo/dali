@@ -55,6 +55,16 @@ test('@03-10-01 full redirect restores unacknowledged image hash and map text ex
   const bytes = syntheticCanaries().imageBytes;
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'pending.png', mimeType: 'image/png', buffer: bytes });
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
+  const journalImage = await page.evaluate(() => new Promise<{ bytes: number[]; mime: string }>((resolve, reject) => {
+    const request = indexedDB.open('dali-account-recovery-v1');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result; const tx = db.transaction('journal', 'readonly'); const rows = tx.objectStore('journal').getAll();
+      tx.oncomplete = () => { const image = rows.result.find(row => row.kind === 'blob'); db.close(); resolve({ bytes: Array.from(image.data), mime: image.mime }); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  }));
+  expect(journalImage).toEqual({ bytes: [...bytes], mime: 'image/png' });
   await text(page, 'Pending map canary'); const before = await model(page);
   expect(database.prepare('SELECT * FROM board_blobs WHERE board_id=?').all(descriptor.summary.id)).toHaveLength(0);
   await expire(page); await page.unrouteAll({ behavior: 'ignoreErrors' });
@@ -64,7 +74,7 @@ test('@03-10-01 full redirect restores unacknowledged image hash and map text ex
   await expect(page.locator('affine-edgeless-root')).toBeVisible();
   expect(await model(page)).toBe(before);
   const blob = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/blobs/' + encodeURIComponent(createHash('sha256').update(bytes).digest('base64url') + '='), { headers: { 'X-Dali-Account': accountId } });
-  expect(blob.status()).toBe(200); expect(await blob.body()).toEqual(bytes);
+  expect(blob.status()).toBe(200); expect(blob.headers()['content-type']).toContain('image/png'); expect(await blob.body()).toEqual(bytes);
   await page.reload(); await expect(page.locator('affine-edgeless-root')).toHaveCount(1); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect(await model(page)).toBe(before);
 });
 test('@03-10-01 interrupted acknowledgment replays idempotently against committed server bytes', async ({ page }) => {

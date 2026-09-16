@@ -2,7 +2,7 @@ import type { BoardDescriptor } from '../../boards/BoardLibrary';
 import { SourceAccessError } from './doc-source';
 
 export type JournalScope = { accountId: string; boardId: string; generation: number };
-export type JournalRecord = JournalScope & { id: string; sequence: number; kind: 'document' | 'blob'; resource: string; data: Uint8Array | Blob };
+export type JournalRecord = JournalScope & { id: string; sequence: number; kind: 'document' | 'blob'; resource: string; data: Uint8Array | Blob; mime?: string };
 const databaseName = 'dali-account-recovery-v1';
 async function database(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -35,6 +35,14 @@ export async function acknowledgeRecord(id: string) { await transaction('readwri
 export async function discardRecords(accountId: string, boardId: string) {
   for (const record of await pendingRecords(accountId, boardId)) await acknowledgeRecord(record.id);
 }
+async function persistRecord(record: JournalRecord) {
+  // Some engines cannot persist file-backed Blobs. Copy their bytes before
+  // opening the transaction; retain the original in memory if copying fails.
+  const stored = record.data instanceof Blob
+    ? { ...record, data: new Uint8Array(await record.data.arrayBuffer()), mime: record.data.type }
+    : record;
+  return transaction('readwrite', store => store.put(stored));
+}
 /** Failed captures remain in memory until a successful explicit preservation retry. */
 export class AccountJournal {
   private sequence = 0;
@@ -45,7 +53,7 @@ export class AccountJournal {
     const record: JournalRecord = { ...this.scope, id: crypto.randomUUID(), sequence: ++this.sequence, kind, resource,
       data: data instanceof Uint8Array ? new Uint8Array(data) : data };
     this.memory.set(record.id, record);
-    const write = transaction('readwrite', store => store.put(record)); this.writes.add(write);
+    const write = persistRecord(record); this.writes.add(write);
     try { await write; this.memory.delete(record.id); return record.id; }
     catch (error) { this.onFailure(); throw error; }
     finally { this.writes.delete(write); }
@@ -53,7 +61,7 @@ export class AccountJournal {
   async preserve() {
     await Promise.allSettled([...this.writes]);
     for (const record of this.memory.values()) {
-      await transaction('readwrite', store => store.put(record)); this.memory.delete(record.id);
+      await persistRecord(record); this.memory.delete(record.id);
     }
   }
 }
@@ -70,7 +78,7 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
     const base = `/api/boards/${encodeURIComponent(descriptor.summary.id)}`;
     const response = await fetch(record.kind === 'blob' ? `${base}/blobs/${encodeURIComponent(record.resource)}` : `${base}/docs/${encodeURIComponent(record.resource)}/push`, {
       method: record.kind === 'blob' ? 'PUT' : 'POST', credentials: 'same-origin', cache: 'no-store', signal,
-      headers: { 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': record.data instanceof Blob ? record.data.type : 'application/octet-stream' },
+      headers: { 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': record.data instanceof Blob ? record.data.type : record.kind === 'blob' ? record.mime || 'application/octet-stream' : 'application/octet-stream' },
       body: record.data instanceof Blob ? record.data : new Uint8Array(record.data),
     });
     if (!response.ok) throw [401, 403, 404, 409].includes(response.status) ? new SourceAccessError(response.status) : new Error('Pending changes could not be applied. Try again.');
