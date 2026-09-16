@@ -58,6 +58,7 @@ test('staging, operation replay, current role and commit-time denial preserve re
     const target = (await reserved.json()).result;
     expect((await (await contexts.editor.request.post('/api/imports', { headers: h('editor'), data: importBody })).json()).result.summary.id).toBe(target.summary.id);
     const root = new Y.Doc({ guid: target.rootDocId }); const content = new Y.Doc({ guid: target.contentDocId }); root.getMap('spaces').set(target.contentDocId, content);
+    root.getMap('meta').set('pages', Y.Array.from([{ id: target.contentDocId, title: 'Synthetic import', createDate: Date.now(), tags: [] }]));
     for (const flavour of ['affine:page', 'affine:surface', 'affine:image']) { const block = new Y.Map<unknown>(); const blockId = randomUUID(); block.set('sys:id', blockId); block.set('sys:flavour', flavour); if (flavour === 'affine:image') block.set('prop:sourceId', key); content.getMap('blocks').set(blockId, block); }
     const payload = { root: Buffer.from(Y.encodeStateAsUpdate(root)).toString('base64'), content: Buffer.from(Y.encodeStateAsUpdate(content)).toString('base64'), manifest: [key] }; root.destroy(); content.destroy();
     const stageBefore = rows();

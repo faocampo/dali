@@ -42,6 +42,7 @@ describe('@03-12-receipts current authority and acknowledgment reconciliation', 
     for (const prefix of ['/api/operations/', '/api/imports/']) expect((await app.inject({ url: prefix + operationId, headers: h('editor') })).statusCode).toBe(404);
     database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(id, actors.editor!.accountId, 'editor');
     const root = new Y.Doc({ guid: d.rootDocId }); const content = new Y.Doc({ guid: d.contentDocId }); root.getMap('spaces').set(d.contentDocId, content);
+    root.getMap('meta').set('pages', Y.Array.from([{ id: d.contentDocId, title: 'Synthetic copy', createDate: Date.now(), tags: [] }]));
     for (const flavour of ['affine:page', 'affine:surface']) { const block = new Y.Map(); const blockId = randomUUID(); block.set('sys:id', blockId); block.set('sys:flavour', flavour); content.getMap('blocks').set(blockId, block); }
     const payload = { root: Buffer.from(Y.encodeStateAsUpdate(root)).toString('base64'), content: Buffer.from(Y.encodeStateAsUpdate(content)).toString('base64'), manifest: [] }; root.destroy(); content.destroy();
     expect((await app.inject({ method: 'PUT', url: `/api/imports/${operationId}/document`, headers: h('editor'), payload })).statusCode).toBe(200);
