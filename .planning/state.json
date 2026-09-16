@@ -71,8 +71,8 @@
   ],
   "next": {
     "command": "$gsd-execute-phase 3",
-    "label": "Execute plan 03-06 account editor shell",
-    "reason": "Phase 03 plans 01 through 05 complete; 2/13 phases accepted and 19/26 plans complete; actual-provider acceptance pending"
+    "label": "Execute plan 03-07 internal access management",
+    "reason": "Phase 03 plans 01 through 06 complete; 2/13 phases accepted and 20/26 plans complete; actual-provider acceptance pending"
   },
-  "updated_at": "2026-09-16T15:03:12.232Z"
+  "updated_at": "2026-09-16T15:38:12.534Z"
 }
