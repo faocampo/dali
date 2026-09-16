@@ -59,10 +59,11 @@ test('repeated editor reopen preserves IDs without duplicate objects or handlers
   await expect(page.locator('affine-edgeless-note')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const stored = await notes(page);
+  const originalUrl = page.url();
   for (let repeat = 0; repeat < 3; repeat += 1) {
     await fileAction(page, 'All boards');
     await expect(page.locator('editor-host')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
+    await page.locator(`a[href="/${new URL(originalUrl).search}"]`).click();
     await expect(page.getByTestId('board-action-menu')).toBeVisible();
     await expect.poll(() => notes(page)).toEqual(stored);
     await expect(page.locator('editor-host')).toHaveCount(1);
@@ -76,58 +77,76 @@ test('interrupted mounting and rapid board switching keep the final board isolat
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const first = await notes(page);
+  const firstUrl = page.url();
   await fileAction(page, 'All boards');
-  await page.getByRole('button', { name: '+ New board', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  const secondTitle = 'Synthetic switch ' + crypto.randomUUID();
+  await page.getByRole('textbox', { name: 'Board name', exact: true }).fill(secondTitle);
+  await page.getByRole('button', { name: 'New board', exact: true }).click();
+  await page.getByRole('link', { name: 'Open ' + secondTitle, exact: true }).click();
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
   const second = await notes(page);
+  const secondUrl = page.url();
   expect(second.boardId).not.toBe(first.boardId);
   expect(second.notes).toEqual([]);
 
-  for (const title of ['Untitled board', 'Untitled board 2', 'Untitled board']) {
+  for (const url of [firstUrl, secondUrl, firstUrl]) {
     await fileAction(page, 'All boards');
-    await page.getByRole('button', { name: `Open ${title}`, exact: true }).click();
+    await page.locator(`a[href="/${new URL(url).search}"]`).click();
     // The React header exists before the asynchronous native editor finishes.
     await fileAction(page, 'All boards');
     await expect(page.locator('editor-host')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: `Open ${title}`, exact: true }).click();
+    await page.locator(`a[href="/${new URL(url).search}"]`).click();
     await expect(page.getByTestId('board-action-menu')).toBeVisible();
     await expect(page.locator('editor-host')).toHaveCount(1);
-    await expect.poll(() => notes(page)).toEqual(title === 'Untitled board' ? first : second);
+    await expect.poll(() => notes(page)).toEqual(url === firstUrl ? first : second);
   }
   await fileAction(page, 'All boards');
-  await page.getByRole('button', { name: 'Open Untitled board 2', exact: true }).click();
+  await page.locator(`a[href="/${new URL(secondUrl).search}"]`).click();
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect.poll(async () => (await notes(page)).notes.length).toBe(1);
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   await fileAction(page, 'All boards');
-  await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
+  await page.locator(`a[href="/${new URL(firstUrl).search}"]`).click();
   await expect.poll(() => notes(page)).toEqual(first);
 });
 
-test.describe('local write failures', () => {
+test.describe('account recovery write failures', () => {
   test.use({ expectErrors: ['Synthetic storage quota'] });
   test('a failed IndexedDB write is reported without a saved acknowledgement', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    const session = await (await page.request.get('/api/session')).json();
+    const boardId = new URL(page.url()).searchParams.get('board');
+    const read = async () => { const response = await page.request.get(`/api/boards/${boardId}/editable-export`, { headers: { 'X-Dali-Account': session.accountId } }); expect(response.status()).toBe(200); return response.json(); };
+    const before = await read();
     await page.evaluate(() => {
-      const transaction = IDBDatabase.prototype.transaction;
-      IDBDatabase.prototype.transaction = function (...args: Parameters<IDBDatabase['transaction']>) {
-        if (this.name === 'djai-storyboard' && args[1] === 'readwrite') {
+      const put = IDBObjectStore.prototype.put;
+      const probe = { failures: 0, restore: () => { IDBObjectStore.prototype.put = put; } }; Object.assign(window, { quotaProbe: probe });
+      IDBObjectStore.prototype.put = function (...args: Parameters<IDBObjectStore['put']>) {
+        if (this.transaction.db.name === 'dali-account-recovery-v1') {
+          probe.failures++;
           throw new DOMException('Synthetic storage quota', 'QuotaExceededError');
         }
-        return transaction.apply(this, args);
+        return put.apply(this, args);
       };
     });
     await page.getByRole('button', { name: 'Add sticky note' }).click();
-    await expect(page.getByRole('button', { name: 'Save failed', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Retry preservation', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { quotaProbe: { failures: number } }).quotaProbe.failures)).toBeGreaterThan(0);
     await expect(page.getByRole('button', { name: 'Saved', exact: true })).toHaveCount(0);
-    await expect(page.locator('affine-edgeless-note')).toHaveCount(1);
-    await page.getByRole('button', { name: 'Save failed', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: 'Local save recovery' })).toContainText('local storage is full');
+    const pending = await notes(page); expect(pending.notes).toHaveLength(1);
+    expect(await read()).toEqual(before);
+    await expect(page.getByText('Pending changes could not be secured for sign-in. Keep this tab open and retry preservation.', { exact: true })).toBeVisible();
+    await page.evaluate(() => (window as unknown as { quotaProbe: { restore(): void } }).quotaProbe.restore());
+    await page.getByRole('button', { name: 'Retry preservation', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Sign in to continue', exact: true })).toBeEnabled();
     await page.reload();
     await expect(page.getByTestId('board-action-menu')).toBeVisible();
-    await expect.poll(async () => (await notes(page)).notes).toEqual([]);
+    await expect.poll(() => notes(page)).toEqual(pending);
+    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await page.reload(); await expect.poll(() => notes(page)).toEqual(pending);
   });
 });
 

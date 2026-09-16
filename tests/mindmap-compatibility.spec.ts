@@ -170,12 +170,22 @@ test('@02-01-02 native duplicate and clipboard preserve complete child details',
 test('@02-01-02 board transformer copy keeps document-scoped hierarchy independent', async ({ page }) => {
   await seed(page);
   const before = await snapshot(page);
+  const sourceUrl = page.url();
+  const semantic = (nodes: typeof before) => {
+    const labels = new Map(nodes.map(node => [node.id, node.text]));
+    return nodes.map(({ id: _id, parent, ...node }) => ({ ...node, parent: parent ? labels.get(parent) : undefined }));
+  };
   await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
   await fileAction(page, 'All boards');
-  const original = page.locator('.board-card').filter({ has: page.getByRole('button', { name: 'Open Untitled board', exact: true }) });
-  await original.getByRole('button', { name: 'Duplicate', exact: true }).click();
-  await page.getByRole('button', { name: 'Open Untitled board copy', exact: true }).click();
-  await expect.poll(() => snapshot(page)).toEqual(before);
+  const original = page.locator(`.board-card[data-board-id="${new URL(sourceUrl).searchParams.get('board')}"]`);
+  await original.getByRole('button', { name: 'Duplicate board', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Duplicate board', exact: true }); const title = 'Synthetic hierarchy copy ' + crypto.randomUUID();
+  await dialog.getByRole('textbox', { name: 'Board name', exact: true }).fill(title); await dialog.getByRole('button', { name: 'Duplicate board', exact: true }).click();
+  await page.getByRole('link', { name: 'Open ' + title, exact: true }).click();
+  await expect.poll(async () => semantic(await snapshot(page))).toEqual(semantic(before));
+  const copied = await snapshot(page); const copiedIds = new Set(copied.map(node => node.id));
+  expect(copied.every(node => !before.some(source => source.id === node.id))).toBe(true);
+  expect(copied.every(node => !node.parent || copiedIds.has(node.parent))).toBe(true);
   await page.locator('affine-edgeless-root').evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     const map = gfx.surface!.elementModels.find(e => e.type === 'mindmap') as MindmapElementModel;
@@ -185,7 +195,7 @@ test('@02-01-02 board transformer copy keeps document-scoped hierarchy independe
   });
   await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
   await fileAction(page, 'All boards');
-  await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
+  await page.locator(`a[href="/${new URL(sourceUrl).search}"]`).click();
   await expect.poll(() => snapshot(page)).toEqual(before);
 });
 

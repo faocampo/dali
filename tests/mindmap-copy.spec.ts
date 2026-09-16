@@ -112,14 +112,24 @@ for (const route of ['duplicate', 'clipboard'] as const) test(`@02-02-01 ${route
   }
 });
 
-test('@02-02-01 board copy retains document-local IDs and independent typography', async ({ page }) => {
+test('@02-02-01 board copy regenerates identities and retains independent typography', async ({ page }) => {
   const ids = await seed(page);
   const original = await state(page);
+  const sourceUrl = page.url();
+  const semantic = (maps: typeof original.maps) => maps.map(map => {
+    const labels = new Map(map.nodes.map(node => [node.id, node.text]));
+    return map.nodes.map(({ id: _id, parent, ...node }) => ({ ...node, parent: parent ? labels.get(parent) : undefined }));
+  });
   await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
   await fileAction(page, 'All boards');
-  await page.locator('.board-card').filter({ has: page.getByRole('button', { name: 'Open Untitled board', exact: true }) }).getByRole('button', { name: 'Duplicate', exact: true }).click();
-  await page.getByRole('button', { name: 'Open Untitled board copy', exact: true }).click();
-  await expect.poll(async () => (await state(page)).maps).toEqual(original.maps);
+  await page.locator(`.board-card[data-board-id="${new URL(sourceUrl).searchParams.get('board')}"]`).getByRole('button', { name: 'Duplicate board', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Duplicate board', exact: true }); const title = 'Synthetic typography copy ' + crypto.randomUUID();
+  await dialog.getByRole('textbox', { name: 'Board name', exact: true }).fill(title); await dialog.getByRole('button', { name: 'Duplicate board', exact: true }).click();
+  await page.getByRole('link', { name: 'Open ' + title, exact: true }).click();
+  await expect.poll(async () => semantic((await state(page)).maps)).toEqual(semantic(original.maps));
+  const copied = await state(page);
+  expect(copied.elements.every(id => !original.elements.includes(id))).toBe(true);
+  for (const map of copied.maps) { const ids = new Set(map.nodes.map(node => node.id)); expect(map.nodes.every(node => !node.parent || ids.has(node.parent))).toBe(true); }
   expect((await state(page)).doc).not.toBe(ids.doc);
   await page.locator('affine-edgeless-root').evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
@@ -137,7 +147,7 @@ test('@02-02-01 board copy retains document-local IDs and independent typography
   await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
   await page.reload(); await expect.poll(() => state(page)).toEqual(changed);
   await fileAction(page, 'All boards');
-  await page.getByRole('button', { name: 'Open Untitled board', exact: true }).click();
+  await page.locator(`a[href="/${new URL(sourceUrl).search}"]`).click();
   await expect.poll(() => state(page)).toEqual(original);
 });
 
