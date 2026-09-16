@@ -89,3 +89,60 @@ test('@03-10-01 real 401 freezes and preserves native buffered text before dispo
   const response = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } });
   expect(response.status()).toBe(200);
 });
+async function records(page: Page) {
+  return page.evaluate(async () => new Promise<{ accountId: string; boardId: string; id: string }[]>((resolve, reject) => {
+    const opening = indexedDB.open('dali-account-recovery-v1'); opening.onerror = () => reject(opening.error);
+    opening.onsuccess = () => { const db = opening.result; const request = db.transaction('journal').objectStore('journal').getAll(); request.onsuccess = () => { db.close(); resolve(request.result); }; request.onerror = () => reject(request.error); };
+  }));
+}
+test('@03-10-02 different identity receives no previous content or replay even with shared access', async ({ page, browser }) => {
+  const descriptor = await board(page); const originalAccount = accountId;
+  const other = await browser.newContext(); const otherPage = await other.newPage(); await otherPage.goto(origin);
+  await otherPage.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(otherPage.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  const otherId = (await (await other.request.get(origin + '/api/session')).json()).accountId;
+  database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(descriptor.summary.id, otherId, 'editor'); await other.close();
+  await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: {} }));
+  await text(page, 'Original identity secret canary'); await expire(page); await page.unrouteAll({ behavior: 'ignoreErrors' });
+  const pending = await records(page); expect(pending.length).toBeGreaterThan(0);
+  await page.context().clearCookies({ name: 'dali_fixture_identity' }); await page.clock.setFixedTime(new Date());
+  let pushes = 0; page.on('request', request => { if (request.url().includes('/push')) pushes++; });
+  await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
+  await page.getByRole('link', { name: 'Synthetic Editor', exact: true }).click();
+  await expect(page.getByText("You're signed in with a different account. Return to your boards or sign in with the previous account to recover its pending changes.", { exact: true })).toBeVisible();
+  expect(pushes).toBe(0); expect(await records(page)).toEqual(pending);
+  await expect(page.locator('editor-host')).toHaveCount(0); await expect(page.getByText('Original identity secret canary')).toHaveCount(0);
+  expect((await records(page)).every(record => record.accountId === originalAccount && record.boardId === descriptor.summary.id)).toBe(true);
+});
+test('@03-10-02 persisted pageshow pauses until fresh session and descriptor authorize', async ({ page }) => {
+  const descriptor = await board(page); await text(page, 'BFCache canary'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let checks = 0;
+  await page.route('**/api/session', async route => { checks++; await barrier; await route.continue(); });
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await expect.poll(() => checks).toBe(1);
+  await expect(page.getByRole('button', { name: 'Add mind map', exact: true })).toHaveCount(0);
+  const before = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
+  await page.keyboard.press('Tab'); await page.keyboard.type('DENIED'); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before);
+  release(); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect(await model(page)).toContain('BFCache canary');
+});
+for (const access of ['viewer', 'revoked'] as const) test(`@03-10-02 ${access} recovery retains original journal with zero replay and named discard`, async ({ page, browser }) => {
+  const descriptor = await board(page);
+  const owner = await browser.newContext(); const ownerPage = await owner.newPage(); await ownerPage.goto(origin);
+  await ownerPage.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(ownerPage.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  const ownerId = (await (await owner.request.get(origin + '/api/session')).json()).accountId;
+  // Transfer fixture ownership in the isolated repository so the original member can lose a grant.
+  database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run(ownerId, descriptor.summary.id);
+  database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(descriptor.summary.id, accountId, 'editor');
+  await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: {} }));
+  await text(page, 'Quarantined grant canary'); await expire(page); await page.unrouteAll({ behavior: 'ignoreErrors' });
+  if (access === 'viewer') database.prepare('UPDATE board_grants SET role=? WHERE board_id=? AND member_id=?').run('viewer', descriptor.summary.id, accountId);
+  else database.prepare('DELETE FROM board_grants WHERE board_id=? AND member_id=?').run(descriptor.summary.id, accountId);
+  const pending = await records(page); const serverBefore = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
+  let writes = 0; page.on('request', request => { if (request.url().includes('/push') || request.method() === 'PUT') writes++; });
+  await page.clock.setFixedTime(new Date()); await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
+  await expect(page.getByText('Your access has changed. Pending changes have not been applied. Return to your boards or contact the board owner.', { exact: true })).toBeVisible();
+  expect(writes).toBe(0); expect(await records(page)).toEqual(pending); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(serverBefore);
+  await page.getByRole('button', { name: 'Discard pending changes', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('Recovery canary'); await expect(page.getByRole('button', { name: 'Keep pending changes', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Discard pending changes', exact: true }).click(); expect(await records(page)).toEqual([]);
+  await owner.close();
+});
