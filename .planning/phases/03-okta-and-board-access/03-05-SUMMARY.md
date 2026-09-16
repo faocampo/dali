@@ -28,6 +28,8 @@ requirements-progressed: [BOARD-01, BOARD-04]
 plan_head_before: 90b8f9a4e8c84310b635d73a51541539e567c58d
 actuals:
   tokens: 12478
+  tokens_basis: realized implementation diff characters divided by four; size estimate only
+  model_token_usage: unavailable
   tasks: 2
   commits: 4
 duration: 28min
@@ -61,7 +63,7 @@ coverage:
 1. Task 03-05-01: `666340d` RED, `3f2ec01` GREEN — BoardWorkspace/BoardDoc/BoardMeta compose the public 0.22.4 contracts with established store extensions. Root/content bytes arrive from authorized sources before metadata validation and Store construction. Native shape/text edits persist across complete disposal and fresh reopening. Foreign document lookup fails closed.
 2. Task 03-05-02: `665be17` RED, `360dc13` GREEN — isolated native staging; explicit readonly hydration; abort/generation checks; no-write teardown; subscription cleanup; stale metadata rejection; native image/map/history/export, identity-alternation and injected-subdocument conformance. The dev harness mounts the production native extensions and existing mind-map compatibility lifecycle.
 
-Four implementation/test commits are measured from the recorded ledger before summary/tracking commits. Actual tokens are the realized nine-file diff character count divided by four, rounded up. No dependency installation or tracked deletion occurred.
+Four implementation/test commits are measured from the recorded ledger before summary/tracking commits. The GSD `actuals.tokens` field is a diff-size estimate: the realized nine-file diff character count divided by four, rounded up. Actual model token usage is unavailable from the harness. No dependency installation or tracked deletion occurred.
 
 ## Verification
 
