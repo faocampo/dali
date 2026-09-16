@@ -190,9 +190,12 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     }
   });
   it('migrations are idempotent and failed additive migration rolls back its table and ledger', () => {
-    runMigrations(database); expect(database.prepare('SELECT version FROM schema_migrations').all()).toEqual([{ version: 1 }]);
-    expect(() => runMigrations(database, [{ version: 2, sql: 'CREATE TABLE synthetic_probe(id TEXT); INSERT INTO missing_table VALUES(1)' }])).toThrow();
+    const ledger = database.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as { version: number }[];
+    expect(ledger).toContainEqual({ version: 1 });
+    runMigrations(database); expect(database.prepare('SELECT version FROM schema_migrations ORDER BY version').all()).toEqual(ledger);
+    const nextVersion = Math.max(...ledger.map(row => row.version)) + 1;
+    expect(() => runMigrations(database, [{ version: nextVersion, sql: 'CREATE TABLE synthetic_probe(id TEXT); INSERT INTO missing_table VALUES(1)' }])).toThrow();
     expect(database.prepare("SELECT name FROM sqlite_master WHERE name='synthetic_probe'").get()).toBeUndefined();
-    expect(database.prepare('SELECT version FROM schema_migrations').all()).toEqual([{ version: 1 }]);
+    expect(database.prepare('SELECT version FROM schema_migrations ORDER BY version').all()).toEqual(ledger);
   });
 });

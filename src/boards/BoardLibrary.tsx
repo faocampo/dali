@@ -8,11 +8,33 @@ export function validSummary(value: BoardSummary, accountId: string) {
     && ['owner', 'editor', 'viewer'].includes(value.role) && ['private', 'shared'].includes(value.access)
     && Number.isSafeInteger(value.updatedAt) && Number.isSafeInteger(value.pendingCount) && value.pendingCount >= 0;
 }
+function ProtectedPreview({ board }: { board: BoardSummary }) {
+  const [url, setUrl] = useState<string>();
+  useEffect(() => {
+    const controller = new AbortController(); let objectUrl: string | undefined;
+    setUrl(undefined);
+    if (board.thumbnailUrl) {
+      const expectedPath = '/api/boards/' + encodeURIComponent(board.id) + '/thumbnail';
+      // Only this board's same-origin endpoint may receive the expected-account header.
+      if (board.thumbnailUrl !== expectedPath) return () => controller.abort();
+      void fetch(expectedPath, { headers: { 'X-Dali-Account': board.accountId }, cache: 'no-store', signal: controller.signal })
+        .then(async response => {
+          if (!response.ok || response.headers.get('X-Dali-Account') !== board.accountId || response.headers.get('Content-Type')?.split(';')[0] !== 'image/png') return;
+          const blob = await response.blob();
+          if (controller.signal.aborted || blob.size > 512 * 1024) return;
+          objectUrl = URL.createObjectURL(blob); setUrl(objectUrl);
+        }).catch(() => { /* An unavailable preview leaves the authorized board usable. */ });
+    }
+    return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [board.id, board.accountId, board.role, board.thumbnailUrl]);
+  return <span className="board-card__preview">{url ? <img src={url} alt="" onError={() => setUrl(undefined)} /> : 'Preview unavailable'}</span>;
+}
 export function BoardLibrary({ member }: { member: SessionDescriptor }) {
   const [boards, setBoards] = useState<BoardSummary[]>([]);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
+  const [filter, setFilter] = useState<'all' | 'mine' | 'shared'>('all');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -24,7 +46,7 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
   }, [member.accountId]);
   useEffect(() => {
     const controller = new AbortController(); setLoading(true); setError(false); setBoards([]);
-    void fetch('/api/boards', { headers: { 'X-Dali-Account': member.accountId }, cache: 'no-store', signal: controller.signal })
+    void fetch('/api/boards?filter=' + filter, { headers: { 'X-Dali-Account': member.accountId }, cache: 'no-store', signal: controller.signal })
       .then(async response => {
         if (!response.ok) throw new Error('Library unavailable');
         const rows: BoardSummary[] = await response.json();
@@ -33,7 +55,7 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
       }).catch(() => { if (!controller.signal.aborted) { setBoards([]); setError(true); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [member.accountId, refresh]);
+  }, [member.accountId, refresh, filter]);
   const create = async () => {
     if (busy) return;
     const controller = lifetime.current!; setBusy(true); setCreateError('');
@@ -69,7 +91,8 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
       if (!result || !validSummary(result.summary, member.accountId)) throw new Error('Invalid result');
       if (!controller.signal.aborted) {
         const created = result.summary;
-        setBoards(current => [created, ...current.filter(board => board.id !== created.id)]);
+        setBoards(current => [created, ...current.filter(board => board.id !== created.id)].sort((a, b) => b.updatedAt - a.updatedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
+        setFilter('all'); setRefresh(value => value + 1);
         setTitle(''); operation.current = null;
       }
     } catch (cause) {
@@ -78,18 +101,22 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
   };
   return <>
     <div className="board-library__title-row"><div><h1>Your boards</h1><p>Boards you can access with this account.</p></div></div>
-    <form onSubmit={event => { event.preventDefault(); void create(); }} style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
-      <label>Board name <input aria-label="Board name" value={title} onChange={event => setTitle(event.target.value)} disabled={busy || !!operation.current} /></label>
-      <button className="djai-primary" disabled={busy} type="submit">{busy ? 'Creating board…' : 'New board'}</button>
+    <form className="board-library__create" onSubmit={event => { event.preventDefault(); void create(); }}>
+      <label htmlFor="new-board-title">Board name <input id="new-board-title" value={title} onChange={event => setTitle(event.target.value)} disabled={busy || !!operation.current} /></label>
+      <button className="djai-primary" disabled={busy || loading} type="submit">{busy ? 'Creating board…' : 'New board'}</button>
     </form>
     {createError && <p role="alert">{createError}</p>}
-    <button onClick={() => setRefresh(value => value + 1)}>Refresh boards</button>
-    {loading ? <p role="status">Loading your boards…</p> : error ? <section><p role="alert">We couldn't load your boards. Try again.</p><button onClick={() => setRefresh(value => value + 1)}>Try again</button></section> : boards.length === 0 ? <section><h2>Create your first board</h2><p>Start a private board. You can share it with internal members afterward.</p></section> : <div className="board-grid">
+    <div className="board-library__filters" aria-label="Filter boards">
+      {(['all', 'mine', 'shared'] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{value === 'all' ? 'All' : value === 'mine' ? 'Mine' : 'Shared with me'}</button>)}
+      <button onClick={() => setRefresh(value => value + 1)}>Refresh boards</button>
+    </div>
+    {loading ? <><p role="status">Loading your boards…</p><div className="board-grid" aria-hidden="true">{[0, 1, 2].map(key => <div className="board-card board-card--skeleton" key={key} />)}</div></> : error ? <section><p role="alert">We couldn't load your boards. Try again.</p><button onClick={() => setRefresh(value => value + 1)}>Try again</button></section> : boards.length === 0 ? <section className="board-library__empty"><h2>{filter === 'shared' ? 'No shared boards yet' : 'Create your first board'}</h2><p>{filter === 'shared' ? 'Boards shared with you will appear here. Choose All to see your boards.' : 'Start a private board. You can share it with internal members afterward.'}</p>{filter === 'shared' && <button onClick={() => setFilter('all')}>View all boards</button>}</section> : <div className="board-grid">
       {boards.map(board => <article className="board-card" key={board.id} data-board-id={board.id}>
         <a className="board-card__open" href={'/?board=' + encodeURIComponent(board.id)} aria-label={'Open ' + board.title}>
-          <span className="board-card__preview">Preview unavailable</span><strong>{board.title}</strong>
+          <ProtectedPreview board={board} /><strong className="board-card__title">{board.title}</strong>
           <small>Edited {new Date(board.updatedAt).toLocaleString()}</small>
-        </a><p>{board.access === 'private' ? 'Private' : 'Shared'} · {board.role[0]!.toUpperCase() + board.role.slice(1)}</p>
+        </a><div className="board-card__metadata"><span>{board.access === 'private' ? 'Private' : 'Shared'}</span><span>{board.role[0]!.toUpperCase() + board.role.slice(1)}</span>{board.pendingCount > 0 && <span>Pending member sign-in</span>}</div>
+        <div className="board-card__actions"><details><summary>Full board name</summary><p>{board.title}</p></details></div>
       </article>)}
     </div>}
   </>;

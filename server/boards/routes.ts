@@ -26,11 +26,16 @@ export function requireBoardCapability(database: AccountDatabase, request: Fasti
   if (!canBoard(board.role, capability)) { reply.code(403).send({ code: 'CAPABILITY_REQUIRED' }); return; }
   return board;
 }
-function summary(board: BoardRow, accountId: string): BoardSummary {
-  return { id: board.id, title: board.title, updatedAt: board.updated_at, role: board.role, access: 'private', pendingCount: 0, accountId };
+function summary(database: AccountDatabase, board: BoardRow, accountId: string): BoardSummary {
+  const counts = database.prepare(`SELECT (SELECT count(*) FROM board_grants WHERE board_id=?) AS active,
+    (SELECT count(*) FROM pending_grants WHERE board_id=?) AS pending,
+    EXISTS(SELECT 1 FROM board_thumbnails WHERE board_id=?) AS thumbnail`).get(board.id, board.id, board.id) as { active: number; pending: number; thumbnail: number };
+  return { id: board.id, title: board.title, updatedAt: board.updated_at, role: board.role,
+    access: counts.active + counts.pending > 0 ? 'shared' : 'private', pendingCount: counts.pending, accountId,
+    ...(counts.thumbnail ? { thumbnailUrl: `/api/boards/${encodeURIComponent(board.id)}/thumbnail` } : {}) };
 }
-function descriptor(board: BoardRow, accountId: string) {
-  return { summary: summary(board, accountId), rootDocId: board.root_doc_id, contentDocId: board.content_doc_id,
+function descriptor(database: AccountDatabase, board: BoardRow, accountId: string) {
+  return { summary: summary(database, board, accountId), rootDocId: board.root_doc_id, contentDocId: board.content_doc_id,
     capabilities: boardCapabilities.filter(capability => canBoard(board.role, capability)), revision: board.revision };
 }
 /** Root and content are separately persisted; a root has exactly one bound subdocument. */
@@ -65,7 +70,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
     CREATE TABLE board_documents (board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE, doc_id TEXT NOT NULL, update_bytes BLOB NOT NULL, PRIMARY KEY(board_id,doc_id));
     CREATE TABLE operations (member_id TEXT NOT NULL REFERENCES members(id), operation_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
       board_id TEXT, result TEXT NOT NULL, PRIMARY KEY(member_id,operation_id));
-  ` }]);
+  ` }, { version: 3, sql: `CREATE TABLE board_thumbnails (board_id TEXT PRIMARY KEY REFERENCES boards(id) ON DELETE CASCADE, bytes BLOB NOT NULL, mime TEXT NOT NULL CHECK(mime='image/png'));` }]);
   app.get<{ Querystring: { filter?: string } }>('/api/boards', async (request, reply) => {
     const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
     const filter = request.query.filter ?? 'all';
@@ -75,11 +80,19 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
       WHERE (b.owner_id=@member OR g.member_id IS NOT NULL)
       AND (@filter='all' OR (@filter='mine' AND b.owner_id=@member) OR (@filter='shared' AND b.owner_id<>@member))
       ORDER BY b.updated_at DESC,b.id ASC`).all({ member: member!.accountId, filter }) as BoardRow[];
-    return rows.map(board => summary(board, member!.accountId));
+    return rows.map(board => summary(database, board, member!.accountId));
   });
   app.get<{ Params: { boardId: string } }>('/api/boards/:boardId', async (request, reply) => {
     const board = requireBoardCapability(database, request, reply, request.params.boardId, 'read', now);
-    if (board) return descriptor(board, currentSession(database, request, now)!.accountId);
+    if (board) return descriptor(database, board, currentSession(database, request, now)!.accountId);
+  });
+  app.get<{ Params: { boardId: string } }>('/api/boards/:boardId/thumbnail', async (request, reply) => {
+    const board = requireBoardCapability(database, request, reply, request.params.boardId, 'image', now);
+    if (!board) return;
+    const thumbnail = database.prepare('SELECT bytes,mime FROM board_thumbnails WHERE board_id=?').get(board.id) as { bytes: Buffer; mime: string } | undefined;
+    if (!thumbnail) return reply.code(404).send({ code: 'PREVIEW_UNAVAILABLE' });
+    reply.header('X-Dali-Account', currentSession(database, request, now)!.accountId);
+    reply.header('X-Content-Type-Options', 'nosniff'); return reply.type(thumbnail.mime).send(thumbnail.bytes);
   });
   app.get<{ Params: { operationId: string } }>('/api/operations/:operationId', async (request, reply) => {
     const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
@@ -108,7 +121,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
       database.prepare(`INSERT INTO boards(id,owner_id,title,root_doc_id,content_doc_id,created_at,updated_at,revision)
         VALUES(@id,@owner_id,@title,@root_doc_id,@content_doc_id,@created_at,@updated_at,@revision)`).run(board);
       seedDocuments(database, board);
-      const result = descriptor(board, member!.accountId);
+      const result = descriptor(database, board, member!.accountId);
       database.prepare('INSERT INTO operations(member_id,operation_id,kind,status,board_id,result) VALUES(?,?,?,?,?,?)')
         .run(member!.accountId, request.body.operationId, 'create', 'completed', board.id, JSON.stringify(result));
       reply.code(201); return result;
