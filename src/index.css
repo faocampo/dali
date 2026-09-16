@@ -1778,3 +1778,23 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 .session-recovery__account { color: #57534e; }
 .session-recovery__notice { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 100; padding: 8px 16px; border-radius: 8px; background: #ffffff; color: #1b1a18; font-size: 13px; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .session-recovery, .session-recovery * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+.local-copy-dialog { box-sizing: border-box; width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; color: var(--board-ink); background: var(--board-surface); border: 1px solid #76736e; border-radius: 16px; overflow: hidden; }
+.local-copy-dialog[open] { display: flex; flex-direction: column; }
+.local-copy-dialog::backdrop { background: rgb(27 26 24 / 40%); }
+.local-copy-dialog header, .local-copy-dialog footer { flex: 0 0 auto; padding: 16px 20px; overflow-wrap: anywhere; }
+.local-copy-dialog header { border-bottom: 1px solid var(--board-line); }
+.local-copy-dialog footer { border-top: 1px solid var(--board-line); }
+.local-copy-dialog h2 { font-size: 20px; line-height: 1.2; margin: 0 0 12px; }
+.local-copy-dialog p { margin: 8px 0; }
+.local-copy-dialog__body { min-height: 0; overflow-y: auto; padding: 12px 20px; overflow-wrap: anywhere; scroll-padding: 12px; }
+.local-copy-dialog__body section { padding-block: 12px; border-bottom: 1px solid var(--board-line); }
+.local-copy-dialog label { display: flex; align-items: start; gap: 8px; min-height: 44px; cursor: pointer; }
+.local-copy-dialog label span { min-width: 0; padding-block: 12px; }
+.local-copy-dialog input[type=checkbox] { flex: 0 0 44px; width: 44px; height: 44px; margin: 0; accent-color: #b4451f; }
+.local-copy-dialog button, .local-copy-dialog a { box-sizing: border-box; min-height: 44px; min-width: 44px; white-space: normal; overflow-wrap: anywhere; }
+.local-copy-dialog a { display: inline-flex; align-items: center; }
+.local-copy-dialog footer > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.local-copy-dialog :focus-visible { outline: 2px solid #b4451f; outline-offset: 2px; }
+.local-copy-dialog [role=alert] { color: #b23b32; }
+@media (max-width: 490px) { .local-copy-dialog footer > div { flex-direction: column; } .local-copy-dialog footer button { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .local-copy-dialog, .local-copy-dialog * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }

@@ -1,6 +1,7 @@
 import { readLegacyValue, createLegacyReader } from '../canvas/workspace';
 import { readLegacyCatalog } from './catalog';
 import * as Y from 'yjs';
+import type { Store } from '@blocksuite/affine/store';
 import { validateMindmapDocument } from '../canvas/mindmap-compatibility';
 import { createStagingWorkspace } from '../canvas/account/board-workspace';
 import { regenerateSurfaceIdentities } from './operations';
@@ -33,11 +34,12 @@ async function captureLocal(id: string) {
   if (!stored || !content) throw new Error('This local board is unavailable.');
   // No persisted sources, start(), metadata initialization, or graceful-stop writes.
   const workspace = createLegacyReader();
+  let sourceStore: Store | undefined;
   try {
     stored.updates.forEach(row => Y.applyUpdate(workspace.doc, row.update));
     const doc = workspace.getDoc(id); if (!doc) throw new Error('This local board is unavailable.');
     content.updates.forEach(row => Y.applyUpdate(doc.spaceDoc, row.update));
-    const store = doc.getStore(); store.load(); store.readonly = true;
+    const store = doc.getStore(); sourceStore = store; store.load(); store.readonly = true;
     validateMindmapDocument(store);
     const reader = store.getTransformer();
     let snapshot;
@@ -58,12 +60,12 @@ async function captureLocal(id: string) {
       blobs.set(key, new Blob([bytes], { type: mime }));
     }
     return { snapshot, schema: store.schema, blobs };
-  } finally { workspace.forceStop(); workspace.dispose(); workspace.doc.destroy(); }
+  } finally { workspace.forceStop(); sourceStore?.dispose(); workspace.dispose(); workspace.doc.destroy(); }
 }
 
+export class LocalCopyOutcomeUnknown extends Error {}
 export class LocalBoardCopy {
-  readonly operationId = crypto.randomUUID();
-  constructor(readonly accountId: string, readonly source: LocalBoard) {}
+  constructor(readonly accountId: string, readonly source: LocalBoard, readonly operationId: string = crypto.randomUUID()) {}
   private assertAccount() {
     const session = getSessionState();
     if (session.phase !== 'authenticated' || session.member?.accountId !== this.accountId || session.member.expiresAt <= Date.now()) throw new Error('Sign in with the original account to resume this copy.');
@@ -100,6 +102,11 @@ export class LocalBoardCopy {
       for (const [key, blob] of captured.blobs) await this.request(path + '/blobs/' + encodeURIComponent(key), { method: 'PUT', headers: { 'Content-Type': blob.type }, body: blob });
     } finally { transformer[Symbol.dispose](); staging.dispose(); }
     try { return validate(await (await this.request(path + '/commit', { method: 'POST', body: '{}' })).json() as BoardDescriptor); }
-    catch (error) { const known = await check(); if (known.status === 'completed') return validate(known.result!); throw error; }
+    catch (error) {
+      let known;
+      try { known = await check(); }
+      catch { throw new LocalCopyOutcomeUnknown('The copy outcome is not confirmed. Check again before closing. Originals remain in this browser.'); }
+      if (known.status === 'completed') return validate(known.result!); throw error;
+    }
   }
 }
