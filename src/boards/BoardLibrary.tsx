@@ -140,7 +140,7 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
         <div className="board-card__actions"><details><summary>Full board name</summary><p>{board.title}</p></details>{board.role !== 'viewer' && <><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'rename' }); }}>Rename board</button><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'duplicate' }); }}>Duplicate board</button></>}{board.role === 'owner' && <><button onClick={event => { event.currentTarget.focus(); setSharing(board); }}>Share board</button><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'delete' }); }}>Delete board</button></>}</div>
       </article>)}
     </div>}
-    <section><h2>Boards in this browser</h2><button onClick={() => setLocalCopyOpen(true)}>Copy local boards</button></section>
+    <section><h2>Boards in this browser</h2><button onClick={event => { event.currentTarget.focus(); setLocalCopyOpen(true); }}>Copy local boards</button></section>
     {localCopyOpen && <LocalBoardCopyDialog key={member.accountId} member={member} onClose={() => { setLocalCopyOpen(false); setRefresh(value => value + 1); }} />}
     {action && <BoardActionDialog board={action.board} kind={action.kind} onClose={() => setAction(undefined)} onComplete={result => {
       const remaining = boards.filter(row => row.id !== action.board.id);
