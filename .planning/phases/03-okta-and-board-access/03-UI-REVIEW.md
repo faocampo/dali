@@ -1,6 +1,95 @@
 # Phase 3 — UI Review
 
-## Final scoped recheck — `f2769dc`
+## Current independent closure — `6d6dade` — 24/24
+
+**Audited:** 2026-09-16. **Current overall: 24/24. Open: 0 blockers, 0 warnings.** UI-X5 is resolved; all thirteen original findings remain closed. This section supersedes the historical 23/24 assessment immediately below while preserving its two reproduced WebKit failures.
+
+HEAD was independently verified as `6d6dade1ea574e41123c252f36499e465adf5811`. The exact commit changes only [BoardLibrary.tsx](../../../src/boards/BoardLibrary.tsx#L143) (local-copy invoker): its click handler now calls `event.currentTarget.focus()` before `setLocalCopyOpen(true)`. The modal consequently captures the real trigger and returns focus to it on cleanup. No tests, copy, styling, operation handling, permission logic or recovery logic changed in this commit.
+
+| Pillar | Current score | Current evidence |
+| --- | --- | --- |
+| Copywriting | 4/4 | Previously verified critical copy retained; focus-only delta changes no strings. |
+| Visuals | 4/4 | Ten inspected 490px/1404px synthetic captures remain applicable to the unchanged visual implementation. |
+| Color | 4/4 | Verified neutral/destructive surfaces, accent focus and measured contrast retained. |
+| Typography | 4/4 | Verified 12/13/15/20px and 400/600 roles unchanged. |
+| Spacing | 4/4 | Verified gutters, insets, borders, responsive layout and targets unchanged. |
+| Experience Design | 4/4 | UI-X5 fixed in source; both original close/focus cases pass across all four browser variants. |
+
+**UI-X5 independent closure:** the unmodified original tests at [local-board-import.spec.ts](../../../tests/local-board-import.spec.ts#L237) (in-flight close, one completed copy and unchanged originals) and [local-board-import.spec.ts](../../../tests/local-board-import.spec.ts#L257) (fifty-row layout, focus trap, reduced motion and Escape close) both passed in development Chromium and production Chromium, Firefox and WebKit: **8/8 in 49.8s**. The complete supplied execution log was read; it identifies all eight passing cases after a fresh production build. The original focus assertions remain at lines 254 and 275; no test-side focus was added. Both TypeScript checks also passed according to the fixer. The prior **2/2 WebKit failures in 69.2s** remain historical RED evidence below.
+
+**Screenshots and limits:** the ten inspected images in `.gsd/acceptance-03-final-ui/1789604554290-123/` depict application `2d4a7aa`, before this single focus-only correction. Their visual evidence is retained because the exact delta changes no rendered styling or content; they are not relabeled as captures of `6d6dade`. Fresh full-gate captures and the complete **1533-case** matrix at `6d6dade` remain with the exclusive acceptance executor. No full-matrix pass is claimed here. Earlier smoke/unit/server/standalone access results remain attributed to their earlier head, rather than being represented as reruns after this fix. Actual native 200% zoom, OS IME, assistive-technology speech, genuine BFCache restoration and operator/provider acceptance remain pending. CSS magnification and synthetic composition establish only their stated automated scenarios.
+
+**Priority fixes:** none remaining within the inspected scope. **Recommendation count:** 0 priority fixes, 0 minor recommendations. Registry gate remains inapplicable. This closure reviewed the exact one-file source delta and the eight-case execution log; the broader source/screenshots and all fourteen finding dispositions are documented below. This auditor ran no browser, test, build, listener or capture and made no application/test/index changes or commits.
+
+---
+
+## Historical independent recheck — `b5698b2` — 23/24
+
+**Audited:** 2026-09-16. **Baseline:** [03-UI-SPEC.md](03-UI-SPEC.md) (approved six-pillar design and interaction contract). **Overall: 23/24. Open: 0 blockers, 1 warning.** All thirteen original findings remain resolved. The earlier 24/24 review below is historical and is superseded by this current assessment.
+
+HEAD was independently verified as `b5698b29591a1d141fba73cfcf22800f11940317`; latest application correction is `2d4a7aa`. This review inspected the current source and the UI delta since `f2769dc`, [03-REGRESSION-FIX.md](03-REGRESSION-FIX.md) (cross-browser correction history), [recovery-native-range.md](../../debug/resolved/recovery-native-range.md) (terminal recovery and exact native range verification), and [03-UI-FIX.md](03-UI-FIX.md) (original thirteen fixes and residual corrections).
+
+**Screenshots:** all ten fresh synthetic PNGs from `.gsd/acceptance-03-final-ui/1789604554290-123/` were opened and inspected: library, sharing, rename action, empty local-copy inventory and session recovery at 490px and 1404px. Earlier `f2769dc` images were not reused as current evidence. Screenshot ignore protection was inspected in `.planning/ui-reviews/.gitignore`; `git check-ignore` confirmed the fresh `.gsd/` artifact tree is ignored. The exclusive acceptance executor owns capture and runtime work; this auditor ran no browser, capture, build or listener and changed no application/test files.
+
+### Pillar scores and evidence
+
+| Pillar | Score | Specific finding |
+| --- | --- | --- |
+| Copywriting | 4/4 | Consequential sharing/delete, unknown-outcome and recovery copy remains aligned; fresh images retain explicit account, action and preservation wording. |
+| Visuals | 4/4 | Ten current captures show a clear library heading/creation anchor, aligned sharing regions, wrapped long titles and reachable dialog actions. |
+| Color | 4/4 | Scoped accent focus and neutral/destructive surfaces are explicit; fresh sharing contrast samples have a minimum 5.891:1 at each width. |
+| Typography | 4/4 | Four scoped sizes (12/13/15/20px), two weights (400/600), and distinct role/email hierarchy retained and measured. |
+| Spacing | 4/4 | 16px narrow/24px wide gutters, 24px dialog insets, 1px borders, 8px radii and 44px controls retained; native selects have explicit height. |
+| Experience Design | 3/4 | **WARNING UI-X5:** local-copy mouse invocation still relies on implicit browser focus; WebKit does not restore focus to the trigger after closing. |
+
+### Priority fixes
+
+1. **WARNING UI-X5 — restore local-copy invoker focus:** [BoardLibrary.tsx](../../../src/boards/BoardLibrary.tsx#L143) (local-copy trigger) calls only `setLocalCopyOpen(true)`. [LocalBoardCopyDialog.tsx](../../../src/boards/LocalBoardCopyDialog.tsx#L43) (modal lifecycle) captures `document.activeElement` and restores that element on cleanup. Unlike the corrected card and header Share triggers, the local-copy trigger is never explicitly focused. The existing WebKit `in-flight close waits for the real outcome and stops before the next copy` case fails its final trigger-focus assertion at [local-board-import.spec.ts](../../../tests/local-board-import.spec.ts#L254) (return-focus oracle), after the dialog closes, exactly one copy is established and originals remain unchanged. Focus the triggering button before opening, or pass an explicit stable invoker reference into the dialog. Re-run both existing WebKit in-flight-close and fifty-row Escape cases without adding test-side focus. This degrades navigation continuity; the observed copy operation itself succeeds.
+
+Only one actionable defect is established; no additional priority fixes are invented. **Recommendation count: 1 priority warning, 0 minor recommendations.**
+
+**UI-X5 runtime confirmation:** both existing production WebKit cases fail, **0/2 passed in 69.2s**, at their final trigger-focus assertion: in-flight close at test line 254, and fifty-row Escape close at test line 275. The latter passes its geometry, focus-trap and reduced-motion assertions before closing. The former passes copy count and unchanged-original assertions. The executor used ordinary clicks without source/test edits or forced focus. Synthetic failure artifacts are under ignored `.gsd/acceptance-03-final-ui/1789604951154-2/`. The warning is therefore a reproduced interaction defect, rather than an inferred browser difference. Remediation and its independent recheck are pending.
+
+### Detailed recheck of corrected browser behavior
+
+- **Copywriting:** [ShareBoardDialog.tsx](../../../src/boards/ShareBoardDialog.tsx#L129) (sharing labels, eligibility explanation, role and removal copy), [BoardActionDialog.tsx](../../../src/boards/BoardActionDialog.tsx#L37) (named irreversible delete), and [BoardLibrary.tsx](../../../src/boards/BoardLibrary.tsx#L120) (unknown creation result) retain the original resolutions. This delta adds no misleading completion wording.
+- **Visuals and responsive interaction:** [index.css](../../../src/index.css#L6) (bounded inspector with fixed header and scrolling body), line 702 (stable save-status dimensions), line 1656 (menu stacking), and lines 1767–1770 (two-column narrow header) address the recorded 390px occlusion and moving-Close mechanisms. [MindMapInspector.tsx](../../../src/canvas/MindMapInspector.tsx#L104) (font-size blur) avoids an unchanged native write. The inspected [mindmap-accessibility.spec.ts](../../../tests/mindmap-accessibility.spec.ts#L54) (390/1280px, 1x/2x layout checks) measures actual center hit targets, unchanged header geometry, close completion, retained selection/font size and canvas focus. The correction report records 24/24 targeted Chromium/Firefox passes. These are source plus attributed measured evidence; the ten current PNGs do not depict the 390px inspector.
+- **Color:** [index.css](../../../src/index.css#L1735) (native selects and neutral button surfaces) sets the essential native control dimensions and backgrounds; lines 1843–1844 apply 2px accent outlines to programmatically focused route headings using scoped `:focus`, preserving Firefox focus visibility before keyboard input. Destructive text remains `#b23b32` at line 1850. The current measured case records **159 sharing samples per viewport**, minimum **5.891199:1**, including destructive text over the explicit light surface. This is the tested sharing text sample, not a whole-application contrast certification. Accent usage remains restrained in the inspected chrome; no numerical pixel-area 60/30/10 measurement is claimed.
+- **Typography:** [index.css](../../../src/index.css#L1820) (surface typography and hierarchy, lines 1820–1841) retains the contract distribution: body/input 15px/400, heading 20px/600, controls/roles 13px/600, email/updated time 12px/400. Current computed assertions inspect actual role/status spans separately from email and updated time. Native authored canvas text is outside those selectors.
+- **Spacing:** [index.css](../../../src/index.css#L1821) (dialog widths/insets), lines 1842–1848 (borders and row rhythm), and lines 1856–1857 (responsive gutters) retain 458px/640px sharing/copy widths at 490px/1404px. The current measured case verifies no page horizontal overflow, all inspected targets at least 44px, native selects at 44px, 24px insets and 1px neutral borders. The 700px boundary and 400px header breakpoint are source-reviewed; the fresh screenshots establish 490px/1404px.
+- **Experience Design:** [BoardLibrary.tsx](../../../src/boards/BoardLibrary.tsx#L131) (explicit filter/refresh and card invoker focus) and [Header.tsx](../../../src/header/Header.tsx#L107) (Share invoker focus) retain the corrected browser behavior. Local copying is the remaining exception described in UI-X5. [session.ts](../../../src/auth/session.ts#L15) (range capture) and lines 25–78 (authorized exact-instance recovery) capture the actual native range, await the mounted editor's readiness, restore the range, terminalize success and cancel queued callbacks. The debugger records 44/44 final native/adjacent cases across development Chromium and production Chromium/Firefox/WebKit, plus a surgical revert that reproduces whole-text selection. The inspected oracle asserts internal/native ranges, selected substring, direct typing with surrounding text retained and exactly one editor mount; it does not move the caret to End to mask loss. Account/board/write guards remain in the source.
+
+### Original finding disposition
+
+| Finding | Current disposition |
+| --- | --- |
+| UI-X1 — sharing pending/unknown dismissal and receipt reconciliation | Resolved; synchronous request guard, held dismissal, retained operation identity and orphan-row reconciliation remain. |
+| UI-W1 — consequential sharing copy | Resolved; exact critical labels and verified-account explanation retained. |
+| UI-W2 — named irreversible delete/removal copy | Resolved; safe action and active/pending distinctions retained. |
+| UI-W3 — honest uncertainty labels | Resolved; Check again retains original operation identity. |
+| UI-V1 — sharing alignment | Resolved; current narrow/wide captures show aligned regions. |
+| UI-C1 — enabled card contrast | Resolved; current source/computed assertion and captures retain neutral ink. |
+| UI-C2 — boundaries/destructive color/focus | Resolved; current browser corrections cover route focus and native button surface. |
+| UI-T1 — typography roles | Resolved; current measured role/email distinction retained. |
+| UI-S1 — spacing/borders/gutters | Resolved; current measured geometry retained. |
+| UI-S2 — menu/import link targets | Resolved; scoped 44px target rules unchanged. |
+| UI-X2 — creation opening/reserved-tab progress | Resolved; acknowledged navigation and progress implementation retained. |
+| UI-X3 — errors/filter semantics | Resolved; field descriptions and labeled pressed-state group retained. |
+| UI-X4 — deliberate route focus | Resolved; account-entry focus and local filter/refresh focus retained. |
+
+### Evidence limits and separate acceptance gates
+
+The independent executor reports the current smoke **2/2**, unit **105/105**, server **112/112**, production build and standalone access **123/123** passing. This auditor independently read the access event record and its passing measured UI case, contrast attachments and ordinary-history-reload BFCache annotation. The full **1533-case** matrix was deliberately stopped to investigate UI-X5; it has no completed pass. The targeted WebKit focus failure is additional evidence and supersedes any inference of complete interaction acceptance from the standalone access result. Overlapping focused runs are not added into a fabricated consolidated total.
+
+Actual 200% native browser zoom, native OS IME, assistive-technology speech, genuine BFCache restoration and operator/provider acceptance remain pending. Supplemental CSS 2x layout and synthetic composition assertions establish only their stated automated scenarios. Registry audit is inapplicable: `components.json` is absent and the contract declares no third-party registry assets.
+
+### Files audited in this recheck
+
+`src/index.css`, `src/boards/BoardLibrary.tsx`, `src/boards/ShareBoardDialog.tsx`, `src/boards/BoardActionDialog.tsx`, `src/boards/LocalBoardCopyDialog.tsx`, `src/header/Header.tsx`, `src/auth/session.ts`, `src/canvas/MindMapInspector.tsx`, `src/App.tsx`; corresponding measured, local-copy, native-recovery and mind-map accessibility tests; the UI contract, context, plan index, previous review/fix reports and resolved native-range journal; ten fresh ignored screenshots. No source, test, index or commit changes were made by this auditor.
+
+---
+
+## Historical scoped recheck — `f2769dc`
 
 **Audited:** 2026-09-16. **Current overall: 24/24. Open findings: 0 blockers, 0 warnings. All 13 original findings are resolved within this audit scope.** The 21/24 and initial 12/24 reviews below remain historical audit trails; this section supersedes their current-status language.
 
@@ -187,3 +276,7 @@ Positive source evidence: loading library cards are decorative/noninteractive; f
 - Synthetic library/sharing/recovery screenshots at both widths in `current-access` and `current-dev`; existing contrast JSON at both widths. These local ignored assets contain synthetic fixtures and are intentionally excluded from published artifacts.
 
 **Recommendation count:** 13 findings: 1 blocker and 12 warnings. Three priority work packages are listed above; nine findings remain outside those packages. Re-review after remediation with fresh exact-revision evidence.
+
+## Final automated gate disposition
+
+The acceptance executor subsequently completed **1,533/1,533 browser cases in 57.1m**, at source/test candidate `73416723411ca2c5b98de090f6d5327ed9e076c7`, with no failure, timeout, skip, interruption or unrun case. Application UI is unchanged from reviewed `6d6dade`; the intervening six-file change concerns fixture readiness only. This executor evidence is separate from the auditor’s source and screenshot inspection above. Newly generated synthetic screenshots have not been relabeled as independently inspected. Actual native zoom, OS IME, assistive-technology speech, persisted BFCache and provider acceptance remain pending.

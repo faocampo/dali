@@ -120,7 +120,7 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
 
 ### Phase 3: Okta and Board Access
 
-**Goal**: As an internal member, I want to sign in through Okta, find my authorized boards and work within owner-controlled permissions, so that board content and images are available only to their owners and members granted access.
+**Goal**: As a member of the internal team, I want to sign in through Okta, find my authorized boards and work within owner-controlled permissions, so that board content and images are available only to their owners and members granted access.
 **Mode:** mvp
 **Depends on**: Phase 2
 **Requirements**: AUTH-01, BOARD-01, BOARD-02, BOARD-03, BOARD-04
@@ -132,7 +132,7 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
 
-**Plans**: 11/12 executed; plan 03-12 remains incomplete. The exact two-case smoke and 112-case access suite passed; two interrupted full-matrix attempts exposed dev fixture issues corrected through 995ec47 with focused evidence. Independent UI remediation precedes a fresh complete 1462-case browser matrix. Native 200% zoom, native OS/assistive-technology observations and actual-provider acceptance remain final-phase obligations. See the checkpoint for exact results and unrun counts.
+**Plans**: 11/12 executed; plan 03-12 remains incomplete. Automated task 03-12-01 passed at 7341672: exact two-case smoke, both typechecks, 105 unit tests, 112 server tests, production build, standalone 123-case access suite and complete 1533-case five-project browser matrix (57.1m, zero failures/timeouts/skips/interruptions/unrun). Earlier failed and interrupted attempts remain in the checkpoint. Independent verification is **human_needed (99/104)** with no proved implementation blocker. Ten items in 03-UAT.md cover actual-provider acceptance, native browser/input/accessibility observations and four flagged prohibition dispositions. Resume with `$gsd-verify-work 3`. Overall progress remains 2/13 accepted phases and 25/26 completed plans.
 
 Plans:
 **Wave 1**
@@ -393,7 +393,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 - [config.json](config.json) (fine granularity and enabled research, plan-check, and verification settings).
 - [research/SUMMARY.md](research/SUMMARY.md) (research findings and risks, including the final scope update that supersedes the earlier phase proposal).
 
-*Last updated: 2026-09-16 — Phase 3 research, UI contract and 12 implementation plans checked; ready to execute. Phase 1 and 2 acceptance is preserved.*
+*Last updated: 2026-09-17 — Phase 3 automated gate and independent verification complete; ten human acceptance items remain pending. Phase 1 and 2 acceptance is preserved.*
 
 ## Backlog
 

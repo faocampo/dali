@@ -52,6 +52,7 @@ Automated viewport, DOM focus, keyboard, composition-event routing and contrast 
 - Native browser 200% zoom: sharing and recovery dialogs keep the focused row and action reachable with vertical scrolling, and the library/header have no horizontal page overflow. A 490px viewport or CSS scaling does not establish this observation.
 - Native OS IME: compose actual text in board-name and member-search fields; composition Enter does not rename, grant or resume paused editing. During recovery, pending native canvas text remains protected.
 - Assistive-technology speech: dialog names, connected errors, progress and the acknowledged resumed-editing announcement are spoken at the correct time. Keyboard focus is contained and returns after successful authorization.
+- Native Firefox/WebKit clipboard: copy and paste native text, images and mind-map branches as Editor and Viewer, including delayed completion after access loss. Confirm permitted content fidelity and denied native/backend mutations; automated payload routing has separate evidence.
 - BFCache: actual history navigation is attempted in the browser suite. If the engine performs an ordinary reload instead of persisted restoration, retain that precise evidence gap; constructed `pageshow` coverage remains separately identified.
 
 ## Automated acceptance commands
@@ -80,7 +81,7 @@ The final route and UI evidence references [access-boundaries.spec.ts](../tests/
 | Actual confidential client registration and assignments | Not run / operator setup required |
 | Actual membership, issuer/subject and verified-email semantics | Not run / human_needed |
 | Actual-provider A1–A9 workflow | Not run / human_needed |
-| Native zoom, OS IME and assistive-technology speech | Not observed in automation; narrow checks above |
+| Native zoom, OS IME, assistive-technology speech and Firefox/WebKit clipboard | Not observed in automation; narrow checks above |
 | Synthetic application/protocol/regression gate | See Phase 3 checkpoint for measured results |
 
 Public outcome format: `Actual provider: accepted` or `Actual provider: failed at A<n> — generic failure`, plus the statuses of the specifically outstanding native checks. Never include configuration values or private evidence in this public record.

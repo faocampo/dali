@@ -2,15 +2,79 @@
 phase: 03-okta-and-board-access
 plan: "12"
 status: incomplete
-automated_task: pending-ui-remediation-and-full-browser-gate
+automated_task: passed-at-7341672
 actual_provider: not-run-human-needed
 ---
 
 # Phase 3 Plan 12 acceptance checkpoint
 
-This record is an incomplete automated handoff. Plan 12 and Phase 3 remain open, including task 03-12-01. All eight code-review findings were corrected through `033ecc0`; subsequent independent code and security reviews are recorded separately. The full browser matrix has now started twice and exposed dev-fixture compatibility failures. Test-only corrections are committed through `995ec47`. The orchestrator requested a pause for the 13 findings in the independent UI audit before restarting the full gate. The operator-controlled identity environment has not been supplied or accepted; no operator acceptance is requested at this stage.
+The automated gate for task 03-12-01 passed on source/test revision `73416723411ca2c5b98de090f6d5327ed9e076c7`. Plan 12 and Phase 3 remain incomplete: actual-provider acceptance and the native evidence gaps below are pending. Progress remains **2/13 accepted phases**, **25/26 completed plans**, and **11/12 Phase 3 plans**. Independent verification is **human_needed (99/104)**, with no proved implementation blocker. The ten remaining observations and review dispositions are saved in [03-UAT.md](03-UAT.md) (acceptance checklist); resume with `$gsd-verify-work 3`.
 
-## Current continuation evidence
+## Final automated evidence — 2026-09-17
+
+Fresh synthetic services executed the exact two-file production smoke, followed sequentially by all seven blocking commands. All five configured projects ran without a filter, required skip, changed timeout or weakened assertion. Source and tests remained frozen during execution.
+
+| Command / scope | Result |
+| --- | --- |
+| Exact production `@03-12-smoke` | 2/2 passed, 27.374s |
+| `npm run typecheck` | Passed in smoke and blocking chain |
+| `npm run typecheck:server` | Passed |
+| `npm test` | 105/105 passed, 12 files, 1.28s |
+| `npm run test:server` | 112/112 passed, 7 files, 7.68s |
+| `npm run build` | Passed, 8.67s; existing build warnings retained |
+| `npm run test:access` | 123/123 passed, 256.485s (4.3m) |
+| `npm run test:browser` | **1533/1533 passed**, 44 files, 3426.487s (57.1m) |
+
+| Full-matrix project | Selected / passed | Failed / timed out / skipped / interrupted / unrun | Sum of case execution time |
+| --- | ---: | --- | ---: |
+| dev | 357 / 357 | 0 / 0 / 0 / 0 / 0 | 558.849s |
+| prod | 351 / 351 | 0 / 0 / 0 / 0 / 0 | 573.095s |
+| prod-firefox | 351 / 351 | 0 / 0 / 0 / 0 / 0 | 1075.242s |
+| prod-webkit | 351 / 351 | 0 / 0 / 0 / 0 / 0 | 932.604s |
+| access | 123 / 123 | 0 / 0 / 0 / 0 / 0 | 250.578s |
+
+Case-time sums exclude runner setup/teardown and are not per-project wall-clock durations. The outer command exited zero. An additive artifact reporter captured every status and annotation; final claims were checked against the entire run, not the latest console lines. Ignored synthetic evidence is retained in `.gsd/acceptance-03-guarded-ui-7341672/1789646405743-1533/`; standalone access captures are in the sibling `1789646148570-123/` directory. Runtime logs remain outside publishable history.
+
+Five `bfcache-observation` annotations each report **ordinary history reload**. Genuine persisted BFCache restoration remains unobserved. Non-Chromium clipboard cases retain their explicit native-handler payload-transport/OS-integration limitations. Native browser 200% zoom, native OS IME, assistive-technology speech and actual-provider acceptance remain unverified. Synthetic screenshots and CSS-zoom checks do not establish those observations.
+
+### Final readiness correction and host-interrupted attempt
+
+Test-only commit `7341672` adds exact singleton readiness at three native reload sites, waits for authenticated library cards and actual authorized preview images before synthetic setup replaces the document, and waits for the existing Saved acknowledgement before the fill-persistence reload. Persisted IDs/model/content, real session expiry, deep-link destinations, canaries, strict console/page-error collectors and protected-pixel assertions remain intact. No production file, project selection or default error allowance changed.
+
+The library timing diagnosis reproduced WebKit cancellation errors with 24 synthetic previews and immediate heading-only navigation. The normal visible card-link click and navigation after all previews rendered both passed (2/2, 23.6s). The affected unchanged behavioral checks then passed in all four modes: 48 cases plus four populated-library preludes, **52/52 in 2.2m**. An earlier focused launcher stopped before any test because the temporary seed retained an unused variable; that diagnostic-only variable was removed. Temporary diagnostics were removed before the committed inventory was refreshed.
+
+The first full run at `7341672` was interrupted after repeated setup timeouts. It selected 1533 cases and ran for 35808.407s (9.9h):
+
+| Project | Passed | Failed | Timed out | Interrupted | Unrun |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| dev | 357 | 0 | 0 | 0 | 0 |
+| prod | 326 | 1 | 24 | 0 | 0 |
+| prod-firefox | 127 | 3 | 12 | 1 | 208 |
+| prod-webkit | 0 | 0 | 0 | 0 | 351 |
+| access | 0 | 0 | 0 | 0 | 123 |
+| Total | **810** | **4** | **36** | **1** | **682** |
+
+The earliest failure was the production long-library rename setup waiting for `Your boards`, with `Signing you in…` still displayed. Its 926.710s duration aligned with a 926s host sleep interval; repeated failures followed repeated sleep/wake cycles. Raw host diagnostics remain outside the repository. Tail-only interim green claims missed prior failures and were withdrawn; the full status aggregate above is authoritative. This attempt remains failed/interrupted evidence.
+
+The exact 40 failed/timed-out project-qualified cases plus two populated-library preludes passed unchanged under a foreground-command idle-sleep guard: **42/42, 141.377s (2.4m)**. The subsequent fresh smoke and full gate above used the same scoped `/usr/bin/caffeinate -i` guard. Its process and idle-sleep assertion were verified during execution and automatically released on teardown. Global power settings were unchanged. All synthetic listeners were confirmed stopped; no user-board listener was touched.
+
+## Intervening executed attempts retained
+
+These results preserve the failed and interrupted history that preceded the final pass. None independently substitutes for the final full gate.
+
+| Revision | Smoke / types / unit / server / build / standalone access | Full browser outcome |
+| --- | --- | --- |
+| `8320dd1` | 2/2, 25.4s; both types; 102, 1.17s; 110, 7.02s; 8.12s; 121/121, 4.0m | Not started; held for confirmed narrow CSS corrections |
+| `f2769dc` | 2/2, 24.2s; both types; 102, 1.07s; 110, 7.25s; 7.97s; 121/121, 4.0m | 1507 selected; 1069 passed, 53 failed, 1 interrupted, 384 unrun, 52.7m |
+| `2d4a7aa` | 2/2, 28.9s; both types; 105, 1.20s; 112, 7.39s; 8.28s; 123/123, 4.3m | 1533 selected; 58 passed, 0 failed, 1 interrupted, 1474 unrun, 1.9m; held for proven local-copy invoker focus defect |
+| `6d6dade` | 2/2, 28.7s; both types; 105, 1.29s; 112, 7.44s; 8.94s; 123/123, 4.4m | **All 1533 executed**: 1525 passed, 8 failed, 0 skipped/interrupted/unrun, 54.9m |
+| `7341672`, first attempt | 2/2, 26.6s; both types; 105, 1.28s; 112, 7.43s; 8.78s; 123/123, 4.3m | Host-interrupted outcome and exact project counts above |
+
+At `f2769dc`, per-project passed/failed/interrupted/unrun counts were dev **345/6/0/0** (351), prod **340/5/0/0** (345), Firefox **333/12/0/0** (345), WebKit **51/30/1/263** (345), access **0/0/0/121** (121). At `2d4a7aa`, dev was **58/0/1/298**; prod, Firefox and WebKit each had 351 unrun, and access had 123 unrun. At `6d6dade`, dev was **356 passed / 1 failed**, prod **351/0**, Firefox **351/0**, WebKit **344/7**, access **123/0**. Every `6d6dade` failure was retained: one native singleton readiness assertion and seven WebKit pre-navigation/persistence request-lifetime failures. The final guarded run executed their unchanged semantic assertions successfully.
+
+The intervening production/UI/native recovery fixes and independent review decisions are documented in the review, UI-fix, security and regression records. This checkpoint records execution scope rather than replacing those audits.
+
+## Earlier continuation through `995ec47`
 
 The seven-command gate ran sequentially on synthetic services. Implementation remained at `033ecc0`; fixture correction `1a55d14` preceded the second run. Both runs reached the full browser command. Selection is **1462 tests in 44 files**: dev 342, production Chromium 336, Firefox 336, WebKit 336, access 112. Unexecuted cases are recorded explicitly below; selection is not execution evidence.
 
@@ -155,9 +219,9 @@ Task 03-12-02 remains **not run / human_needed**. Its precondition requires an o
 
 After independent review and private setup, the agent exercises the configured application and records generic accepted/failed-step status only. Operator values, real traces, actual identities and screenshots stay in the operator-controlled evidence store. A2 requires actual directory trust/uniqueness semantics; synthetic claims cannot satisfy it. Additional manual observations are limited to the native gaps listed above.
 
-Descriptor-less prohibitions remain **flagged-unverified** where the workflow has no wired deterministic check. The public staged content was reviewed for organization neutrality and contains synthetic fixtures only. Final independent threat review remains required.
+Descriptor-less prohibitions remain **flagged-unverified** where the workflow has no wired deterministic check. The public staged content was reviewed for organization neutrality and contains synthetic fixtures only. Final independent threat review records 31/31 closed threats; the four prohibition dispositions remain pending.
 
-## Handoff and self-check
+## Historical execution handoff and self-check
 
 The browser/build slot was released after the current fixture corrections and focused dev recovery checks. Current automatic task completion is 0/1; plan completion remains 0/2 because the automated task still requires UI remediation and the complete matrix, followed by the actual-provider checkpoint. Overall tracking remains 2/13 phases and 25/26 plans complete.
 
@@ -166,3 +230,9 @@ All named implementation/test/checklist files and six task commits were verified
 Continuation self-check: current implementation commit, both exact smoke cases, all 110 access case results and all six refreshed screenshots were verified present. No implementation/test mutation or required skip was introduced. Parent-owned review artifacts remain untouched.
 
 Latest continuation self-check: `1a55d14` and `995ec47`, the exact smoke and 112-case access logs, both interrupted matrix logs, focused dev results and six current-dev screenshots were verified present. No tracked files were deleted. Parent-owned audit artifacts were preserved. The previously quoted 110-case self-check remains historical.
+
+## Final verification handoff
+
+The independent verifier reconciled all 1,533 browser events and inspected implementation, 104 roadmap/plan truths, 41 required artifacts and 28 links. Result: **human_needed, 99/104 verified**, zero established implementation blockers. Four truths retain unobserved native behavior and actual-provider acceptance remains uncertain. Three named behavioral unit probes and the 17-case provider self-test also passed independently. Code review has no open findings; security is 31/31 closed; UI is 24/24 for the unchanged application.
+
+Current automatic task completion is **1/1**; plan task completion is **1/2**. Plan 03-12 and Phase 3 remain open. The historical handoff immediately above predates remediation and the complete passing gate. The current acceptance checklist is `03-UAT.md`: actual provider, native zoom, genuine BFCache, OS IME, assistive-technology speech, Firefox/WebKit native clipboard and four explicit prohibition dispositions. All ten are pending. Run `$gsd-verify-work 3` to record observations and resolve them.

@@ -1,8 +1,24 @@
 ---
 phase: 03-okta-and-board-access
-reviewed: 2026-09-16T22:03:02Z
+reviewed: 2026-09-17T01:48:19Z
 depth: standard
-source_head: f2769dcea41a6bf610eb4a45f35cb563d5bcc9c1
+source_head: 73416723411ca2c5b98de090f6d5327ed9e076c7
+test_head: 73416723411ca2c5b98de090f6d5327ed9e076c7
+application_head: 6d6dade1ea574e41123c252f36499e465adf5811
+reviewed_readiness_delta_base: 6d6dade1ea574e41123c252f36499e465adf5811
+reviewed_readiness_delta_files: 6
+reviewed_readiness_delta_list:
+  - tests/fixtures.ts
+  - tests/authentication.spec.ts
+  - tests/board-access.spec.ts
+  - tests/canvas-feedback.spec.ts
+  - tests/community.spec.ts
+  - tests/session-recovery.spec.ts
+prior_cumulative_files_reviewed: 97
+final_review_baseline: f2769dcea41a6bf610eb4a45f35cb563d5bcc9c1
+final_review_delta_files: 20
+review_method: cumulative_standard_review_with_current_source_and_delta_inspection
+runtime_validation: passed_independent_acceptance_executor
 reviewed_ui_residual_delta_files: 2
 reviewed_ui_delta_files: 15
 reviewed_sharing_remediation_files: 2
@@ -17,7 +33,7 @@ resolved_prior_findings: 7
 diff_base: 3b48c837e73203712020c496352c908a4cc87d3f
 reviewed_test_delta: f7be2f840b1110dab2b73dee4a31148cf95cbf1e
 reviewed_followup_test_delta: 1d3c9cb5bfd246c86a4bb3cb51f9ded0d0a3b84f
-files_reviewed: 92
+files_reviewed: 98
 files_reviewed_list:
   - docs/access-acceptance.md
   - package.json
@@ -52,6 +68,7 @@ files_reviewed_list:
   - src/boards/operations.ts
   - src/boards/preferences.ts
   - src/canvas/BlockSuiteCanvas.tsx
+  - src/canvas/MindMapInspector.tsx
   - src/canvas/account/blob-source.test.ts
   - src/canvas/account/blob-source.ts
   - src/canvas/account/board-doc.ts
@@ -61,6 +78,7 @@ files_reviewed_list:
   - src/canvas/account/doc-source.ts
   - src/canvas/account/mutation-guard.test.ts
   - src/canvas/account/mutation-guard.ts
+  - src/canvas/account/outbox.test.ts
   - src/canvas/account/outbox.ts
   - src/canvas/blocksuite-editor.ts
   - src/canvas/export-board.test.ts
@@ -85,14 +103,18 @@ files_reviewed_list:
   - tests/board-library.spec.ts
   - tests/board-roles.spec.ts
   - tests/board-sharing.spec.ts
+  - tests/board-title.spec.ts
   - tests/canvas-arrangement.spec.ts
   - tests/canvas-editing.spec.ts
+  - tests/canvas-feedback.spec.ts
+  - tests/canvas-view.spec.ts
   - tests/community.spec.ts
   - tests/connector-labels.spec.ts
   - tests/dali-menu.spec.ts
   - tests/fixtures.ts
   - tests/image-export.spec.ts
   - tests/image-import.spec.ts
+  - tests/image-visual-edits.spec.ts
   - tests/local-board-import.spec.ts
   - tests/mindmap-accessibility.spec.ts
   - tests/mindmap-collapse.spec.ts
@@ -122,14 +144,53 @@ status: clean
 # Phase 3: Code Review Report
 
 **Depth:** standard, with relevant cross-module call traces
-**Cumulative scope:** all 92 configured files
-**Implementation snapshot:** `f2769dcea41a6bf610eb4a45f35cb563d5bcc9c1` (UI residual CSS/test correction; previous cumulative implementation and sharing remediation reviews retained)
+**Cumulative scope:** 98 distinct paths: the retained 97-file cumulative review plus newly changed `tests/canvas-feedback.spec.ts`
+**Source/test snapshot:** `73416723411ca2c5b98de090f6d5327ed9e076c7` (six-file readiness delta); application implementation remains at `6d6dade1ea574e41123c252f36499e465adf5811` (local-copy invoker focus correction)
 **Remediation rereview:** all 19 files changed in `43bd9c5..12a2184`, read in full, retaining the original complete phase review
-**Final delta:** three source/test files in `033ecc0` and the acceptance document in `7360be0`; checkpoint/tracking deltas reviewed as supporting context
+**Current delta:** six test/fixture files in `6d6dade..7341672`, read in full; earlier final deltas and checkpoint/tracking provenance are retained below
 **Additional test-only reviews:** `1a55d14` (two files) and `995ec47` (eight files); sharing source/test delta `7c8982c` (three files)
 **Status:** clean — all seven original findings and follow-up CR-07, CR-08 and CR-09 resolved; no open finding in the pinned scope
 
 ## Narrative Findings (AI reviewer)
+
+### Final fixture readiness delta at 7341672
+
+**Result: clean. Open BLOCKER: 0. Open WARNING: 0.** Independently inspected the exact six-file delta and all six current files, tracing readiness into `src/boards/BoardLibrary.tsx` and save-state presentation. No introduced defect or weakened semantic oracle was proved. The historical 97-file review and all ten resolved findings remain retained. `tests/canvas-feedback.spec.ts` newly enters the phase delta, so the current cumulative inventory is 98 paths. Unchanged files retain their earlier review provenance; this bounded review does not claim a fresh reread of all 98 files.
+
+- `tests/fixtures.ts:6-18,70` preserves the exact authenticated heading and additionally requires successful real session/library responses, disappearance of the loading state, the expected authorized card count and the expected thumbnail-image count before the fixture creates and navigates to its board. In `src/boards/BoardLibrary.tsx:14-32`, an image is rendered only after the authorized thumbnail response passes account/type checks and its complete blob is read. Thus the wait covers the protected network reads that the following fixture navigation previously interrupted. These are setup predicates, not an assertion of thumbnail decoding or exact board identity; dedicated role/source/content assertions remain necessary and unchanged. The default library filter is All, matching the helper query, and all new call sites use the configured origin. Serial fixture setup supplies stable rows with no injected unavailable previews at this boundary.
+- `tests/authentication.spec.ts:73-80` settles that library before deliberately expiring the actual browser cookie. The real `/api/session` 401, cleared fixture identity and signed-out reload assertions remain. `tests/board-access.spec.ts:28,60,99,126,177,220` uses the same wait during Owner setup, before creating its test board or installing protected-resource fault injection. The isolated empty-library service, foreign-account denial path and Editor-intent tests retain their own entry flows. The helper neither creates grants nor changes the authenticated member, and it does not run inside the delayed-resource/account-switch recovery scenarios.
+- `tests/community.spec.ts:52` and `tests/session-recovery.spec.ts:90,268` add an exact singleton-root wait before the existing attached/visible and model/geometry checks. They do not select the first of multiple roots or remove duplicate detection. Persistent duplication still fails. Sticky-note board/object/text equality, independent server export comparison, exact reopened model, bounded recovery controls and journal board scope remain asserted.
+- `tests/canvas-feedback.spec.ts:41-44` retains the immediate native fill-alpha assertion, waits for the existing Saved indicator, reloads, and asserts the same persisted alpha. The added save precondition does not substitute for the reopened-value oracle. Pending/replay/interrupted-acknowledgment scenarios remain separately covered by their unchanged tests.
+- The exact delta changes no application code, error allowance, error collector, test selection or skip condition. No temporary thumbnail seed or diagnostic instrumentation appears in the committed delta. Source review alone does not establish that the previous runtime failures are gone.
+
+**Executor-attributed evidence:** The parent reports the complete prior `6d6dade` matrix took 54.9 minutes with 1,525 passed, 8 failed and zero skipped/unrun: dev 356/357, production Chromium 351/351, Firefox 351/351, WebKit 344/351 and access 123/123. The failures comprised six WebKit thumbnail-navigation errors, one WebKit push interrupted by reload and one development duplicate-root timing failure. A controlled 24-thumbnail comparison reproduced immediate-heading navigation failure while normal card navigation and settled-library navigation passed 2/2 in 23.6 seconds. The correction then passed a focused 52/52 in 2.2 minutes, including twelve unchanged behaviors and one temporary 24-thumbnail seed per four browser variants; both static checks passed. These results are supplied by the executor, not rerun by this reviewer.
+
+**Final acceptance remains pending:** The independent acceptance executor owns the fresh 1,533-case matrix at `7341672`; no full-gate pass is claimed here. Actual-provider registration/claim policy, native OS zoom, IME, assistive-technology speech and genuine BFCache evidence remain separate. The four descriptorless prohibitions remain independent acceptance requirements. This reviewer ran no tests, build, browser, listener or index action and changed only this report.
+
+### Final local-copy focus delta at 6d6dade
+
+**Result: clean. Open BLOCKER: 0. Open WARNING: 0.** The exact one-line change in `src/boards/BoardLibrary.tsx:143` explicitly focuses the Copy local boards button before opening its dialog. `LocalBoardCopyDialog` captures `document.activeElement` before `showModal()` and restores that connected element during cleanup. The trigger remains mounted outside the refreshing board grid, so closing the dialog can restore focus to the correct invoker across mouse and keyboard activation. The change matches the existing action/share trigger pattern and leaves copy execution and authorization unchanged. No new defect was proved.
+
+The parent attributes the original WebKit reproduction (2/2 failing cases), corrected four-engine focused run (8/8 passing in 49.8s), and both static checks to the UI auditor/fix executor. This reviewer inspected the exact delta and its dialog lifecycle without executing those checks. The complete fresh five-project matrix is running under the acceptance executor; final results remain pending. The exact 97-file inventory, cumulative method below, and all ten historical finding closures are retained.
+
+### Final current-source review at b5698b2
+
+**Result: clean. Open BLOCKER: 0. Open WARNING: 0.** All ten historical findings below remain resolved. No new defect was proved by this source review.
+
+The scope is the complete explicit 97-file inventory from `3b48c837e73203712020c496352c908a4cc87d3f` to the pinned HEAD, with planning, lock and deleted-file exclusions already applied. It is a cumulative standard-depth review: the prior complete 92-file review is retained; current application/server modules and their relevant call chains were inspected again, and all twenty changed paths since `f2769dc` were inspected in current source or full delta context. Unchanged regression files retain their earlier review provenance. This does not claim a fresh full-file reread of every unchanged test or the complete stylesheet. The five added inventory paths are `src/canvas/MindMapInspector.tsx`, `src/canvas/account/outbox.test.ts`, `tests/board-title.spec.ts`, `tests/canvas-view.spec.ts` and `tests/image-visual-edits.spec.ts`.
+
+- Authentication and authorization tracing covered configured issuer/client/callback policy, verified internal identity, account-bound session guards, current-role checks, receipt authorization, document/blob/export reads, and commit-time reauthorization in board actions, grants and imports. Transactional mutation and acknowledgment paths preserve the previously reviewed account and board boundaries.
+- `src/canvas/account/outbox.ts` converts new blob records to exact bytes and MIME before opening the IndexedDB transaction. Replay accepts both legacy Blob records and the new byte representation. Pending memory records survive failed preservation and are cleared only after the corresponding acknowledgment. The added unit oracle and recovery fixture compare payload bytes and MIME, alongside the existing identity and acknowledgment gates.
+- `src/auth/session.ts` captures the inline range before suspension, restores only the captured account/board generation and exact newly mounted native editor, waits for native readiness, and checks range bounds. Successful restoration becomes terminal before publishing recovery: it stops observation and cancels the queued animation frame. Cleanup and stale-generation checks also stop late work. This addresses the resolved debugger's queued second-mount/select-all cause without weakening access checks.
+- The inspector/header changes retain a stable save-status footprint, commit font size only when changed, constrain the inspector body to its scrollable region, preserve its header, and explicitly focus mouse-activated library and sharing controls. Current markup and changed CSS selectors were cross-checked with the affected layout and focus assertions.
+- The OIDC rotation additions use an opt-in synthetic provider control, a still-live JWKS cache, independently verified signatures, and unchanged application/provider instances. Unknown-key rejection asserts no session/member/grant mutation. The test controls do not enter the production server configuration.
+- Fixture review covered error-object identity collection, authenticated-library readiness before a second navigation, account-board URL identity, singleton editor assertions, and browser-specific clipboard handling. The new parser, canceled-image and revoked-blob allowances retain exact diagnostics plus operation timing, URL/count or request-failure checks and page-error rejection. Existing successful byte/DOM/authorization assertions remain. The WebKit context workaround closes its isolated browser when the context closes and restores the worker fixture override.
+
+`03-REGRESSION-FIX.md`, the fixture handoff for `ea7e1f2`, and the resolved native-range debug journal were supporting context. Their focused passes and regression isolation are executor-attributed evidence. Earlier partial-run failures and pending-range notes in those handoffs are historical and are superseded only where the later source/debug evidence explicitly addresses them.
+
+This reviewer ran no tests, build, browser, listener or index operation and modified only this report. The current full five-project matrix remains pending independent executor evidence at review time. Its reported 1,533 selected tests across 44 files describe inventory, not executed results. Source-level cleanliness does not complete actual-provider registration/claim-policy checks, genuine BFCache restoration, native OS zoom, IME or assistive-technology acceptance. These remaining evidence boundaries are not reported as implementation defects.
+
+### Historical cumulative review and resolved findings
 
 The eight original remediation commits address the six initial BLOCKER findings and separate test-reliability WARNING. Follow-up commit `033ecc0` resolves CR-07. Independent source review confirms the corrected contracts and their relevant consumers. The subsequent sharing delta `7c8982c` introduced two proved recovery-path defects. Independent rereview of both complete changed files in `b4877ce` confirms both are resolved as detailed below. No new defect was proved in this bounded remediation. Final acceptance remains open.
 
@@ -274,7 +335,7 @@ The two-file test-only commit `1a55d14` was read in full and traced into the unc
 - The automatic fixture at `tests/fixtures.ts` continues to collect all errors and reject unmatched messages after the test. No global suppression or listener removal was introduced. The expected message is a specific console prefix under the existing substring-matching contract, rather than an allowance for arbitrary stale errors or pageerrors.
 - The parent reports both typechecks and 16 focused dev cases passing in 41s. These execution claims are attributed to the executor; this reviewer ran no tests or services. The first full dev run exposed fixture HMR handshake errors, and the complete 1462-case matrix is reported rerunning. Selection and focused passes do not establish full-matrix completion.
 
-## Coverage, evidence limits and deltas
+## Historical coverage, evidence limits and deltas
 
 - The original standard-depth review read all 92 listed files. This rereview preserves the full scope and rereads all 19 remediation files, plus relevant consumers and native ZIP-transformer code. No scope was dropped.
 - Commits reviewed: `8654e1c`, `536f5d3`, `b1b262b`, `19528cd`, `2cfd25c`, `f635a62`, `46a8402`, `12a2184`.
@@ -289,4 +350,8 @@ The two-file test-only commit `1a55d14` was read in full and traced into the unc
 - This reviewer changed only this report and performed no implementation/test edits, commits or runtime validation during rereview.
 
 _Reviewer: gsd-code-reviewer_
-_Reviewed: 2026-09-16T22:03:02Z_
+_Reviewed: 2026-09-17T01:48:19Z_
+
+## Final execution evidence, recorded separately from source review
+
+The acceptance executor completed the unchanged source/test candidate `73416723411ca2c5b98de090f6d5327ed9e076c7` on 2026-09-17. Both type checks, 105 unit tests, 112 server tests and the production build passed. The full browser matrix passed **1,533/1,533 cases in 57.1m**, with zero failures, timeouts, skips, interruptions or unrun cases. The orchestrator reconciled every result against the completed event record. These are execution results supplied by the executor; the independent reviewer performed source review. Historical pending statements retain their audit-time meaning. See `03-12-CHECKPOINT.md` for distinct runs and remaining acceptance obligations.

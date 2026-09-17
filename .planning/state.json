@@ -70,9 +70,9 @@
     }
   ],
   "next": {
-    "command": "$gsd-execute-phase 3",
-    "label": "Resolve UI findings, then complete plan 03-12 final gate",
-    "reason": "112 access cases passed; interrupted 1462-case matrix exposed corrected dev fixtures; UI remediation and complete matrix pending; 2/13 phases accepted and 25/26 plans complete; actual-provider pending"
+    "command": "$gsd-verify-work 3",
+    "label": "Complete the ten Phase 3 acceptance items",
+    "reason": "Full 1533-case gate passed at 7341672; independent verification human_needed (99/104), no implementation blockers; actual-provider/native observations and four prohibition dispositions pending in 03-UAT.md"
   },
-  "updated_at": "2026-09-16T21:22:01.636696+00:00"
+  "updated_at": "2026-09-17T13:43:09.794134+00:00"
 }

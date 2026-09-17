@@ -8,14 +8,15 @@ threats_closed: 31
 asvs_level: 1
 block_on: high
 created: "2026-09-16"
-source_head: 8320dd1eae58b28444237f464b8cb7a1d4d19156
-style_delta_head: f2769dc
-documentation_head: 23db4248aebcfdb98d6eb75ac5c24bfd83ec8d2b
+source_head: 73416723411ca2c5b98de090f6d5327ed9e076c7
+application_head: 6d6dade1ea574e41123c252f36499e465adf5811
+baseline_audit_head: 8320dd1eae58b28444237f464b8cb7a1d4d19156
+previous_style_delta_head: f2769dc
 ---
 
 # Phase 3 — Security
 
-The independent typed security auditor verified all 31 declared mitigation boundaries at the pinned source revision. This ASVS level 1 result establishes mitigation presence. Full browser execution, actual-provider acceptance and native observations have separate gates in `03-12-CHECKPOINT.md` and `docs/access-acceptance.md`.
+The independent typed security auditor verified all 31 declared mitigation boundaries, then reviewed the affected implementation and fixtures through source `73416723411ca2c5b98de090f6d5327ed9e076c7` (application unchanged from `6d6dade`). All 31 threats remain CLOSED with zero open threats. This ASVS level 1 result establishes mitigation presence. Full browser execution, actual-provider acceptance and native observations have separate gates in `03-12-CHECKPOINT.md` and `docs/access-acceptance.md`. Earlier evidence references below retain their original pinned revisions; the final delta section records current evidence.
 
 ## Trust Boundaries
 
@@ -118,3 +119,48 @@ The typed security auditor independently checked the full affected source throug
 The remaining 23 threat implementations are unchanged and retain the source evidence above. No tests, builds, browsers or listeners were run by the auditor. The final full matrix and actual-provider/native acceptance remain separate gates. Historical raw pre-install provenance timing remains unverified; dependency files and the earlier 58-tarball integrity result are unchanged.
 
 Subsequent commit `f2769dc` changes only scoped styling and its measured test in `src/index.css` and `tests/accessibility-access.spec.ts`. Independent code and UI reviews inspected the full delta and found no open findings. It changes no identity, permission, operation, recovery or network logic; the 31 mitigation dispositions remain applicable.
+
+## Final cross-browser and recovery security delta
+
+The typed security auditor reviewed the complete affected delta from `f2769dc` through `b5698b2`, followed by the one-line application change in `6d6dade`. The result remains **31/31 CLOSED, zero open threats, ASVS level 1 with high blocking threshold**. All 31 dispositions are mitigate: 30 high and one medium. No accepted risks or unregistered flags were introduced.
+
+| Threat | Reviewed control and evidence | Result |
+|---|---|---|
+| T-03-01 | `tests/oidc-provider.ts` adds opt-in signed-key fixture controls; application authentication still uses ordinary OIDC and rejects production bypass configuration. | CLOSED |
+| T-03-02 | `server/auth/oidc.test.ts` now rejects a validly signed token with an unpublished key ID, denies callback replay, and proves a second JWKS request after key rotation in the same running application/issuer. Library signature validation, single-use state and PKCE remain intact. | CLOSED |
+| T-03-03 | Stable issuer/subject identity, session rotation and absolute expiry controls remain intact during rotated-key authentication. | CLOSED |
+| T-03-05 | Revoked preview URLs remain inaccessible. The WebKit expected-resource diagnostic is limited to the exact intentionally revoked URL and fetch window, with rejection and cleanup assertions retained. | CLOSED |
+| T-03-12 | Protected runtime mounting still follows authorization; native recovery is bound to the current account, board and runtime generation. | CLOSED |
+| T-03-19 | Explicit dialog invoker focus and stable control geometry retain named confirmations and existing operation handling. `BoardLibrary.tsx:143` focuses Copy local boards before opening; `LocalBoardCopyDialog.tsx:44–47` captures the invoker, focuses the heading and restores the connected invoker. | CLOSED |
+| T-03-20 | Native read-only and current-scope mutation guards remain in place. Focus recovery does not authorize editing. | CLOSED |
+| T-03-22 | `src/canvas/account/outbox.ts` retains account/board/generation namespaces and in-memory records after conversion or storage failure; new image journal records use bytes plus MIME. | CLOSED |
+| T-03-23 | Replay accepts legacy Blob records, obtains a fresh writable descriptor, uploads images first, retains expected-account headers and deletes only acknowledged records. | CLOSED |
+| T-03-24 | `src/auth/session.ts` rechecks current scope after asynchronous work. Native restoration now binds to the exact editor instance and terminates queued frame/observer work after success; cross-tab and stale-session barriers remain. | CLOSED |
+| T-03-25 | `BoardLibrary.tsx:144` retains account-keyed dialog mounting. `LocalBoardCopyDialog.tsx:22,32,35,50,55–59` retains current-session authorization, initially unselected inventory, explicit selection and authorization before each copy. | CLOSED |
+| T-03-28 | Bounded review of the 25-file final delta and its commit messages found zero examined private-data patterns. Synthetic provider controls, generic diagnostics and operator-owned configuration boundaries remain. | CLOSED |
+| T-03-29 | Actual-provider, native browser zoom, OS IME, assistive-technology speech and observed BFCache restoration remain separate acceptance obligations. Cross-engine DataTransfer clipboard coverage explicitly leaves native OS clipboard integration unverified. | CLOSED |
+| T-03-30 | The strict error collector retains raw diagnostics and actual Error identity. Narrow allowances require exact injected phases and state/canary oracles. The independent 189-denial matrix remains intact. | CLOSED |
+
+The other 17 threat implementations retain their earlier reviewed closures. No server route, dependency or authorization policy changed in this final delta. The original 58-tarball integrity and lifecycle review remains applicable; historical raw pre-install provenance timing remains unattested.
+
+The security auditor performed source review only and ran no runtime checks. Focused execution evidence belongs to the regression report and executor checkpoint. The fresh complete browser gate at `6d6dade` remains pending as this audit is recorded. The most recent genuine history observation was ordinary reload; persisted BFCache restoration was not observed.
+
+## Final fixture-readiness delta — 7341672
+
+After the complete `6d6dade` matrix reported 1,525 passes and eight failures, commit `7341672` changes six test files only. The typed security auditor independently reviewed that exact delta and retained **31/31 CLOSED, zero open threats, no accepted risks and no unregistered flags**. Production implementation, dependencies, server authorization and the independent denial matrix are unchanged.
+
+| Threat | Reviewed delta evidence | Result |
+|---|---|---|
+| T-03-01 | `tests/fixtures.ts:68–74` retains ordinary signed-provider login and guarded API creation; the new readiness helper uses authenticated reads. | CLOSED |
+| T-03-03 | `tests/authentication.spec.ts:75–80` waits for library completion before expiring the cookie, then preserves the real endpoint's 401 and return-to-sign-in assertions. | CLOSED |
+| T-03-05 | `tests/fixtures.ts:6–18` requires successful session/catalog responses, expected-account headers, and exact card/preview counts from the authorized catalog. `src/boards/BoardLibrary.tsx:20–31` retains board-specific same-origin path, expected account, PNG type, bounded bytes, cancellation and URL disposal. | CLOSED |
+| T-03-12 | Three reload checks now require one native root before existing assertions. `tests/board-access.spec.ts:207–212` retains zero editor hosts, zero blob images and absent protected canary after denial. | CLOSED |
+| T-03-23 | `tests/session-recovery.spec.ts:80–92` retains interrupted acknowledgment, independent authorized export, equal reopened content and unchanged native model; the singleton check supplements them. | CLOSED |
+| T-03-24 | Fixture setup completes before deliberate navigation; existing revocation, cancellation-phase, account-switch and stale-response assertions are unchanged. | CLOSED |
+| T-03-30 | `tests/fixtures.ts:83–113` retains automatic strict error collection without new allowances, skips or response substitutions. `tests/canvas-feedback.spec.ts:42` additionally requires Saved before a persistence reload. | CLOSED |
+
+The remaining 24 threat dispositions retain their prior closures. The auditor ran no tests, builds, browsers, listeners or mutations. The executor recorded 52/52 focused passes across four browser variants (including four populated-library setup cases) and both type checks; the fresh complete gate remains pending at this audit. Operator/provider and native-observation limits remain unchanged.
+
+## Final automated gate disposition
+
+After the independent source audit above, the acceptance executor completed the unchanged `7341672` candidate: both type checks, 105 unit tests, 112 server tests, production build, standalone access **123/123**, and complete browser matrix **1,533/1,533 (57.1m)** passed. There were zero failed, timed-out, skipped, interrupted or unrun cases. The orchestrator reconciled the full event record. Earlier pending statements describe their audit-time state; this separately attributed execution evidence closes the automated gate. Actual-provider and native observations retain their checkpoint status.
