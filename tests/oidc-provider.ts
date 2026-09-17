@@ -1,4 +1,4 @@
-/** Test-only signed OIDC service. Production entrypoints must never import this module. */
+/** Synthetic signed OIDC for tests/local development. Production entrypoints must never import this module. */
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -34,6 +34,7 @@ const escaped = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"'
 export async function createOidcProvider(options: {
   port?: number; clients: ClientRegistration[]; now?: () => number;
   signingKeyControls?: true; onIdToken?: (token: string) => void;
+  signInPage?: { title: string; notice: string };
 }) {
   const now = options.now ?? Date.now;
   const app = Fastify({ logger: false, bodyLimit: 16_384 });
@@ -97,7 +98,9 @@ export async function createOidcProvider(options: {
         const target = new URL(url); target.searchParams.set('fixture_identity', name);
         return `<p><a href="${escaped(target.pathname + target.search)}">${identity.name}</a></p>`;
       }).join('');
-      return reply.type('text/html').send(`<!doctype html><html lang="en"><title>Synthetic sign-in</title><h1>Choose a synthetic account</h1>${links}</html>`);
+      const title = escaped(options.signInPage?.title ?? 'Synthetic sign-in');
+      const notice = options.signInPage ? `<p>${escaped(options.signInPage.notice)}</p>` : '';
+      return reply.type('text/html; charset=utf-8').send(`<!doctype html><html lang="en"><meta charset="utf-8"><title>${title}</title><h1>Choose a synthetic account</h1>${notice}${links}</html>`);
     }
     reply.setCookie(IDENTITY_COOKIE, selected, { httpOnly: true, sameSite: 'lax', path: '/' });
     for (const [code, value] of codes) if (value.expiresAt <= now()) codes.delete(code);

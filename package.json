@@ -20,10 +20,12 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
+    "dev:ui": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:dev": "node --test --test-concurrency=1 scripts/dev-startup.test.mjs",
     "typecheck": "tsc --noEmit",
     "test:browser": "playwright test",
     "server:build": "tsc -p tsconfig.server.json",

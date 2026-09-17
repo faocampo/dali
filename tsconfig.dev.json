@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.server.json",
+  "compilerOptions": { "outDir": ".gsd/dev-build" },
+  "include": ["scripts/dev-server.ts", "server/**/*.ts", "tests/oidc-provider.ts"],
+  "exclude": ["server/**/*.test.ts"]
+}

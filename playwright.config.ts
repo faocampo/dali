@@ -29,13 +29,15 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: 'npm run dev -- --host 127.0.0.1 --port 5494 --strictPort',
+      command: 'npm run dev:ui -- --host 127.0.0.1 --port 5494 --strictPort',
+      env: { DALI_API_PROXY_TARGET: 'http://127.0.0.1:5495' },
       url: DEV_URL,
       reuseExistingServer: false,
       timeout: 180_000,
     },
     {
       command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 5493 --strictPort',
+      env: { DALI_API_PROXY_TARGET: 'http://127.0.0.1:5497' },
       url: PROD_URL,
       reuseExistingServer: false,
       timeout: 300_000,

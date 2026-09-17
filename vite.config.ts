@@ -18,12 +18,16 @@ import { resolve, relative } from 'node:path';
 //     serves hundreds of individual .ts files per page load.
 /** Optional generic asset base; operator values stay outside this repository. */
 const base = process.env.DEPLOY_BASE ?? '/';
+const apiTarget = process.env.DALI_API_PROXY_TARGET ?? 'http://127.0.0.1:3000';
 
 export default defineConfig(() => {
   return {
     base,
-    server: { proxy: { '/api': 'http://127.0.0.1:5495', '/auth': 'http://127.0.0.1:5495' } },
-    preview: { proxy: { '/api': 'http://127.0.0.1:5497', '/auth': 'http://127.0.0.1:5497' } },
+    server: {
+      proxy: { '/api': apiTarget, '/auth': apiTarget },
+      fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/.gsd/**'] },
+    },
+    preview: { proxy: { '/api': apiTarget, '/auth': apiTarget } },
   //  3. BlockSuite styles edgeless notes / the outline fragment with
   //     vanilla-extract `*.css.ts` files. Vite's dep optimizer externalizes those,
   //     so without @vanilla-extract/vite-plugin the browser is handed the raw

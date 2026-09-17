@@ -1,6 +1,6 @@
 # Dali
 
-Dali extends [DJAI Academy's Open Canvas](https://github.com/DJAI-Academy/djai-open-canvas/tree/27f8bb97b10984e04e48d7650d954d0a7ecd212c) (pinned upstream source) with a local editable canvas. The current foundation stores boards and image blobs in browser IndexedDB; board selection and the board catalog use browser storage. Clearing site data removes local work. Shared storage, authenticated access and collaboration follow the approved roadmap.
+Dali extends [DJAI Academy's Open Canvas](https://github.com/DJAI-Academy/djai-open-canvas/tree/27f8bb97b10984e04e48d7650d954d0a7ecd212c) (pinned upstream source) with an editable canvas and authenticated board library. Account boards use the application backend; earlier browser-local boards and images remain in IndexedDB and can be copied into an account. Clearing site data removes browser-local work.
 
 ## Run locally
 
@@ -8,10 +8,22 @@ From the repository root:
 
 ```sh
 npm ci
-npm run dev -- --host 127.0.0.1
+npm run dev
 ```
 
-Open the loopback URL printed by Vite. Use **Add sticky note**, double-click the note to type, and wait for **Saved locally** before reloading. The board switcher opens the local board library. **Save failed** exposes recovery actions when browser storage rejects a write.
+Open **http://127.0.0.1:5173** after the launcher prints **Dali local development ready**. Choose **Synthetic Owner** on the explicitly labeled synthetic sign-in page, then create a board from the library. This local flow uses signed OIDC and the application's session and board-permission checks. The synthetic accounts are for development; actual-provider acceptance remains a separate operator check.
+
+The launcher compiles the backend and starts Vite, the application API on port **5174**, and the synthetic identity provider on port **5175**, all bound to `127.0.0.1`. **Ctrl+C** stops the services together. Running `npm run dev` again retains local account boards and valid sessions: the SQLite database and generated session secret live in the ignored, private `.gsd/local-dev/` directory. Keep that directory and the same UI/provider ports when restarting. Back up the whole directory while stopped if you need to preserve this local development data. Browser IndexedDB is left intact.
+
+Ports fail explicitly when occupied. `--port <port>` (or `DALI_DEV_UI_PORT`), `DALI_DEV_API_PORT`, and `DALI_DEV_OIDC_PORT` select alternate loopback ports. Use a separate `DALI_DEV_STATE_DIR` for an independent local environment; changing the saved UI/provider origins in an existing directory is rejected to preserve account identity. Keep custom runtime storage outside publishable source. The launcher refuses `NODE_ENV=production`.
+
+For frontend work against an independently configured backend, use:
+
+```sh
+DALI_API_PROXY_TARGET=http://127.0.0.1:3000 npm run dev:ui -- --host 127.0.0.1
+```
+
+`dev:ui` starts Vite. `DALI_API_PROXY_TARGET` configures `/api` and `/auth` forwarding for both Vite development and preview, defaulting to the backend's loopback port **3000**. Register the matching frontend `/auth/callback` origin with that backend/provider. The browser-test harness selects its own proxy targets and disposable state. Production startup remains [server/app.ts](server/app.ts) (operator-configured application entrypoint), independent of synthetic development/provider code.
 
 ## Verify
 
@@ -19,11 +31,12 @@ Open the loopback URL printed by Vite. Use **Add sticky note**, double-click the
 npm exec playwright install -- chromium firefox webkit
 npm run typecheck
 npm test
+npm run test:dev
 npm run build
 npm run test:browser
 ```
 
-The browser runner starts loopback development and production-preview servers. It runs Chromium against both builds and Firefox/WebKit against the production build. Each test receives isolated browser storage. Unexpected console errors and page exceptions fail tests automatically.
+`test:dev` runs a bounded Chromium startup/restart regression using isolated ports and private temporary state, plus port-collision and failed-start cleanup checks. The browser runner starts loopback development and production-preview servers. It runs Chromium against both builds and Firefox/WebKit against the production build. Each test receives isolated browser storage. Unexpected console errors and page exceptions fail tests automatically.
 
 To use a custom browser cache, set `PLAYWRIGHT_BROWSERS_PATH` to the same external directory for both the install and test commands. Test reports and generated builds are ignored by Git.
 
