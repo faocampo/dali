@@ -1,5 +1,22 @@
 import { test as base, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import type { Page } from '@playwright/test';
+
+/** Complete synthetic library setup before a test replaces its document. */
+export async function waitForAuthenticatedLibrary(page: Page) {
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  const session = await page.request.get('/api/session');
+  expect(session.status()).toBe(200);
+  const member = await session.json();
+  const response = await page.request.get('/api/boards?filter=all', { headers: { 'X-Dali-Account': member.accountId } });
+  expect(response.status()).toBe(200);
+  const rows: { thumbnailUrl?: string }[] = await response.json();
+  await expect(page.getByText('Loading your boards…', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.board-card[data-board-id]')).toHaveCount(rows.length);
+  // Heading visibility precedes the card effects. Waiting for these real
+  // authorized previews prevents test goto/reload from cancelling their reads.
+  await expect(page.locator('.board-card__preview img')).toHaveCount(rows.filter(row => row.thumbnailUrl).length);
+}
 
 /**
  * Every test gets console/page-error checking automatically.
@@ -50,7 +67,7 @@ export const test = base.extend<{
         if (!boardId) {
           await original('/auth/start');
           await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-          await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+          await waitForAuthenticatedLibrary(page);
           const session = await context.request.get('/api/session'); expect(session.status()).toBe(200);
           const member = await session.json();
           const response = await context.request.post('/api/boards', { headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1' }, data: { operationId: randomUUID(), title: 'Untitled board' } });

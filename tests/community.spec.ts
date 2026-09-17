@@ -49,6 +49,7 @@ test('creates, edits and reopens exactly one locally stored sticky note', async 
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const stored = await notes(page);
   await page.reload();
+  await expect(page.locator('affine-edgeless-root')).toHaveCount(1);
   await expect(page.locator('affine-edgeless-root')).toBeAttached();
   await expect.poll(() => notes(page)).toEqual(stored);
   await expect(page.locator('editor-host')).toHaveCount(1);

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect } from './fixtures';
+import { test, expect, waitForAuthenticatedLibrary } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { acceptanceService, syntheticCanaries } from './access-fixtures';
 import { fileAction } from './app-menu';
@@ -25,7 +25,7 @@ async function expectAcknowledgedJournal(page: Page, retained: unknown[] = []) {
 
 test('@03-06-02 two New commands create distinct private tabs and preserve the source board', async ({ page, context, baseURL }) => {
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Preserved source title' } })).json();
@@ -57,7 +57,7 @@ test.describe('blocked popup and interrupted creation', () => {
 test.use({ expectErrors: ['401 (Unauthorized)', '503 (Service Unavailable)', 'net::ERR_TIMED_OUT'] });
 test('@03-06-02 blocked popup retry reconciles one committed destination without touching source', async ({ page, context, baseURL }) => {
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Popup source canary' } })).json();
@@ -96,7 +96,7 @@ test('@03-06-02 valid new intent survives OIDC and reload reconciles the same op
 test('@03-06-01 authorized deep link mounts native editing and cold reopen retains acknowledged content', async ({ page, context, browser, baseURL }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const created = await context.request.post('/api/boards', { headers, data: { title: 'Native shell canary', operationId: randomUUID() } });
@@ -123,7 +123,7 @@ test.use({ expectErrors: ['Failed to load resource: the server responded with a 
 
 test('@03-06-01 loading blank board gates mutations and native history publishes acknowledged preview', async ({ page, context, baseURL }) => {
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID() } })).json();
@@ -174,7 +174,7 @@ test('@03-06-01 image loading missing retry and lost authorization clear protect
     }));
   });
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Image access canary' } })).json();
@@ -216,7 +216,7 @@ test('@03-06-01 image loading missing retry and lost authorization clear protect
 test('@03-03-01 private creates have independent IDs and idempotent operation results', async ({ page, context, baseURL }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const operationId = randomUUID();

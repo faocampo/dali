@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures';
+import { test, expect, waitForAuthenticatedLibrary } from './fixtures';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -72,6 +72,7 @@ test('@03-02-02 signed provider token with tampered nonce is rejected without ac
 test('@03-02-02 expired browser cookie denies the real session endpoint', async ({ page, context }) => {
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your boards' })).toBeVisible();
+  await waitForAuthenticatedLibrary(page);
   const cookie = (await context.cookies()).find(c => c.name === 'dali_session')!;
   await context.addCookies([{ ...cookie, expires: Math.floor(Date.now() / 1000) - 1 }]);
   expect((await context.request.get('/api/session')).status()).toBe(401);

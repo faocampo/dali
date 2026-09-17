@@ -39,6 +39,7 @@ test('fill transparency applies immediately and survives reload', async ({ page 
     await page.screenshot({ path: test.info().outputPath('fill-transparency.png') });
   }
   await expect.poll(async () => (await state(page)).find(m => m.type === 'shape')?.fill).toMatch(/80$/);
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   await page.reload();
   await expect.poll(async () => (await state(page)).find(m => m.type === 'shape')?.fill).toMatch(/80$/);
 });

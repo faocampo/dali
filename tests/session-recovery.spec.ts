@@ -87,7 +87,7 @@ test('@03-10-01 interrupted acknowledgment replays idempotently against committe
   expect(await model(page)).toBe(before);
   const independent = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } });
   expect(independent.status()).toBe(200);
-  const saved = await independent.json(); await page.reload(); await expect(page.locator('affine-edgeless-root')).toBeVisible();
+  const saved = await independent.json(); await page.reload(); await expect(page.locator('affine-edgeless-root')).toHaveCount(1); await expect(page.locator('affine-edgeless-root')).toBeVisible();
   const reopened = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } });
   expect((await reopened.json()).content).toBe(saved.content); expect(await model(page)).toBe(before);
 });
@@ -265,7 +265,7 @@ test('@03-10-03 same-board recovery announces acknowledged resume and restores p
 test('@03-10-03 long account recovery fits 490px and short viewport with reachable static controls', async ({ page }) => {
   const descriptor = await board(page); const email = 'synthetic-' + 'longidentifier'.repeat(22) + '@example.org';
   database.prepare('UPDATE members SET email=?,display_name=? WHERE id=?').run(email, 'Synthetic ' + 'longname'.repeat(30), accountId);
-  await page.reload(); await expect(page.locator('affine-edgeless-root')).toBeVisible(); await page.setViewportSize({ width: 490, height: 240 }); await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.reload(); await expect(page.locator('affine-edgeless-root')).toHaveCount(1); await expect(page.locator('affine-edgeless-root')).toBeVisible(); await page.setViewportSize({ width: 490, height: 240 }); await page.emulateMedia({ reducedMotion: 'reduce' });
   await expire(page); await expect(page.getByRole('dialog').getByText(email, { exact: true })).toBeVisible();
   const action = page.getByRole('button', { name: 'Sign in to continue', exact: true }); await action.scrollIntoViewIfNeeded(); const box = (await action.boundingBox())!;
   expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44); expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(490); expect(box.y + box.height).toBeLessThanOrEqual(240);
