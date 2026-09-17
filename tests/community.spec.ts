@@ -144,9 +144,10 @@ test.describe('account recovery write failures', () => {
     await expect(page.getByRole('button', { name: 'Sign in to continue', exact: true })).toBeEnabled();
     await page.reload();
     await expect(page.getByTestId('board-action-menu')).toBeVisible();
+    await expect(page.locator('editor-host')).toHaveCount(1);
     await expect.poll(() => notes(page)).toEqual(pending);
     await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
-    await page.reload(); await expect.poll(() => notes(page)).toEqual(pending);
+    await page.reload(); await expect(page.locator('editor-host')).toHaveCount(1); await expect.poll(() => notes(page)).toEqual(pending);
   });
 });
 

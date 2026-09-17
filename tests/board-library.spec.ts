@@ -187,7 +187,7 @@ test('@03-03-02 UI-HOME-zero-one-many overflow and long Unicode names work at de
 
 test.describe('preview lifecycle', () => {
 test.use({ expectErrors: ['Failed to load resource: the server responded with a status of 401 (Unauthorized)', 'Failed to load resource: the server responded with a status of 404 (Not Found)', 'Failed to load resource: net::ERR_FILE_NOT_FOUND'] });
-test('@03-03-02 protected previews reject denied and delayed generations and revoke object URLs', async ({ page }) => {
+test('@03-03-02 protected previews reject denied and delayed generations and revoke object URLs', async ({ page, expectErrors, pageErrors }) => {
   const own = syntheticCanaries(); const foreign = syntheticCanaries();
   const id = seed('Preview owner', { image: own.imageBytes }); seed(foreign.boardText, { foreign: true, image: foreign.imageBytes });
   await refresh(page); const image = card(page, id).locator('img'); await expect(image).toBeVisible();
@@ -199,7 +199,14 @@ test('@03-03-02 protected previews reject denied and delayed generations and rev
   await refresh(page); await expect(card(page, id).getByText('Preview unavailable')).toBeVisible();
   await expect(image).toHaveCount(0);
   // Blob URLs from the discarded generation can no longer be fetched.
+  const revokedResourceError = 'Failed to load resource: The operation couldn’t be completed. (WebKitBlobResource error 1.)';
+  const rejectedProbeEvents: { url: string; probing: boolean }[] = []; let probing = false;
+  page.on('console', message => { if (message.type() === 'error' && message.text() === revokedResourceError) rejectedProbeEvents.push({ url: message.location().url, probing }); });
+  expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]);
+  expectErrors.push(revokedResourceError); probing = true;
   expect(await page.evaluate(async url => { try { await fetch(url!); return true; } catch { return false; } }, url)).toBe(false);
+  // Flush the browser event queue before leaving this deliberate failed fetch.
+  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0))); probing = false;
   await page.getByRole('button', { name: 'Shared with me', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'No shared boards yet' })).toBeVisible();
   release(); thumbnailWait = undefined; await expect(page.locator('.board-card__preview img')).toHaveCount(0);
@@ -211,6 +218,9 @@ test('@03-03-02 protected previews reject denied and delayed generations and rev
   const denied = await app.inject({ url: '/api/boards/' + id + '/thumbnail', headers: { cookie: (await page.context().cookies()).filter(value => value.name === 'dali_session').map(value => value.name + '=' + value.value).join('; '), 'x-dali-account': accountId } });
   expect(denied.statusCode).toBe(404); expect(denied.rawPayload.includes(own.imageBytes)).toBe(false);
   await refresh(page); await expect(card(page, id)).toHaveCount(0); expect(await page.locator('body').innerText()).not.toContain(foreign.boardText);
+  expect(rejectedProbeEvents.length).toBeLessThanOrEqual(1);
+  for (const event of rejectedProbeEvents) { expect(event.url).toBe(url); expect(event.probing).toBe(true); }
+  expect(pageErrors.filter(error => error.startsWith('pageerror:'))).toEqual([]);
 });
 test('@03-03-02 UI-HOME-partial denied preview keeps the authorized open action usable', async ({ page }) => {
   const canary = syntheticCanaries();

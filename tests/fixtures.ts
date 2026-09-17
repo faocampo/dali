@@ -66,12 +66,25 @@ export const test = base.extend<{
   pageErrors: [
     async ({ page, expectErrors }, use) => {
       const errors: string[] = [];
+      const pendingConsole: Promise<void>[] = [];
       page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
       page.on('console', (m) => {
-        if (m.type() === 'error') errors.push(`console: ${m.text()}`);
+        if (m.type() !== 'error') return;
+        const index = errors.push(`console: ${m.text()}`) - 1;
+        // Firefox renders Error objects as "Error" or "JSHandle@object".
+        // Preserve that raw text and append concrete error identity; a failed
+        // argument read leaves the original strict collector entry intact.
+        pendingConsole.push(Promise.all(m.args().map(arg => arg.evaluate(value =>
+          value && typeof value.name === 'string' && typeof value.message === 'string'
+            ? `${value.name}: ${value.message}` : ''
+        ).catch(() => ''))).then(details => {
+          const identities = details.filter(Boolean);
+          if (identities.length) errors[index] += ` [${identities.join('; ')}]`;
+        }));
       });
 
       await use(errors);
+      await Promise.all(pendingConsole);
 
       const unexpected = errors.filter(
         (e) => !expectErrors.some((allowed) => e.includes(allowed))

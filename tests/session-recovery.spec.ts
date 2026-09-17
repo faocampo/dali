@@ -190,7 +190,15 @@ test('@03-10-02 explicit logout quota failure retains tab and only sends logout 
 for (const resource of ['document', 'image', 'thumbnail'] as const) test.describe(`delayed ${resource}`, () => {
   // Pinned native image loading logs this exact cancellation when its authorized request is aborted.
   if (resource === 'image') test.use({ expectErrors: [...expectedAccessErrors, 'AbortError: signal is aborted without reason'] });
-  test(`@03-10-02 delayed ${resource} from old cookie identity cannot render after account switch`, async ({ page, context }) => {
+  test(`@03-10-02 delayed ${resource} from old cookie identity cannot render after account switch`, async ({ page, context, expectErrors, pageErrors }) => {
+  let accountSwitchInjected = false; let heldImageUrl = '';
+  const abortedRequests: { url: string; afterSwitch: boolean }[] = [];
+  const cancellationPhases: boolean[] = []; const cancellationReads: Promise<void>[] = [];
+  page.on('requestfailed', request => { if (request.url() === heldImageUrl) abortedRequests.push({ url: request.url(), afterSwitch: accountSwitchInjected }); });
+  page.on('console', message => {
+    if (message.type() !== 'error') return; const afterSwitch = accountSwitchInjected;
+    cancellationReads.push(Promise.all(message.args().map(arg => arg.evaluate(value => value?.name).catch(() => null))).then(names => { if (names.includes('AbortError')) cancellationPhases.push(afterSwitch); }));
+  });
   const descriptor = await board(page); await text(page, 'Delayed identity canary');
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'canary.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes }); await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
@@ -200,8 +208,12 @@ for (const resource of ['document', 'image', 'thumbnail'] as const) test.describ
   const before = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
   let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let received = false;
   const pattern = resource === 'document' ? '**/docs/*/pull' : resource === 'image' ? '**/blobs/*' : '**/thumbnail';
-  await page.route(pattern, async route => { const response = await route.fetch(); expect(response.status()).toBe(200); expect(route.request().headers()['x-dali-account']).toBe(accountId); received = true; await barrier; await route.fulfill({ response }).catch(() => {}); });
+  await page.route(pattern, async route => { const response = await route.fetch(); expect(response.status()).toBe(200); expect(route.request().headers()['x-dali-account']).toBe(accountId); if (resource === 'image') heldImageUrl = route.request().url(); received = true; await barrier; await route.fulfill({ response }).catch(() => {}); });
   await page.goto(resource === 'thumbnail' ? origin : origin + '/?board=' + descriptor.summary.id); await expect.poll(() => received).toBe(true);
+  await Promise.all(cancellationReads); expect(cancellationPhases).toEqual([]);
+  expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]);
+  if (resource === 'image') expectErrors.push('AbortError: The operation was aborted. ', 'AbortError: Fetch is aborted');
+  accountSwitchInjected = true;
   await context.clearCookies({ name: 'dali_fixture_identity' }); const other = await context.newPage(); await other.goto(origin + '/auth/start');
   await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   await expect(page.getByText("You're signed in with a different account. Return to your boards or sign in with the previous account to recover its pending changes.", { exact: true })).toBeVisible();
@@ -211,6 +223,10 @@ for (const resource of ['document', 'image', 'thumbnail'] as const) test.describ
   expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before);
   const denied = await page.request.post(origin + '/api/boards/' + descriptor.summary.id + '/docs/' + descriptor.contentDocId + '/push', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0, 0]) });
   expect(denied.status()).toBe(409); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before); await other.close();
+  await Promise.all(cancellationReads);
+  expect(cancellationPhases.every(Boolean)).toBe(true);
+  if (resource === 'image') { expect(heldImageUrl).toContain('/blobs/'); expect(abortedRequests.length).toBeGreaterThan(0); expect(abortedRequests.every(request => request.afterSwitch)).toBe(true); }
+  expect(pageErrors.filter(error => error.startsWith('pageerror:'))).toEqual([]);
   });
 });
 test('@03-10-02 role revocation at replay commit retains journal and unchanged document bytes', async ({ page, browser }) => {

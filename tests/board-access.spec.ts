@@ -25,6 +25,7 @@ async function expectAcknowledgedJournal(page: Page, retained: unknown[] = []) {
 
 test('@03-06-02 two New commands create distinct private tabs and preserve the source board', async ({ page, context, baseURL }) => {
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Preserved source title' } })).json();
@@ -56,6 +57,7 @@ test.describe('blocked popup and interrupted creation', () => {
 test.use({ expectErrors: ['401 (Unauthorized)', '503 (Service Unavailable)', 'net::ERR_TIMED_OUT'] });
 test('@03-06-02 blocked popup retry reconciles one committed destination without touching source', async ({ page, context, baseURL }) => {
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Popup source canary' } })).json();
@@ -94,6 +96,7 @@ test('@03-06-02 valid new intent survives OIDC and reload reconciles the same op
 test('@03-06-01 authorized deep link mounts native editing and cold reopen retains acknowledged content', async ({ page, context, browser, baseURL }) => {
   await page.goto('/');
   await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const created = await context.request.post('/api/boards', { headers, data: { title: 'Native shell canary', operationId: randomUUID() } });
@@ -120,6 +123,7 @@ test.use({ expectErrors: ['Failed to load resource: the server responded with a 
 
 test('@03-06-01 loading blank board gates mutations and native history publishes acknowledged preview', async ({ page, context, baseURL }) => {
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID() } })).json();
@@ -161,10 +165,16 @@ test.use({ expectErrors: ['401 (Unauthorized)', '404 (Not Found)', 'SourceAccess
 test('@03-06-01 image loading missing retry and lost authorization clear protected pixels', async ({ page, context, baseURL, expectErrors, pageErrors }) => {
   let revocationInjected = false;
   const staleCancellationPhases: boolean[] = [];
+  const cancellationReads: Promise<void>[] = [];
   page.on('console', message => {
-    if (message.type() === 'error' && message.text().startsWith('Error: Account source is stale')) staleCancellationPhases.push(revocationInjected);
+    if (message.type() !== 'error') return;
+    const inRevokedPhase = revocationInjected;
+    cancellationReads.push(Promise.all(message.args().map(arg => arg.evaluate(value => ({ name: value?.name, message: value?.message })).catch(() => null))).then(args => {
+      if (args.some(arg => arg?.message === 'Account source is stale' || (arg?.name === 'SourceAccessError' && arg.message === 'Board access changed'))) staleCancellationPhases.push(inRevokedPhase);
+    }));
   });
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   const member = await (await context.request.get('/api/session')).json();
   const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Image access canary' } })).json();
@@ -186,7 +196,7 @@ test('@03-06-01 image loading missing retry and lost authorization clear protect
   phase = 'ready'; await page.getByRole('button', { name: 'Retry images' }).click();
   await expect(page.locator('affine-edgeless-image img')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Retry images' })).toHaveCount(0); expect(reads).toBeGreaterThanOrEqual(2);
-  expect(staleCancellationPhases).toEqual([]);
+  await Promise.all(cancellationReads); expect(staleCancellationPhases).toEqual([]);
   expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]);
   expect(pageErrors.filter(error => error.startsWith('pageerror:'))).toEqual([]);
   // Native ImageEdgelessBlock.refreshData catches and logs an in-flight read
@@ -197,6 +207,7 @@ test('@03-06-01 image loading missing retry and lost authorization clear protect
   await expect(page.getByRole('heading', { name: "You don't have access to this board" })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0); await expect(page.locator('img[src^="blob:"]')).toHaveCount(0);
   expect(await page.locator('body').innerText()).not.toContain('Image access canary');
+  await Promise.all(cancellationReads);
   expect(staleCancellationPhases.every(inRevokedPhase => inRevokedPhase)).toBe(true);
   expect(pageErrors.filter(error => error.startsWith('pageerror:'))).toEqual([]);
 });

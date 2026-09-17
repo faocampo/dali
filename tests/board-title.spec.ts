@@ -3,6 +3,7 @@ import { test, expect } from './fixtures';
 
 test('inline title saves with Enter and survives reload without replacing canvas', async ({ page }) => {
   await page.goto('/');
+  const boardUrl = new URL(page.url());
   await expect(page.locator('affine-edgeless-root')).toHaveCount(1);
   await page.locator('affine-edgeless-root').evaluate(el => el.setAttribute('data-title-sentinel', 'mounted'));
   await page.getByRole('textbox', { name: 'Board name' }).fill('Synthetic planning');
@@ -12,7 +13,9 @@ test('inline title saves with Enter and survives reload without replacing canvas
   await page.reload();
   await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveValue('Synthetic planning');
   await fileAction(page, 'All boards');
-  await expect(page.getByRole('button', { name: 'Open Synthetic planning', exact: true })).toBeVisible();
+  const boardLink = page.locator(`[data-board-id="${boardUrl.searchParams.get('board')}"]`).getByRole('link', { name: 'Open Synthetic planning', exact: true });
+  await expect(boardLink).toBeVisible();
+  await expect(boardLink).toHaveAttribute('href', '/' + boardUrl.search);
 });
 
 test('inline title cancels on Escape, rejects blanks, and saves on blur', async ({ page }) => {

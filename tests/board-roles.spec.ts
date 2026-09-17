@@ -10,6 +10,7 @@ import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
 import { proxyApplicationAssets, syntheticCanaries } from './access-fixtures';
 import { fileAction } from './app-menu';
+import { prepareClipboard, pasteClipboard } from './clipboard-route';
 import { PDFDocument, PDFRawStream, PDFName, decodePDFRawStream } from 'pdf-lib';
 import { unzipSync, strFromU8 } from 'fflate';
 let closeProxy: (() => void) | undefined;
@@ -99,7 +100,8 @@ test('@CR-04 Viewer menu zoom and fit navigate without native or server mutation
   await page.keyboard.press('Escape'); await page.getByRole('menuitem', { name: 'Edit', exact: true }).click(); await expect(page.getByRole('menuitem', { name: 'Undo', exact: true })).toBeDisabled(); await expect(page.getByRole('menuitem', { name: 'Redo', exact: true })).toBeDisabled();
   expect(await localState(page)).toEqual(before); expect(await ownerRead(board.summary.id)).toEqual(server);
 });
-test('@03-09-01 Viewer native keyboard clipboard drop and history preserve model and server while navigation works', async ({ page, context }) => {
+test('@03-09-01 Viewer native keyboard clipboard drop and history preserve model and server while navigation works', async ({ page, context, browserName }, testInfo) => {
+  await prepareClipboard(page, context, browserName, testInfo, []);
   const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id);
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Role map canary'); await page.keyboard.press('Enter');
   await page.keyboard.press('Tab'); await page.keyboard.type('Child canary'); await page.keyboard.press('Escape');
@@ -112,9 +114,8 @@ test('@03-09-01 Viewer native keyboard clipboard drop and history preserve model
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
     await page.keyboard.press(key); expect(await localState(page), key).toEqual(before); expect(sourceState(board.summary.id), key).toEqual(server); expect(await ownerRead(board.summary.id)).toEqual(owner);
   }
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.evaluate(() => navigator.clipboard.writeText('Native clipboard canary'));
-  await page.mouse.click(600, 400); await page.keyboard.press('ControlOrMeta+v');
+  await page.mouse.click(600, 400); await pasteClipboard(page, browserName);
   await page.locator('editor-host').evaluate(el => { const data = new DataTransfer(); data.setData('text/plain', 'Constructed drop canary'); el.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true })); el.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertCompositionText', data: 'Composition canary', bubbles: true, cancelable: true })); });
   await page.evaluate(() => { for (const detail of ['undo', 'redo']) window.dispatchEvent(new CustomEvent('dali:board-command', { detail })); });
   expect(await localState(page)).toEqual(before); expect(sourceState(board.summary.id)).toEqual(server);
@@ -142,7 +143,8 @@ test('@03-09-01 Viewer native keyboard clipboard drop and history preserve model
   await expect.poll(() => page.locator('affine-edgeless-root').evaluate(el => ({ ...(el as HTMLElement & { gfx: GfxController }).gfx.viewport.center }))).not.toEqual(center);
   expect(await localState(page)).toEqual(before); expect(sourceState(board.summary.id)).toEqual(server);
 });
-for (const access of ['owner', 'editor'] as const) test(`@03-09-01 ${access} native creation typing styling collection history and clipboard remain writable`, async ({ page, context }) => {
+for (const access of ['owner', 'editor'] as const) test(`@03-09-01 ${access} native creation typing styling collection history and clipboard remain writable`, async ({ page, context, browserName, expectErrors, pageErrors }, testInfo) => {
+  await prepareClipboard(page, context, browserName, testInfo, []);
   const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id);
   if (access === 'editor') await role(page, board.summary.id, access);
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Writable map'); await page.keyboard.press('Enter');
@@ -155,11 +157,32 @@ for (const access of ['owner', 'editor'] as const) test(`@03-09-01 ${access} nat
     return { fill: root.fillColor, collapsed: map.children.get(map.tree.id)!.collapsed, count: map.children.size };
   });
   expect(result).toEqual({ fill: '#123456', collapsed: true, count: 2 });
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']); await page.evaluate(() => navigator.clipboard.writeText('Writable native clipboard'));
-  await page.mouse.click(700, 600); await page.keyboard.press('ControlOrMeta+v');
+  const parserErrors: { text: string; pasting: boolean }[] = []; let pasting = false;
+  if (browserName === 'firefox') {
+    expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]);
+    // The pinned native paste handler probes plain text as SVG before pasting
+    // it as text. Observe that exact parser call without changing its result.
+    await page.evaluate(() => {
+      const original = DOMParser.prototype.parseFromString;
+      const probe = { inputs: [] as string[], restore: () => { DOMParser.prototype.parseFromString = original; } };
+      Object.assign(window, { rolePasteProbe: probe });
+      DOMParser.prototype.parseFromString = function (input, type) { if (type === 'image/svg+xml') probe.inputs.push(String(input)); return original.call(this, input, type); };
+    });
+    page.on('console', message => { if (message.type() === 'error' && message.text().includes('XML Parsing Error: syntax error')) parserErrors.push({ text: message.text(), pasting }); });
+    expectErrors.push('XML Parsing Error: syntax error\nLocation: ' + page.url());
+  }
+  pasting = true;
+  await page.evaluate(() => navigator.clipboard.writeText('Writable native clipboard'));
+  await page.mouse.click(700, 600); await pasteClipboard(page, browserName);
   await expect.poll(async () => (await localState(page)).model).toContain('Writable native clipboard');
+  pasting = false;
+  if (browserName === 'firefox') {
+    const inputs = await page.evaluate(() => { const probe = (window as unknown as { rolePasteProbe: { inputs: string[]; restore(): void } }).rolePasteProbe; probe.restore(); return probe.inputs; });
+    expect(inputs).toEqual(['Writable native clipboard']);
+  }
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
-  const saved = await localState(page); await page.reload(); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect((await localState(page)).model).toBe(saved.model);
+  const saved = await localState(page); await page.reload(); await expect(page.locator('affine-edgeless-root')).toHaveCount(1); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect((await localState(page)).model).toBe(saved.model);
+  if (browserName === 'firefox') { expect(parserErrors).toHaveLength(1); expect(parserErrors[0]!.pasting).toBe(true); }
 });
 test('@03-09-01 Viewer native shape drawing image properties groups connectors and map creation preserve each state', async ({ page }) => {
   const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id);

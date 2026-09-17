@@ -152,6 +152,7 @@ test('Replace preflights raster dimensions and preserves edited pixels on reject
 
 test('Replace rejects a changed board after blob storage and permits retry', async ({ page }) => {
   await setup(page); await crop(page);
+  const authorizedUrl = page.url();
   const before = await state(page);
   await page.locator('affine-edgeless-root').evaluate(el => {
     const sync = (el as HTMLElement & { gfx: GfxController }).gfx.doc.blobSync;
@@ -168,9 +169,7 @@ test('Replace rejects a changed board after blob storage and permits retry', asy
   await input.setInputFiles(file);
   await expect(page.locator('.selection-inspector [role=alert]')).toContainText('board changed');
   expect(await state(page)).toEqual(before);
-  await page.locator('affine-edgeless-root').evaluate(el => {
-    history.replaceState(null, '', '?board=' + (el as HTMLElement & { gfx: GfxController }).gfx.doc.id);
-  });
+  await page.evaluate(url => history.replaceState(null, '', url), authorizedUrl);
   await input.setInputFiles(file);
   await expect.poll(async () => (await state(page)).edits.length).toBe(0);
 });
