@@ -2,6 +2,7 @@ import { getActiveAccessScope, getRecoveryBoard, preserveCanvasRuntime, suspendA
 import type { BlockComponent, EditorHost } from '@blocksuite/affine/std';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { ShapeElementModel } from '@blocksuite/affine/model';
+import type { EdgelessShapeTextEditor } from '@blocksuite/affine/gfx/shape';
 export type SessionDescriptor = { accountId: string; displayName: string; email: string; expiresAt: number };
 export type SessionPhase = 'loading' | 'authenticated' | 'preserving' | 'auth-paused' | 'preservation-failed' | 'recovering' | 'access-denied' | 'identity-changed' | 'signed-out' | 'error';
 export type SessionState = { phase: SessionPhase; member: SessionDescriptor | null; intent: 'expiry' | 'logout'; revision: number; notice: string };
@@ -9,14 +10,17 @@ let state: SessionState = { phase: 'loading', member: null, intent: 'expiry', re
 const listeners = new Set<() => void>();
 let preservation: Promise<void> | undefined;
 let transition = 0;
-type FocusToken = { accountId: string; boardId: string; label?: string; tag?: string; elements: string[]; editing: boolean };
+type FocusToken = { accountId: string; boardId: string; label?: string; tag?: string; elements: string[]; editing: boolean; range?: { index: number; length: number } };
 let focusToken: FocusToken | undefined;
 function captureFocus() {
   const scope = getActiveAccessScope(); if (scope?.phase !== 'active') return;
   let active = document.activeElement; while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
   const root = document.querySelector('affine-edgeless-root') as (HTMLElement & { gfx: GfxController }) | null;
+  const editor = document.querySelector<EdgelessShapeTextEditor>('edgeless-shape-text-editor');
+  const native = editor?.inlineEditor?.getNativeRange();
+  const range = native ? editor?.inlineEditor?.toInlineRange(native) : null;
   focusToken = { accountId: scope.accountId, boardId: scope.boardId, elements: root?.gfx.selection.selectedElements.map(element => element.id) ?? [],
-    editing: !!document.querySelector('edgeless-shape-text-editor'), label: active?.getAttribute('aria-label') ?? undefined, tag: active?.tagName.toLowerCase() };
+    editing: !!editor, ...(range ? { range: { index: range.index, length: range.length } } : {}), label: active?.getAttribute('aria-label') ?? undefined, tag: active?.tagName.toLowerCase() };
 }
 export function restoreRecoveryFocus() {
   let token: FocusToken | null;
@@ -28,17 +32,32 @@ export function restoreRecoveryFocus() {
     if (stopped || restoring || scope?.phase !== 'active' || !scope.canWrite || scope.accountId !== captured.accountId || scope.boardId !== captured.boardId) return;
     const host = document.querySelector<EditorHost>('editor-host');
     const root = host?.querySelector<BlockComponent & { gfx: GfxController }>('affine-edgeless-root');
-    if (!host || !root?.querySelector('.edgeless-mount-point') || host.store.readonly) return;
+    const mountPoint = root?.querySelector('.edgeless-mount-point');
+    if (!host || !root || !mountPoint || host.store.readonly) return;
     restoring = true;
     try {
       const current = () => !stopped && getActiveAccessScope() === scope && host.isConnected && !host.store.readonly;
       if (captured.editing && captured.elements.length) {
-        const { mountShapeTextEditor } = await import('@blocksuite/affine/gfx/shape');
+        const { mountShapeTextEditor, EdgelessShapeTextEditor } = await import('@blocksuite/affine/gfx/shape');
         const shape = root.gfx.surface?.getElementById(captured.elements[0]!);
         if (!current()) return;
         if (shape?.type === 'shape') {
           root.gfx.viewport.setCenter(shape.x + shape.w / 2, shape.y + shape.h / 2);
           mountShapeTextEditor(shape as ShapeElementModel, root);
+          // Native mounting appends synchronously; keep that instance through readiness.
+          const editor = mountPoint.lastElementChild;
+          if (editor instanceof EdgelessShapeTextEditor && editor.element.id === shape.id) {
+            await editor.updateComplete;
+            await editor.richText.updateComplete;
+            await editor.inlineEditor?.waitForUpdate();
+            if (!current() || !editor.isConnected) return;
+            const range = captured.range;
+            const inline = editor.inlineEditor;
+            if (inline && range && Number.isSafeInteger(range.index) && Number.isSafeInteger(range.length) && range.index >= 0 && range.length >= 0 && range.index + range.length <= inline.yTextLength) {
+              inline.setInlineRange(range);
+              inline.syncInlineRange(range);
+            }
+          }
         }
       } else {
         const target = captured.label && captured.tag && /^[a-z-]+$/.test(captured.tag) ? document.querySelector<HTMLElement>(`${captured.tag}[aria-label="${CSS.escape(captured.label)}"]`) : null;
@@ -47,8 +66,11 @@ export function restoreRecoveryFocus() {
         else { root.gfx.selection.set({ elements: captured.elements.filter(id => !!root.gfx.surface?.getElementById(id)), editing: false }); host.tabIndex = -1; host.focus(); }
       }
       if (!current()) return;
+      // Rendering can queue another observer frame while this attempt awaits readiness.
+      // Success is terminal, including callbacks already queued before disconnect.
+      stopped = true; observer.disconnect(); cancelAnimationFrame(frame);
       sessionStorage.removeItem('dali-recovery-focus'); sessionStorage.removeItem('dali-recovery-account');
-      observer.disconnect(); set({ notice: 'Editing resumed.' });
+      set({ notice: 'Editing resumed.' });
     } finally { restoring = false; }
   };
   const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => { void attempt(); }); };

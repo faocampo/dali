@@ -281,8 +281,34 @@ test('@03-10-03 failed replay stays pending without resume and retries committed
   await expect(page.getByText('Editing resumed.', { exact: true })).toBeVisible(); expect(await model(page)).toContain('Replay retry canary');
   const independent = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } }); expect(independent.status()).toBe(200);
 });
-test('@03-10-03 native topic focus returns only after replay acknowledgment and composition stays blocked while paused', async ({ page }) => {
+for (const scenario of [
+  { name: 'at end', range: { index: 19, length: 0 }, selected: '', input: ' resumed', result: 'Native focus canary resumed' },
+  { name: 'with selected text', range: { index: 7, length: 5 }, selected: 'focus', input: 'resumed', result: 'Native resumed canary' },
+  { name: 'at start', range: { index: 0, length: 0 }, selected: '', input: 'Resumed ', result: 'Resumed Native focus canary' },
+]) test(`@03-10-03 native topic focus returns only after replay acknowledgment and composition stays blocked while paused ${scenario.name}`, async ({ page }) => {
+  await page.addInitScript(() => {
+    const mounts = new Set<Node>();
+    Object.assign(window, { recoveryNativeMounts: 0 });
+    new MutationObserver(records => {
+      for (const record of records) for (const node of record.addedNodes) {
+        if (node instanceof Element && node.matches('edgeless-shape-text-editor')) mounts.add(node);
+      }
+      Object.assign(window, { recoveryNativeMounts: mounts.size });
+    }).observe(document, { childList: true, subtree: true });
+  });
   await board(page); await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Native focus canary');
+  if (scenario.name !== 'at end') await page.locator('edgeless-shape-text-editor').evaluate((el, range) => (el as HTMLElement & { inlineEditor: { setInlineRange(range: { index: number; length: number }): void } }).inlineEditor.setInlineRange(range), scenario.range);
+  const selectionState = () => page.locator('edgeless-shape-text-editor').evaluate(el => {
+    const inline = (el as HTMLElement & { inlineEditor: {
+      getInlineRange(): { index: number; length: number } | null;
+      getNativeRange(): Range | null;
+      toInlineRange(range: Range): { index: number; length: number } | null;
+    } }).inlineEditor;
+    const native = inline.getNativeRange();
+    return { inline: inline.getInlineRange(), native: native ? inline.toInlineRange(native) : null, selected: window.getSelection()?.toString() };
+  });
+  const expectedSelection = { inline: scenario.range, native: scenario.range, selected: scenario.selected };
+  await expect.poll(selectionState).toEqual(expectedSelection);
   await expire(page); const pending = await records(page);
   await page.getByRole('dialog').evaluate(el => { el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: '未' })); el.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'insertCompositionText', data: '未承認' })); el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '未承認' })); });
   await page.keyboard.press('Escape'); expect(await records(page)).toEqual(pending);
@@ -292,7 +318,9 @@ test('@03-10-03 native topic focus returns only after replay acknowledgment and 
   await expect(page.getByText('Editing resumed.', { exact: true })).toHaveCount(0); await expect(page.locator('editor-host')).toHaveCount(0);
   release(); await expect(page.getByText('Editing resumed.', { exact: true })).toBeVisible(); await expect(page.locator('edgeless-shape-text-editor [contenteditable="true"]')).toBeVisible();
   expect(await page.locator('edgeless-shape-text-editor').evaluate(el => el.contains(document.activeElement))).toBe(true);
-  await page.keyboard.press('End'); await page.keyboard.type(' resumed'); await page.keyboard.press('Escape'); expect(await model(page)).toContain('Native focus canary resumed');
+  await expect.poll(selectionState).toEqual(expectedSelection);
+  await page.keyboard.type(scenario.input); await page.keyboard.press('Escape'); expect(await model(page)).toContain(scenario.result);
+  expect(await page.evaluate(() => (window as unknown as { recoveryNativeMounts: number }).recoveryNativeMounts)).toBe(1);
 });
 test('@03-10-03 long authentication error stays bounded and retries deliberate sign-in', async ({ page }) => {
   await page.setViewportSize({ width: 490, height: 240 }); await page.goto(origin + '/?authError=' + 'synthetic-long-error-'.repeat(80));
