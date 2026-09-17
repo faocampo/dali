@@ -3,7 +3,7 @@ status: testing
 phase: 03-okta-and-board-access
 source: [03-VERIFICATION.md]
 started: 2026-09-17T13:43:09.794134+00:00
-updated: 2026-09-17T13:43:09.794134+00:00
+updated: 2026-09-17T20:43:08.786425+00:00
 ---
 
 # Phase 3 acceptance checklist
@@ -101,4 +101,4 @@ blocked: 0
 
 ## Gaps
 
-None reported in UAT yet. The pending items above remain open; no Phase 3 acceptance has been recorded.
+The ten acceptance items above remain pending; no Phase 3 acceptance has been recorded. The separately reported local-development startup defect is resolved at `2d0dae4`: complete local service startup and signed synthetic sign-in reached the authenticated board library in the live in-app browser. See [resolved startup journal](../../debug/resolved/local-sign-in-startup.md) (root cause and regression evidence) and [checkpoint delta](03-12-CHECKPOINT.md) (bounded validation and revision scope). This local result does not establish actual-provider acceptance.

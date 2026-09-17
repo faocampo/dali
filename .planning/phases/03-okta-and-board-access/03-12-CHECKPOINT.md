@@ -10,6 +10,16 @@ actual_provider: not-run-human-needed
 
 The automated gate for task 03-12-01 passed on source/test revision `73416723411ca2c5b98de090f6d5327ed9e076c7`. Plan 12 and Phase 3 remain incomplete: actual-provider acceptance and the native evidence gaps below are pending. Progress remains **2/13 accepted phases**, **25/26 completed plans**, and **11/12 Phase 3 plans**. Independent verification is **human_needed (99/104)**, with no proved implementation blocker. The ten remaining observations and review dispositions are saved in [03-UAT.md](03-UAT.md) (acceptance checklist); resume with `$gsd-verify-work 3`.
 
+## Local development startup correction — 2026-09-17
+
+A subsequent user report exposed an omitted development service: the documented `npm run dev` launched only Vite, whose authentication proxy targeted a separately started test backend. Unsigned session lookup and sign-in initiation both returned empty HTTP 500. Existing browser tests supplied that backend independently and therefore missed the ordinary startup path.
+
+Source revision `2d0dae437499830adc1d4a142d1765a30b5cf52d` adds complete loopback development startup, explicitly labeled signed synthetic OIDC, the real application backend, persistent private local state, coordinated shutdown and a separate raw-Vite `dev:ui` command. Development and preview now use an explicit generic proxy target. Production authentication and board authorization remain unchanged. See [resolved startup journal](../../debug/resolved/local-sign-in-startup.md) (root cause, implementation and regression evidence) and [README](../../../README.md) (local startup instructions).
+
+Validation for this correction: **4/4** actual-command startup cases (21.17s), including signed sign-in, saved board content after restart, retained sessions, authorization, port collisions, invalid configuration and cleanup; **63/63** adjacent OIDC/preflight tests (7.32s); frontend/server typechecks, development compilation and syntax/whitespace checks passed. The existing development/production-preview authentication runner passed **4/4** callback-recovery and ordinary-entry/logout cases (22.8s), including a fresh production build. A controlled revert reproduced both HTTP 500 responses; reapplication restored HTTP 401 for unsigned session lookup and HTTP 302 for sign-in start. The live in-app browser completed local sign-in and displayed the authenticated board library and local-copy control.
+
+The full 1,533-case gate below remains evidence for `7341672`; it was not repeated for this bounded development-only correction. Actual-provider and native acceptance remain pending, with all ten UAT items unchanged. Phase 3 stays in progress.
+
 ## Final automated evidence — 2026-09-17
 
 Fresh synthetic services executed the exact two-file production smoke, followed sequentially by all seven blocking commands. All five configured projects ran without a filter, required skip, changed timeout or weakened assertion. Source and tests remained frozen during execution.

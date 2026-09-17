@@ -5,9 +5,9 @@ current_phase_name: Okta and Board Access
 current_plan: 12
 status: executing
 stopped_at: Phase 3 verified human_needed (99/104); ten UAT items pending
-last_updated: "2026-09-17T13:43:09.794134+00:00"
+last_updated: "2026-09-17T20:43:08.786425+00:00"
 last_activity: 2026-09-17
-last_activity_desc: Full automated gate and independent reviews complete; ten UAT items pending
+last_activity_desc: Local authenticated startup corrected and verified; ten Phase 3 UAT items pending
 progress:
   total_phases: 13
   completed_phases: 2
@@ -34,6 +34,8 @@ Status: Human verification pending — 99/104 truths verified; ten items saved i
 Last activity: 2026-09-17 — Source/test revision 7341672 passed the exact smoke, both typechecks, 105 unit tests, 112 server tests, production build, standalone 123-case access suite and the entire 1533-case five-project matrix (57.1m, zero failures/timeouts/skips/interruptions/unrun). Earlier failed and interrupted attempts remain recorded in 03-12-CHECKPOINT.md. The final run used a command-scoped idle-sleep guard after host sleep interrupted a prior attempt; all 40 affected cases first passed unchanged in focused reproduction. Five BFCache observations were ordinary history reloads. Independent verification is human_needed (99/104), with zero proved implementation blockers. Actual provider, native zoom, IME, speech, BFCache, Firefox/WebKit clipboard and four prohibition dispositions remain in the ten-item UAT checklist. Phase 3 remains in progress.
 
 Progress: [██░░░░░░░░] 15% (2/13 phases complete; 25/26 plans complete)
+
+Local development follow-up at `2d0dae4`: documented startup now launches the complete authenticated loopback stack and preserves development state. Four startup regressions, 63 adjacent server tests, four dev/preview authentication cases, static checks and a fresh build passed; the live browser reached Your boards. Full-matrix evidence retains revision `7341672`. See [resolved journal](debug/resolved/local-sign-in-startup.md) (startup cause, fix and validation). All ten Phase 3 acceptance items remain pending.
 
 ## Performance Metrics
 
@@ -139,7 +141,7 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ## Session Continuity
 
-Last session: 2026-09-17T13:43:09.794134+00:00
+Last session: 2026-09-17T20:43:08.786425+00:00
 Stopped at: Phase 3 verified human_needed (99/104); ten UAT items pending
 Resume file: .planning/phases/03-okta-and-board-access/03-UAT.md
 Next action: $gsd-verify-work 3 — complete the ten pending acceptance items; preserve private operator settings and evidence outside the repository.
