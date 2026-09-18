@@ -1571,8 +1571,10 @@ djai-image-visual-edit {
 .board-title-control { position: relative; min-width: 0; margin-right: auto; }
 /* Editable board title and separate library navigation. */
 .board-title-inline { display: flex; align-items: center; gap: 8px; }
-.board-title-inline input { min-width: 60px; max-width: 28vw; padding: 7px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--board-ink); font: 600 var(--affine-font-sm)/1.2 var(--affine-font-family); }
-.board-title-inline input:hover { border-color: var(--board-line); }
+.board-title-label, .board-title-inline input { box-sizing: border-box; min-width: 60px; max-width: 28vw; padding: 4px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--board-ink); font: 600 var(--affine-font-sm)/1.2 var(--affine-font-family); }
+.board-title-label { text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: text; }
+.board-title-label:hover { background: var(--affine-hover-color); }
+.board-title-label:focus-visible { outline: 2px solid var(--affine-primary-color); outline-offset: 2px; }
 .board-title-inline input:focus { border-color: var(--affine-primary-color); outline: 2px solid var(--affine-primary-color); background: var(--board-surface); }
 .board-title-error { position: absolute; top: 100%; background: var(--board-surface); padding: 8px; border: 1px solid var(--board-line); }
 
@@ -1702,9 +1704,8 @@ djai-image-visual-edit {
 
 /* View controls share the application menu and leave the canvas fully interactive. */
 .dali-submenu:has(.dali-menu-switch), .dali-submenu:has(.dali-grid-menu) { width: 268px; }
-.dali-menu-value, .dali-menu-section-label, .dali-menu-hint { color: #69645c; font-size: 12px; }
+.dali-menu-value, .dali-menu-section-label { color: #69645c; font-size: 12px; }
 .dali-menu-section-label { padding: 10px 10px 4px; font-weight: 600; }
-.dali-menu-hint { margin: 6px 10px 10px; line-height: 1.5; }
 .dali-menu-separator { border-top: 1px solid var(--board-line); margin: 6px 4px; }
 .dali-menu-switch { width: 30px; height: 18px; flex-shrink: 0; border-radius: 12px; background: #77736e; padding: 3px; box-sizing: border-box; }
 .dali-menu-switch::after { content: ''; display: block; width: 12px; height: 12px; border-radius: 50%; background: white; }
@@ -1758,12 +1759,15 @@ djai-image-visual-edit {
 .djai-header button, .djai-header summary, .board-title-inline input { min-height: 44px; }
 .board-title-inline { flex-wrap: wrap; min-width: 0; }
 .board-title-readable { font-size: 15px; min-width: 0; max-width: 30vw; overflow-wrap: anywhere; }
-.board-role { font-size: 12px; white-space: nowrap; }
+.board-role { display: inline-flex; align-items: center; box-sizing: border-box; font-size: 12px; white-space: nowrap; }
 .board-account { position: relative; font-size: 13px; }
-.board-account summary { display: flex; align-items: center; cursor: pointer; padding: 0 8px; }
+.board-account summary { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 0 8px; }
+.board-account summary::-webkit-details-marker { display: none; }
+.board-account__avatar { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; background: #ece5ff; color: #5735a3; font: 600 12px/1 var(--affine-font-family); }
+.board-account__name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .board-account > div { position: absolute; right: 0; top: 100%; width: min(260px, calc(100vw - 32px)); padding: 16px; box-sizing: border-box; background: var(--board-surface); border: 1px solid var(--board-line); border-radius: 12px; box-shadow: 0 8px 24px #0002; }
 .board-account p { overflow-wrap: anywhere; }
-@media (max-width: 600px) { .djai-header-actions { width: 100%; justify-content: flex-end; } .board-title-inline input { max-width: 48vw; } }
+@media (max-width: 600px) { .djai-header-actions { width: 100%; justify-content: flex-end; } .board-title-label, .board-title-inline input { max-width: 48vw; } }
 @media (max-width: 400px) {
   .djai-header-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; }
   .djai-header-actions > *, .djai-header-actions .djai-save__status { box-sizing: border-box; min-width: 0; width: 100%; }
@@ -1833,14 +1837,14 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 .local-copy-dialog button, .local-copy-dialog a, .board-card__actions button,
 .board-account summary, .board-account button, .board-role, .djai-header-actions > button,
 .dali-menu-popup [role^='menuitem'] { font: 600 13px/1.5 var(--affine-font-family); border-radius: 8px; padding: 8px 16px; min-height: 44px; }
-.share-dialog input, .share-dialog select, .board-action-dialog input, .board-title-inline input, .board-library input { border: 1px solid #76736e; border-radius: 8px; padding: 8px; }
+.share-dialog input, .share-dialog select, .board-action-dialog input, .board-library input { border: 1px solid #76736e; border-radius: 8px; padding: 8px; }
 .share-dialog input, .board-action-dialog input { font: 400 15px/1.5 var(--affine-font-family); }
 .board-title-inline input { font: 600 15px/1.5 var(--affine-font-family); }
 .board-card__actions button { color: #1b1a18; }
 .share-owner > span:first-of-type, .share-row > span:first-of-type, .board-card__open small { font: 400 12px/1.5 var(--affine-font-family); }
 .share-owner > span:not(:first-of-type), .share-row > span:not(:first-of-type), .board-card__metadata { font: 600 13px/1.5 var(--affine-font-family); }
 .share-dialog button:not(.djai-primary), .board-action-dialog button:not(.djai-primary), .local-copy-dialog button:not(.djai-primary) { border: 1px solid #76736e; }
-.board-library h1[tabindex="-1"]:focus, .session-recovery h1[tabindex="-1"]:focus, #root > div > section > h1[tabindex="-1"]:focus,
+.session-recovery h1[tabindex="-1"]:focus, #root > div > section > h1[tabindex="-1"]:focus,
 .board-action-dialog :is(button, input, a):focus-visible { outline: 2px solid #b4451f; outline-offset: 2px; }
 .share-owner, .share-row, .local-copy-dialog__body section { padding-block: 16px; }
 .share-dialog [role=option], .local-copy-dialog label span { padding: 8px; }
@@ -1857,3 +1861,19 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 @media (max-width: 700px) { .board-library__header { padding-inline: 16px; } }
 .board-library__title-row { margin-bottom: 24px; }
 .board-library__title-row h1 { margin-bottom: 8px; }
+
+/* Library navigation focuses its heading without styling it as a control. */
+.board-library__title-row h1:focus { outline: none; }
+.board-library__import { position: relative; align-self: flex-start; }
+.board-library__import summary { display: flex; align-items: center; gap: 8px; padding: 0 16px; border: 1px solid var(--board-line); background: var(--board-surface); cursor: pointer; }
+.board-library__import summary::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+.board-library__import summary::-webkit-details-marker { display: none; }
+.board-library__import > div { position: absolute; right: 0; top: calc(100% + 8px); z-index: 2; min-width: 180px; padding: 8px; border: 1px solid var(--board-line); border-radius: 8px; background: var(--board-surface); }
+.board-library__import button { width: 100%; border: 0; text-align: left; }
+.board-library__import button:hover { background: var(--affine-hover-color); }
+.board-account summary { box-sizing: border-box; padding-block: 4px; }
+@media (max-width: 600px) {
+  .board-role, .board-account summary { padding-inline: 8px; }
+  .djai-save__status { width: auto; min-width: 60px; max-width: 100px; }
+}
+@media (max-width: 700px) { .board-library__import > div { right: auto; left: 0; } }

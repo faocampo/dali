@@ -1,5 +1,5 @@
+import { editBoardTitle, fileAction } from './app-menu';
 import { test, expect } from './fixtures';
-import { fileAction } from './app-menu';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { ShapeElementModel } from '@blocksuite/affine/model';
@@ -71,7 +71,7 @@ for (const [width, zoom] of [[1280, 0.65], [800, 1.4]] as const) {
 test('File New opens a blank independent board and both tabs survive reload', async ({ page }) => {
   await startTopic(page);
   await page.keyboard.type('Original content'); await page.keyboard.press('Enter');
-  await page.getByRole('textbox', { name: 'Board name' }).fill('Original board');
+  await (await editBoardTitle(page)).fill('Original board');
   await page.getByRole('textbox', { name: 'Board name' }).press('Enter');
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const sourceURL = page.url();
@@ -89,7 +89,7 @@ test('File New opens a blank independent board and both tabs survive reload', as
   expect(new URL(popup.url()).searchParams.has('new')).toBe(false);
   expect(await popup.locator('affine-edgeless-root').evaluate(el =>
     (el as HTMLElement & { gfx: GfxController }).gfx.surface!.elementModels.length)).toBe(0);
-  await popup.getByRole('textbox', { name: 'Board name' }).fill('New board');
+  await (await editBoardTitle(popup)).fill('New board');
   await popup.getByRole('textbox', { name: 'Board name' }).press('Enter');
   await popup.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => popup.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
@@ -108,8 +108,8 @@ test('File New opens a blank independent board and both tabs survive reload', as
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   await page.reload(); await popup.reload();
-  await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveValue('Original board');
-  await expect(popup.getByRole('textbox', { name: 'Board name' })).toHaveValue('New board');
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Original board');
+  await expect(popup.getByRole('button', { name: /^Rename board:/ })).toHaveText('New board');
   expect(page.url()).toBe(sourceURL);
   expect(new URL(popup.url()).searchParams.get('board')).toBe(boardId);
   for (const [tab, text] of [[page, 'Original content'], [popup, 'New content']] as const) {

@@ -36,7 +36,6 @@ export function ViewMenu({ children }: { children: React.ReactNode }) {
     <div className="dali-menu-section-label">Grid spacing</div>
     {([20, 40, 80] as const).map(spacing => <button key={spacing} role="menuitemradio" aria-checked={prefs.spacing === spacing} tabIndex={-1} onClick={() => setViewPreferences({ spacing })}><span className="dali-menu-label">{spacing} px</span><span aria-hidden="true">{prefs.spacing === spacing ? '✓' : ''}</span></button>)}
     </div>
-    <p className="dali-menu-hint">Canvas pixels. Grid density adapts as you zoom out.</p>
   </div>;
   return <>
     <button ref={gridButton} role="menuitem" tabIndex={-1} aria-haspopup="menu" aria-expanded={false} onClick={() => setGridOpen(true)} onKeyDown={event => {
@@ -45,7 +44,6 @@ export function ViewMenu({ children }: { children: React.ReactNode }) {
     {(['dimensions', 'distances'] as const).map(key => <button key={key} role="menuitemcheckbox" aria-checked={prefs[key]} tabIndex={-1} onClick={() => setViewPreferences({ [key]: !prefs[key] })}>
       <Icon name={key} /><span className="dali-menu-label">{key === 'dimensions' ? 'Object dimensions' : 'Distances'}</span><span className="dali-menu-switch" aria-hidden="true" />
     </button>)}
-    <p className="dali-menu-hint">Select or move objects to see their measurements in canvas pixels.</p>
     <div role="separator" className="dali-menu-separator" />
     {children}
   </>;

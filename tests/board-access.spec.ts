@@ -1,8 +1,8 @@
+import { fileAction } from './app-menu';
 import { randomUUID } from 'node:crypto';
 import { test, expect, waitForAuthenticatedLibrary } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { acceptanceService, syntheticCanaries } from './access-fixtures';
-import { fileAction } from './app-menu';
 import type { Page } from '@playwright/test';
 
 async function journalRecords(page: Page) {
@@ -48,7 +48,7 @@ test('@03-06-02 two New commands create distinct private tabs and preserve the s
   }
   expect(new Set([board.summary.id, ...destinations]).size).toBe(3);
   expect(new URL(page.url()).searchParams.get('board')).toBe(board.summary.id);
-  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Preserved source title');
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Preserved source title');
   expect(await (await context.request.post(`/api/boards/${board.summary.id}/docs/${board.contentDocId}/pull`, { headers: { ...headers, 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0]) })).body()).toEqual(sourceBytes);
   expect(errors).toEqual([]);
 });
@@ -74,7 +74,7 @@ test('@03-06-02 blocked popup retry reconciles one committed destination without
   const after = await (await context.request.get('/api/boards', { headers })).json(); expect(after).toHaveLength(before.length + 1);
   const href = await link.getAttribute('href'); expect(href).toMatch(/^\/\?board=/);
   expect(new URL(page.url()).searchParams.get('board')).toBe(board.summary.id);
-  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Popup source canary');
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Popup source canary');
   const copy = await (await context.request.get('/api/boards/' + new URL(href!, baseURL!).searchParams.get('board'), { headers })).json();
   expect(copy.summary).toMatchObject({ role: 'owner', access: 'private', accountId: member.accountId });
 });
@@ -244,15 +244,15 @@ test('@03-03-01 BOARD-01 empty creates server-confirmed default and named cards 
   await page.goto(service.origin); await page.getByRole('link', { name: 'Synthetic Viewer', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Create your first board' })).toBeVisible();
   await page.getByRole('button', { name: 'New board', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Untitled board');
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Untitled board');
   const firstId = new URL(page.url()).searchParams.get('board');
   await expectAcknowledgedJournal(page); await fileAction(page, 'All boards');
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeFocused();
   const retained = await journalRecords(page); expect(retained).toHaveLength(2);
   expect(retained.every(row => row.boardId === firstId && row.kind === 'document')).toBe(true);
-  await page.getByRole('textbox', { name: 'Board name' }).fill('  Named synthetic board  ');
+  await page.getByRole('textbox', { name: 'Board name', exact: true }).fill('  Named synthetic board  ');
   await page.getByRole('button', { name: 'New board', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Named synthetic board');
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Named synthetic board');
   await expect(page.locator('editor-host')).toBeVisible();
   const secondId = new URL(page.url()).searchParams.get('board'); expect(secondId).not.toBe(firstId);
   await expectAcknowledgedJournal(page, retained);
@@ -307,9 +307,9 @@ test('@03-03-01 uncertain create response reconciles operation before any second
     posts++; await route.fetch(); await route.abort('timedout');
   });
   await page.route('**/api/operations/*', route => { lookups++; return route.continue(); });
-  await page.getByRole('textbox', { name: 'Board name' }).fill('Reconciled synthetic board');
+  await page.getByRole('textbox', { name: 'Board name', exact: true }).fill('Reconciled synthetic board');
   await page.getByRole('button', { name: 'New board', exact: true }).click();
-  await expect(page.locator('editor-host')).toBeVisible(); await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Reconciled synthetic board');
+  await expect(page.locator('editor-host')).toBeVisible(); await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Reconciled synthetic board');
   expect(posts).toBe(1); expect(lookups).toBe(1);
 });
 });

@@ -120,7 +120,7 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
     } finally { if (!controller.signal.aborted) setBusy(false); }
   };
   return <>
-    <div className="board-library__title-row"><div><h1 ref={heading} tabIndex={-1}>Your boards</h1><p>Boards you can access with this account.</p></div></div>
+    <div className="board-library__title-row"><div><h1 ref={heading} tabIndex={-1}>Your boards</h1><p>Boards you can access with this account.</p></div><details className="board-library__import"><summary>Import</summary><div><button onClick={event => { event.currentTarget.focus(); setLocalCopyOpen(true); }}>Copy local boards</button></div></details></div>
     <form className="board-library__create" onSubmit={event => { event.preventDefault(); void create(); }}>
       <label htmlFor="new-board-title">Board name <input id="new-board-title" aria-describedby={createError ? 'board-create-error' : undefined} value={title} onChange={event => setTitle(event.target.value)} disabled={busy || !!operation.current} /></label>
       <button className="djai-primary" aria-describedby={createError ? 'board-create-error' : undefined} disabled={busy || loading} type="submit">{busy ? 'Creating board…' : operation.current ? 'Check again' : 'New board'}</button>
@@ -134,13 +134,12 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
     {loading ? <><p role="status">Loading your boards…</p><div className="board-grid" aria-hidden="true">{[0, 1, 2].map(key => <div className="board-card board-card--skeleton" key={key} />)}</div></> : error ? <section><p role="alert">We couldn't load your boards. Try again.</p><button onClick={() => setRefresh(value => value + 1)}>Try again</button></section> : boards.length === 0 ? <section className="board-library__empty"><h2>{filter === 'shared' ? 'No shared boards yet' : 'Create your first board'}</h2><p>{filter === 'shared' ? 'Boards shared with you will appear here. Choose All to see your boards.' : 'Start a private board. You can share it with internal members afterward.'}</p>{filter === 'shared' && <button onClick={() => setFilter('all')}>View all boards</button>}</section> : <div className="board-grid">
       {boards.map(board => <article className="board-card" key={board.id} data-board-id={board.id}>
         <a className="board-card__open" href={'/?board=' + encodeURIComponent(board.id)} aria-label={'Open ' + board.title}>
-          <ProtectedPreview board={board} /><strong className="board-card__title">{board.title}</strong>
+          <ProtectedPreview board={board} /><strong className="board-card__title" title={board.title}>{board.title}</strong>
           <small>Edited {new Date(board.updatedAt).toLocaleString()}</small>
         </a><div className="board-card__metadata"><span>{board.access === 'private' ? 'Private' : 'Shared'}</span><span>{board.role[0]!.toUpperCase() + board.role.slice(1)}</span>{board.pendingCount > 0 && <span>Pending member sign-in</span>}</div>
-        <div className="board-card__actions"><details><summary>Full board name</summary><p>{board.title}</p></details>{board.role !== 'viewer' && <><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'rename' }); }}>Rename board</button><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'duplicate' }); }}>Duplicate board</button></>}{board.role === 'owner' && <><button onClick={event => { event.currentTarget.focus(); setSharing(board); }}>Share board</button><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'delete' }); }}>Delete board</button></>}</div>
+        <div className="board-card__actions">{board.role !== 'viewer' && <><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'rename' }); }}>Rename board</button><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'duplicate' }); }}>Duplicate board</button></>}{board.role === 'owner' && <><button onClick={event => { event.currentTarget.focus(); setSharing(board); }}>Share board</button><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'delete' }); }}>Delete board</button></>}</div>
       </article>)}
     </div>}
-    <section><h2>Boards in this browser</h2><button onClick={event => { event.currentTarget.focus(); setLocalCopyOpen(true); }}>Copy local boards</button></section>
     {localCopyOpen && <LocalBoardCopyDialog key={member.accountId} member={member} onClose={() => { setLocalCopyOpen(false); setRefresh(value => value + 1); }} />}
     {action && <BoardActionDialog board={action.board} kind={action.kind} onClose={() => setAction(undefined)} onComplete={result => {
       const remaining = boards.filter(row => row.id !== action.board.id);

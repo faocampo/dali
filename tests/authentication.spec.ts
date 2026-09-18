@@ -98,7 +98,7 @@ for (const intent of ['?board=synthetic-board', '?new=1']) {
       expect(new URL(page.url()).search).toBe(intent);
     } else {
       await expect(page.locator('editor-host')).toBeVisible();
-      await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Untitled board');
+      await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Untitled board');
       const id = new URL(page.url()).searchParams.get('board'); expect(id).toBeTruthy();
       const member = await (await context.request.get('/api/session')).json();
       const descriptor = await context.request.get('/api/boards/' + id, { headers: { 'X-Dali-Account': member.accountId } });

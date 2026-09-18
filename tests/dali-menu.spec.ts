@@ -1,5 +1,5 @@
-import { test, expect } from './fixtures';
 import { fileAction } from './app-menu';
+import { test, expect } from './fixtures';
 
 test('Main Menu supports arrow navigation, nested Escape, View actions and outside dismissal', async ({ page }) => {
   await page.goto('/');
@@ -12,6 +12,7 @@ test('Main Menu supports arrow navigation, nested Escape, View actions and outsi
   await page.keyboard.press('ArrowRight');
   await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeFocused();
   expect((await page.getByRole('menuitem', { name: 'New', exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect((await page.getByRole('menu', { name: 'File', exact: true }).getByRole('menuitem').allTextContents()).slice(-2)).toEqual(['Import board', 'Export board']);
   await page.keyboard.press('End');
   await expect(page.getByRole('menuitem', { name: 'Export board', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');

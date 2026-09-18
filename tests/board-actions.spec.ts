@@ -1,3 +1,4 @@
+import { editBoardTitle, fileAction } from './app-menu';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { Page } from '@playwright/test';
@@ -10,7 +11,6 @@ import { proxyApplicationAssets, syntheticCanaries } from './access-fixtures';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
 import * as Y from 'yjs';
-import { fileAction } from './app-menu';
 import { unzipSync, zipSync } from 'fflate';
 let closeProxy: (() => void) | undefined;
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
@@ -43,7 +43,7 @@ test('@CR-01 rejected malformed root still opens in the native account editor', 
     expect(response.status()).toBe(400); expect(sourceState(board.summary.id)).toEqual(before); root.destroy();
   }
   await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Reopen canary');
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Reopen canary');
   expect(sourceState(board.summary.id)).toEqual(before);
 });
 for (const sourceRole of ['owner', 'editor']) test(`@CR-02 @CR-07 ${sourceRole} editable download restores a private copy through the file picker`, async ({ page }) => {
@@ -268,23 +268,25 @@ test('@03-08-01 native map image duplicate has fresh identities private ownershi
 });
 test('@03-08-02 inline naming is acknowledged composition-safe and responsive with account role and sharing', async ({ page }) => {
   const board = await create(page, 'Inline source'); await page.goto(origin + '/?board=' + board.summary.id);
-  await expect(page.locator('affine-edgeless-root')).toBeVisible(); const input = page.getByRole('textbox', { name: 'Board name', exact: true });
+  await expect(page.locator('affine-edgeless-root')).toBeVisible(); const input = await editBoardTitle(page);
   await expect(input).toBeVisible();
   await input.fill('Uncommitted'); expect((database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id) as { title: string }).title).toBe('Inline source');
-  await input.press('Escape'); await expect(input).toHaveValue('Inline source');
+  await input.press('Escape'); await expect(page.locator('.board-title-label')).toHaveText('Inline source'); await editBoardTitle(page);
   await input.fill('Composition'); await input.dispatchEvent('compositionstart'); await input.dispatchEvent('keydown', { key: 'Enter', isComposing: true }); await input.dispatchEvent('blur');
   expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Inline source' });
-  await input.dispatchEvent('compositionend'); await input.focus(); await input.press('Escape');
-  const title = '👩🏽‍💻'.repeat(200); await input.fill('  ' + title + '  '); await input.press('Enter'); await expect(input).toHaveValue(title);
+  await input.dispatchEvent('compositionend'); await input.focus(); await input.press('Escape'); await editBoardTitle(page);
+  const title = '👩🏽‍💻'.repeat(200); await input.fill('  ' + title + '  '); await input.press('Enter'); await expect(page.locator('.board-title-label')).toHaveText(title);
   await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title });
-  await input.fill(' '); await input.press('Tab'); await expect(input).toHaveValue(title);
+  await editBoardTitle(page); await input.fill(' '); await input.press('Tab'); await expect(page.locator('.board-title-label')).toHaveText(title);
   await page.setViewportSize({ width: 490, height: 800 });
-  await input.focus(); await input.press('End');
+  await editBoardTitle(page); await expect(input).toBeFocused();
+  // Collapse the initially selected name to its end; End only scrolls on macOS Firefox.
+  await input.press('ArrowRight');
   expect(await input.evaluate(el => { const field = el as HTMLInputElement; return { caret: field.selectionStart, length: field.value.length, scroll: field.scrollLeft > 0 }; })).toEqual({ caret: title.length, length: title.length, scroll: true });
   await expect(page.getByText('Owner', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Share board', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Share board' })).toBeVisible(); await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Share board', exact: true })).toBeFocused();
-  await page.getByText('Account', { exact: true }).click(); await expect(page.getByRole('button', { name: 'Sign out of Dalí', exact: true })).toBeVisible();
+  await page.locator('.board-account summary').click(); await expect(page.getByRole('button', { name: 'Sign out of Dalí', exact: true })).toBeVisible();
   expect(await page.locator('.djai-header').evaluate(el => { const bounds = el.getBoundingClientRect(); return [...el.querySelectorAll('button, summary, input')].filter(node => (node as HTMLElement).offsetParent).every(node => { const rect = node.getBoundingClientRect(); return rect.x >= 0 && rect.right <= innerWidth && rect.height >= 44 && rect.y >= bounds.y; }); })).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
@@ -297,20 +299,22 @@ test('@03-08-02 long library rename labels and errors wrap within 490px without 
   expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title });
 });
 test('@03-08-02 inline loading guards repeated commits and uncertain failure retains a correctable draft', async ({ page }) => {
-  const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id); const input = page.getByRole('textbox', { name: 'Board name', exact: true }); await expect(input).toBeVisible();
+  const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id); const input = await editBoardTitle(page); await expect(input).toBeVisible();
   let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; }); let writes = 0;
   await page.route('**/api/boards/' + board.summary.id, async route => { if (route.request().method() !== 'PATCH') return route.continue(); writes++; await wait; await route.continue(); });
   await input.fill('Pending name'); await input.press('Enter'); await expect(page.getByRole('status', { name: '' }).filter({ hasText: 'Saving name' })).toBeVisible(); await expect(input).toBeDisabled();
-  expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Synthetic actions' }); release(); await expect(input).toBeEnabled(); expect(writes).toBe(1);
+  expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Synthetic actions' }); release(); await expect(page.locator('.board-title-label')).toHaveText('Pending name'); await editBoardTitle(page); expect(writes).toBe(1);
   await page.unroute('**/api/boards/' + board.summary.id);
   await input.fill('Failed draft'); await page.route('**/api/boards/' + board.summary.id, route => route.request().method() === 'PATCH' ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }) : route.continue());
   await input.press('Enter'); await expect(page.getByRole('button', { name: 'Check again' })).toBeVisible(); await expect(input).toHaveValue('Failed draft');
   expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Pending name' }); await page.getByRole('button', { name: 'Check again' }).click(); await expect(input).toBeEnabled();
   await page.unroute('**/api/boards/' + board.summary.id); await input.fill('Corrected draft'); await input.press('Tab');
   await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Corrected draft' });
-  await input.fill('界'.repeat(201)); await input.press('Enter'); await expect(input).toHaveValue('界'.repeat(201)); await expect(page.getByRole('alert')).toContainText('200');
+  await expect(page.getByRole('button', { name: 'Share board', exact: true })).toBeFocused();
+  await editBoardTitle(page); await input.fill('界'.repeat(201)); await input.press('Enter'); await expect(input).toHaveValue('界'.repeat(201)); await expect(page.getByRole('alert')).toContainText('200');
   await expect(input).toHaveAttribute('aria-describedby', 'board-title-error');
-  await input.press('Escape'); await expect(input).toHaveValue('Corrected draft');
+  await input.fill(' '); await input.press('Enter');
+  await expect(page.locator('.board-title-label')).toHaveText('Corrected draft'); await expect(page.locator('#board-title-error')).toHaveCount(0);
 });
 test('@03-08-02 Viewer readable title account controls and Main Menu preserve role restrictions at 490px', async ({ page }) => {
   const title = '長い名前👩🏽‍💻'.repeat(30); const board = await create(page, title);
@@ -323,6 +327,6 @@ test('@03-08-02 Viewer readable title account controls and Main Menu preserve ro
   await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveCount(0); await expect(page.getByText('Viewer · View only', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: 'Share board' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Main Menu', exact: true }).click(); await page.getByRole('menuitem', { name: 'File', exact: true }).click();
   await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeVisible(); await expect(page.getByRole('menuitem', { name: 'Duplicate board' })).toHaveCount(0); await expect(page.getByRole('menuitem', { name: 'Delete board' })).toHaveCount(0);
-  await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.getByText('Account', { exact: true }).click(); await expect(page.getByRole('button', { name: 'Sign out of Dalí' })).toBeVisible();
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.locator('.board-account summary').click(); await expect(page.getByRole('button', { name: 'Sign out of Dalí' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

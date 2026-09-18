@@ -1,3 +1,4 @@
+import { editBoardTitle, openLocalBoardCopy } from './app-menu';
 import { randomUUID } from 'node:crypto';
 import { test, expect, acceptanceService } from './access-fixtures';
 import type { Page } from '@playwright/test';
@@ -31,7 +32,7 @@ async function geometry(page: Page, selector: string) {
 test('@03-12-smoke recovery dialog contains focus and keeps actions visible at 490 and 1404px', async ({ page }, testInfo) => {
   await page.clock.install(); const board = await create(page, 'Synthetic recovery ' + '界'.repeat(120));
   await page.goto(service.origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
-  await page.getByRole('textbox', { name: 'Board name', exact: true }).focus();
+  await editBoardTitle(page);
   await page.clock.fastForward(86400001);
   const dialog = page.getByRole('dialog'); const resume = dialog.getByRole('button', { name: 'Sign in to continue', exact: true });
   await expect(resume).toBeEnabled(); await expect(dialog).toContainText('Session expired');
@@ -59,7 +60,7 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
   }
   await page.reload(); await expect(page.locator('[data-board-id]')).toHaveCount(50);
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeFocused();
-  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-color', 'rgb(180, 69, 31)');
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-style', 'none');
   const card = page.locator(`[data-board-id="${board.summary.id}"]`);
   await expect(card.getByRole('link', { name: 'Open ' + title, exact: true })).toBeVisible();
   for (const width of [490, 1404]) {
@@ -73,9 +74,10 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     await expect(page.getByLabel('Board name', { exact: true })).toHaveCSS('border-top-color', 'rgb(118, 115, 110)');
     await page.getByRole('heading', { name: 'Your boards', exact: true }).evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeInViewport();
-    await page.keyboard.press('Tab'); await page.getByRole('heading', { name: 'Your boards', exact: true }).focus();
-    await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-color', 'rgb(180, 69, 31)');
-    await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-width', '2px');
+    await page.getByRole('heading', { name: 'Your boards', exact: true }).focus();
+    await page.keyboard.press('Tab'); await expect(page.locator('.board-library__import summary')).toBeFocused();
+    await page.getByRole('heading', { name: 'Your boards', exact: true }).focus();
+    await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-style', 'none');
     await page.screenshot({ path: testInfo.outputPath(`synthetic-library-${width}.png`) });
     await card.getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
     await expect(dialog.getByRole('combobox', { name: 'Access role', exact: true })).toHaveCount(50);
@@ -112,7 +114,7 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     for (const button of await action.getByRole('button').all()) await expect(button).toHaveCSS('border-top-width', '1px');
     await expect(action.getByRole('button', { name: 'Save name' })).toHaveCSS('font-size', '13px'); await expect(action.getByRole('heading')).toHaveCSS('font-weight', '600');
     await page.screenshot({ path: testInfo.outputPath(`synthetic-action-${width}.png`) }); await action.getByRole('button', { name: 'Keep name' }).click();
-    await page.getByRole('button', { name: 'Copy local boards' }).click(); const copy = page.getByRole('dialog', { name: 'Copy local boards' });
+    await openLocalBoardCopy(page); const copy = page.getByRole('dialog', { name: 'Copy local boards' });
     await geometry(page, 'dialog'); expect((await copy.boundingBox())!.width).toBe(Math.min(640, width - 32)); await expect(copy.locator('header')).toHaveCSS('padding', '24px');
     await expect(copy.getByRole('button', { name: 'Close local copies' })).toHaveCSS('border-top-width', '1px');
     await page.screenshot({ path: testInfo.outputPath(`synthetic-local-copy-${width}.png`) }); await copy.getByRole('button', { name: 'Close local copies', exact: true }).click();

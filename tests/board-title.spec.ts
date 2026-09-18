@@ -1,4 +1,4 @@
-import { fileAction } from './app-menu';
+import { editBoardTitle, fileAction } from './app-menu';
 import { test, expect } from './fixtures';
 
 test('inline title saves with Enter and survives reload without replacing canvas', async ({ page }) => {
@@ -6,12 +6,12 @@ test('inline title saves with Enter and survives reload without replacing canvas
   const boardUrl = new URL(page.url());
   await expect(page.locator('affine-edgeless-root')).toHaveCount(1);
   await page.locator('affine-edgeless-root').evaluate(el => el.setAttribute('data-title-sentinel', 'mounted'));
-  await page.getByRole('textbox', { name: 'Board name' }).fill('Synthetic planning');
+  await (await editBoardTitle(page)).fill('Synthetic planning');
   await page.getByRole('textbox', { name: 'Board name' }).press('Enter');
   await expect(page.locator('affine-edgeless-root')).toHaveAttribute('data-title-sentinel', 'mounted');
-  await expect(page.getByRole('textbox', { name: 'Board name' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toBeFocused();
   await page.reload();
-  await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveValue('Synthetic planning');
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Synthetic planning');
   await fileAction(page, 'All boards');
   const boardLink = page.locator(`[data-board-id="${boardUrl.searchParams.get('board')}"]`).getByRole('link', { name: 'Open Synthetic planning', exact: true });
   await expect(boardLink).toBeVisible();
@@ -20,14 +20,15 @@ test('inline title saves with Enter and survives reload without replacing canvas
 
 test('inline title cancels on Escape, rejects blanks, and saves on blur', async ({ page }) => {
   await page.goto('/');
-  const title = page.getByRole('textbox', { name: 'Board name' });
+  const label = page.getByRole('button', { name: /^Rename board:/ });
+  const title = await editBoardTitle(page);
   await title.fill('Discard'); await title.press('Escape');
-  await expect(title).toHaveValue('Untitled board');
+  await expect(label).toHaveText('Untitled board'); await editBoardTitle(page);
   await title.fill('   '); await title.press('Enter');
-  await expect(title).toHaveValue('Untitled board');
+  await expect(label).toHaveText('Untitled board'); await editBoardTitle(page);
   await title.fill('Blur saved'); await page.mouse.click(400, 500);
-  await expect(title).toBeEnabled();
-  await page.reload(); await expect(title).toHaveValue('Blur saved');
+  await expect(label).toHaveText('Blur saved');
+  await page.reload(); await expect(label).toHaveText('Blur saved');
 });
 
 test('hand drags the viewport without changing objects and Select restores selection', async ({ page }) => {

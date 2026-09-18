@@ -86,7 +86,7 @@ test('@UI-X2 unknown creation keeps its receipt and opens the acknowledged priva
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   reconcile = true; await page.getByRole('button', { name: 'Check again', exact: true }).click();
   await expect(page).toHaveURL(origin + '/?board=' + created.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue(original.title);
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText(original.title);
   expect(posts).toEqual([original]); expect(receipts.every(id => id === original.operationId)).toBe(true);
   expect(database.prepare('SELECT * FROM operations WHERE operation_id=?').all(original.operationId)).toHaveLength(1);
 });
@@ -166,9 +166,8 @@ test('@03-03-02 UI-HOME-zero-one-many overflow and long Unicode names work at de
   await expect(card(page, id)).toBeVisible();
   expect((await card(page, id).boundingBox())!.width).toBeLessThan(400);
   await expect(card(page, id).getByRole('link', { name: 'Open ' + title, exact: true })).toBeVisible();
-  const disclosure = card(page, id).locator('summary'); await disclosure.focus(); await page.keyboard.press('Enter');
-  await expect(card(page, id).locator('details')).toHaveAttribute('open', '');
-  await expect(card(page, id).locator('details p')).toHaveText(title);
+  await expect(card(page, id).locator('strong')).toHaveAttribute('title', title);
+  await expect(card(page, id).locator('details')).toHaveCount(0);
   for (let index = 1; index < 50; index++) seed(index === 1 ? 'x'.repeat(120) : 'Synthetic board ' + index);
   database.prepare('UPDATE members SET email=? WHERE id=?').run('long'.repeat(40) + '@example.org', accountId);
   await page.reload(); await expect(page.locator('[data-board-id]')).toHaveCount(50);
@@ -181,7 +180,7 @@ test('@03-03-02 UI-HOME-zero-one-many overflow and long Unicode names work at de
     expect(sizes.every(height => height >= 44)).toBe(true);
     await page.screenshot({ path: '.gsd/library-' + width + '.png', fullPage: false });
   }
-  await card(page, id).locator('summary').click(); await expect(card(page, id).locator('details p')).toBeVisible();
+  await expect(card(page, id).getByRole('link', { name: 'Open ' + title, exact: true })).toBeVisible();
   expect(await card(page, id).locator('strong').evaluate(node => node.getBoundingClientRect().height)).toBeLessThanOrEqual(46);
 });
 
@@ -236,6 +235,6 @@ test('@03-03-02 UI-HOME-partial denied preview keeps the authorized open action 
   await expect(card(page, id).locator('img')).toHaveCount(0);
   await card(page, id).getByRole('link', { name: 'Open Missing preview board' }).click();
   await expect(page.locator('affine-edgeless-root')).toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Board name', exact: true })).toHaveValue('Missing preview board');
+  await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Missing preview board');
 });
 });

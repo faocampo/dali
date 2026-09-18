@@ -1,3 +1,4 @@
+import { editBoardTitle, fileAction } from './app-menu';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { request, type Page, type APIRequestContext } from '@playwright/test';
@@ -9,7 +10,6 @@ import { createOidcProvider } from './oidc-provider';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
 import { proxyApplicationAssets, syntheticCanaries } from './access-fixtures';
-import { fileAction } from './app-menu';
 import { prepareClipboard, pasteClipboard } from './clipboard-route';
 import { PDFDocument, PDFRawStream, PDFName, decodePDFRawStream } from 'pdf-lib';
 import { unzipSync, strFromU8 } from 'fflate';
@@ -62,7 +62,7 @@ test('@CR-07 Viewer import is disabled with an accessible reason and keyboard na
   await expect(page.getByRole('menuitem', { name: 'File', exact: true })).toBeFocused(); await page.keyboard.press('ArrowRight');
   const item = page.getByRole('menuitem', { name: 'Import board', exact: true });
   await expect(item).toBeDisabled(); await expect(item).toHaveAccessibleDescription('Board import requires Owner or Editor access.');
-  await expect(page.getByText('Board import requires Owner or Editor access.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Board import requires Owner or Editor access.', { exact: true })).toBeHidden();
   await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeFocused(); await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'All boards', exact: true })).toBeFocused(); await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'Export board', exact: true })).toBeFocused(); await page.keyboard.press('ArrowUp');
@@ -75,7 +75,7 @@ test('@CR-07 Viewer import is disabled with an accessible reason and keyboard na
 test('@CR-06 immediate rename updates all download names and decoded archive metadata', async ({ page }) => {
   const board = await create(page, 'Synthetic old'); await page.goto(origin + '/?board=' + board.summary.id);
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Rename export canary'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
-  const name = page.getByRole('textbox', { name: 'Board name', exact: true }); await name.fill('Synthetic new'); await page.getByRole('button', { name: 'Saved', exact: true }).click();
+  const name = await editBoardTitle(page); await name.fill('Synthetic new'); await page.getByRole('button', { name: 'Saved', exact: true }).click();
   await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Synthetic new' });
   for (const format of ['board', 'png', 'pdf']) {
     await fileAction(page, 'Export board'); const dialog = page.getByRole('dialog', { name: 'Export board', exact: true });
@@ -96,7 +96,7 @@ test('@CR-04 Viewer menu zoom and fit navigate without native or server mutation
   await view(); await page.getByRole('menuitem', { name: 'Reset zoom to 100%', exact: true }).click(); await expect.poll(async () => (await viewport()).zoom).toBe(1);
   await page.mouse.move(600, 400); await page.mouse.down({ button: 'middle' }); await page.mouse.move(900, 650, { steps: 5 }); await page.mouse.up({ button: 'middle' }); const moved = await viewport();
   await view(); await page.getByRole('menuitem', { name: 'Fit to screen', exact: true }).click(); await expect.poll(viewport).not.toEqual(moved);
-  await view(); await expect(page.getByRole('menuitem', { name: 'Layers', exact: true })).toBeDisabled(); await expect(page.getByText('Layer editing requires Owner or Editor access.', { exact: true })).toBeVisible();
+  await view(); await expect(page.getByRole('menuitem', { name: 'Layers', exact: true })).toBeDisabled(); await expect(page.getByText('Layer editing requires Owner or Editor access.', { exact: true })).toBeHidden();
   await page.keyboard.press('Escape'); await page.getByRole('menuitem', { name: 'Edit', exact: true }).click(); await expect(page.getByRole('menuitem', { name: 'Undo', exact: true })).toBeDisabled(); await expect(page.getByRole('menuitem', { name: 'Redo', exact: true })).toBeDisabled();
   expect(await localState(page)).toEqual(before); expect(await ownerRead(board.summary.id)).toEqual(server);
 });
