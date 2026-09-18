@@ -11,6 +11,10 @@ created: "2026-09-16"
 
 This contract defines AUTH-01 and BOARD-01 through BOARD-04. It carries forward all 16 locked access decisions. Routine copy, dimensions and interaction details are defaults selected under the user's instruction to move forward with recommended options. This is a design artifact; implementation, runtime accessibility and real-provider acceptance require separate evidence.
 
+## User-directed refinement — 2026-09-18
+
+The eight browser comments recorded in quick task 260918-eix amend the presentation contract: click-to-edit borderless titles; vertically centered roles; an initials avatar and user name; Import/Export last in File; concise menu labels; an unoutlined library heading; no full-name disclosure; and local copying under Import instead of a separate section. Authorization, preservation and pending acceptance remain unchanged.
+
 ## Sources and Decision Status
 
 - [03-CONTEXT.md](03-CONTEXT.md) (D-01–D-16: authentication, roles, library and local-copy decisions) is authoritative for behavior.
@@ -102,7 +106,7 @@ Accent reserved for New board, Sign in again/Sign in to continue, Grant access, 
 | Read-only indicator | Viewer · View only |
 | Private status | Private |
 | Shared status / pending detail | Shared / Pending member sign-in |
-| Account control | Account |
+| Account control | Initials avatar and {display name} |
 | Account action | Sign out of Dalí |
 | New default title | Untitled board |
 | Rename accessible label | Board name |
@@ -134,7 +138,7 @@ Accent reserved for New board, Sign in again/Sign in to continue, Grant access, 
 | Delete confirmation | Delete “{board title}”? This removes the board and its access grants for everyone. This cannot be undone. |
 | Delete confirmation buttons | Keep board / Delete board |
 | Duplicate success | Private copy created. Only you have access. |
-| Local work section / entry | Boards in this browser / Copy local boards |
+| Local work entry | Import > Copy local boards |
 | Local-copy helper | Select the local boards to copy into this account as private boards. Their titles, content and images will be copied. Originals stay in this browser. |
 | Local-copy destination | Copy to: {current account email} |
 | Local-copy CTA / progress | Copy selected boards / Copying {completed} of {total} boards… |
@@ -164,13 +168,13 @@ If reauthentication returns a different identity, dispose the previous visible r
 
 Use the existing centered card grid. Order authorized account boards by most recently updated; break equal timestamps by stable board identity. All includes every accessible board; Mine includes owned boards; Shared with me includes non-owned explicit grants. Keep the selected filter while actions refresh the list. Empty filters use their matching copy and remain operable.
 
-The library's visual anchor is the Your boards heading paired with the accent-filled New board CTA in the existing heading/action layout. Reading order is Your boards and its subtitle, New board, the filter group, account-board cards, then Boards in this browser. Preserve this order when the heading/actions stack on narrow viewports; secondary account and card actions remain visually subordinate to New board.
+The library's visual anchor is the Your boards heading paired with the accent-filled New board CTA in the existing heading/action layout. Reading order is Your boards and its subtitle, the compact Import disclosure, New board, the filter group and account-board cards. Preserve this order when the heading/actions stack on narrow viewports; secondary account and card actions remain visually subordinate to New board.
 
 Each card includes a decorative preview, title, edited date/time, Private or Shared, and the current member's role. Private means owner-only with zero active or pending grants. Shared means at least one active or pending grant; pending-only sharing also exposes Pending member sign-in. Labels use authoritative summaries. A missing thumbnail gets a neutral placeholder and never blocks opening. Missing required permission/identity metadata prevents rendering an actionable card until refreshed.
 
 New board creates a private owned board with Untitled board and opens it. Library creation may use the current tab. Preserve File > New opening another tab while leaving the current board intact. Reserve the tab during the user gesture, show progress there and resolve it to the authorized board; if blocked, expose the resulting board link without creating another board. Creation failure offers a retry without abandoning the existing board.
 
-Owner and Editor retain inline header rename: Enter or blur submits a trimmed nonblank title, Escape restores the acknowledged title, and IME composition does not submit. Blank names restore the previous name; creation retains the usable default. Preserve Unicode title content through rename, copying and display; trimming only removes surrounding whitespace. Keep failed draft text available for correction and show the acknowledged title elsewhere until success. Library Rename board opens a small labeled dialog prefilled with the title; Save name commits, Keep name preserves the acknowledged title and closes the dialog. Viewers see a text title. Prevent duplicate submits; normalize via the same title rules in both entry points.
+Owner and Editor see a compact borderless title label that enters editing on click or keyboard activation. Inline header rename preserves its behavior: Enter or blur submits a trimmed nonblank title, Escape restores the acknowledged title, and IME composition does not submit. Blank names restore the previous name; creation retains the usable default. Preserve Unicode title content through rename, copying and display; trimming only removes surrounding whitespace. Keep failed draft text available for correction and show the acknowledged title elsewhere until success. Library Rename board opens a small labeled dialog prefilled with the title; Save name commits, Keep name preserves the acknowledged title and closes the dialog. Viewers see a text title. Prevent duplicate submits; normalize via the same title rules in both entry points.
 
 ### Roles and editor affordances — D-09–D-12
 
@@ -196,7 +200,7 @@ Access rows show member identity, Editor/Viewer, and Active or Pending member si
 
 ### Selected local-board copy and identity isolation — D-16
 
-Place a distinct Boards in this browser section after account boards. Open Copy local boards to enumerate legacy, unbound browser-local documents. Account-bound caches and recovery drafts never enter this inventory. Enumeration failures show an error and retry; they never imply an empty collection. No board is preselected. Show checkboxes, titles, local updated times, selected count, destination account and the preservation helper before any upload.
+Place Copy local boards inside the compact Import disclosure beside the library heading. Open Copy local boards to enumerate legacy, unbound browser-local documents. Account-bound caches and recovery drafts never enter this inventory. Enumeration failures show an error and retry; they never imply an empty collection. No board is preselected. Show checkboxes, titles, local updated times, selected count, destination account and the preservation helper before any upload.
 
 Copy selected boards processes only explicit selections into private owned account boards, preserving titles, canvas hierarchy, collapsed state and referenced images. Each row progresses through Waiting, Copying, Copied or Failed. Only acknowledge a copied board once its required content and images are complete. A failed item remains retryable; successful items are excluded from retry to prevent duplicates. Reconcile ambiguous outcomes by the original copy attempt. Partial completion keeps per-board results visible, with singular/plural counts and links to successful copies.
 
@@ -208,11 +212,11 @@ At 1404px viewport width, retain the 1240px centered library, 16px grid gap and 
 
 Sharing and copy dialogs use width `min(640px, calc(100vw - 32px))`, maximum height `calc(100dvh - 32px)`, fixed header/footer and a vertically scrollable body. At 490px recipient fields and role/actions stack; emails wrap; action buttons retain 44px targets. No essential controls are hover-only. Sticky dialog regions may not cover focused content at 200% browser zoom.
 
-Cards show at most two title lines with a focusable full-title disclosure or text equivalent available to keyboard and touch users; accessible open names retain the full title. Header titles truncate visually while the input permits horizontal caret scrolling during editing. Dialog titles and destructive confirmations wrap fully. Test 200-character titles, 120-character unbroken tokens, long member emails, one board and 50 boards/grants. Lists scroll vertically without compressing row controls. A single card retains ordinary column width at desktop.
+Cards show at most two title lines without a separate full-name disclosure. Accessible open names and native title tooltips retain the full title; opening the board exposes its readable or editable title. Header titles truncate visually while the input permits horizontal caret scrolling during editing. Dialog titles and destructive confirmations wrap fully. Test 200-character titles, 120-character unbroken tokens, long member emails, one board and 50 boards/grants. Lists scroll vertically without compressing row controls. A single card retains ordinary column width at desktop.
 
 Use actual buttons, links, inputs and selects. Filters use a labeled button group with `aria-pressed`; Tab visits each filter and Enter/Space activates it. Card open and actions are separate interactive elements. Menus retain existing arrow/Escape behavior. Combobox Up/Down selects results, Enter chooses and Escape dismisses results before closing the dialog. Enter within IME composition never grants, renames or submits.
 
-Dialogs trap focus, label their title, make the background inert and restore focus to the trigger on close. For sharing, focus the member field; for local copy, focus the heading then selection controls; for destructive confirmation, focus the safe action. Escape cancels ordinary dialogs without mutating data. During an in-flight request, preserve context until the operation settles rather than pretending cancellation. Session expiry remains blocking even if its visual dialog is dismissed. Route changes focus the page heading. Errors connect to fields using `aria-describedby` and announce via `role=alert`; progress/result announcements use a polite status region. Skeletons are noninteractive and decorative. Use static progress under reduced motion.
+Dialogs trap focus, label their title, make the background inert and restore focus to the trigger on close. For sharing, focus the member field; for local copy, focus the heading then selection controls; for destructive confirmation, focus the safe action. Escape cancels ordinary dialogs without mutating data. During an in-flight request, preserve context until the operation settles rather than pretending cancellation. Session expiry remains blocking even if its visual dialog is dismissed. Route changes focus the page heading. Your boards remains visually plain when programmatically focused; interactive controls retain visible keyboard focus. Errors connect to fields using `aria-describedby` and announce via `role=alert`; progress/result announcements use a polite status region. Skeletons are noninteractive and decorative. Use static progress under reduced motion.
 
 ## UI Considerations
 
