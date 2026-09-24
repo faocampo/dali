@@ -69,6 +69,9 @@ These are the agreed capabilities to scope into requirements and phases, rather 
 
 ### Deferred to Later Iterations
 
+- Actual Okta-compatible provider configuration and acceptance: postponed on 2026-09-24 until operator access is available (backlog 999.4); generic OIDC support remains implemented.
+- Assistive-technology speech and interaction acceptance: moved to backlog 999.3 on 2026-09-24.
+
 - MCP services for creating diagrams and mind maps from natural-language instructions; generated content must remain editable by the team when delivered.
 - Plane integration for linking board cards/action items to tasks and sourcing task data for planning views.
 

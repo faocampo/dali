@@ -4,10 +4,10 @@ current_phase: 03
 current_phase_name: Okta and Board Access
 current_plan: 12
 status: executing
-stopped_at: Phase 3 verified human_needed (99/104); ten UAT items pending
-last_updated: "2026-09-24T19:31:21Z"
+stopped_at: Phase 3 UAT: six passes, two deferred follow-ups, two pending items
+last_updated: "2026-09-24T22:34:12.094408+00:00"
 last_activity: 2026-09-24
-last_activity_desc: Completed canvas formatting, placement, and interaction refinements; ten Phase 3 UAT items remain pending
+last_activity_desc: Recorded Phase 3 user acceptance and privacy review; deferred provider and assistive-technology follow-ups
 state_head: 18bb38e7344de7fd270210bd8689134d257f8062
 progress:
   total_phases: 13
@@ -28,11 +28,13 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-15).
 
 ## Current Position
 
+Acceptance update (2026-09-24): five user-reported passes plus a scoped privacy-review pass; provider work and screen-reader testing are deferred. The exported snapshot is structurally valid with a hash-matched image asset, but the user tested export only. See [UAT review](phases/03-okta-and-board-access/03-UAT-REVIEW.md) (analysis, review scope and remaining copy procedure). Earlier progress notes below retain their historical status.
+
 Phase: 03 (Okta and Board Access) — HUMAN VERIFICATION PENDING
 Current Plan: 12
 Total Plans in Phase: 12
-Status: Human verification pending — 99/104 truths verified; ten items saved in 03-UAT.md
-Last activity: 2026-09-24 - Completed quick task 260924-m9n: canvas formatting, placement, and interaction refinements
+Status: Human verification pending — six UAT passes, two approved deferrals, two pending dispositions (03-07 and 03-11). Historical automated score: 99/104.
+Last activity: 2026-09-24 - Recorded UAT results, reviewed export and public-artifact privacy, captured backlog 999.3 and 999.4.
 
 Progress: [██░░░░░░░░] 15% (2/13 phases complete; 25/26 plans complete)
 
@@ -132,7 +134,7 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ### Pending Todos
 
-- Final automated task 03-12-01 passed at 7341672. Complete the ten items in 03-UAT.md before accepting Phase 3; final verifier and audit disposition are recorded. Plans 03-01 through 03-11 remain complete; plan 03-12 and shared requirements remain open. Preserve dormant seeds and earlier TDD process deviations in WINDOWS.md.
+- Final automated task 03-12-01 passed at 7341672. Resolve the two pending items in 03-UAT.md before accepting current Phase 3 scope; provider and assistive-technology acceptance are explicitly deferred; final verifier and audit disposition are recorded. Plans 03-01 through 03-11 remain complete; plan 03-12 and shared requirements remain open. Preserve dormant seeds and earlier TDD process deviations in WINDOWS.md.
 
 ### Blockers/Concerns
 
@@ -149,9 +151,9 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 ## Session Continuity
 
 Last session: 2026-09-17T20:43:08.786425+00:00
-Stopped at: Phase 3 verified human_needed (99/104); ten UAT items pending
+Stopped at: Phase 3 UAT: six passes, two deferred follow-ups, two pending items
 Resume file: .planning/phases/03-okta-and-board-access/03-UAT.md
-Next action: $gsd-verify-work 3 — complete the ten pending acceptance items; preserve private operator settings and evidence outside the repository.
+Next action: $gsd-verify-work 3 — resolve pending-access presentation (item 8) and deliberate selected local copying (item 9). Backlog 999.3 and 999.4 hold the approved deferrals.
 
 ## Phase 1 verification outcome
 

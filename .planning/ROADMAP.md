@@ -132,7 +132,7 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
 
-**Plans**: 11/12 executed; plan 03-12 remains incomplete. Automated task 03-12-01 passed at 7341672: exact two-case smoke, both typechecks, 105 unit tests, 112 server tests, production build, standalone 123-case access suite and complete 1533-case five-project browser matrix (57.1m, zero failures/timeouts/skips/interruptions/unrun). Earlier failed and interrupted attempts remain in the checkpoint. Independent verification is **human_needed (99/104)** with no proved implementation blocker. Ten items in 03-UAT.md cover actual-provider acceptance, native browser/input/accessibility observations and four flagged prohibition dispositions. Resume with `$gsd-verify-work 3`. Overall progress remains 2/13 accepted phases and 25/26 completed plans.
+**Plans**: 11/12 executed; plan 03-12 remains incomplete. Automated task 03-12-01 passed at 7341672: exact two-case smoke, both typechecks, 105 unit tests, 112 server tests, production build, standalone 123-case access suite and complete 1533-case five-project browser matrix (57.1m, zero failures/timeouts/skips/interruptions/unrun). Earlier failed and interrupted attempts remain in the checkpoint. Independent verification is **human_needed (99/104)** with no proved implementation blocker. The 2026-09-24 UAT update records five user passes and one scoped privacy-review pass; pending-access presentation and selected local-copy acceptance remain open. Actual-provider work and assistive-technology testing are deferred to backlog 999.4 and 999.3 respectively. The historical automated score retains its original revision scope. Resume with `$gsd-verify-work 3`. Overall progress remains 2/13 accepted phases and 25/26 completed plans.
 
 Plans:
 **Wave 1**
@@ -393,7 +393,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 - [config.json](config.json) (fine granularity and enabled research, plan-check, and verification settings).
 - [research/SUMMARY.md](research/SUMMARY.md) (research findings and risks, including the final scope update that supersedes the earlier phase proposal).
 
-*Last updated: 2026-09-17 — Phase 3 automated gate and independent verification complete; ten human acceptance items remain pending. Phase 1 and 2 acceptance is preserved.*
+*Last updated: 2026-09-24 — Phase 3 UAT has six passes, two deferred follow-ups and two pending items. Phase 1 and 2 acceptance is preserved.*
 
 ## Backlog
 
@@ -418,6 +418,28 @@ Plans:
 **Plans:** 0 plans
 
 **Captured context:** Introduce system features through a sequence of tutorial steps. Feature coverage, step order and tutorial interactions will be defined during planning.
+
+Plans:
+
+- [ ] TBD (promote with $gsd-review-backlog when ready)
+
+### Phase 999.3: Assistive-technology acceptance (BACKLOG)
+
+**Goal:** Validate screen-reader speech and interaction through login/recovery, board library, sharing, destructive confirmation and copy progress.
+**Requirements:** Follow-up acceptance for Phase 3; preserve current accessibility implementation and automated checks.
+**Plans:** 0 plans
+**Captured context:** Deferred by the user on 2026-09-24 from UAT item 5. Record actual assistive technology and browser, spoken names/state/errors/progress, focus containment and return. Resume when a screen-reader testing session is available. This is an approved deferred follow-up, not a current Phase 3 blocker.
+
+Plans:
+
+- [ ] TBD (promote with $gsd-review-backlog when ready)
+
+### Phase 999.4: Actual Okta-compatible provider acceptance (BACKLOG)
+
+**Goal:** Complete real-provider configuration and acceptance when operator access becomes available.
+**Requirements:** Deferred real-provider portion of AUTH-01; the generic OIDC implementation and synthetic validation remain in place.
+**Plans:** 0 plans
+**Captured context:** User postponed this work on 2026-09-24 because Okta access is unavailable. Resume docs/access-acceptance.md A1–A9 with operator-managed registration, membership policy and claims. Keep all settings, identities and protocol evidence outside the public repository. No real-provider compatibility acceptance is claimed until this follow-up passes.
 
 Plans:
 

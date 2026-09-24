@@ -10,7 +10,7 @@ Initial release includes the capabilities below. Delivery proceeds through small
 
 ### Identity and board access
 
-- [ ] **AUTH-01**: Members can sign in through configurable OIDC SSO with Okta compatibility and sign out of Dali.
+- [ ] **AUTH-01**: Members can sign in through configurable OIDC SSO with Okta compatibility and sign out of Dali. Real-provider configuration and acceptance are deferred by the user (2026-09-24) to backlog 999.4 until operator access is available; existing generic OIDC behavior remains in scope.
 - [ ] **BOARD-01**: Members can create named boards and reopen boards they are authorized to access from a home view.
 - [ ] **BOARD-02**: The home view identifies private and shared boards and the member's role on each board.
 - [ ] **BOARD-03**: Board owners can grant and revoke editor or viewer access for internal members.

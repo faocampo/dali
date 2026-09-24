@@ -8,7 +8,9 @@ overrides_applied: 0
 source_head: 2d0dae437499830adc1d4a142d1765a30b5cf52d
 full_gate_source_head: 73416723411ca2c5b98de090f6d5327ed9e076c7
 application_head: 6d6dade1ea574e41123c252f36499e465adf5811
-flagged_prohibitions: 4
+flagged_prohibitions: 2
+acceptance_updated: 2026-09-24
+acceptance_source: 03-UAT.md
 covered_files:
   - ".planning/PROJECT.md"
   - ".planning/REQUIREMENTS.md"
@@ -185,9 +187,10 @@ behavior_unverified_items:
 prohibitions:
   - statement: "Explicit Dali sign-out MUST NOT silently sign the member back in or terminate their provider-wide session."
     verification: test
-    status: unverified
-    flagged: true
+    status: verified
+    flagged: false
     enforcement_evidence: []
+    disposition: User explicitly accepted UAT item 7 on 2026-09-24; no wired automated descriptor claimed.
   - statement: "Pending access MUST NOT be presented as an emailed invitation or active membership before verified internal sign-in."
     verification: test
     status: unverified
@@ -200,9 +203,10 @@ prohibitions:
     enforcement_evidence: []
   - statement: "Public artifacts MUST NOT contain operator-specific identity settings, real organizational content, credentials or real-provider evidence."
     verification: judgment
-    status: unverified
-    flagged: true
+    status: verified
+    flagged: false
     enforcement_evidence: []
+    disposition: Scoped judgment review in 03-UAT-REVIEW.md on 2026-09-24; publication recheck remains required.
 human_verification:
   - name: "Actual configured Okta-compatible provider"
     test: "Complete docs/access-acceptance.md A1–A9 using private operator-controlled registration, assignments, claim mapping and settings."
@@ -245,6 +249,9 @@ human_verification:
     expected: "Record human disposition or provide a wired enforcement descriptor and reverify."
     why_human: "Descriptor-less judgment prohibition; semantic test coverage does not supply the missing enforcement contract."
 ---
+
+> Acceptance update, 2026-09-24: [03-UAT.md](03-UAT.md) records five user passes and one scoped privacy-review pass, two approved deferrals, and two pending dispositions (03-07 and 03-11). [03-UAT-REVIEW.md](03-UAT-REVIEW.md) details export analysis and privacy scope. The score, covered digest and automated evidence below are the historical verification; this update does not claim a new full gate. Human-verification entries below describe the original checks, with current dispositions in the UAT file.
+
 
 # Phase 3: Okta and Board Access Verification Report
 
