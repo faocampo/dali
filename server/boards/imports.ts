@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import * as Y from 'yjs';
 import type { AuthConfig } from '../app.js';
-import { currentSession, requireExpectedMember, requireMutation } from '../auth/session-store.js';
+import { currentSession, requireExpectedMember, requireSystemWriter, requireMutation } from '../auth/session-store.js';
 import { runMigrations, type AccountDatabase } from '../storage/database.js';
 import { requireBoardCapability, operationReceipt, type BoardRow } from './routes.js';
 import { referencedImageKeys, validateDocument, DOCUMENT_LIMITS, type BeforeCommit } from './documents.js';
@@ -30,7 +30,7 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
   }, async (request, reply) => {
     if (!requireMutation(request, reply, config)) return;
     return database.transaction(() => {
-      const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
+      const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member) || !requireSystemWriter(reply, member)) return;
       const { operationId, title, manifest } = request.body;
       if (![...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length || [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length > 200) return reply.code(400).send({ code: 'INVALID_TITLE' });
       const old = previous(member!.accountId, operationId);
@@ -50,7 +50,7 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
     schema: { body: { type: 'object', required: ['root', 'content', 'manifest'], properties: { root: { type: 'string' }, content: { type: 'string' }, manifest: { type: 'array', maxItems: 10000, uniqueItems: true, items: { type: 'string', maxLength: 44 } } } } },
   }, async (request, reply) => {
     if (!requireMutation(request, reply, config)) return;
-    const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
+    const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member) || !requireSystemWriter(reply, member)) return;
     const stage = stageFor(member!.accountId, request.params.operationId); if (!stage) return reply.code(404).send({ code: 'STAGING_UNAVAILABLE' });
     const d = JSON.parse(stage.descriptor); const board = { root_doc_id: d.rootDocId, content_doc_id: d.contentDocId } as BoardRow;
     const root = Buffer.from(request.body.root, 'base64'); const content = Buffer.from(request.body.content, 'base64'); const docs = [new Y.Doc(), new Y.Doc()];
@@ -82,7 +82,7 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
   app.put<{ Params: { operationId: string; key: string }; Body: Buffer }>('/api/imports/:operationId/blobs/:key', { bodyLimit: IMAGE_LIMITS.bytes,
     onRequest: async (request, reply) => { requireMutation(request, reply, config, ['image/png', 'image/jpeg']); },
   }, async (request, reply) => {
-    const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
+    const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member) || !requireSystemWriter(reply, member)) return;
     const stage = stageFor(member!.accountId, request.params.operationId); if (!stage) return reply.code(404).send({ code: 'STAGING_UNAVAILABLE' });
     const mime = (request.headers['content-type'] ?? '').split(';')[0]!;
     try { if (!Buffer.isBuffer(request.body) || !(JSON.parse(stage.manifest) as string[]).includes(request.params.key) || imageHash(request.body) !== request.params.key) throw new Error(); validateImageBytes(request.body, mime); }
@@ -95,7 +95,7 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
     if (!requireMutation(request, reply, config)) return;
     await beforeCommit?.();
     return database.transaction(() => {
-      const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
+      const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member) || !requireSystemWriter(reply, member)) return;
       const old = previous(member!.accountId, request.params.operationId);
       if (old && !['import', 'duplicate'].includes(old.kind)) return reply.code(409).send({ code: 'OPERATION_CONFLICT' });
       if (old?.status === 'completed') return operationReceipt(database, request, reply, request.params.operationId, now, true)?.result;

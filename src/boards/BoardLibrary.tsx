@@ -126,23 +126,23 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
     <header className="board-library__header">
       <a className="djai-brand" href="/" aria-label="Dalí"><img src={logo} alt="" height={34} /></a>
       <nav className="board-library__header-actions" aria-label="Library controls">
-        <Dropdown className="board-library__import" summary="Import">{close => <button onClick={() => { close(); setLocalCopyOpen(true); }}>Copy local boards</button>}</Dropdown>
+        {member.systemRole !== 'viewer' && <Dropdown className="board-library__import" summary="Import">{close => <button onClick={() => { close(); setLocalCopyOpen(true); }}>Copy local boards</button>}</Dropdown>}
         <AccountMenu member={member} signOut={signOut} />
       </nav>
     </header>
     <main className="board-library__main">
     <div className="board-library__title-row"><div><h1 ref={heading} tabIndex={-1}>Your boards</h1><p>Boards you can access with this account.</p></div></div>
-    <form className="board-library__create" onSubmit={event => { event.preventDefault(); void create(); }}>
+    {member.systemRole !== 'viewer' && <form className="board-library__create" onSubmit={event => { event.preventDefault(); void create(); }}>
       <label htmlFor="new-board-title">Board name <input id="new-board-title" aria-describedby={createError ? 'board-create-error' : undefined} value={title} onChange={event => setTitle(event.target.value)} disabled={busy || !!operation.current} /></label>
       <button className="djai-primary" aria-describedby={createError ? 'board-create-error' : undefined} disabled={busy || loading} type="submit">{busy ? 'Creating board…' : operation.current ? 'Check again' : 'New board'}</button>
-    </form>
+    </form>}
     {createError && <p id="board-create-error" role="alert">{createError}</p>}
     {notice && <p role="status">{notice}</p>}
     <div className="board-library__filters" role="group" aria-label="Filter boards">
       {(['all', 'mine', 'shared'] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={event => { event.currentTarget.focus(); setFilter(value); }}>{value === 'all' ? 'All' : value === 'mine' ? 'Mine' : 'Shared with me'}</button>)}
       <button onClick={event => { event.currentTarget.focus(); setRefresh(value => value + 1); }}>Refresh boards</button>
     </div>
-    {loading ? <><p role="status">Loading your boards…</p><div className="board-grid" aria-hidden="true">{[0, 1, 2].map(key => <div className="board-card board-card--skeleton" key={key} />)}</div></> : error ? <section><p role="alert">We couldn't load your boards. Try again.</p><button onClick={() => setRefresh(value => value + 1)}>Try again</button></section> : boards.length === 0 ? <section className="board-library__empty"><h2>{filter === 'shared' ? 'No shared boards yet' : 'Create your first board'}</h2><p>{filter === 'shared' ? 'Boards shared with you will appear here. Choose All to see your boards.' : 'Start a private board. You can share it with internal members afterward.'}</p>{filter === 'shared' && <button onClick={() => setFilter('all')}>View all boards</button>}</section> : <div className="board-grid">
+    {loading ? <><p role="status">Loading your boards…</p><div className="board-grid" aria-hidden="true">{[0, 1, 2].map(key => <div className="board-card board-card--skeleton" key={key} />)}</div></> : error ? <section><p role="alert">We couldn't load your boards. Try again.</p><button onClick={() => setRefresh(value => value + 1)}>Try again</button></section> : boards.length === 0 ? <section className="board-library__empty"><h2>{member.systemRole === 'viewer' || filter === 'shared' ? 'No shared boards yet' : 'Create your first board'}</h2><p>{member.systemRole === 'viewer' || filter === 'shared' ? 'Boards shared with you will appear here. Choose All to see your boards.' : 'Start a private board. You can share it with internal members afterward.'}</p>{filter === 'shared' && <button onClick={() => setFilter('all')}>View all boards</button>}</section> : <div className="board-grid">
       {boards.map(board => <article className="board-card" key={board.id} data-board-id={board.id}>
         <a className="board-card__open" href={'/?board=' + encodeURIComponent(board.id)} aria-label={'Open ' + board.title}>
           <ProtectedPreview board={board} /><strong className="board-card__title" title={board.title}>{board.title}</strong>

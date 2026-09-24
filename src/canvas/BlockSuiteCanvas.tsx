@@ -267,6 +267,11 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
       }}>{importUnknown ? 'Check import again' : 'Import private copy'}</button>}
       <button disabled={importBusy || importUnknown} onClick={() => { setArchive(undefined); document.querySelector<HTMLButtonElement>('.dali-menu-trigger')?.focus(); }}>Close import</button>
     </dialog>}
+    {(imageError || actionError) && <div className="canvas-feedback" role="alert" data-testid={imageError ? 'image-import-error' : undefined}>
+      <p>{imageError || actionError}</p>
+      <div>{imageError && <button type="button" onClick={() => inputRef.current?.click()}>Choose another image</button>}
+      <button type="button" aria-label="Dismiss error" onClick={() => { setImageError(null); setActionError(null); }}>Dismiss</button></div>
+    </div>}
     <div
       data-testid="board-action-menu"
       role="toolbar"
@@ -292,10 +297,6 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
       }}
     >
       <EdgelessToolbarDragHandle host={host} />
-      {actionError && <p role="alert">{actionError}</p>}
-      {imageError && <div role="alert" data-testid="image-import-error" style={{width:240,maxWidth:'calc(100vw - 64px)',whiteSpace:'normal'}}>
-        <p>{imageError}</p><button type="button" onClick={()=>inputRef.current?.click()}>Choose another image</button>
-      </div>}
       <ControlButton label="Insert image" onClick={() => inputRef.current?.click()}>
         <rect x="3" y="4" width="18" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
         <circle cx="8.75" cy="9.5" r="1.6" fill="currentColor" />

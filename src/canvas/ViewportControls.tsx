@@ -16,8 +16,8 @@ export function ViewportControls({ host }: { host: EditorHost }) {
   }, [gfx, store]);
   const zoom = (step: number) => gfx.viewport.smoothZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, gfx.viewport.zoom + step)));
   return <div className="canvas-viewport-controls" role="toolbar" aria-label="Viewport and history">
-    <button type="button" aria-label="Undo" title="Undo" disabled={!state.undo || store.readonly} onClick={() => store.undo()}><Icon path="m9 5-5 5 5 5M4 10h10a5 5 0 0 1 0 10" /></button>
-    <button type="button" aria-label="Redo" title="Redo" disabled={!state.redo || store.readonly} onClick={() => store.redo()}><Icon path="m15 5 5 5-5 5M20 10H10a5 5 0 0 0 0 10" /></button>
+    <button type="button" aria-label="Undo" title={navigator.platform.includes('Mac') ? 'Undo (⌘Z)' : 'Undo (Ctrl+Z)'} disabled={!state.undo || store.readonly} onClick={() => store.undo()}><Icon path="m9 5-5 5 5 5M4 10h10a5 5 0 0 1 0 10" /></button>
+    <button type="button" aria-label="Redo" title={navigator.platform.includes('Mac') ? 'Redo (⇧⌘Z)' : 'Redo (Ctrl+Shift+Z)'} disabled={!state.redo || store.readonly} onClick={() => store.redo()}><Icon path="m15 5 5 5-5 5M20 10H10a5 5 0 0 0 0 10" /></button>
     <span className="viewport-divider" aria-hidden="true" />
     <button type="button" aria-label="Fit to screen" title="Fit to screen" disabled={state.locked} onClick={() => gfx.fitToScreen()}><Icon path="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></button>
     <button type="button" aria-label="Zoom out" title="Zoom out" disabled={state.locked || state.zoom <= ZOOM_MIN} onClick={() => zoom(-ZOOM_STEP)}><Icon path="M5 12h14" /></button>

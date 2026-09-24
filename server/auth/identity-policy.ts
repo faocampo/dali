@@ -9,6 +9,9 @@ export function validateInternalIdentity(config: AuthConfig, claims: Record<stri
       Array.isArray(membership) && membership.some(v => typeof v === 'string' && config.internalValues.includes(v)))) fail();
   const email = profile.email as string; const canonicalEmail = canonicalInternalEmail(config, email);
   if (!canonicalEmail) fail();
+  const role = config.roleClaim ? profile[config.roleClaim] : undefined;
+  const roles = Array.isArray(role) ? role : [role];
+  const canEdit = !config.roleClaim || roles.some(value => typeof value === 'string' && config.editorValues?.includes(value));
   return { issuer: config.issuer, subject: claims.sub as string, displayName: profile.name as string, email,
-    canonicalEmail: canonicalEmail! };
+    canonicalEmail: canonicalEmail!, systemRole: canEdit ? 'member' as const : 'viewer' as const };
 }

@@ -49,6 +49,37 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   const members = () => database.prepare('SELECT * FROM members ORDER BY id').all();
   const count = () => (database.prepare('SELECT count(*) AS n FROM sessions WHERE member_id IS NOT NULL').get() as { n: number }).n;
 
+  it('trusted system Viewer overrides ownership and grants, including existing sessions', async () => {
+    const flow = await begin('/', 'viewer'); const first = await finish(flow); const oldCookie = cookieOf(first);
+    const actor = (await session(oldCookie)).json();
+    const headers = { cookie: oldCookie, origin: env.DALI_ORIGIN!, 'x-dali-account': actor.accountId, 'x-dali-request': '1' };
+    const created = await app.inject({ method: 'POST', url: '/api/boards', headers, payload: { title: 'Previously owned', operationId: '11111111-1111-4111-8111-111111111111' } });
+    expect(created.statusCode).toBe(201); const board = created.json();
+    await app.close();
+    app = await buildApp({ config: { ...env, DALI_ROLE_CLAIM: 'app_role', DALI_EDITOR_VALUES_JSON: '["editor"]' }, database, now: () => clock });
+    const restricted = await finish(await begin('/', 'viewer'));
+    expect((await session(cookieOf(restricted))).json().systemRole).toBe('viewer');
+    expect((await session(oldCookie)).json().systemRole).toBe('viewer');
+    const path = '/api/boards/' + board.summary.id;
+    const descriptor = (await app.inject({ url: path, headers })).json();
+    expect(descriptor.summary.role).toBe('viewer'); expect(descriptor.capabilities).not.toContain('write');
+    expect((await app.inject({ url: '/api/boards', headers })).json()[0].role).toBe('viewer');
+    const before = database.prepare('SELECT * FROM boards').all();
+    expect((await app.inject({ method: 'POST', url: '/api/boards', headers, payload: { title: 'Denied', operationId: '22222222-2222-4222-8222-222222222222' } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'PATCH', url: path, headers, payload: { title: 'Denied', revision: board.revision, operationId: '33333333-3333-4333-8333-333333333333' } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'POST', url: '/api/imports', headers, payload: { title: 'Denied import', manifest: [], operationId: '44444444-4444-4444-8444-444444444444' } })).statusCode).toBe(403);
+    const binary = { ...headers, 'content-type': 'application/octet-stream' };
+    expect((await app.inject({ method: 'POST', url: path + '/docs/' + board.contentDocId + '/pull', headers: binary, payload: Buffer.from([0]) })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'POST', url: path + '/docs/' + board.contentDocId + '/push', headers: binary, payload: Buffer.from([0, 0]) })).statusCode).toBe(403);
+    expect((await app.inject({ url: path + '/editable-export', headers })).statusCode).toBe(403);
+    expect(database.prepare('SELECT * FROM boards').all()).toEqual(before);
+    // A missing or unrecognized configured role is read-only, never elevated.
+    provider.setFaults({ omitClaims: ['app_role'] }); const unknown = await finish(await begin('/', 'editor'));
+    expect((await session(cookieOf(unknown))).json().systemRole).toBe('viewer');
+    provider.setFaults({}); const writer = await finish(await begin('/', 'editor'));
+    expect((await session(cookieOf(writer))).json().systemRole).toBe('member');
+  });
+
   it('external fixture with a verified accepted-domain email cannot enter the system', async () => {
     const before = members();
     const flow = await begin('/', 'external');
@@ -121,7 +152,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     const flow = await signIn(); expect(flow.authenticated).not.toBe(flow.cookie);
     const result = await session(flow.authenticated);
     expect(result.statusCode).toBe(200); expect(result.headers['cache-control']).toBe('private, no-store');
-    expect(result.json()).toEqual({ accountId: expect.any(String), email: 'owner@example.org', displayName: 'Synthetic Owner', expiresAt: clock + 86400000 });
+    expect(result.json()).toEqual({ accountId: expect.any(String), email: 'owner@example.org', displayName: 'Synthetic Owner', systemRole: 'member', expiresAt: clock + 86400000 });
     const set = String(flow.response.headers['set-cookie']);
     expect(set).toContain('HttpOnly'); expect(set).toContain('SameSite=Lax'); expect(set).toContain('Path=/'); expect(set).toContain('Expires='); expect(set).not.toContain('Domain=');
     expect((await session(flow.cookie)).statusCode).toBe(401);

@@ -2,7 +2,7 @@
  * Keep geometry registration and renderer overrides together on engine upgrades. */
 import { ShapeTool, shape as renderNativeShape, ShapeElementRendererExtension } from '@blocksuite/affine/gfx/shape';
 import { ToolOverlay, type SurfaceBlockComponent, type ElementRenderer, type DomRenderer } from '@blocksuite/affine/blocks/surface';
-import { ShapeElementModel, ShapeType, StrokeStyle, ShapeStyle, DefaultTheme, shapeMethods } from '@blocksuite/affine/model';
+import { MindmapElementModel, ShapeElementModel, ShapeType, StrokeStyle, ShapeStyle, DefaultTheme, shapeMethods } from '@blocksuite/affine/model';
 import { ViewExtensionProvider, type ViewExtensionContext } from '@blocksuite/affine/ext-loader';
 import type { PointerEventState } from '@blocksuite/affine/std';
 import type { PointTestOptions } from '@blocksuite/affine/std/gfx';
@@ -51,8 +51,29 @@ function trace(ctx: CanvasRenderingContext2D, points: IVec[]) {
   ctx.closePath();
 }
 
+const renderClippedText: ElementRenderer<ShapeElementModel> = (model, ctx, matrix, renderer, rc, viewportBound) => {
+  if (!model.textDisplay) return;
+  const textModel = new Proxy(model, { get(target, key) {
+    if (key === 'shapeType') return ShapeType.Rect;
+    if (key === 'filled') return false;
+    if (key === 'strokeStyle') return StrokeStyle.None;
+    if (key === 'shadow') return undefined;
+    return Reflect.get(target, key, target);
+  } });
+  ctx.save();
+  ctx.setTransform(DOMMatrix.fromMatrix(matrix).translateSelf(model.w / 2, model.h / 2).rotateSelf(model.rotate).translateSelf(-model.w / 2, -model.h / 2));
+  ctx.beginPath(); ctx.rect(0, 0, model.w, model.h); ctx.clip();
+  renderNativeShape(textModel, ctx, DOMMatrix.fromMatrix(matrix), renderer, rc, viewportBound);
+  ctx.restore();
+};
+
 const renderShape: ElementRenderer<ShapeElementModel> = (model, ctx, matrix, renderer, rc, viewportBound) => {
-  if (!classicalShape(model.shapeType)) return renderNativeShape(model, ctx, matrix, renderer, rc, viewportBound);
+  if (!classicalShape(model.shapeType)) {
+    if (model.group instanceof MindmapElementModel) return renderNativeShape(model, ctx, matrix, renderer, rc, viewportBound);
+    const silhouette = new Proxy(model, { get(target, key) { return key === 'textDisplay' ? false : Reflect.get(target, key, target); } });
+    renderNativeShape(silhouette, ctx, DOMMatrix.fromMatrix(matrix), renderer, rc, viewportBound);
+    return renderClippedText(model, ctx, matrix, renderer, rc, viewportBound);
+  }
   const inset = Math.max(0, model.strokeWidth) / 2;
   const width = Math.max(0, model.w - inset * 2), height = Math.max(0, model.h - inset * 2);
   const transform = DOMMatrix.fromMatrix(matrix).translateSelf(inset, inset).translateSelf(width / 2, height / 2).rotateSelf(model.rotate).translateSelf(-width / 2, -height / 2);
@@ -72,16 +93,7 @@ const renderShape: ElementRenderer<ShapeElementModel> = (model, ctx, matrix, ren
     if (model.strokeStyle !== StrokeStyle.None && model.strokeWidth > 0) { ctx.strokeStyle = stroke; ctx.stroke(); }
   }
   ctx.restore();
-  // Reuse the engine's full text renderer and metrics without drawing a second
-  // silhouette. Proxy reads preserve the record, styles, textBound and history.
-  const textModel = new Proxy(model, { get(target, key) {
-    if (key === 'shapeType') return ShapeType.Rect;
-    if (key === 'filled') return false;
-    if (key === 'strokeStyle') return StrokeStyle.None;
-    if (key === 'shadow') return undefined;
-    return Reflect.get(target, key, target);
-  } });
-  renderNativeShape(textModel, ctx, matrix, renderer, rc, viewportBound);
+  renderClippedText(model, ctx, matrix, renderer, rc, viewportBound);
 };
 
 function domShape(native: DomElementRenderer<ShapeElementModel>): DomElementRenderer<ShapeElementModel> {

@@ -9,7 +9,7 @@ CREATE INDEX sessions_expiry ON sessions(expires_at);
 CREATE TABLE login_transactions (state TEXT PRIMARY KEY, browser_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
  nonce TEXT NOT NULL, verifier TEXT NOT NULL, return_to TEXT NOT NULL, expires_at INTEGER NOT NULL);
 CREATE INDEX login_browser ON login_transactions(browser_id);
-` }];
+` }, { version: 7, sql: `ALTER TABLE members ADD COLUMN system_role TEXT NOT NULL DEFAULT 'member' CHECK(system_role IN ('member','viewer'));` }];
 /** Additive migrations and their ledger commit together. */
 export function runMigrations(database: AccountDatabase, additional: Migration[] = []) {
   database.pragma('foreign_keys = ON');

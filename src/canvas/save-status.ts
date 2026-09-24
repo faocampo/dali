@@ -6,6 +6,7 @@ export type LocalSaveStatus = {
   state: LocalSaveState;
   label: string;
   message?: string;
+  savedAt?: number;
 };
 
 let docSaving = true;
@@ -32,7 +33,7 @@ function publish(): void {
     ? { state: 'failed', label: 'Save failed', message: failure }
     : docSaving || pendingBlobWrites > 0
       ? { state: 'saving', label: 'Saving…' }
-      : { state: 'saved', label: 'Saved locally' };
+      : { state: 'saved', label: 'Saved locally', savedAt: snapshot.state === 'saved' ? snapshot.savedAt : Date.now() };
   if (
     next.state === snapshot.state &&
     next.label === snapshot.label &&

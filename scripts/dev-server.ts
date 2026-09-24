@@ -82,13 +82,14 @@ export async function startLocalDevelopment(options: DevOptions, stopped: () => 
     const state = await loadDevState(options); ensureRunning();
     const registration = { clientId: 'synthetic-local-development', clientSecret: randomBytes(32).toString('base64url'), redirectUri: `${state.origin}/auth/callback` };
     provider = await createOidcProvider({ port: options.providerPort, clients: [registration],
-      signInPage: { title: 'Dali local development — synthetic sign-in', notice: 'Local development only. Open Shared role test to try Owner, Editor or Viewer access with the matching synthetic account. Roles apply per board; creating a board makes you its Owner.' },
+      signInPage: { title: 'Dali local development — synthetic sign-in', notice: 'Local development only. Open Shared role test to try Owner, Editor or Viewer access with the matching synthetic account. Viewer is read-only throughout the system. Other members can create boards and receive board-specific access.' },
     }); ensureRunning();
     app = await buildApp({ config: {
       DALI_ORIGIN: state.origin, DALI_DATABASE_PATH: join(options.stateDirectory, 'boards.sqlite'),
       DALI_SESSION_SECRET: state.sessionSecret, DALI_SESSION_TTL_MS: '86400000',
       DALI_OIDC_ISSUER: state.issuer, DALI_OIDC_CLIENT_ID: registration.clientId,
       DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri,
+      DALI_ROLE_CLAIM: 'app_role', DALI_EDITOR_VALUES_JSON: '["editor"]',
       DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]',
       DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]', DALI_EMAIL_CASE_FOLD: 'false',
     } }); ensureRunning();

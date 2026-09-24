@@ -4,7 +4,7 @@ import { APP_URL } from './links';
 import { newBoardUrl } from '../boards/preferences';
 
 type Category = 'File' | 'View' | 'Edit' | 'Settings' | 'Help';
-export function DaliMenu({ onOpenBoards, onExport, onNewBoard, role, onBoardAction }: { onOpenBoards?: () => void; onExport: () => void; onNewBoard?: () => void; role?: 'owner' | 'editor' | 'viewer'; onBoardAction?: (kind: 'rename' | 'duplicate' | 'delete') => void }) {
+export function DaliMenu({ onOpenBoards, onExport, onNewBoard, role, onBoardAction, canCreate = true }: { onOpenBoards?: () => void; onExport: () => void; onNewBoard?: () => void; role?: 'owner' | 'editor' | 'viewer'; canCreate?: boolean; onBoardAction?: (kind: 'rename' | 'duplicate' | 'delete') => void }) {
   const [open, setOpen] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
   const [history, setHistory] = useState({ undo: false, redo: false });
@@ -68,7 +68,7 @@ export function DaliMenu({ onOpenBoards, onExport, onNewBoard, role, onBoardActi
       </div>
       {category && <div role="menu" aria-label={category} className="dali-submenu">
         {category === 'File' && <>
-          <a role="menuitem" tabIndex={-1} href={newBoardUrl()} target="_blank" rel="noopener noreferrer" onClick={event => { if (onNewBoard) { event.preventDefault(); onNewBoard(); } close(); }}><MenuIcon name="new" /><span className="dali-menu-label">New</span></a>
+          {canCreate && <a role="menuitem" tabIndex={-1} href={newBoardUrl()} target="_blank" rel="noopener noreferrer" onClick={event => { if (onNewBoard) { event.preventDefault(); onNewBoard(); } close(); }}><MenuIcon name="new" /><span className="dali-menu-label">New</span></a>}
           <button role="menuitem" tabIndex={-1} disabled={!onOpenBoards} onClick={() => run(() => onOpenBoards?.())}><MenuIcon name="boards" /><span className="dali-menu-label">All boards</span></button>
 
           {onBoardAction && role !== 'viewer' && <><button role="menuitem" tabIndex={-1} onClick={() => run(() => onBoardAction('rename'))}>Rename board</button><button role="menuitem" tabIndex={-1} onClick={() => run(() => onBoardAction('duplicate'))}>Duplicate board</button></>}
@@ -85,8 +85,8 @@ export function DaliMenu({ onOpenBoards, onExport, onNewBoard, role, onBoardActi
           {role === 'viewer' && <p id="viewer-layers-reason" hidden>Layer editing requires Owner or Editor access.</p>}
         </ViewMenu>}
         {category === 'Edit' && <>
-          <button role="menuitem" tabIndex={-1} disabled={!history.undo} onClick={() => command('undo')}><MenuIcon name="undo" /><span className="dali-menu-label">Undo</span></button>
-          <button role="menuitem" tabIndex={-1} disabled={!history.redo} onClick={() => command('redo')}><MenuIcon name="redo" /><span className="dali-menu-label">Redo</span></button>
+          <button role="menuitem" tabIndex={-1} disabled={!history.undo} onClick={() => command('undo')}><MenuIcon name="undo" /><span className="dali-menu-label">Undo</span><kbd aria-hidden="true">{navigator.platform.includes('Mac') ? '⌘Z' : 'Ctrl+Z'}</kbd></button>
+          <button role="menuitem" tabIndex={-1} disabled={!history.redo} onClick={() => command('redo')}><MenuIcon name="redo" /><span className="dali-menu-label">Redo</span><kbd aria-hidden="true">{navigator.platform.includes('Mac') ? '⇧⌘Z' : 'Ctrl+Shift+Z'}</kbd></button>
         </>}
         {category === 'Settings' && <button role="menuitem" tabIndex={-1} onClick={() => { setShowControls(!showControls); close(); }}><MenuIcon name="controls" /><span className="dali-menu-label">{showControls ? 'Hide' : 'Show'} viewport controls</span></button>}
         {category === 'Help' && <>

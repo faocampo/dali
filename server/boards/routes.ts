@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as Y from 'yjs';
 import type { AuthConfig } from '../app.js';
-import { currentSession, requireExpectedMember, requireMutation } from '../auth/session-store.js';
+import { currentSession, requireExpectedMember, requireSystemWriter, requireMutation } from '../auth/session-store.js';
 import { runMigrations, type AccountDatabase } from '../storage/database.js';
 import { registerDocumentRoutes, type BeforeCommit } from './documents.js';
 import { registerBlobRoutes, validateImageBytes } from './blobs.js';
@@ -27,6 +27,7 @@ export function requireBoardCapability(database: AccountDatabase, request: Fasti
     FROM boards b LEFT JOIN board_grants g ON g.board_id=b.id AND g.member_id=@member
     WHERE b.id=@board AND (b.owner_id=@member OR g.member_id IS NOT NULL)`).get({ member: member!.accountId, board: boardId }) as BoardRow | undefined;
   if (!board) { reply.code(404).send({ code: 'BOARD_UNAVAILABLE' }); return; }
+  if (member!.systemRole === 'viewer') board.role = 'viewer';
   if (!canBoard(board.role, capability)) { reply.code(403).send({ code: 'CAPABILITY_REQUIRED' }); return; }
   return board;
 }
@@ -123,7 +124,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
       WHERE (b.owner_id=@member OR g.member_id IS NOT NULL)
       AND (@filter='all' OR (@filter='mine' AND b.owner_id=@member) OR (@filter='shared' AND b.owner_id<>@member))
       ORDER BY b.updated_at DESC,b.id ASC`).all({ member: member!.accountId, filter }) as BoardRow[];
-    return rows.map(board => summary(database, board, member!.accountId));
+    return rows.map(board => summary(database, member!.systemRole === 'viewer' ? { ...board, role: 'viewer' } : board, member!.accountId));
   });
   app.get<{ Params: { boardId: string } }>('/api/boards/:boardId', async (request, reply) => {
     const board = requireBoardCapability(database, request, reply, request.params.boardId, 'read', now);
@@ -167,7 +168,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
     const title = request.body.title?.trim() || 'Untitled board';
     if ([...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length > 200) return reply.code(400).send({ code: 'TITLE_TOO_LONG' });
     return database.transaction(() => {
-      const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
+      const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member) || !requireSystemWriter(reply, member)) return;
       const previous = database.prepare('SELECT kind,result FROM operations WHERE member_id=? AND operation_id=?')
         .get(member!.accountId, request.body.operationId) as { kind: string; result: string } | undefined;
       if (previous) {

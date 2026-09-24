@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   beginBlobWrite,
   finishBlobWrite,
@@ -20,7 +20,18 @@ describe('local save status', () => {
     reportDocEngineStatus(engineStatus(1));
     expect(getSaveStatus().state).toBe('saving');
     reportDocEngineStatus(engineStatus(2));
-    expect(getSaveStatus()).toEqual({ state: 'saved', label: 'Saved locally' });
+    expect(getSaveStatus()).toMatchObject({ state: 'saved', label: 'Saved locally', savedAt: expect.any(Number) });
+  });
+
+  it('keeps the last acknowledgement time stable until another save completes', () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    try {
+      reportDocEngineStatus(engineStatus(2)); expect(getSaveStatus().savedAt).toBe(1000);
+      clock.mockReturnValue(2000); reportDocEngineStatus(engineStatus(2)); expect(getSaveStatus().savedAt).toBe(1000);
+      beginBlobWrite(); expect(getSaveStatus().savedAt).toBeUndefined();
+      finishBlobWrite(); expect(getSaveStatus().savedAt).toBe(2000);
+      resetSaveStatus(); expect(getSaveStatus().savedAt).toBeUndefined();
+    } finally { clock.mockRestore(); }
   });
 
   it('keeps blob persistence in the saving state', () => {

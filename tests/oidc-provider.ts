@@ -12,11 +12,11 @@ import * as oidc from 'openid-client';
 export const PROVIDER_PORT = 5496;
 export const IDENTITY_COOKIE = 'dali_fixture_identity';
 export const identities = {
-  owner: { sub: 'synthetic-owner', name: 'Synthetic Owner', email: 'owner@example.org', membership: 'internal' },
-  editor: { sub: 'synthetic-editor', name: 'Synthetic Editor', email: 'editor@example.org', membership: 'internal' },
-  viewer: { sub: 'synthetic-viewer', name: 'Synthetic Viewer', email: 'viewer@example.org', membership: 'internal' },
+  owner: { sub: 'synthetic-owner', name: 'Synthetic Owner', email: 'owner@example.org', membership: 'internal', app_role: 'editor' },
+  editor: { sub: 'synthetic-editor', name: 'Synthetic Editor', email: 'editor@example.org', membership: 'internal', app_role: 'editor' },
+  viewer: { sub: 'synthetic-viewer', name: 'Synthetic Viewer', email: 'viewer@example.org', membership: 'internal', app_role: 'viewer' },
   // This internal member has no grants on other members' test boards.
-  nonMember: { sub: 'synthetic-non-member', name: 'Synthetic Internal Member', email: 'non-member@example.org', membership: 'internal' },
+  nonMember: { sub: 'synthetic-non-member', name: 'Synthetic Internal Member', email: 'non-member@example.org', membership: 'internal', app_role: 'editor' },
   // A verified email on the accepted domain alone must never admit this account.
   external: { sub: 'synthetic-external', name: 'Synthetic External Account', email: 'external@example.org', membership: 'external' },
 } as const;
@@ -159,8 +159,8 @@ export async function createOidcProvider(options: {
     const token = request.headers.authorization?.match(/^Bearer (.+)$/)?.[1] ?? '';
     const record = tokens.get(token);
     if (!record || record.expiresAt <= now()) return reply.code(401).send({ error: 'invalid_token' });
-    const { sub, name, email, email_verified, membership } = record.claims;
-    return { sub, name, email, email_verified, membership };
+    const { sub, name, email, email_verified, membership, app_role } = record.claims;
+    return { sub, name, email, email_verified, membership, app_role };
   });
   await app.listen({ host: '127.0.0.1', port: options.port ?? 0 });
   const address = app.server.address();

@@ -105,6 +105,8 @@ test('npm dev signs in, saves and reopens after restart, and preserves authoriza
     await editorPage.locator('affine-edgeless-note').dblclick(); await editorPage.keyboard.insertText('Shared role canary'); await editorPage.keyboard.press('Escape');
     await expect(editorPage.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
     const viewer = await browser.newContext(); const viewerPage = await signIn(viewer, config.origin, 'Viewer');
+    await expect(viewerPage.getByRole('button', { name: 'New board', exact: true })).toHaveCount(0);
+    await expect(viewerPage.locator('.board-library__import')).toHaveCount(0);
     const viewerSession = await (await viewer.request.get(config.origin + '/api/session')).json();
     const viewerHeaders = { ...headers, 'X-Dali-Account': viewerSession.accountId };
     const sharedViewer = await (await viewer.request.get(sharedPath, { headers: viewerHeaders })).json();
@@ -122,10 +124,13 @@ test('npm dev signs in, saves and reopens after restart, and preserves authoriza
     assert.equal(await model(viewerPage), before);
     const denied = await viewer.request.patch(sharedPath, { headers: viewerHeaders, data: { operationId: randomUUID(), revision: sharedViewer.revision, title: 'Denied rename' } });
     assert.equal(denied.status(), 403);
-    assert.deepEqual(await (await owner.request.get(sharedPath + '/editable-export', { headers })).json(), stored);
-    // An account's Viewer grant applies to this board; its own new board has independent ownership.
+    const afterDenied = await (await owner.request.get(sharedPath + '/editable-export', { headers })).json();
+    // The editor's asynchronous thumbnail upload may complete during this probe.
+    for (const snapshot of [stored, afterDenied]) delete snapshot.descriptor.summary.thumbnailUrl;
+    assert.deepEqual(afterDenied, stored);
+    // System Viewers cannot create boards, even though other members can.
     const viewerOwned = await viewer.request.post(config.origin + '/api/boards', { headers: viewerHeaders, data: { operationId: randomUUID(), title: 'Viewer-owned board' } });
-    assert.equal(viewerOwned.status(), 201); assert.equal((await viewerOwned.json()).summary.role, 'owner');
+    assert.equal(viewerOwned.status(), 403); assert.equal(viewerSession.systemRole, 'viewer');
     await viewer.close();
     const boardPath = config.origin + '/api/boards/' + boardId;
     assert.equal((await editor.request.get(boardPath, { headers: editorHeaders })).status(), 404);

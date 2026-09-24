@@ -34,6 +34,8 @@ export function Header({
   const [action, setAction] = useState<'rename' | 'duplicate' | 'delete'>();
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 10000); return () => clearInterval(timer); }, []);
   const saveStatus = useSyncExternalStore(subscribeSaveStatus, getSaveStatus);
   type Creation = { id: string; accountId: string; generation: number; tab: Window | null; state: 'pending' | 'error' | 'ready'; href?: string };
   const [creations, setCreations] = useState<Creation[]>([]);
@@ -66,7 +68,7 @@ export function Header({
     }
   };
   const newBoard = () => {
-    const scope = getActiveAccessScope(); if (scope?.phase !== 'active') return;
+    const scope = getActiveAccessScope(); if (scope?.phase !== 'active' || member?.systemRole === 'viewer') return;
     // Reserve synchronously in the gesture; network completion only navigates it.
     const tab = window.open('about:blank', '_blank'); if (tab) tab.opener = null;
     const creation: Creation = { id: crypto.randomUUID(), accountId: scope.accountId, generation: scope.generation, tab, state: 'pending' };
@@ -99,20 +101,19 @@ export function Header({
         <img src={logo} alt="Dalí" height={34} />
       </a>
 
-      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} role={board?.summary.role} onBoardAction={board ? setAction : undefined} />
+      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} canCreate={member?.systemRole !== 'viewer'} role={board?.summary.role} onBoardAction={board ? setAction : undefined} />
+      <div className="board-document-heading">
       {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
-      <nav className="djai-header-actions">
-        {board && <span className="board-role">{board.summary.role[0]!.toUpperCase() + board.summary.role.slice(1)}{board.summary.role === 'viewer' ? ' · View only' : ''}</span>}
-        {board?.summary.role === 'owner' && <button className="djai-ghost" onClick={event => { event.currentTarget.focus(); setSharing(true); }}>Share board</button>}
-        {member && <AccountMenu member={member} signOut={signOut} />}
         <div className="djai-save">
           <button
             type="button"
             className={`djai-save__status djai-save__status--${saveStatus.state}`}
             aria-haspopup={saveStatus.state === 'failed' ? 'dialog' : undefined}
             aria-expanded={saveStatus.state === 'failed' ? saveHelpOpen : undefined}
+            aria-label={saveStatus.state === 'saved' ? 'Saved' : saveStatus.label}
+            title={saveStatus.savedAt ? `Last saved ${new Date(saveStatus.savedAt).toLocaleTimeString()}` : undefined}
             aria-live="polite"
             onClick={() => {
               if (saveStatus.state === 'failed') setSaveHelpOpen((open) => !open);
@@ -120,6 +121,7 @@ export function Header({
           >
             <span aria-hidden="true" />
             {saveStatus.state === 'saved' ? 'Saved' : saveStatus.label}
+            {saveStatus.state === 'saved' && saveStatus.savedAt && <small className="save-age" aria-hidden="true">{formatSaveAge(saveStatus.savedAt, now)}</small>}
           </button>
           {saveStatus.state === 'failed' && saveHelpOpen && (
             <div className="djai-save__recovery" role="dialog" aria-label="Local save recovery">
@@ -152,6 +154,12 @@ export function Header({
             </div>
           )}
         </div>
+      </div>
+
+      <nav className="djai-header-actions">
+        {board?.summary.role === 'owner' && <button className="djai-ghost" onClick={event => { event.currentTarget.focus(); setSharing(true); }}>Share board</button>}
+        {member && <AccountMenu member={member} signOut={signOut} role={board?.summary.role} />}
+
       </nav>
 
       {exportOpen && <ExportDialog onClose={closeExport} />}
@@ -170,4 +178,13 @@ export function Header({
       </div>)}
     </header>
   );
+}
+
+export function formatSaveAge(savedAt: number, now: number) {
+  const seconds = Math.max(0, Math.floor((now - savedAt) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
 }

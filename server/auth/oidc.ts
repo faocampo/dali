@@ -55,9 +55,9 @@ export async function registerOidcRoutes(app: FastifyInstance, config: AuthConfi
       const member = database.transaction(() => {
         const previous = database.prepare('SELECT canonical_email,email_history FROM members WHERE issuer=? AND subject=?').get(identity.issuer, identity.subject) as { canonical_email: string; email_history: string } | undefined;
         const history = [...new Set([...(previous ? JSON.parse(previous.email_history) as string[] : []), ...(previous ? [previous.canonical_email] : []), identity.canonicalEmail])];
-        const established = database.prepare(`INSERT INTO members(id,issuer,subject,email,canonical_email,display_name,email_history) VALUES(?,?,?,?,?,?,?)
-          ON CONFLICT(issuer,subject) DO UPDATE SET email=excluded.email,canonical_email=excluded.canonical_email,display_name=excluded.display_name,email_history=excluded.email_history
-          RETURNING id`).get(randomUUID(), identity.issuer, identity.subject, identity.email, identity.canonicalEmail, identity.displayName, JSON.stringify(history)) as { id: string };
+        const established = database.prepare(`INSERT INTO members(id,issuer,subject,email,canonical_email,display_name,email_history,system_role) VALUES(?,?,?,?,?,?,?,?)
+          ON CONFLICT(issuer,subject) DO UPDATE SET email=excluded.email,canonical_email=excluded.canonical_email,display_name=excluded.display_name,email_history=excluded.email_history,system_role=excluded.system_role
+          RETURNING id`).get(randomUUID(), identity.issuer, identity.subject, identity.email, identity.canonicalEmail, identity.displayName, JSON.stringify(history), identity.systemRole) as { id: string };
         activatePendingGrants(database, identity, established.id); return established;
       })();
       await request.session.regenerate(); request.session.memberId = member.id; request.session.expiresAt = expiry;

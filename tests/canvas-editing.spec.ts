@@ -48,6 +48,7 @@ test('native drawing tools create editable shapes, frames, arrows and freehand',
   await page.getByRole('button', { name: 'Straight arrow', exact: true }).click();
   await drag(page, 260, 380, 200, 50);
   await page.getByRole('button', { name: 'Freehand', exact: true }).click();
+  await page.getByRole('button', { name: 'Pen', exact: true }).click();
   await drag(page, 450, 470, 170, -30);
   await expect.poll(async () => (await models(page)).map(m => m.type).sort()).toEqual(['affine:frame', 'brush', 'connector', 'shape']);
   await page.getByRole('button', { name: 'Select', exact: true }).click();

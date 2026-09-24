@@ -7,14 +7,18 @@ import { EdgelessCRUDIdentifier } from '@blocksuite/affine/blocks/surface';
 /** Complete either end of a free connector with an editable shape. */
 export function ConnectorQuickAdd({ host }: { host: EditorHost }) {
   const gfx = host.std.get(GfxControllerIdentifier);
-  const [selection, setSelection] = useState<{ model: ConnectorElementModel; x: number; y: number; w: number; h: number } | null>(null);
+  const [selection, setSelection] = useState<{ model: ConnectorElementModel; source: [number, number]; target: [number, number] } | null>(null);
   useEffect(() => {
     const sync = () => {
       const models = gfx.selection.selectedElements;
       const model = models[0];
       if (models.length !== 1 || !(model instanceof ConnectorElementModel) || model.isLocked() || host.store.readonly || gfx.selection.editing) return setSelection(null);
-      const bound = gfx.viewport.toViewBound(model.elementBound);
-      setSelection({ model, x: bound.x, y: bound.y, w: bound.w, h: bound.h });
+      const endpoint = (end: 'source' | 'target'): [number, number] => {
+        const [x, y] = model[end].position ?? [model.x, model.y];
+        const [vx, vy] = gfx.viewport.toViewCoord(x!, y!);
+        return [vx!, vy!];
+      };
+      setSelection({ model, source: endpoint('source'), target: endpoint('target') });
     };
     sync();
     const subscriptions = [gfx.selection.slots.updated.subscribe(sync), gfx.viewport.viewportUpdated.subscribe(sync), gfx.surface!.elementUpdated.subscribe(sync)];
@@ -35,5 +39,5 @@ export function ConnectorQuickAdd({ host }: { host: EditorHost }) {
     });
     host.store.captureSync();
   };
-  return <>{(['source', 'target'] as const).filter(end => !selection.model[end].id).map(end => <button key={end} className="connector-quick-add" type="button" title={`Add shape at ${end === 'source' ? 'start' : 'end'}`} aria-label={`Add shape at connector ${end === 'source' ? 'start' : 'end'}`} style={{ left: selection.x + (end === 'source' ? -36 : selection.w + 8), top: selection.y + selection.h / 2 - 14 }} onPointerDown={event => event.stopPropagation()} onClick={() => add(end)}>+</button>)}</>;
+  return <>{(['source', 'target'] as const).filter(end => !selection.model[end].id).map(end => <button key={end} className="connector-quick-add" type="button" title={`Add shape at ${end === 'source' ? 'start' : 'end'}`} aria-label={`Add shape at connector ${end === 'source' ? 'start' : 'end'}`} style={{ left: selection[end][0] + (end === 'source' ? -40 : 12), top: selection[end][1] - 14 }} onPointerDown={event => event.stopPropagation()} onClick={() => add(end)}><svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16"><path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="1.5" /></svg></button>)}</>;
 }

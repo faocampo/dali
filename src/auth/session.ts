@@ -3,7 +3,7 @@ import type { BlockComponent, EditorHost } from '@blocksuite/affine/std';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { ShapeElementModel } from '@blocksuite/affine/model';
 import type { EdgelessShapeTextEditor } from '@blocksuite/affine/gfx/shape';
-export type SessionDescriptor = { accountId: string; displayName: string; email: string; expiresAt: number };
+export type SessionDescriptor = { accountId: string; displayName: string; email: string; expiresAt: number; systemRole?: 'member' | 'viewer' };
 export type SessionPhase = 'loading' | 'authenticated' | 'preserving' | 'auth-paused' | 'preservation-failed' | 'recovering' | 'access-denied' | 'identity-changed' | 'signed-out' | 'error';
 export type SessionState = { phase: SessionPhase; member: SessionDescriptor | null; intent: 'expiry' | 'logout'; revision: number; notice: string };
 let state: SessionState = { phase: 'loading', member: null, intent: 'expiry', revision: 0, notice: '' };

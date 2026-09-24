@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
+import { BrushTool, EraserTool } from '@blocksuite/affine/gfx/brush';
 import { ShapeTool } from '@blocksuite/affine/gfx/shape';
 import { ConnectorTool } from '@blocksuite/affine/gfx/connector';
 import { ConnectorMode, PointStyle, ShapeType, type ShapeName } from '@blocksuite/affine/model';
@@ -22,7 +23,7 @@ const modes = [
   { name: 'Curved', mode: ConnectorMode.Curve, path: 'M3 20C20 20 4 4 21 4' },
   { name: 'Angled', mode: ConnectorMode.Orthogonal, path: 'M3 20H12V4H21' },
 ];
-export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost; kind: 'Shapes' | 'Lines'; active: boolean; icon: ReactNode }) {
+export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost; kind: 'Shapes' | 'Lines' | 'Freehand'; active: boolean; icon: ReactNode }) {
   const gfx = host.std.get(GfxControllerIdentifier);
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
@@ -41,7 +42,7 @@ export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost;
   }, [position]);
   const pick = (action: () => void) => { close(); action(); };
   return <>
-    <button ref={trigger} type="button" className="canvas-tool-button" aria-label={kind} title={`${kind} (${kind === 'Shapes' ? 'S' : 'C'})`} aria-pressed={active} aria-haspopup="dialog" aria-expanded={!!position} onClick={() => {
+    <button ref={trigger} type="button" className="canvas-tool-button" aria-label={kind} title={`${kind} (${kind === 'Shapes' ? 'S' : kind === 'Lines' ? 'C' : 'P'})`} aria-pressed={active} aria-haspopup="dialog" aria-expanded={!!position} onClick={() => {
       const bounds = trigger.current!.getBoundingClientRect();
       if (position) close();
       else setPosition({ left: Math.min(bounds.right + 12, window.innerWidth - 284), top: Math.max(64, Math.min(bounds.top, window.innerHeight - 430)) });
@@ -62,12 +63,15 @@ export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost;
     }}>
       <h2>{kind}</h2>
       <div className={`drawing-palette-options${kind === 'Shapes' ? ' drawing-palette-options--shapes' : ''}`}>
-        {kind === 'Shapes' ? shapes.map(item => <button key={item.name} aria-label={item.name} title={item.name} onClick={() => pick(() => item.shape.startsWith('dali:') ? gfx.tool.setTool(ClassicalShapeTool, { shapeName: ShapeType.Rect, geometry: item.shape }) : gfx.tool.setTool(ShapeTool, { shapeName: item.shape as ShapeName }))}><Glyph path={item.path} /></button>) : modes.flatMap(item => [false, true].map(arrow => <button key={`${item.name}-${arrow}`} onClick={() => pick(() => {
+        {kind === 'Freehand' ? <>
+          <button onClick={() => pick(() => gfx.tool.setTool(BrushTool))}><Glyph path="M3 17c4-15 6 7 10-3s6-3 8-6" /><span>Pen</span></button>
+          <button onClick={() => pick(() => gfx.tool.setTool(EraserTool))}><Glyph path="m4 15 10-11 7 7-9 10H9Zm4-4 7 7M12 21h9" /><span>Eraser</span></button>
+        </> : kind === 'Shapes' ? shapes.map(item => <button key={item.name} aria-label={item.name} title={item.name} onClick={() => pick(() => item.shape.startsWith('dali:') ? gfx.tool.setTool(ClassicalShapeTool, { shapeName: ShapeType.Rect, geometry: item.shape }) : gfx.tool.setTool(ShapeTool, { shapeName: item.shape as ShapeName }))}><Glyph path={item.path} /></button>) : modes.flatMap(item => [false, true].map(arrow => <button key={`${item.name}-${arrow}`} onClick={() => pick(() => {
           host.std.get(EditPropsStore).recordLastProps('connector', { frontEndpointStyle: PointStyle.None, rearEndpointStyle: arrow ? PointStyle.Arrow : PointStyle.None });
           gfx.tool.setTool(ConnectorTool, { mode: item.mode });
         })}><Glyph path={item.path + (arrow ? 'M15 4H21V10' : '')} /><span>{item.name} {arrow ? 'arrow' : 'line'}</span></button>))}
       </div>
-      <p>{kind === 'Shapes' ? 'Choose a shape, then click or drag on the canvas. Hold Shift while dragging for equal sides.' : 'Choose a line, then drag between points or objects. Endpoints attach when drawn onto objects.'}</p>
+      {kind !== 'Freehand' && <p>{kind === 'Shapes' ? 'Choose a shape, then click or drag on the canvas. Hold Shift while dragging for equal sides.' : 'Choose a line, then drag between points or objects. Endpoints attach when drawn onto objects.'}</p>}
     </div>, document.body)}
   </>;
 }

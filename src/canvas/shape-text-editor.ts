@@ -11,6 +11,11 @@ export function installShapeTextTypography(): void {
   // text measurement. It also covers editors mounted by native double-click.
   EdgelessShapeTextEditor.addInitializer(host => {
     const editor = host as EdgelessShapeTextEditor;
+    // The native resize observer grows shapes while typing; only mind-map
+    // topics retain automatic layout. Ordinary shape geometry belongs to resize.
+    const resize = editor as unknown as { _updateElementWH(): void };
+    const nativeResize = resize._updateElementWH.bind(editor);
+    resize._updateElementWH = () => { if (editor.isMindMapNode) nativeResize(); };
     let preparedInput = false;
     let restoreInput = () => {};
     editor.addController({
@@ -18,6 +23,10 @@ export function installShapeTextTypography(): void {
         if (!editor.richText || !editor.element) return;
         editor.richText.style.fontFamily = `${TextUtils.wrapFontFamily(editor.element.fontFamily)}, sans-serif`;
         editor.richText.style.fontStyle = editor.element.fontStyle;
+        if (!editor.isMindMapNode) Object.assign(editor.richText.style, {
+          width: `${editor.element.w}px`, height: `${editor.element.h}px`,
+          minHeight: '0', maxHeight: `${editor.element.h}px`, overflow: 'hidden',
+        });
         if (!preparedInput && editor.isMindMapNode) {
           preparedInput = true;
           void editor.richText.updateComplete.then(() => {

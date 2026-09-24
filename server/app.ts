@@ -13,7 +13,7 @@ import { registerBoardRoutes } from './boards/routes.js';
 export type AuthConfig = {
   origin: string; databasePath: string; secret: string; ttl: number; issuer: string;
   clientId: string; clientSecret: string; callback: string; claim: string;
-  internalValues: string[]; domains: string[]; emailCaseFold: boolean; secure: boolean;
+  roleClaim?: string; editorValues?: string[]; internalValues: string[]; domains: string[]; emailCaseFold: boolean; secure: boolean;
 };
 const fail = () => { throw new Error('Authentication configuration unavailable'); };
 export function readConfig(env: Record<string, string | undefined>): AuthConfig {
@@ -42,6 +42,7 @@ export function readConfig(env: Record<string, string | undefined>): AuthConfig 
     return { origin: origin.origin, databasePath: required('DALI_DATABASE_PATH'), secret, ttl,
       issuer: required('DALI_OIDC_ISSUER'), clientId: required('DALI_OIDC_CLIENT_ID'),
       clientSecret: required('DALI_OIDC_CLIENT_SECRET'), callback: callback.href,
+      roleClaim: env.DALI_ROLE_CLAIM?.trim() || undefined, editorValues: env.DALI_ROLE_CLAIM?.trim() ? list('DALI_EDITOR_VALUES_JSON') : undefined,
       claim: required('DALI_INTERNAL_CLAIM'), internalValues: list('DALI_INTERNAL_VALUES_JSON'),
       domains, emailCaseFold: emailCaseFold === 'true', secure: origin.protocol === 'https:' };
   } catch { return fail(); }

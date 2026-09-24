@@ -1870,3 +1870,51 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
   .djai-save__status { width: auto; min-width: 60px; max-width: 100px; }
 }
 @media (max-width: 700px) { .board-library__import > div { right: auto; left: 0; } }
+
+/* The logo's plum ink and violet accent anchor the compact document shell. */
+.djai-header, .board-library__header {
+  --board-ink: #251735;
+  --affine-hover-color: #f1eaf9;
+  --affine-primary-color: #7540b4;
+  background: #fdfbff;
+  border-bottom: 1px solid #e5d9ef;
+  color: var(--board-ink);
+  box-shadow: 0 3px 12px rgb(55 25 77 / 4%);
+}
+.djai-header { gap: 12px; padding: 8px 16px; min-height: 64px; box-sizing: border-box; flex-wrap: nowrap; }
+.djai-header .djai-brand img { width: 40px; height: 40px; }
+.djai-header .dali-menu-trigger { background: transparent; border-color: #e1d5eb; border-radius: 10px; color: #39234c; }
+.board-document-heading { display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
+.board-document-heading .board-title-inline { flex:0 1 auto; margin-right:0; }
+.board-document-heading .board-title-label, .board-document-heading .board-title-inline input { min-height:36px; }
+.board-document-heading .board-title-readable { margin:0; }
+.djai-header .djai-header-actions { margin-left:auto; flex-wrap:nowrap; gap:12px; }
+.djai-header-actions > .djai-ghost { background:#7540b4; border:1px solid #7540b4; color:white; border-radius:10px; }
+.djai-header-actions > .djai-ghost:hover { background:#613195; }
+.board-document-heading .djai-save { flex-shrink:0; }
+.board-document-heading .djai-save__status { width:auto; max-width:none; gap:6px; white-space:nowrap; }
+.djai-save__status > span { flex-shrink:0; }
+.djai-save__status--saved { color:#526057; }
+.save-age { font-size:11px; font-weight:400; color:#65586f; }
+.board-account .board-role { margin:0 0 16px; padding:4px 8px; border-radius:6px; background:#f1eaf9; color:#573379; }
+.dali-submenu kbd { margin-left:auto; font:11px/1.4 inherit; color:#716579; white-space:nowrap; }
+.canvas-feedback { position:absolute; z-index:25; left:88px; top:16px; width:min(320px,calc(100% - 104px)); box-sizing:border-box; padding:14px 16px; border-radius:12px; background:#fff; box-shadow:0 6px 22px rgb(37 23 53 / 16%); font-size:13px; line-height:1.5; color:#532b38; }
+.canvas-feedback p { margin:0 0 10px; }
+.canvas-feedback > div { display:flex; flex-wrap:wrap; gap:8px; }
+.canvas-feedback button { min-height:36px; border:0; border-radius:6px; padding:6px 10px; color:#663793; background:#f1eaf9; font:inherit; cursor:pointer; }
+.connector-quick-add { display:grid; place-items:center; padding:0; line-height:1; }
+/* The native note container scales this base text together with its geometry. */
+affine-edgeless-note { --affine-font-base:24px; --affine-font-h-1:32px; --affine-line-height:1.35; }
+@media (max-width: 900px) {
+  .board-document-heading { align-items:flex-start; flex-direction:column; gap:0; }
+  .board-document-heading .djai-save__status { min-height:20px; padding:0 8px; }
+  .djai-header .board-account__name { display:none; }
+}
+@media (max-width: 600px) {
+  .djai-header { flex-wrap:wrap; gap:8px; padding:8px 12px; }
+  .board-document-heading { flex:1 1 130px; }
+  .djai-header .djai-header-actions { width:auto; display:flex; flex:1 1 100%; justify-content:flex-end; }
+  .djai-header .djai-header-actions > * { width:auto; flex:0 0 auto; }
+  .board-document-heading .board-title-label, .board-document-heading .board-title-inline input { max-width:100%; }
+  .board-document-heading .djai-save__recovery { position:fixed; left:16px; right:16px; top:90px; width:auto; }
+}

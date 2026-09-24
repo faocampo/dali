@@ -13,6 +13,7 @@ export function seedLocalRoleBoard(databasePath: string, issuer: string): void {
   try {
     database.transaction(() => {
       database.exec('CREATE TABLE IF NOT EXISTS local_dev_fixtures (name TEXT PRIMARY KEY, board_id TEXT NOT NULL)');
+      database.prepare("UPDATE members SET system_role='viewer' WHERE issuer=? AND subject=?").run(issuer, identities.viewer.sub);
       if (database.prepare('SELECT 1 FROM local_dev_fixtures WHERE name=?').get('shared-role-board-v1')) return;
       const members = new Map<string, string>();
       for (const role of ['owner', 'editor', 'viewer'] as const) {
@@ -23,6 +24,7 @@ export function seedLocalRoleBoard(databasePath: string, issuer: string): void {
         members.set(role, member.id);
       }
       const time = Date.now();
+      database.prepare("UPDATE members SET system_role='viewer' WHERE issuer=? AND subject=?").run(issuer, identities.viewer.sub);
       const board: BoardRow = { id: randomUUID(), owner_id: members.get('owner')!, title: ROLE_TEST_BOARD_TITLE,
         root_doc_id: randomUUID(), content_doc_id: randomUUID(), created_at: time, updated_at: time, revision: 1, role: 'owner' };
       database.prepare('INSERT INTO boards(id,owner_id,title,root_doc_id,content_doc_id,created_at,updated_at,revision) VALUES(@id,@owner_id,@title,@root_doc_id,@content_doc_id,@created_at,@updated_at,@revision)').run(board);

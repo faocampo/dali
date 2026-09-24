@@ -1,7 +1,7 @@
 import type { SessionDescriptor } from '../auth/AuthBoundary';
 import { Dropdown } from './Dropdown';
 
-export function AccountMenu({ member, signOut }: { member: SessionDescriptor; signOut?: () => Promise<void> }) {
+export function AccountMenu({ member, signOut, role }: { member: SessionDescriptor; signOut?: () => Promise<void>; role?: 'owner' | 'editor' | 'viewer' }) {
   const name = member.displayName.trim() || member.email;
   const parts = name.split(/\s+/);
   const initials = [parts[0], ...(parts.length > 1 ? [parts.at(-1)] : [])]
@@ -11,6 +11,7 @@ export function AccountMenu({ member, signOut }: { member: SessionDescriptor; si
     <span className="board-account__name">{name}</span>
   </>}>
     {close => <><p className="board-account__identity">{name}</p><p className="board-account__email">{member.email}</p>
+      {(role || member.systemRole === 'viewer') && <p className="board-role">{member.systemRole === 'viewer' ? 'Viewer · View only' : role === 'viewer' ? 'Viewer · View only' : role === 'owner' ? 'Owner' : 'Editor'}</p>}
       <button onClick={() => { close(); void signOut?.(); }}>Sign out of Dalí</button></>}
   </Dropdown>;
 }
