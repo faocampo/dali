@@ -34,7 +34,7 @@ export function ViewMenu({ children }: { children: React.ReactNode }) {
     <div role="separator" className="dali-menu-separator" />
     <div role="group" aria-label="Grid spacing">
     <div className="dali-menu-section-label">Grid spacing</div>
-    {([20, 40, 80] as const).map(spacing => <button key={spacing} role="menuitemradio" aria-checked={prefs.spacing === spacing} tabIndex={-1} onClick={() => setViewPreferences({ spacing })}><span className="dali-menu-label">{spacing} px</span><span aria-hidden="true">{prefs.spacing === spacing ? '✓' : ''}</span></button>)}
+    {([20, 40, 80] as const).map(spacing => <button key={spacing} role="menuitemradio" aria-checked={prefs.spacing === spacing} tabIndex={-1} onClick={() => setViewPreferences({ spacing })}><Icon name="distances" /><span className="dali-menu-label">{spacing} px</span><span aria-hidden="true">{prefs.spacing === spacing ? '✓' : ''}</span></button>)}
     </div>
   </div>;
   return <>

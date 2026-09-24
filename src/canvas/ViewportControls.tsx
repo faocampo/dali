@@ -1,9 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '@blocksuite/affine/std/gfx';
 
 /** Native viewport operations with explicit names and a stable history group. */
 export function ViewportControls({ host }: { host: EditorHost }) {
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const zoomRoot = useRef<HTMLDivElement>(null);
+  const zoomTrigger = useRef<HTMLButtonElement>(null);
+  const closeZoom = () => { setZoomOpen(false); zoomTrigger.current?.focus(); };
+  useEffect(() => {
+    if (!zoomOpen) return;
+    (zoomRoot.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]') ?? zoomRoot.current?.querySelector<HTMLButtonElement>('[role="menuitemradio"]'))?.focus();
+    const outside = (event: PointerEvent) => { if (!zoomRoot.current?.contains(event.target as Node)) setZoomOpen(false); };
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
+  }, [zoomOpen]);
   const gfx = host.std.get(GfxControllerIdentifier);
   const store = host.std.store;
   const [state, setState] = useState(() => ({ zoom: gfx.viewport.zoom, locked: gfx.viewport.locked, undo: store.history.canUndo, redo: store.history.canRedo }));
@@ -21,7 +32,22 @@ export function ViewportControls({ host }: { host: EditorHost }) {
     <span className="viewport-divider" aria-hidden="true" />
     <button type="button" aria-label="Fit to screen" title="Fit to screen" disabled={state.locked} onClick={() => gfx.fitToScreen()}><Icon path="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></button>
     <button type="button" aria-label="Zoom out" title="Zoom out" disabled={state.locked || state.zoom <= ZOOM_MIN} onClick={() => zoom(-ZOOM_STEP)}><Icon path="M5 12h14" /></button>
-    <button type="button" aria-label={`Reset zoom to 100%, current ${Math.round(state.zoom * 100)}%`} title="Reset zoom to 100%" disabled={state.locked} onClick={() => gfx.viewport.smoothZoom(1)}>{Math.round(state.zoom * 100)}%</button>
+    <div ref={zoomRoot} className="zoom-presets" onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setZoomOpen(false); }} onKeyDown={event => {
+      event.stopPropagation();
+      if (event.key === 'Escape') { event.preventDefault(); closeZoom(); }
+      if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        event.preventDefault();
+        if (!zoomOpen) { setZoomOpen(true); return; }
+        const options = Array.from(zoomRoot.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? []);
+        const index = options.indexOf(document.activeElement as HTMLButtonElement);
+        options[event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length]?.focus();
+      }
+    }}>
+      <button ref={zoomTrigger} type="button" aria-label={`Zoom, current ${Math.round(state.zoom * 100)}%`} title="Zoom presets" aria-haspopup="menu" aria-expanded={zoomOpen} disabled={state.locked} onClick={() => setZoomOpen(value => !value)}>{Math.round(state.zoom * 100)}%</button>
+      {zoomOpen && <div role="menu" aria-label="Zoom presets" className="zoom-presets-menu">
+        {[25, 50, 100, 200, 300].map(percent => <button key={percent} type="button" role="menuitemradio" tabIndex={-1} aria-checked={Math.round(state.zoom * 100) === percent} onClick={() => { gfx.viewport.smoothZoom(percent / 100); closeZoom(); }}><Icon path="M16 10a6 6 0 1 1-12 0 6 6 0 1 1 12 0m-1 5 6 6" /><span>{percent}%</span><span aria-hidden="true">{Math.round(state.zoom * 100) === percent ? '✓' : ''}</span></button>)}
+      </div>}
+    </div>
     <button type="button" aria-label="Zoom in" title="Zoom in" disabled={state.locked || state.zoom >= ZOOM_MAX} onClick={() => zoom(ZOOM_STEP)}><Icon path="M5 12h14M12 5v14" /></button>
   </div>;
 }

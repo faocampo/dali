@@ -34,7 +34,7 @@ const objectActionsToolbarModule = ToolbarModuleExtension({
               menu?.hide();
               (menu?.shadowRoot?.querySelector('editor-icon-button') as HTMLElement | null)?.focus();
             }
-          }}>Object actions <span aria-hidden="true">›</span></button>`;
+          }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M8 4v6M16 14v6" stroke="currentColor" stroke-width="1.6" /></svg>Object actions <span aria-hidden="true">›</span></button>`;
       },
     }],
   },

@@ -1918,3 +1918,36 @@ affine-edgeless-note { --affine-font-base:24px; --affine-font-h-1:32px; --affine
   .board-document-heading .board-title-label, .board-document-heading .board-title-inline input { max-width:100%; }
   .board-document-heading .djai-save__recovery { position:fixed; left:16px; right:16px; top:90px; width:auto; }
 }
+
+/* Consistent menu glyph columns and sharing control baselines. */
+.board-account button, .board-library__import button, .board-card__actions button,
+.share-dialog button { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.board-account button, .board-library__import button, .board-card__actions button { justify-content:flex-start; }
+.share-new-controls, .share-row-controls { display:flex; align-items:flex-end; gap:8px; width:100%; }
+.share-new-controls label, .share-row-controls label { flex:1; min-width:100px; margin:0; }
+.share-new-controls > button, .share-row-controls > button { flex-shrink:0; }
+.share-new-controls { margin:16px 0 24px; }
+.share-row, .share-owner { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center; padding-block:20px; }
+.share-person { display:grid; gap:2px; min-width:0; }
+.share-person span { font-size:12px; color:#65586f; }
+.share-status { display:flex; flex-direction:column; gap:2px; align-items:flex-end; font-size:12px; }
+.share-status span:last-child { color:#65586f; }
+.share-row-controls, .share-row > p, .share-row > button { grid-column:1 / -1; }
+.share-owner > .share-owner-role { flex-basis:auto; font-size:13px; }
+.share-dialog .djai-close { padding:8px; }
+.share-dialog .share-row-controls select { width:100%; }
+.share-dialog .djai-primary { background:#7540b4; }
+.share-dialog .djai-primary:disabled { opacity:.5; }
+.zoom-presets { position:relative; }
+.zoom-presets-menu { position:absolute; bottom:calc(100% + 16px); left:50%; transform:translateX(-50%); width:152px; padding:6px; border:1px solid var(--board-line); border-radius:12px; background:var(--board-surface); box-shadow:0 6px 24px rgb(37 23 53 / 14%); }
+.canvas-viewport-controls .zoom-presets-menu button { width:100%; display:flex; gap:12px; justify-content:flex-start; }
+.zoom-presets-menu button > span:last-child { margin-left:auto; }
+.zoom-presets-menu [aria-checked=true] { background:#f1eaf9; color:#573379; }
+@media (max-width:600px) {
+  .share-dialog .djai-panel-head, .share-dialog__body, .share-dialog .export-footer { padding:16px; }
+  .share-row-controls { display:grid; grid-template-columns:1fr 1fr; }
+  .share-row-controls label { grid-column:1 / -1; }
+  .share-row-controls button { padding:8px; }
+}
+
+.object-context-menu [role="menuitem"] { display:flex; align-items:center; gap:8px; text-align:left; }

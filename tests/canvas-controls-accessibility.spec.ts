@@ -12,11 +12,12 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 390, height: 640 
     }
     const controls = page.getByRole('toolbar', { name: 'Viewport and history' });
     await expect(controls.getByRole('button')).toHaveCount(6);
-    const before = await controls.getByRole('button', { name: /Reset zoom/ }).textContent();
+    const before = await controls.getByRole('button', { name: /^Zoom, current/ }).textContent();
     await controls.getByRole('button', { name: 'Zoom in', exact: true }).click();
-    await expect(controls.getByRole('button', { name: /Reset zoom/ })).not.toHaveText(before!);
-    await controls.getByRole('button', { name: /Reset zoom/ }).click();
-    await expect(controls.getByRole('button', { name: /Reset zoom/ })).toHaveText('100%');
+    await expect(controls.getByRole('button', { name: /^Zoom, current/ })).not.toHaveText(before!);
+    await controls.getByRole('button', { name: /^Zoom, current/ }).click();
+    await page.getByRole('menuitemradio', { name: '100%', exact: true }).click();
+    await expect(controls.getByRole('button', { name: /^Zoom, current/ })).toHaveText('100%');
     await page.getByRole('button', { name: 'Main Menu', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Help', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Canvas shortcuts' })).toBeVisible();

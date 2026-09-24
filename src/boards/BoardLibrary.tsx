@@ -1,3 +1,4 @@
+import { MenuIcon } from '../header/MenuIcon';
 import { useEffect, useRef, useState } from 'react';
 import type { SessionDescriptor } from '../auth/AuthBoundary';
 import { ShareBoardDialog } from './ShareBoardDialog';
@@ -126,7 +127,7 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
     <header className="board-library__header">
       <a className="djai-brand" href="/" aria-label="Dalí"><img src={logo} alt="" height={34} /></a>
       <nav className="board-library__header-actions" aria-label="Library controls">
-        {member.systemRole !== 'viewer' && <Dropdown className="board-library__import" summary="Import">{close => <button onClick={() => { close(); setLocalCopyOpen(true); }}>Copy local boards</button>}</Dropdown>}
+        {member.systemRole !== 'viewer' && <Dropdown className="board-library__import" summary="Import">{close => <button onClick={() => { close(); setLocalCopyOpen(true); }}><MenuIcon name="import" />Copy local boards</button>}</Dropdown>}
         <AccountMenu member={member} signOut={signOut} />
       </nav>
     </header>
@@ -150,11 +151,11 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
         </a><div className="board-card__footer"><div className="board-card__metadata"><span>{board.access === 'private' ? 'Private' : 'Shared'}</span><span>{board.role[0]!.toUpperCase() + board.role.slice(1)}</span>{board.pendingCount > 0 && <span>Pending member sign-in</span>}</div>
           {board.role !== 'viewer' && <Dropdown className="board-card__actions" label={'Actions for ' + board.title} summary={<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.75" /><circle cx="12" cy="12" r="1.75" /><circle cx="19" cy="12" r="1.75" /></svg>}>
             {close => <>
-              <button onClick={() => { close(); setAction({ board, kind: 'rename' }); }}>Rename board</button>
-              <button onClick={() => { close(); setAction({ board, kind: 'duplicate' }); }}>Duplicate board</button>
+              <button onClick={() => { close(); setAction({ board, kind: 'rename' }); }}><MenuIcon name="rename" />Rename board</button>
+              <button onClick={() => { close(); setAction({ board, kind: 'duplicate' }); }}><MenuIcon name="duplicate" />Duplicate board</button>
               {board.role === 'owner' && <>
-                <button onClick={() => { close(); setSharing(board); }}>Share board</button>
-                <button className="access-destructive" onClick={() => { close(); setAction({ board, kind: 'delete' }); }}>Delete board</button>
+                <button onClick={() => { close(); setSharing(board); }}><MenuIcon name="share" />Share board</button>
+                <button className="access-destructive" onClick={() => { close(); setAction({ board, kind: 'delete' }); }}><MenuIcon name="delete" />Delete board</button>
               </>}
             </>}
           </Dropdown>}
