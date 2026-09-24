@@ -5,10 +5,10 @@ current_phase_name: Okta and Board Access
 current_plan: 12
 status: executing
 stopped_at: Phase 3 UAT: six passes, two deferred follow-ups, two pending items
-last_updated: "2026-09-24T22:34:12.094408+00:00"
+last_updated: "2026-09-24T22:46:56.092868+00:00"
 last_activity: 2026-09-24
-last_activity_desc: Recorded Phase 3 user acceptance and privacy review; deferred provider and assistive-technology follow-ups
-state_head: 18bb38e7344de7fd270210bd8689134d257f8062
+last_activity_desc: Completed canvas editing and ownership follow-up; Phase 3 has six passes, two deferrals and two pending dispositions
+state_head: d071a44
 progress:
   total_phases: 13
   completed_phases: 2
@@ -28,13 +28,15 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-15).
 
 ## Current Position
 
+Quick follow-up `d071a44`: zoom presets/shortcuts, connector hover, custom colors, last shape fill, note focus and shape caret are verified. Creators retain Owner privileges on their existing boards; system Viewers remain read-only on shared boards and cannot create fresh boards/imports. All 110 unit tests, 116 server tests and 64 distinct focused browser/project cases passed; static checks and production build passed.
+
 Acceptance update (2026-09-24): five user-reported passes plus a scoped privacy-review pass; provider work and screen-reader testing are deferred. The exported snapshot is structurally valid with a hash-matched image asset, but the user tested export only. See [UAT review](phases/03-okta-and-board-access/03-UAT-REVIEW.md) (analysis, review scope and remaining copy procedure). Earlier progress notes below retain their historical status.
 
 Phase: 03 (Okta and Board Access) — HUMAN VERIFICATION PENDING
 Current Plan: 12
 Total Plans in Phase: 12
 Status: Human verification pending — six UAT passes, two approved deferrals, two pending dispositions (03-07 and 03-11). Historical automated score: 99/104.
-Last activity: 2026-09-24 - Recorded UAT results, reviewed export and public-artifact privacy, captured backlog 999.3 and 999.4.
+Last activity: 2026-09-24 - Completed quick task 260924-qq8: canvas editing and creator ownership; recorded Phase 3 UAT dispositions.
 
 Progress: [██░░░░░░░░] 15% (2/13 phases complete; 25/26 plans complete)
 
@@ -186,6 +188,8 @@ Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted
 | 260924-kqt | Menu icons, sharing alignment and zoom presets | 2026-09-24 | 5b76249 | Complete | [Quick task](quick/260924-kqt-menu-icons-sharing-alignment-and-zoom-pr/260924-kqt-SUMMARY.md) |
 | 260924-l0p | Logo-derived design system and whole UI polish | 2026-09-24 | 29158d6 | Complete | [Quick task](quick/260924-l0p-logo-derived-design-system-and-whole-ui-/260924-l0p-SUMMARY.md) |
 | 260924-m9n | Canvas formatting layers, live thickness, placement and concise object menus | 2026-09-24 | 18bb38e | Complete | [Quick task](quick/260924-m9n-canvas-formatting-layers-live-thickness-/260924-m9n-SUMMARY.md) |
+
+| 260924-qq8 | Stable zoom, connector hints, color and text editing, creator ownership | 2026-09-24 | d071a44 | Complete | [Quick task](quick/260924-qq8-fix-zoom-menus-and-shortcuts-connector-h/260924-qq8-SUMMARY.md) |
 
 Phase 2 was tested and approved on 2026-09-15. Canonical phase verification records the acceptance revision; subsequent quick tasks retain separate validation provenance. Quick task 260915-s9s passed 79 unit tests and 51 distinct browser/project cases across focused runs, with TypeScript checks and production build passing.
 
