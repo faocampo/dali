@@ -32,7 +32,7 @@ Phase: 03 (Okta and Board Access) — HUMAN VERIFICATION PENDING
 Current Plan: 12
 Total Plans in Phase: 12
 Status: Human verification pending — 99/104 truths verified; ten items saved in 03-UAT.md
-Last activity: 2026-09-17 — Source/test revision 7341672 passed the exact smoke, both typechecks, 105 unit tests, 112 server tests, production build, standalone 123-case access suite and the entire 1533-case five-project matrix (57.1m, zero failures/timeouts/skips/interruptions/unrun). Earlier failed and interrupted attempts remain recorded in 03-12-CHECKPOINT.md. The final run used a command-scoped idle-sleep guard after host sleep interrupted a prior attempt; all 40 affected cases first passed unchanged in focused reproduction. Five BFCache observations were ordinary history reloads. Independent verification is human_needed (99/104), with zero proved implementation blockers. Actual provider, native zoom, IME, speech, BFCache, Firefox/WebKit clipboard and four prohibition dispositions remain in the ten-item UAT checklist. Phase 3 remains in progress.
+Last activity: 2026-09-24 - Completed quick task 260924-j0y: system Viewer and canvas refinements
 
 Progress: [██░░░░░░░░] 15% (2/13 phases complete; 25/26 plans complete)
 
@@ -180,6 +180,7 @@ Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted
 | 260918-eix | Compact title, aligned roles, identity avatar, concise File menu and simpler library | 2026-09-18 | 3c59e71 | Complete | [Quick task](quick/260918-eix-refine-board-header-menus-and-library-pr/260918-eix-SUMMARY.md) |
 | 260924-amb | Compact card menus, top-bar Import/account controls and internal/external admission checks | 2026-09-24 | bfbe573 | Complete | [Quick task](quick/260924-amb-compact-board-library-controls-and-verif/260924-amb-SUMMARY.md) |
 | 15 | Add optional port arguments to local start and stop scripts | 2026-09-24 | — | — | — |
+| 260924-j0y | System-wide Viewer access, canvas formatting and header refinements | 2026-09-24 | 4adb017 | Complete | [Quick task](quick/260924-j0y-canvas-controls-typography-header-and-sy/260924-j0y-SUMMARY.md) |
 
 Phase 2 was tested and approved on 2026-09-15. Canonical phase verification records the acceptance revision; subsequent quick tasks retain separate validation provenance. Quick task 260915-s9s passed 79 unit tests and 51 distinct browser/project cases across focused runs, with TypeScript checks and production build passing.
 
