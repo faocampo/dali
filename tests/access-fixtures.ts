@@ -14,7 +14,7 @@ import { test, expect } from './fixtures.js';
 export type AccessIdentity = 'owner' | 'editor' | 'viewer' | 'nonMember';
 export const accessIdentityNames: AccessIdentity[] = ['owner', 'editor', 'viewer', 'nonMember'];
 export const accessIdentityLabels: Record<AccessIdentity, string> = {
-  owner: 'Synthetic Owner', editor: 'Synthetic Editor', viewer: 'Synthetic Viewer', nonMember: 'Synthetic Non-member',
+  owner: 'Synthetic Owner', editor: 'Synthetic Editor', viewer: 'Synthetic Viewer', nonMember: 'Synthetic Internal Member',
 };
 export { test, expect };
 

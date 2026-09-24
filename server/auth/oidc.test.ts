@@ -49,6 +49,16 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   const members = () => database.prepare('SELECT * FROM members ORDER BY id').all();
   const count = () => (database.prepare('SELECT count(*) AS n FROM sessions WHERE member_id IS NOT NULL').get() as { n: number }).n;
 
+  it('external fixture with a verified accepted-domain email cannot enter the system', async () => {
+    const before = members();
+    const flow = await begin('/', 'external');
+    const response = await finish(flow);
+    expect(response.headers.location).toBe('/?authError=signin');
+    expect((await session(cookieOf(response) || flow.cookie)).statusCode).toBe(401);
+    expect((await app.inject({ url: '/api/boards', headers: { cookie: flow.cookie } })).statusCode).toBe(401);
+    expect(count()).toBe(0); expect(members()).toEqual(before);
+  });
+
   it('@NYQ-01 a valid signature with an unpublished kid rejects identity mutation and callback replay', async () => {
     const keys = provider.keyControls!; const knownKid = keys.currentKid();
     const valid = await signIn(); const validSession = (await session(valid.authenticated)).json();

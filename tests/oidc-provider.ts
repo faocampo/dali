@@ -12,10 +12,13 @@ import * as oidc from 'openid-client';
 export const PROVIDER_PORT = 5496;
 export const IDENTITY_COOKIE = 'dali_fixture_identity';
 export const identities = {
-  owner: { sub: 'synthetic-owner', name: 'Synthetic Owner', email: 'owner@example.org' },
-  editor: { sub: 'synthetic-editor', name: 'Synthetic Editor', email: 'editor@example.org' },
-  viewer: { sub: 'synthetic-viewer', name: 'Synthetic Viewer', email: 'viewer@example.org' },
-  nonMember: { sub: 'synthetic-non-member', name: 'Synthetic Non-member', email: 'non-member@example.org' },
+  owner: { sub: 'synthetic-owner', name: 'Synthetic Owner', email: 'owner@example.org', membership: 'internal' },
+  editor: { sub: 'synthetic-editor', name: 'Synthetic Editor', email: 'editor@example.org', membership: 'internal' },
+  viewer: { sub: 'synthetic-viewer', name: 'Synthetic Viewer', email: 'viewer@example.org', membership: 'internal' },
+  // This internal member has no grants on other members' test boards.
+  nonMember: { sub: 'synthetic-non-member', name: 'Synthetic Internal Member', email: 'non-member@example.org', membership: 'internal' },
+  // A verified email on the accepted domain alone must never admit this account.
+  external: { sub: 'synthetic-external', name: 'Synthetic External Account', email: 'external@example.org', membership: 'external' },
 } as const;
 export type IdentityName = keyof typeof identities;
 export type ProviderFaults = {
@@ -102,7 +105,10 @@ export async function createOidcProvider(options: {
       const notice = options.signInPage ? `<p>${escaped(options.signInPage.notice)}</p>` : '';
       return reply.type('text/html; charset=utf-8').send(`<!doctype html><html lang="en"><meta charset="utf-8"><title>${title}</title><h1>Choose a synthetic account</h1>${notice}${links}</html>`);
     }
-    reply.setCookie(IDENTITY_COOKIE, selected, { httpOnly: true, sameSite: 'lax', path: '/' });
+    // A denied external demo must let the next attempt choose an eligible account.
+    if (identities[selected as IdentityName].membership === 'internal') {
+      reply.setCookie(IDENTITY_COOKIE, selected, { httpOnly: true, sameSite: 'lax', path: '/' });
+    } else reply.clearCookie(IDENTITY_COOKIE, { path: '/' });
     for (const [code, value] of codes) if (value.expiresAt <= now()) codes.delete(code);
     const code = opaque();
     codes.set(code, { client, challenge: p.get('code_challenge')!, nonce: p.get('nonce')!,
@@ -134,7 +140,7 @@ export async function createOidcProvider(options: {
     const f = record.faults;
     const seconds = Math.floor(now() / 1000) + (f.clockOffsetSeconds ?? 0);
     const claims: Record<string, unknown> = {
-      ...identities[record.identity], email_verified: true, membership: 'internal',
+      ...identities[record.identity], email_verified: true,
       iss: f.issuer ?? issuer, aud: f.audience ?? clientId, iat: seconds, exp: seconds + 300,
       nonce: f.nonce ?? record.nonce, ...f.claims,
     };

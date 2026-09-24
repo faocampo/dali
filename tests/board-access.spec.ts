@@ -280,7 +280,7 @@ test('@03-03-01 @03-06-01 D-05 D-13 foreign target and library conceal canary an
   expect(created.status()).toBe(201); const descriptor = await created.json();
   const stranger = await browser.newContext({ baseURL });
   try {
-    const tab = await stranger.newPage(); await tab.goto('/auth/start'); await tab.getByRole('link', { name: 'Synthetic Non-member', exact: true }).click();
+    const tab = await stranger.newPage(); await tab.goto('/auth/start'); await tab.getByRole('link', { name: 'Synthetic Internal Member', exact: true }).click();
     await expect(tab.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
     const other = await (await stranger.request.get('/api/session')).json();
     const otherHeaders = { 'X-Dali-Account': other.accountId };
