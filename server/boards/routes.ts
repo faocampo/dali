@@ -70,7 +70,7 @@ export function operationReceipt(database: AccountDatabase, request: FastifyRequ
   return { status: operation.status, result: current };
 }
 /** Root and content are separately persisted; a root has exactly one bound subdocument. */
-function seedDocuments(database: AccountDatabase, board: BoardRow) {
+export function seedDocuments(database: AccountDatabase, board: BoardRow) {
   const root = new Y.Doc({ guid: board.root_doc_id });
   const content = new Y.Doc({ guid: board.content_doc_id });
   try {

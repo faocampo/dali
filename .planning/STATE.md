@@ -5,9 +5,9 @@ current_phase_name: Okta and Board Access
 current_plan: 12
 status: executing
 stopped_at: Phase 3 verified human_needed (99/104); ten UAT items pending
-last_updated: "2026-09-24T10:58:07.431852+00:00"
+last_updated: "2026-09-24T13:04:33.097456+00:00"
 last_activity: 2026-09-24
-last_activity_desc: Completed quick task 260924-amb compact library controls and internal-member admission checks; ten Phase 3 UAT items pending
+last_activity_desc: Resolved local Viewer test setup and removed empty-canvas mind-map guidance; ten Phase 3 UAT items pending
 progress:
   total_phases: 13
   completed_phases: 2
@@ -40,6 +40,8 @@ Local development follow-up at `2d0dae4`: documented startup now launches the co
 UI refinement follow-up at `3c59e71`: all eight user comments are implemented. Static checks, production build and 146 distinct browser/project cases passed across focused runs, including a final 21-case header/menu run in Chromium, Firefox and WebKit. See [quick summary](quick/260918-eix-refine-board-header-menus-and-library-pr/260918-eix-SUMMARY.md) (changes, validation and preserved Phase 3 acceptance boundary).
 
 Library controls follow-up at `bfbe573` (with admission fixtures at `f224778`): compact card menus, top-bar Import and a shared account avatar/name control are verified. Static checks, production build, 105 unit tests, 113 server tests and 126 distinct focused browser/project cases passed. Signed external accounts are rejected; internal-member admission is separate from per-board permissions. See [quick summary](quick/260924-amb-compact-board-library-controls-and-verif/260924-amb-SUMMARY.md) (changes, evidence and preserved Phase 3 acceptance boundary).
+
+Viewer test follow-up: the user confirmed that the board being edited by Synthetic Viewer showed Owner. Added Shared role test with actual Owner/Editor/Viewer grants to the local launcher and removed the empty-canvas mind-map message. All three typechecks, four startup tests, 79 targeted server tests, the production build and 21 focused browser cases across Chromium/Firefox/WebKit passed. See [resolved journal](debug/resolved/viewer-role-test.md) (cause, local fixture correction and validation). The user confirmed local external-account rejection; the ten broader Phase 3 UAT items remain pending.
 
 ## Performance Metrics
 

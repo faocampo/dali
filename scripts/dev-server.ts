@@ -6,6 +6,7 @@ import { resolve, join } from 'node:path';
 import { createServer, type ViteDevServer } from 'vite';
 import { buildApp } from '../server/app.js';
 import { createOidcProvider } from '../tests/oidc-provider.js';
+import { seedLocalRoleBoard } from './dev-role-board.js';
 
 export type DevOptions = { uiPort: number; apiPort: number; providerPort: number; stateDirectory: string };
 const port = (value: string, name: string) => {
@@ -81,7 +82,7 @@ export async function startLocalDevelopment(options: DevOptions, stopped: () => 
     const state = await loadDevState(options); ensureRunning();
     const registration = { clientId: 'synthetic-local-development', clientSecret: randomBytes(32).toString('base64url'), redirectUri: `${state.origin}/auth/callback` };
     provider = await createOidcProvider({ port: options.providerPort, clients: [registration],
-      signInPage: { title: 'Dali local development — synthetic sign-in', notice: 'Local development only. These synthetic accounts use example data. Choose an account to continue to your local boards.' },
+      signInPage: { title: 'Dali local development — synthetic sign-in', notice: 'Local development only. Open Shared role test to try Owner, Editor or Viewer access with the matching synthetic account. Roles apply per board; creating a board makes you its Owner.' },
     }); ensureRunning();
     app = await buildApp({ config: {
       DALI_ORIGIN: state.origin, DALI_DATABASE_PATH: join(options.stateDirectory, 'boards.sqlite'),
@@ -91,6 +92,7 @@ export async function startLocalDevelopment(options: DevOptions, stopped: () => 
       DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]',
       DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]', DALI_EMAIL_CASE_FOLD: 'false',
     } }); ensureRunning();
+    seedLocalRoleBoard(join(options.stateDirectory, 'boards.sqlite'), state.issuer); ensureRunning();
     await app.listen({ host: '127.0.0.1', port: options.apiPort }); ensureRunning();
     const target = `http://127.0.0.1:${options.apiPort}`;
     vite = await createServer({ server: { host: '127.0.0.1', port: options.uiPort, strictPort: true,

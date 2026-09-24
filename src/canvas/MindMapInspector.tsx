@@ -54,11 +54,6 @@ export function MindMapInspector({ host }: { host: EditorHost }) {
       topic.gfx.viewport.center.y + (top - nextTop) / topic.gfx.viewport.zoom);
   }, [open, editing, topic?.shape.id, topic?.shape.xywh]);
   useEffect(() => { if (open) panel.current?.querySelector<HTMLButtonElement>('.selection-inspector__close')?.focus(); }, [open]);
-  const empty = host.std.get(GfxControllerIdentifier).surface?.elementModels.length === 0;
-  if (!topic && empty) return <aside className="mindmap-empty" aria-label="Mind-map guidance">
-    <h2>Start a mind map</h2>
-    <p>Add a mind map, then name the central topic. Select a topic and press Tab to add a child or Enter to add a sibling.</p>
-  </aside>;
   const feedback = <div className="mindmap-feedback">
     {error && <p role="alert">{error}</p>}
     <p className="sr-only" aria-live="polite">{announcement}</p>

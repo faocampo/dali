@@ -7,7 +7,7 @@
 .mindmap-panel .selection-inspector__head { flex: 0 0 auto; }
 .mindmap-panel .selection-inspector__body { min-height: 0; overflow-y: auto; }
 .mindmap-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.mindmap-panel h2, .mindmap-empty h2 { font-size: 20px; line-height: 1.2; font-weight: 600; margin: 0; }
+.mindmap-panel h2 { font-size: 20px; line-height: 1.2; font-weight: 600; margin: 0; }
 .mindmap-panel .mindmap-actions, .mindmap-panel fieldset { margin: 16px 0 0; }
 .mindmap-panel fieldset { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; padding: 8px; border: 1px solid #76736e; }
 .mindmap-panel label { display: grid; gap: 4px; min-width: 0; }
@@ -31,8 +31,6 @@
 .mindmap-panel[data-editing="true"] fieldset,
 .mindmap-panel[data-editing="true"] .mindmap-context,
 .mindmap-panel[data-editing="true"] #mindmap-root-hint { display: none; }
-.mindmap-empty { position: absolute; top: 24px; left: 96px; width: 360px; max-width: calc(100% - 112px); color: #1b1a18; pointer-events: none; }
-.mindmap-empty p { font-size: 15px; line-height: 1.5; }
 .mindmap-opening { margin: 24px; color: #1b1a18; }
 
 /*

@@ -89,7 +89,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
   });
 }
 
-test('@02-05-03 empty loading populated partial and long-text states retain usable guidance', async ({ page }) => {
+test('@02-05-03 empty loading populated partial and long-text states retain usable controls', async ({ page }) => {
   await page.addInitScript(() => {
     const evidence = { opening: false, mutationAvailable: false };
     Object.assign(window, { mindmapLoadingEvidence: evidence });
@@ -101,8 +101,8 @@ test('@02-05-03 empty loading populated partial and long-text states retain usab
     }).observe(document, { childList: true, subtree: true });
   });
   await page.goto('/');
-  await expect(page.getByText('Start a mind map', { exact: true })).toBeVisible({ timeout: 2000 });
-  await expect(page.getByText('Add a mind map, then name the central topic. Select a topic and press Tab to add a child or Enter to add a sibling.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Add mind map', exact: true })).toBeEnabled();
+  await expect(page.getByRole('complementary', { name: 'Mind-map guidance', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => (window as unknown as { mindmapLoadingEvidence: unknown }).mindmapLoadingEvidence)).toEqual({ opening: true, mutationAvailable: false });
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');

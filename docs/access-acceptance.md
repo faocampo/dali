@@ -57,6 +57,8 @@ Automated viewport, DOM focus, keyboard, composition-event routing and contrast 
 
 ## Automated acceptance commands
 
+For local manual role checks, open **Shared role test** using the matching synthetic account. Its Viewer grant is read-only; boards created by that same account are owned by it. See [local role testing](local-role-testing.md) (account roles, sample persistence and retest steps).
+
 Run the two focused cases first:
 
 ```sh
