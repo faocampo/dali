@@ -410,3 +410,15 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 Plans:
 
 - [ ] TBD (promote with $gsd-review-backlog when ready)
+
+### Phase 999.2: Step-by-step onboarding tutorial (BACKLOG)
+
+**Goal:** Help new users discover Dali's features through a guided, step-by-step onboarding tutorial.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+**Captured context:** Introduce system features through a sequence of tutorial steps. Feature coverage, step order and tutorial interactions will be defined during planning.
+
+Plans:
+
+- [ ] TBD (promote with $gsd-review-backlog when ready)
