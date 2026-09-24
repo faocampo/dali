@@ -3,12 +3,25 @@ phase: 03-okta-and-board-access
 plan: "12"
 status: incomplete
 automated_task: passed-at-7341672
-actual_provider: not-run-human-needed
+actual_provider: deferred-backlog-999.4
+human_acceptance: pending-item-8
 ---
 
 # Phase 3 Plan 12 acceptance checkpoint
 
-The automated gate for task 03-12-01 passed on source/test revision `73416723411ca2c5b98de090f6d5327ed9e076c7`. Plan 12 and Phase 3 remain incomplete: actual-provider acceptance and the native evidence gaps below are pending. Progress remains **2/13 accepted phases**, **25/26 completed plans**, and **11/12 Phase 3 plans**. Independent verification is **human_needed (99/104)**, with no proved implementation blocker. The ten remaining observations and review dispositions are saved in [03-UAT.md](03-UAT.md) (acceptance checklist); resume with `$gsd-verify-work 3`.
+The automated gate for task 03-12-01 passed on source/test revision `73416723411ca2c5b98de090f6d5327ed9e076c7`. Plan 12 and Phase 3 remain incomplete with **one human acceptance item pending: UAT item 8, pending-access presentation**. Current dispositions are **6 passes and 3 skips**: actual-provider acceptance is deferred to backlog 999.4, assistive-technology acceptance to 999.3, and the removed optional local-copy workflow is waived. Progress remains **2/13 accepted phases**, **25/26 completed plans**, and **11/12 Phase 3 plans**. Independent verification remains **human_needed**, with its historical 99/104 score preserved. [03-UAT.md](03-UAT.md) (current acceptance checklist) is authoritative over the historical obligations below.
+
+## Current pending-access review — 2026-09-24
+
+Resumed through `$gsd-progress --next` at revision `5c7fe7a`. Phases 1 and 2 have matching plan/summary counts; 03-12 is the first incomplete plan. Previously approved deferrals remain effective.
+
+Fresh focused evidence: **3/3 browser cases** passed in Chromium, Firefox and WebKit (31.0s), exercising an owner granting pending Viewer access, acknowledged presentation and revocation. **16/16 grant server tests** passed (2.61s), including trusted first sign-in activation, revoked pending grants and rejected ambiguous/unverified identities. Commands: `npx playwright test tests/board-sharing.spec.ts --grep 'owner grants pending Viewer' --project=prod --project=prod-firefox --project=prod-webkit --trace=on` and `npm run test:server -- server/boards/grants.test.ts`.
+
+Reviewed the synthetic browser capture: the row says **Pending member sign-in**, the acknowledgment says **Pending access added.**, and the explanation says **Access starts after this person signs in with a verified internal account.** The action is **Grant access**. This is fresh scoped evidence for the wording and pending-grant behavior; human acceptance of item 8 is still awaited. No actual-provider acceptance or new full-phase gate is claimed. Synthetic runtime captures remain outside tracked content.
+
+The remaining question is whether this wording clearly communicates pending access and its verified-sign-in condition. Record the user's pass or reported wording issue in the current UAT checklist before continuing phase completion.
+
+The sections below retain historical execution evidence and original obligations at their stated revisions.
 
 ## Local development startup correction — 2026-09-17
 

@@ -6,6 +6,12 @@ Date: 2026-09-24. Source revision before this follow-up: `3eef1e3`. This review 
 
 The user reported passes for native 200% browser zoom, genuine BFCache restoration, native OS IME, Firefox/WebKit native clipboard and deliberate Dali-only logout (03-02). These are user observations; exact environment versions and detailed traces were not supplied. Actual-provider acceptance is deferred until operator access is available (backlog 999.4). Assistive-technology testing is deferred to backlog 999.3. Pending-access presentation (03-07) remains pending as requested.
 
+## 03-07: pending-access wording review
+
+Resumed on 2026-09-24 at revision `5c7fe7a`. The owner pending-Viewer grant/revoke browser case passed in Chromium, Firefox and WebKit (**3/3**, 31.0s); the grant server suite passed **16/16** (2.61s). The captured UI labels the grant **Pending member sign-in**, acknowledges **Pending access added.**, and explains **Access starts after this person signs in with a verified internal account.** The primary action is **Grant access**. The reviewed flow contains no invitation-sent claim and distinguishes pending from active grants.
+
+This fresh check supports the existing implementation. UAT item 8 remains pending the user's wording review; the historical descriptor-less prohibition and full-gate result are not reclassified by these focused tests. [03-12-CHECKPOINT.md](03-12-CHECKPOINT.md) (current checkpoint and exact commands) records the evidence and preserves approved deferrals.
+
 ## 03-11: supplied export analysis
 
 The user-supplied local export parses as a single page snapshot: one page, one surface, five shapes, three connectors, four notes, twelve paragraphs, one image block and two image-adjustment records. The image block declares 460 by 690 pixels and 1,928,265 bytes. Its source reference matches the SHA-256 content hash and byte size of an asset beside the snapshot. The asset directory has three files; only one is directly referenced by an image block. No external HTTP(S) URL was found in the snapshot.

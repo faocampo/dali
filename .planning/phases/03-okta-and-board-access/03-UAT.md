@@ -3,7 +3,7 @@ status: testing
 phase: 03-okta-and-board-access
 source: [03-VERIFICATION.md]
 started: 2026-09-17T13:43:09.794134+00:00
-updated: 2026-09-24T23:07:19.642633+00:00
+updated: 2026-09-24T23:44:12.324354+00:00
 ---
 
 # Phase 3 acceptance checklist
@@ -15,7 +15,7 @@ The complete automated gate passed at `7341672`. Independent verification is `hu
 number: 8
 name: 03-07 prohibition resolution
 expected: Pending access is described as pending access, without implying an email invitation or active membership before verified internal sign-in.
-awaiting: user testing (explicitly left pending)
+awaiting: user review of pending-access wording after fresh focused checks
 
 ## Tests
 
@@ -95,6 +95,7 @@ procedure: Explicitly review and resolve: Pending access MUST NOT be presented a
 expected: Record human disposition or provide a wired enforcement descriptor and reverify.
 reason: Descriptor-less test prohibition; semantic test coverage does not supply the missing enforcement contract.
 result: [pending]
+agent_check: 2026-09-24 — 3/3 pending-access browser checks and 16/16 grant server tests passed. Synthetic capture reviewed; human wording acceptance remains pending. See 03-UAT-REVIEW.md.
 
 ### 9. 03-11 prohibition resolution
 
