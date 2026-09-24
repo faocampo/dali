@@ -74,7 +74,7 @@ export function installReadOnlyInputs(host: HTMLElement, store: Store, scope: Ac
     if (event instanceof KeyboardEvent) {
       const modifier = event.ctrlKey || event.metaKey;
       if (['Escape', 'Tab', ' ', 'Shift', 'Control', 'Meta', 'Alt'].includes(event.key) ||
-          (modifier && ['a', 'c', '+', '-', '0', '='].includes(event.key.toLowerCase())) || event.key.startsWith('Arrow') || (event.key === 'Tab' && event.shiftKey)) return;
+          (modifier && ['a', 'c', '+', '-', '0', '1', '='].includes(event.key.toLowerCase())) || event.key.startsWith('Arrow') || (event.key === 'Tab' && event.shiftKey)) return;
       if (!event.composedPath().includes(host) && target !== document.body) return;
     }
     event.preventDefault(); event.stopImmediatePropagation();

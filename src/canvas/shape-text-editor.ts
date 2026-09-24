@@ -23,6 +23,10 @@ export function installShapeTextTypography(): void {
         if (!editor.richText || !editor.element) return;
         editor.richText.style.fontFamily = `${TextUtils.wrapFontFamily(editor.element.fontFamily)}, sans-serif`;
         editor.richText.style.fontStyle = editor.element.fontStyle;
+        editor.richText.style.caretColor = 'currentColor';
+        editor.richText.style.userSelect = 'text';
+        editor.richText.style.setProperty('-webkit-user-select', 'text');
+        editor.richText.style.cursor = 'text';
         if (!editor.isMindMapNode) Object.assign(editor.richText.style, {
           width: `${editor.element.w}px`, height: `${editor.element.h}px`,
           minHeight: '0', maxHeight: `${editor.element.h}px`, overflow: 'hidden',

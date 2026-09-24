@@ -27,7 +27,7 @@ export function requireBoardCapability(database: AccountDatabase, request: Fasti
     FROM boards b LEFT JOIN board_grants g ON g.board_id=b.id AND g.member_id=@member
     WHERE b.id=@board AND (b.owner_id=@member OR g.member_id IS NOT NULL)`).get({ member: member!.accountId, board: boardId }) as BoardRow | undefined;
   if (!board) { reply.code(404).send({ code: 'BOARD_UNAVAILABLE' }); return; }
-  if (member!.systemRole === 'viewer') board.role = 'viewer';
+  if (member!.systemRole === 'viewer' && board.role !== 'owner') board.role = 'viewer';
   if (!canBoard(board.role, capability)) { reply.code(403).send({ code: 'CAPABILITY_REQUIRED' }); return; }
   return board;
 }
@@ -124,7 +124,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
       WHERE (b.owner_id=@member OR g.member_id IS NOT NULL)
       AND (@filter='all' OR (@filter='mine' AND b.owner_id=@member) OR (@filter='shared' AND b.owner_id<>@member))
       ORDER BY b.updated_at DESC,b.id ASC`).all({ member: member!.accountId, filter }) as BoardRow[];
-    return rows.map(board => summary(database, member!.systemRole === 'viewer' ? { ...board, role: 'viewer' } : board, member!.accountId));
+    return rows.map(board => summary(database, member!.systemRole === 'viewer' && board.role !== 'owner' ? { ...board, role: 'viewer' } : board, member!.accountId));
   });
   app.get<{ Params: { boardId: string } }>('/api/boards/:boardId', async (request, reply) => {
     const board = requireBoardCapability(database, request, reply, request.params.boardId, 'read', now);

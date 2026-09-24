@@ -75,8 +75,8 @@ export function DaliMenu({ onOpenBoards, onExport, onNewBoard, role, onBoardActi
           {onBoardAction && role !== 'viewer' && <><button role="menuitem" tabIndex={-1} onClick={() => run(() => onBoardAction('rename'))}><MenuIcon name="rename" /><span className="dali-menu-label">Rename board</span></button><button role="menuitem" tabIndex={-1} onClick={() => run(() => onBoardAction('duplicate'))}><MenuIcon name="duplicate" /><span className="dali-menu-label">Duplicate board</span></button></>}
           {onBoardAction && role === 'owner' && <button role="menuitem" tabIndex={-1} onClick={() => run(() => onBoardAction('delete'))}><MenuIcon name="delete" /><span className="dali-menu-label">Delete board</span></button>}
           <div role="separator" className="dali-menu-separator" />
-          <button role="menuitem" tabIndex={-1} disabled={role === 'viewer'} aria-describedby={role === 'viewer' ? 'viewer-import-reason' : undefined} onClick={() => command('import')}><MenuIcon name="import" /><span className="dali-menu-label">Import board</span></button>
-          {role === 'viewer' && <p id="viewer-import-reason" hidden>Board import requires Owner or Editor access.</p>}
+          <button role="menuitem" tabIndex={-1} disabled={!canCreate || role === 'viewer'} aria-describedby={!canCreate || role === 'viewer' ? 'viewer-import-reason' : undefined} onClick={() => command('import')}><MenuIcon name="import" /><span className="dali-menu-label">Import board</span></button>
+          {(!canCreate || role === 'viewer') && <p id="viewer-import-reason" hidden>Board import requires permission to create boards.</p>}
           <button role="menuitem" tabIndex={-1} onClick={() => run(onExport)}><MenuIcon name="export" /><span className="dali-menu-label">Export board</span></button>
         </>}
         {category === 'View' && <ViewMenu>
@@ -96,6 +96,7 @@ export function DaliMenu({ onOpenBoards, onExport, onNewBoard, role, onBoardActi
             <h2>Canvas shortcuts</h2>
             <p>Select V · Frame F · Shape S · Connector C · Freehand P</p>
             <p>Hold Space to pan, or use Hand.</p>
+            <p>Ctrl+0 resets zoom to 100%. Ctrl+1 fits the selected objects. On Mac, Command also works.</p>
             <h3>Mind maps</h3>
             <p>Tab adds a child. Enter adds a sibling (a child for the root). Double-click edits text. Escape finishes editing.</p>
             <p>Open Properties from the object's More menu for formatting.</p>

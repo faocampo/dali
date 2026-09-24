@@ -83,8 +83,37 @@ describe('@03-08-01 board action transactions', () => {
     const result = await app.inject({ method: 'PATCH', url: '/api/boards/' + board.summary.id, headers: headers('editor'), payload: { operationId: randomUUID(), revision: 1, title: 'Rejected' } }); expect(result.statusCode).toBe(404);
     expect(database.prepare('SELECT * FROM board_documents').all()).toEqual(docs); expect(database.prepare('SELECT title FROM boards').get()).toEqual({ title: 'Synthetic board' });
   });
-  it('duplicate only publishes complete fresh documents and images; source changes and revocation block atomically', async () => {
+  it('system Viewers retain owned-board privileges and remain read-only on shared boards', async () => {
+    const owned = await create('editor'); const shared = await create(); grant(shared.summary.id, 'editor');
+    database.prepare("UPDATE members SET system_role='viewer' WHERE id=?").run(actors.editor!.accountId);
+    const ownAccess = await app.inject({ url: '/api/boards/' + owned.summary.id, headers: headers('editor') });
+    expect(ownAccess.json().summary.role).toBe('owner');
+    expect(ownAccess.json().capabilities).toContain('write');
+    const sharedAccess = await app.inject({ url: '/api/boards/' + shared.summary.id, headers: headers('editor') });
+    expect(sharedAccess.json().summary.role).toBe('viewer');
+    expect(sharedAccess.json().capabilities).not.toContain('write');
+    const before = state();
+    for (const [method, suffix] of [['PATCH', ''], ['POST', '/duplicate']] as const) {
+      expect((await app.inject({ method, url: '/api/boards/' + shared.summary.id + suffix, headers: headers('editor'), payload: { operationId: randomUUID(), revision: 1, title: 'Denied' } })).statusCode).toBe(403);
+      expect(state()).toEqual(before);
+    }
+    expect((await app.inject({ method: 'POST', url: '/api/imports', headers: headers('editor'), payload: { operationId: randomUUID(), title: 'Denied import', manifest: [] } })).statusCode).toBe(403);
+    const renamed = await app.inject({ method: 'PATCH', url: '/api/boards/' + owned.summary.id, headers: headers('editor'), payload: { operationId: randomUUID(), revision: 1, title: 'Owned board' } });
+    expect(renamed.statusCode).toBe(200);
+    expect(renamed.json().summary.role).toBe('owner');
+  });
+
+  it.each(['editor', 'legacy-owner'] as const)('%s duplicate publishes complete fresh documents and images; source changes and revocation block atomically', async mode => {
     const board = await create(); grant(board.summary.id, 'editor');
+    if (mode === 'legacy-owner') {
+      database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run(actors.editor!.accountId, board.summary.id);
+      database.prepare("UPDATE members SET system_role='viewer' WHERE id=?").run(actors.editor!.accountId);
+      const mine = await app.inject({ url: '/api/boards?filter=mine', headers: headers('editor') });
+      expect(mine.body).toContain('owner');
+      const descriptor = await app.inject({ url: '/api/boards/' + board.summary.id, headers: headers('editor') });
+      expect(descriptor.json().summary.role).toBe('owner');
+      expect((await app.inject({ method: 'POST', url: '/api/boards', headers: headers('editor'), payload: { title: 'Restricted new board', operationId: randomUUID() } })).statusCode).toBe(403);
+    }
     const image = syntheticCanaries().imageBytes; const key = imageHash(image);
     database.prepare('INSERT INTO board_blobs(board_id,blob_key,mime,bytes,hash) VALUES(?,?,?,?,?)').run(board.summary.id, key, 'image/png', image, key);
     const source = new Y.Doc(); const stored = database.prepare('SELECT update_bytes FROM board_documents WHERE doc_id=?').get(board.contentDocId) as { update_bytes: Buffer };
@@ -110,9 +139,9 @@ describe('@03-08-01 board action transactions', () => {
     expect((await app.inject({ method: 'PUT', url: '/api/imports/' + operationId + '/blobs/' + key, headers: { ...headers('editor'), 'content-type': 'image/png' }, payload: image })).statusCode).toBe(200);
     database.prepare('UPDATE boards SET revision=revision+1 WHERE id=?').run(board.summary.id); expect((await commit()).statusCode).toBe(409);
     database.prepare('UPDATE boards SET revision=1 WHERE id=?').run(board.summary.id);
-    barrier = async () => { database.prepare('DELETE FROM board_grants WHERE board_id=?').run(board.summary.id); }; expect((await commit()).statusCode).toBe(404);
+    barrier = async () => { database.prepare('DELETE FROM board_grants WHERE board_id=?').run(board.summary.id); if (mode === 'legacy-owner') database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run(actors.owner!.accountId, board.summary.id); }; expect((await commit()).statusCode).toBe(404);
     expect(database.prepare('SELECT id FROM boards').all()).toEqual([{ id: board.summary.id }]); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(board.summary.id)).toEqual(before);
-    barrier = async () => {}; grant(board.summary.id, 'editor'); const completed = await commit(); expect(completed.statusCode).toBe(200); expect((await commit()).json()).toEqual(completed.json());
+    barrier = async () => {}; grant(board.summary.id, 'editor'); if (mode === 'legacy-owner') database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run(actors.editor!.accountId, board.summary.id); const completed = await commit(); expect(completed.statusCode).toBe(200); expect((await commit()).json()).toEqual(completed.json());
     expect(completed.json().summary).toMatchObject({ role: 'owner', access: 'private', accountId: actors.editor!.accountId }); expect(database.prepare('SELECT * FROM board_grants WHERE board_id=?').all(d.summary.id)).toEqual([]);
     expect((database.prepare('SELECT bytes FROM board_blobs WHERE board_id=?').get(d.summary.id) as { bytes: Buffer }).bytes).toEqual(image);
     expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(board.summary.id)).toEqual(before);

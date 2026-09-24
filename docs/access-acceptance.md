@@ -87,3 +87,9 @@ The final route and UI evidence references [access-boundaries.spec.ts](../tests/
 | Synthetic application/protocol/regression gate | See Phase 3 checkpoint for measured results |
 
 Public outcome format: `Actual provider: accepted` or `Actual provider: failed at A<n> — generic failure`, plus the statuses of the specifically outstanding native checks. Never include configuration values or private evidence in this public record.
+
+## Ownership and system Viewer acceptance
+
+A system Viewer can read shared boards but cannot create fresh boards or import local/archive boards. A member who already owns a board retains Owner capabilities on that board, even when the member's system role is Viewer. The library and account menu display this effective board role. Duplicating a board requires effective Editor or Owner access, produces a private copy owned by the copier, and preserves the source. Grant revocation or ownership loss before commit denies the copy.
+
+Actual-provider acceptance is deferred until operator access is available; it remains separately tracked in backlog 999.4. Screen-reader speech and interaction acceptance is tracked in backlog 999.3. See [Phase 3 UAT](../.planning/phases/03-okta-and-board-access/03-UAT.md) (current user dispositions and remaining checks).

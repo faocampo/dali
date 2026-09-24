@@ -10,6 +10,8 @@
 import { canvasFonts } from './canvas-fonts';
 import { installLineWidthControl } from './line-width-control';
 import { installFormattingTheme } from './formatting-theme';
+import { installCanvasColorPicker } from './color-picker';
+import { installEditingInteractions } from './editing-interactions';
 import { Subscription } from 'rxjs';
 import {
   DocModeExtension,
@@ -36,6 +38,7 @@ export async function mountEdgelessEditor(
   installShapeTextTypography();
   installLineWidthControl();
   installFormattingTheme();
+  installCanvasColorPicker();
   const { store, scope } = await getCanvasRuntime();
   const disposeGuard = installMutationGuard(store, scope);
 
@@ -108,6 +111,7 @@ export async function mountEdgelessEditor(
   // default: Space-drag and middle-drag temporarily pan, while ordinary clicks,
   // drags and double-clicks continue to select, move and edit objects.
   await host.updateComplete;
+  const disposeEditing = installEditingInteractions(host);
 
   // Pinned BlockSuite 0.22.4 caches the host rectangle on a one-second poll.
   // Header/font/layout changes can move the host between polls, displacing
@@ -135,6 +139,7 @@ export async function mountEdgelessEditor(
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
+      disposeEditing();
       pointerEvents.forEach(name => host.removeEventListener(name, refreshPointerRect, true));
       viewport.removeEventListener('mousedown', preventMiddleMouseDefault, true);
       viewport.removeEventListener('auxclick', preventMiddleMouseDefault, true);

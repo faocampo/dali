@@ -299,3 +299,28 @@ test('@03-09-02 denied image and identity change during image resolution produce
   await expect(page.locator('affine-edgeless-root, editor-host')).toHaveCount(0);
   expect(downloads).toEqual([]); await second.close();
 });
+
+test('system Viewer creator retains Owner controls and owns an independent copy', async ({ page }) => {
+  const board = await create(page, 'Legacy creator board');
+  database.prepare("UPDATE members SET system_role='viewer' WHERE id=?").run(accountId);
+  await page.goto(origin + '/?board=' + board.summary.id);
+  await expect(page.getByRole('button', { name: 'Add sticky note', exact: true })).toBeVisible();
+  await page.getByLabel('Account for Synthetic Owner').click();
+  await expect(page.locator('.board-account .board-role')).toHaveText('Owner');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.insertText('Owned content'); await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Main Menu', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'File', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Duplicate board', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Duplicate board', exact: true }).getByRole('button', { name: 'Duplicate board', exact: true }).click();
+  await page.getByRole('link', { name: 'Open Legacy creator board (copy)', exact: true }).click();
+  await expect(page.locator('affine-edgeless-note')).toContainText('Owned content');
+  const boards = database.prepare('SELECT id,owner_id FROM boards').all() as { id: string; owner_id: string }[];
+  expect(boards).toHaveLength(2); expect(boards.every(row => row.owner_id === accountId)).toBe(true);
+  await page.getByRole('button', { name: 'Main Menu', exact: true }).click(); await page.getByRole('menuitem', { name: 'File', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: 'Import board', exact: true })).toBeDisabled();
+  await expect(page.getByRole('menuitem', { name: 'Duplicate board', exact: true })).toBeVisible();
+});

@@ -49,7 +49,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   const members = () => database.prepare('SELECT * FROM members ORDER BY id').all();
   const count = () => (database.prepare('SELECT count(*) AS n FROM sessions WHERE member_id IS NOT NULL').get() as { n: number }).n;
 
-  it('trusted system Viewer overrides ownership and grants, including existing sessions', async () => {
+  it('trusted system Viewer preserves ownership and limits shared grants, including existing sessions', async () => {
     const flow = await begin('/', 'viewer'); const first = await finish(flow); const oldCookie = cookieOf(first);
     const actor = (await session(oldCookie)).json();
     const headers = { cookie: oldCookie, origin: env.DALI_ORIGIN!, 'x-dali-account': actor.accountId, 'x-dali-request': '1' };
@@ -62,7 +62,13 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     expect((await session(oldCookie)).json().systemRole).toBe('viewer');
     const path = '/api/boards/' + board.summary.id;
     const descriptor = (await app.inject({ url: path, headers })).json();
-    expect(descriptor.summary.role).toBe('viewer'); expect(descriptor.capabilities).not.toContain('write');
+    expect(descriptor.summary.role).toBe('owner'); expect(descriptor.capabilities).toContain('write');
+    expect((await app.inject({ url: '/api/boards', headers })).json()[0].role).toBe('owner');
+    const nextOwner = (await session(cookieOf(await finish(await begin('/', 'owner'))))).json();
+    database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run(nextOwner.accountId, board.summary.id);
+    database.prepare("INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,'editor')").run(board.summary.id, actor.accountId);
+    const shared = (await app.inject({ url: path, headers })).json();
+    expect(shared.summary.role).toBe('viewer'); expect(shared.capabilities).not.toContain('write');
     expect((await app.inject({ url: '/api/boards', headers })).json()[0].role).toBe('viewer');
     const before = database.prepare('SELECT * FROM boards').all();
     expect((await app.inject({ method: 'POST', url: '/api/boards', headers, payload: { title: 'Denied', operationId: '22222222-2222-4222-8222-222222222222' } })).statusCode).toBe(403);

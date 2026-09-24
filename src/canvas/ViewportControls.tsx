@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '@blocksuite/affine/std/gfx';
+import { getCommonBound } from '@blocksuite/global/gfx';
+import { canvasModelVisible } from './selection-summary';
 
 /** Native viewport operations with explicit names and a stable history group. */
 export function ViewportControls({ host }: { host: EditorHost }) {
@@ -17,6 +19,24 @@ export function ViewportControls({ host }: { host: EditorHost }) {
   }, [zoomOpen]);
   const gfx = host.std.get(GfxControllerIdentifier);
   const store = host.std.store;
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (!host.isConnected || gfx.viewport.locked || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || !['0', '1'].includes(event.key)) return;
+      if (event.composedPath().some(node => node instanceof Element && node.matches('input,textarea,select,[contenteditable="true"],[role="dialog"],dialog'))) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      if (event.key === '0') gfx.viewport.smoothZoom(1);
+      else {
+        const selected = gfx.selection.selectedElements.filter(canvasModelVisible);
+        if (selected.length) {
+          const bound = getCommonBound(selected.map(model => model.elementBound));
+          const fit = gfx.viewport.getFitToScreenData(bound, [80, 40, 80, 100], ZOOM_MAX);
+          gfx.viewport.setViewport(fit.zoom, [fit.centerX, fit.centerY], true);
+        }
+      }
+    };
+    document.addEventListener('keydown', key, true);
+    return () => document.removeEventListener('keydown', key, true);
+  }, [host, gfx]);
   const [state, setState] = useState(() => ({ zoom: gfx.viewport.zoom, locked: gfx.viewport.locked, undo: store.history.canUndo, redo: store.history.canRedo }));
   useEffect(() => {
     const sync = () => setState({ zoom: gfx.viewport.zoom, locked: gfx.viewport.locked, undo: store.history.canUndo, redo: store.history.canRedo });
@@ -32,9 +52,10 @@ export function ViewportControls({ host }: { host: EditorHost }) {
     <span className="viewport-divider" aria-hidden="true" />
     <button type="button" aria-label="Fit to screen" title="Fit to screen" disabled={state.locked} onClick={() => gfx.fitToScreen()}><Icon path="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></button>
     <button type="button" aria-label="Zoom out" title="Zoom out" disabled={state.locked || state.zoom <= ZOOM_MIN} onClick={() => zoom(-ZOOM_STEP)}><Icon path="M5 12h14" /></button>
-    <div ref={zoomRoot} className="zoom-presets" onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setZoomOpen(false); }} onKeyDown={event => {
+    <div ref={zoomRoot} className="zoom-presets" onKeyDown={event => {
       event.stopPropagation();
       if (event.key === 'Escape') { event.preventDefault(); closeZoom(); }
+      if (event.key === 'Tab') closeZoom();
       if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
         event.preventDefault();
         if (!zoomOpen) { setZoomOpen(true); return; }
