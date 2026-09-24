@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SessionDescriptor } from '../auth/AuthBoundary';
 import { ShareBoardDialog } from './ShareBoardDialog';
 import { BoardActionDialog } from './BoardActionDialog';
-import { LocalBoardCopyDialog } from './LocalBoardCopyDialog';
+import { BoardImportDialog } from './BoardImportDialog';
 import { AccountMenu } from '../header/AccountMenu';
 import { Dropdown } from '../header/Dropdown';
 import logo from '../../imgs/svg/dali-logo-light.svg';
@@ -37,7 +37,7 @@ function ProtectedPreview({ board }: { board: BoardSummary }) {
   return <span className="board-card__preview">{url ? <img src={url} alt="" onError={() => setUrl(undefined)} /> : 'Preview unavailable'}</span>;
 }
 export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; signOut: () => Promise<void> }) {
-  const [localCopyOpen, setLocalCopyOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [action, setAction] = useState<{ board: BoardSummary; kind: 'rename' | 'duplicate' | 'delete' }>();
   const [notice, setNotice] = useState('');
   const [sharing, setSharing] = useState<BoardSummary>();
@@ -127,7 +127,7 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
     <header className="board-library__header">
       <a className="djai-brand" href="/" aria-label="Dalí"><img src={logo} alt="" height={34} /></a>
       <nav className="board-library__header-actions" aria-label="Library controls">
-        {member.systemRole !== 'viewer' && <Dropdown className="board-library__import" summary="Import">{close => <button onClick={() => { close(); setLocalCopyOpen(true); }}><MenuIcon name="import" />Copy local boards</button>}</Dropdown>}
+        {member.systemRole !== 'viewer' && <button type="button" className="board-library__import" onClick={event => { event.currentTarget.focus(); setImportOpen(true); }}><MenuIcon name="import" />Import</button>}
         <AccountMenu member={member} signOut={signOut} />
       </nav>
     </header>
@@ -162,7 +162,7 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
         </div>
       </article>)}
     </div>}
-    {localCopyOpen && <LocalBoardCopyDialog key={member.accountId} member={member} onClose={() => { setLocalCopyOpen(false); setRefresh(value => value + 1); }} />}
+    {importOpen && <BoardImportDialog key={member.accountId} member={member} onClose={() => setImportOpen(false)} onImported={() => { setFilter('all'); setRefresh(value => value + 1); }} />}
     {action && <BoardActionDialog board={action.board} kind={action.kind} onClose={() => setAction(undefined)} onComplete={result => {
       const remaining = boards.filter(row => row.id !== action.board.id);
       const next = result.deleted ? remaining[0]?.id : action.kind === 'duplicate' && filter === 'shared' ? action.board.id : result.summary.id;

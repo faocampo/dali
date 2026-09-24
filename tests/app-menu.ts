@@ -26,8 +26,6 @@ export async function editBoardTitle(page: Page) {
   return page.getByRole('textbox', { name: 'Board name', exact: true });
 }
 
-export async function openLocalBoardCopy(page: Page) {
-  const menu = page.locator('.board-library__import');
-  if (await menu.getAttribute('open') === null) await menu.locator('summary').click();
-  await page.getByRole('button', { name: 'Copy local boards', exact: true }).click();
+export async function openBoardImport(page: Page) {
+  await page.getByRole('button', { name: 'Import', exact: true }).click();
 }

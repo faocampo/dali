@@ -1,4 +1,4 @@
-import { openLocalBoardCopy } from './app-menu';
+import { fileAction, openBoardImport } from './app-menu';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import * as Y from 'yjs';
 import type { Page } from '@playwright/test';
@@ -19,7 +19,7 @@ test.use({ expectErrors: ['the server responded with a status of 400', 'the serv
 test.beforeEach(async ({ page, baseURL }) => {
   const registration = { clientId: 'synthetic-actions', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
   provider = await createOidcProvider({ clients: [registration] }); database = openDatabase(':memory:');
-  app = await buildApp({ database, config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000', DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]' } });
+  app = await buildApp({ database, config: { DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000', DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret, DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]', DALI_ROLE_CLAIM: 'app_role', DALI_EDITOR_VALUES_JSON: '["editor"]' } });
   closeProxy = proxyApplicationAssets(app, baseURL!);
   await app.listen({ host: '127.0.0.1', port: 5499 });
   await page.goto(origin); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
@@ -27,42 +27,9 @@ test.beforeEach(async ({ page, baseURL }) => {
   accountId = (await (await page.request.get(origin + '/api/session')).json()).accountId;
 });
 
-test('@03-11-01 actual commit rollback and lost acknowledgment reconcile the original operation', async ({ page }) => {
-  await seedLocal(page); const before = await originalState(page);
-  database.exec("CREATE TRIGGER synthetic_import_failure BEFORE INSERT ON board_documents BEGIN SELECT RAISE(ABORT, 'synthetic commit failure'); END");
-  await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-  await dialog.getByRole('checkbox', { name: 'Legacy map canary', exact: true }).check();
-  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click(); await expect(dialog.getByText('Failed', { exact: true })).toBeVisible();
-  expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(database.prepare('SELECT * FROM board_documents').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
-  database.exec('DROP TRIGGER synthetic_import_failure');
-  await page.route('**/api/imports/*/commit', async route => { const response = await route.fetch(); expect(response.status()).toBe(200); await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); });
-  await dialog.getByRole('button', { name: 'Retry failed boards', exact: true }).click(); await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
-  expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 1 }); expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
-});
+import { unzipSync, zipSync } from 'fflate';
 
-test('@03-11-01 staging validates complete manifest and binds every operation to the authenticated importer', async ({ page, browser }) => {
-  const local = await seedLocal(page); const before = await originalState(page);
-  const headers = { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' };
-  const operationId = randomUUID();
-  const reserved = await page.request.post(origin + '/api/imports', { headers, data: { operationId, title: 'Manifest canary', manifest: [local.key] } }); expect(reserved.status()).toBe(200);
-  expect((await page.request.post(origin + '/api/imports/' + operationId + '/commit', { headers, data: {} })).status()).toBe(409);
-  const foreign = await browser.newContext(); const other = await foreign.newPage();
-  try {
-    await other.goto(origin); await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
-    const otherId = (await (await other.request.get(origin + '/api/session')).json()).accountId;
-    const denied = await other.request.get(origin + '/api/imports/' + operationId, { headers: { 'X-Dali-Account': otherId } }); expect(await denied.json()).toEqual({ status: 'unknown' });
-    expect((await other.request.post(origin + '/api/imports/' + operationId + '/commit', { headers: { ...headers, 'X-Dali-Account': otherId }, data: {} })).status()).toBe(404);
-    expect((await other.request.post(origin + '/api/imports', { headers, data: { operationId: randomUUID(), title: 'Denied canary', manifest: [] } })).status()).toBe(409);
-  } finally { await foreign.close(); }
-  expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
-});
 test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); closeProxy?.(); closeProxy = undefined; await app?.close(); database?.close(); await provider?.close(); });
-test("@03-11-01 selected local copy entry requires deliberate selection", async ({ page }) => {
-  await expect(page.locator('.board-library__import summary')).toBeVisible();
-  await openLocalBoardCopy(page);
-  await expect(page.getByRole("dialog", { name: "Copy local boards" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Copy selected boards", exact: true })).toBeDisabled();
-});
 
 async function seedLocal(page: Page, titles = ['Legacy map canary', 'Unselected canary']) {
   const response = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' }, data: { title: 'Fixture source', operationId: randomUUID() } });
@@ -84,6 +51,12 @@ async function seedLocal(page: Page, titles = ['Legacy map canary', 'Unselected 
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   await expect.poll(() => database.prepare('SELECT count(*) AS n FROM board_blobs WHERE board_id=?').get(board.summary.id)).toEqual({ n: 1 });
   const semantic = await nativeSemantic(page);
+  await fileAction(page, 'Export board'); const pending = page.waitForEvent('download');
+  await page.getByRole('dialog', { name: 'Export board', exact: true }).getByRole('button', { name: 'Download', exact: true }).click();
+  const download = await pending; const chunks: Buffer[] = [];
+  for await (const chunk of (await download.createReadStream())!) chunks.push(Buffer.from(chunk));
+  const archive = { name: 'Imported canary.bs.zip', mimeType: 'application/zip', buffer: Buffer.concat(chunks) };
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
   const content = (database.prepare('SELECT update_bytes FROM board_documents WHERE board_id=? AND doc_id=?').get(board.summary.id, board.contentDocId) as { update_bytes: Buffer }).update_bytes;
   const ids = titles.map(() => randomUUID()); const root = new Y.Doc({ guid: 'djai-storyboard' });
   const pages = new Y.Array(); root.getMap('meta').set('pages', pages);
@@ -102,7 +75,7 @@ async function seedLocal(page: Page, titles = ['Legacy map canary', 'Unselected 
     localStorage.setItem('djai-design.board-catalog.v1', JSON.stringify({}));
   }, { rows, image: [...image], key });
   database.prepare('DELETE FROM boards WHERE id=?').run(board.summary.id);
-  return { ids, key, image, semantic };
+  return { ids, key, image, semantic, archive };
 }
 async function nativeSemantic(page: Page) {
   return page.locator('affine-edgeless-root').evaluate(el => {
@@ -136,244 +109,162 @@ async function originalState(page: Page) {
   });
   return { ...snapshot, normalized };
 }
-test('@03-11-01 selected map and image publish privately with unchanged original bytes and membership', async ({ page }) => {
+
+// The library's legacy-selection UI was retired. Keep source preservation and
+// staged-import coverage, now exercised through real exported files.
+const importDialog = (page: Page) => page.getByRole('dialog', { name: 'Import board', exact: true });
+async function chooseArchive(page: Page, archive: { name: string; mimeType: string; buffer: Buffer }) {
+  await openBoardImport(page);
+  const pending = page.waitForEvent('filechooser'); await importDialog(page).getByRole('button', { name: 'Choose board file' }).click();
+  await (await pending).setFiles(archive);
+}
+async function dropFiles(page: Page, files: { name: string; mimeType: string; buffer: Buffer }[]) {
+  const dataTransfer = await page.evaluateHandle(files => {
+    const transfer = new DataTransfer();
+    for (const file of files) transfer.items.add(new File([new Uint8Array(file.bytes)], file.name, { type: file.mimeType }));
+    return transfer;
+  }, files.map(file => ({ name: file.name, mimeType: file.mimeType, bytes: [...file.buffer] })));
+  try { await importDialog(page).getByRole('button', { name: 'Choose board file' }).dispatchEvent('drop', { dataTransfer }); }
+  finally { await dataTransfer.dispose(); }
+}
+for (const method of ['picker', 'drop'] as const) test(`file import by ${method} preserves native objects and images with new private ownership`, async ({ page }) => {
   const local = await seedLocal(page); const before = await originalState(page);
-  await expect(page.locator('.board-library__import summary')).toBeVisible();
-  await openLocalBoardCopy(page);
-  const dialog = page.getByRole('dialog', { name: 'Copy local boards' });
-  await dialog.getByRole('checkbox', { name: 'Legacy map canary', exact: true }).check();
-  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
-  await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copy local boards', exact: true })).toHaveCount(0);
+  if (method === 'picker') await chooseArchive(page, local.archive);
+  else { await openBoardImport(page); await dropFiles(page, [local.archive]); }
+  const dialog = importDialog(page);
+  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 0 });
+  await dialog.getByRole('button', { name: 'Import board', exact: true }).dblclick();
+  await expect(dialog.getByRole('link', { name: 'Open board', exact: true })).toBeVisible();
   const copies = database.prepare('SELECT * FROM boards').all() as { id: string; title: string; owner_id: string }[];
-  expect(copies).toHaveLength(1); expect(copies[0]).toMatchObject({ title: 'Legacy map canary', owner_id: accountId });
+  expect(copies).toHaveLength(1); expect(copies[0]).toMatchObject({ title: 'Imported canary', owner_id: accountId });
   expect(database.prepare('SELECT * FROM board_grants').all()).toEqual([]); expect(database.prepare('SELECT * FROM pending_grants').all()).toEqual([]);
-  const blob = database.prepare('SELECT bytes FROM board_blobs WHERE board_id=?').get(copies[0]!.id) as { bytes: Buffer };
-  expect(blob.bytes).toEqual(local.image); expect(await originalState(page)).toEqual(before);
-  await dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true }).click();
-  await expect(page.locator('affine-edgeless-root')).toBeVisible();
-  const model = await page.locator('affine-edgeless-root').evaluate(el => {
-    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
-    const map = gfx.surface!.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel;
-    return { count: map.children.size, collapsed: [...map.children.values()].some(detail => detail.collapsed), text: JSON.stringify(gfx.doc.spaceDoc.toJSON()) };
-  });
-  expect(model.count).toBe(4); expect(model.collapsed).toBe(true);
-  expect(await nativeSemantic(page)).toEqual(local.semantic);
-  for (const text of ['Root canary', 'Branch canary', 'Hidden canary', 'Sibling canary']) expect(model.text).toContain(text);
+  expect((database.prepare('SELECT bytes FROM board_blobs WHERE board_id=?').get(copies[0]!.id) as { bytes: Buffer }).bytes).toEqual(local.image);
+  expect(await originalState(page)).toEqual(before);
+  await dialog.getByRole('link', { name: 'Open board', exact: true }).click();
+  await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect(await nativeSemantic(page)).toEqual(local.semantic);
+  await page.reload(); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect(await nativeSemantic(page)).toEqual(local.semantic);
   expect(await originalState(page)).toEqual(before);
 });
 
-for (const failure of ['upload', 'commit', 'missing-image'] as const) test(`@03-11-01 ${failure} retains originals and publishes only a complete reconciled copy`, async ({ page }) => {
-  const local = await seedLocal(page);
-  if (failure === 'missing-image') await page.evaluate(async key => {
-    const req = indexedDB.open('djai-storyboard_blob'); const db = await new Promise<IDBDatabase>(resolve => { req.onsuccess = () => resolve(req.result); });
-    await new Promise<void>(resolve => { const tx = db.transaction('blob', 'readwrite'); tx.objectStore('blob').delete(key); tx.oncomplete = () => resolve(); }); db.close();
-  }, local.key);
-  const before = await originalState(page); const attempts: string[] = [];
-  const routePattern = failure === 'upload' ? '**/api/imports/*/blobs/*' : '**/api/imports/*/commit';
-  if (failure !== 'missing-image') await page.route(routePattern, route => { attempts.push(route.request().url()); return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); });
-  await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-  await dialog.getByRole('checkbox', { name: 'Legacy map canary', exact: true }).check();
-  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
-  await expect(dialog.getByText('Failed', { exact: true })).toBeVisible();
-  expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
-  if (failure !== 'missing-image') {
-    await page.unroute(routePattern); await dialog.getByRole('button', { name: 'Retry failed boards', exact: true }).click();
-    await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
-    expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 1 });
-    expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(attempts).toHaveLength(1);
-    expect(await originalState(page)).toEqual(before);
-  }
-  await dialog.getByRole('button', { name: 'Close local copies', exact: true }).click(); expect(await originalState(page)).toEqual(before);
-});
-
-test('@03-11-02 empty inventory never creates legacy storage and stays distinct from unavailable storage', async ({ page }) => {
+test('import opens without reading local boards, cancels and restores focus at narrow widths', async ({ page }, info) => {
   const before = await page.evaluate(async () => ({ dbs: await indexedDB.databases(), catalog: localStorage.getItem('djai-design.board-catalog.v1') }));
-  await openLocalBoardCopy(page);
-  const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText('No local boards are available in this browser.', { exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Copy selected boards', exact: true })).toBeDisabled();
-  await dialog.getByRole('button', { name: 'Close local copies', exact: true }).click();
+  for (const width of [1404, 707, 320]) {
+    await page.setViewportSize({ width, height: 700 }); await openBoardImport(page); const dialog = importDialog(page);
+    await expect(dialog.getByRole('button', { name: 'Choose board file' })).toBeFocused();
+    await expect(dialog.getByRole('button', { name: 'Import board', exact: true })).toBeDisabled();
+    const box = (await dialog.boundingBox())!; expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(box.y + box.height).toBeLessThanOrEqual(700);
+    await page.screenshot({ path: info.outputPath(`file-import-${width}.png`) });
+    await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(page.getByRole('button', { name: 'Import', exact: true })).toBeFocused();
+  }
   expect(await page.evaluate(async () => ({ dbs: await indexedDB.databases(), catalog: localStorage.getItem('djai-design.board-catalog.v1') }))).toEqual(before);
-  const storage = await page.evaluateHandle(() => indexedDB);
-  await page.evaluate(() => { Object.defineProperty(window, 'indexedDB', { configurable: true, get() { throw new Error('Synthetic unavailable storage'); } }); });
-  await openLocalBoardCopy(page);
-  await expect(dialog.getByRole('alert')).toContainText('read local boards'); await expect(dialog.getByText('No local boards are available in this browser.', { exact: true })).toHaveCount(0);
-  await page.evaluate(storage => { Object.defineProperty(window, 'indexedDB', { configurable: true, value: storage }); }, storage);
-  await storage.dispose();
-  await dialog.getByRole('button', { name: 'Try again', exact: true }).click();
-  await expect(dialog.getByText('No local boards are available in this browser.', { exact: true })).toBeVisible();
+  expect(database.prepare('SELECT * FROM boards').all()).toEqual([]);
 });
 
-test('@03-11-02 multiple explicit selections retain per-row partial success and retry only the failed operation', async ({ page }) => {
-  await seedLocal(page); const before = await originalState(page);
-  let commits = 0; const paths: string[] = [];
-  await page.route('**/api/imports/*/commit', route => { paths.push(route.request().url()); commits++; return commits === 2 ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }) : route.continue(); });
-  await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(0);
-  for (const title of ['Legacy map canary', 'Unselected canary']) await dialog.getByRole('checkbox', { name: title, exact: true }).check();
-  await expect(dialog.getByText('2 boards selected.', { exact: true })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
-  await expect(dialog.getByText('1 copied; 1 could not be copied. Retry the failed boards. Originals remain in this browser.', { exact: true })).toBeVisible();
-  await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
-  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
-  await dialog.getByRole('button', { name: 'Retry failed boards', exact: true }).click();
-  await expect(dialog.getByText('2 boards copied. Originals remain in this browser.', { exact: true })).toBeVisible();
-  expect(paths).toHaveLength(3); expect(paths[2]).toBe(paths[1]); expect(paths[2]).not.toBe(paths[0]);
-  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 2 }); expect(await originalState(page)).toEqual(before);
+test('unsupported, empty and multiple files are rejected before creating an import', async ({ page }) => {
+  await openBoardImport(page); const dialog = importDialog(page);
+  for (const [files, message] of [
+    [[{ name: 'photo.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes }], 'exported Dalí board'],
+    [[{ name: 'empty.zip', mimeType: 'application/zip', buffer: Buffer.alloc(0) }], 'non-empty'],
+    [[{ name: 'one.zip', mimeType: 'application/zip', buffer: Buffer.from('x') }, { name: 'two.zip', mimeType: 'application/zip', buffer: Buffer.from('y') }], 'one board file'],
+  ] as const) {
+    await dropFiles(page, [...files]); await expect(dialog.getByRole('alert')).toContainText(message);
+    await expect(dialog.getByRole('button', { name: 'Import board', exact: true })).toBeDisabled();
+  }
+  expect(database.prepare('SELECT * FROM operations').all()).toEqual([]);
 });
 
-test('@03-11-02 inventory reads original catalog titles and excludes account recovery namespaces', async ({ page }) => {
-  const local = await seedLocal(page, ['Root title']);
-  await page.evaluate(async id => {
-    localStorage.setItem('djai-design.board-catalog.v1', JSON.stringify({ [id]: { title: 'Exact catalog title 界', createdAt: 1000, updatedAt: 3000 } }));
-    for (const name of ['dali-account-recovery-v1', 'dali-account-cache-canary']) await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.open(name); req.onupgradeneeded = () => req.result.createObjectStore('canary').put({ title: 'Private recovery canary' }, 'secret'); req.onsuccess = () => { req.result.close(); resolve(); }; req.onerror = () => reject(req.error);
-    });
-  }, local.ids[0]!);
-  const before = await originalState(page); await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('checkbox', { name: 'Exact catalog title 界', exact: true })).toBeVisible(); await expect(dialog.getByRole('checkbox')).toHaveCount(1);
-  await expect(dialog).not.toContainText('Private recovery canary'); await dialog.getByRole('button', { name: 'Close local copies', exact: true }).click(); expect(await originalState(page)).toEqual(before);
-});
-
-test('@03-11-03 in-flight close waits for the real outcome and stops before the next copy', async ({ page }) => {
-  await seedLocal(page); const before = await originalState(page);
-  let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let received = false;
-  await page.route('**/api/imports/*/commit', async route => { received = true; await barrier; await route.continue(); });
-  await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-  for (const title of ['Legacy map canary', 'Unselected canary']) await dialog.getByRole('checkbox', { name: title, exact: true }).check();
-  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click(); await expect.poll(() => received).toBe(true);
-  try {
-    await expect(dialog.getByText('Copying 0 of 2 boards…', { exact: true })).toBeVisible();
-    await expect(dialog.getByText('Waiting', { exact: true })).toHaveCount(1); await expect(dialog.getByText('Copying', { exact: true })).toHaveCount(1);
-    await expect(dialog.getByRole('button', { name: 'Close local copies', exact: true })).toBeEnabled();
-    await dialog.getByRole('button', { name: 'Close local copies', exact: true }).click();
-    await expect(dialog.getByRole('status')).toContainText('Finishing the current copy before closing');
-    expect(database.prepare('SELECT * FROM boards').all()).toEqual([]);
-  } finally { release(); }
-  await expect(dialog).toHaveCount(0);
-  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
-  await expect(page.locator('.board-library__import summary')).toBeFocused();
-});
-
-test('@03-11-03 fifty long rows fit at 490px with fixed actions keyboard focus and reduced motion', async ({ page }) => {
-  await seedLocal(page, Array.from({ length: 50 }, (_, index) => index === 0 ? '界'.repeat(200) : `${index} ${'界'.repeat(120)}`)); const before = await originalState(page);
-  const email = 'long'.repeat(30) + '@example.org'; database.prepare('UPDATE members SET email=? WHERE id=?').run(email, accountId); await page.reload();
-  await page.setViewportSize({ width: 490, height: 600 }); await page.emulateMedia({ reducedMotion: 'reduce' });
-  await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Copy local boards', exact: true })).toBeFocused();
-  await expect(dialog.getByText('Copy to: ' + email, { exact: true })).toBeVisible();
-  await expect(dialog.getByRole('checkbox')).toHaveCount(50);
-  const geometry = await dialog.evaluate(el => {
-    const bounds = el.getBoundingClientRect(); const body = el.querySelector('.local-copy-dialog__body')!;
-    return { left: bounds.left, right: bounds.right, height: bounds.height, overflow: body.scrollHeight > body.clientHeight,
-      buttons: [...el.querySelectorAll('button')].map(button => ({ height: button.getBoundingClientRect().height, bottom: button.getBoundingClientRect().bottom })), animation: getComputedStyle(el).animationName };
-  });
-  expect(geometry.left).toBeGreaterThanOrEqual(16); expect(geometry.right).toBeLessThanOrEqual(474); expect(geometry.height).toBeLessThanOrEqual(568); expect(geometry.overflow).toBe(true);
-  geometry.buttons.forEach(button => { expect(button.height).toBeGreaterThanOrEqual(44); expect(button.bottom).toBeLessThanOrEqual(584); }); expect(geometry.animation).toBe('none');
-  await dialog.getByRole('checkbox').last().focus(); await page.keyboard.press('Space'); await expect(dialog.getByText('1 board selected.', { exact: true })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Close local copies', exact: true }).focus(); await page.keyboard.press('Tab');
-  expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
-  await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(page.locator('.board-library__import summary')).toBeFocused();
-  expect(await originalState(page)).toEqual(before);
-});
-
-for (const identity of ['same', 'different'] as const) test(`@03-11-03 expiry stops new copies and ${identity} account requires deliberate authorized recovery`, async ({ page, context }) => {
-  await seedLocal(page); const before = await originalState(page); let requests = 0;
-  await page.route('**/api/imports/*/commit', async route => { requests++; database.prepare('UPDATE sessions SET expires_at=0').run(); await route.continue(); });
-  await openLocalBoardCopy(page); let dialog = page.getByRole('dialog', { name: 'Copy local boards' });
-  for (const title of ['Legacy map canary', 'Unselected canary']) await dialog.getByRole('checkbox', { name: title, exact: true }).check();
-  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Sign in to continue', exact: true })).toBeVisible();
-  await expect(dialog).toHaveCount(0); expect(requests).toBe(1);
+for (const invalid of ['corrupt', 'missing-image', 'multiple-boards'] as const) test(`${invalid} archive does not publish a board and another file can be selected`, async ({ page }) => {
+  const local = await seedLocal(page); const before = await originalState(page);
+  const files = unzipSync(local.archive.buffer);
+  if (invalid === 'missing-image') for (const key of Object.keys(files)) if (key.startsWith('assets/')) delete files[key];
+  if (invalid === 'multiple-boards') { const key = Object.keys(files).find(key => key.endsWith('.snapshot.json'))!; const second = JSON.parse(Buffer.from(files[key]!).toString()); second.meta.id = randomUUID(); files['second.snapshot.json'] = new TextEncoder().encode(JSON.stringify(second)); }
+  const bad = { ...local.archive, buffer: invalid === 'corrupt' ? Buffer.from('invalid zip') : Buffer.from(zipSync(files)) };
+  await chooseArchive(page, bad); const dialog = importDialog(page);
+  await dialog.getByRole('button', { name: 'Import board', exact: true }).click(); await expect(dialog.getByRole('alert')).toBeVisible();
   expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
-  const firstOperation = (database.prepare("SELECT operation_id FROM operations WHERE kind='import'").get() as { operation_id: string }).operation_id;
+  await dialog.locator('input[type=file]').setInputFiles(local.archive);
+  await dialog.getByRole('button', { name: 'Import board', exact: true }).click(); await expect(dialog.getByRole('link', { name: 'Open board', exact: true })).toBeVisible();
+  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 });
+});
+
+for (const failure of ['upload', 'commit', 'quota'] as const) test(`${failure} failure retries the same operation and preserves original data`, async ({ page }) => {
+  const local = await seedLocal(page); const before = await originalState(page); const limit = IMAGE_LIMITS.boardBytes;
+  if (failure === 'upload') await page.route('**/api/imports/*/blobs/*', route => route.fulfill({ status: 503, json: {} }));
+  if (failure === 'commit') database.exec("CREATE TRIGGER synthetic_import_failure BEFORE INSERT ON board_documents BEGIN SELECT RAISE(ABORT, 'synthetic commit failure'); END");
+  if (failure === 'quota') IMAGE_LIMITS.boardBytes = 1;
+  try {
+    await chooseArchive(page, local.archive); const dialog = importDialog(page);
+    await dialog.getByRole('button', { name: 'Import board', exact: true }).click(); await expect(dialog.getByRole('alert')).toBeVisible();
+    expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(database.prepare('SELECT * FROM board_documents').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
+    await page.unrouteAll({ behavior: 'ignoreErrors' }); if (failure === 'commit') database.exec('DROP TRIGGER synthetic_import_failure'); IMAGE_LIMITS.boardBytes = limit;
+    await dialog.getByRole('button', { name: 'Import board', exact: true }).click(); await expect(dialog.getByRole('link', { name: 'Open board', exact: true })).toBeVisible();
+    expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
+  } finally { IMAGE_LIMITS.boardBytes = limit; }
+});
+
+test('uncertain completed import preserves the file until reconciliation and never duplicates it', async ({ page }) => {
+  const local = await seedLocal(page); let committed = false;
+  await page.route('**/api/imports/*', route => route.request().method() === 'GET' && committed ? route.fulfill({ status: 503, json: {} }) : route.continue());
+  await page.route('**/api/imports/*/commit', async route => { await route.fetch(); committed = true; await route.fulfill({ status: 503, json: {} }); });
+  await chooseArchive(page, local.archive); const dialog = importDialog(page);
+  await dialog.getByRole('button', { name: 'Import board', exact: true }).click(); await expect(dialog.getByRole('alert')).toContainText('could not be confirmed');
+  await expect(dialog.getByRole('button', { name: 'Close import', exact: true })).toBeDisabled(); await expect(dialog.getByRole('button', { name: 'Choose board file' })).toBeDisabled();
+  await page.keyboard.press('Escape'); await expect(dialog).toBeVisible(); expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 });
+  await page.unrouteAll({ behavior: 'ignoreErrors' }); await dialog.getByRole('button', { name: 'Check import again', exact: true }).click();
+  await expect(dialog.getByRole('link', { name: 'Open board', exact: true })).toBeVisible(); expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 });
+});
+
+test('system Viewers cannot open or submit library imports', async ({ page, context }) => {
+  await context.clearCookies(); await page.goto(origin + '/auth/start'); await page.getByRole('link', { name: 'Synthetic Viewer', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Import', exact: true })).toHaveCount(0);
+  const member = await (await page.request.get(origin + '/api/session')).json();
+  const response = await page.request.post(origin + '/api/imports', { headers: { Origin: origin, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1' }, data: { operationId: randomUUID(), title: 'Denied import', manifest: [] } });
+  expect(response.status()).toBe(403); expect(database.prepare('SELECT * FROM boards').all()).toEqual([]);
+});
+
+test('@03-11-01 staging validates complete manifest and binds every operation to the authenticated importer', async ({ page, browser }) => {
+  const local = await seedLocal(page); const before = await originalState(page);
+  const headers = { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' };
+  const operationId = randomUUID();
+  const reserved = await page.request.post(origin + '/api/imports', { headers, data: { operationId, title: 'Manifest canary', manifest: [local.key] } }); expect(reserved.status()).toBe(200);
+  expect((await page.request.post(origin + '/api/imports/' + operationId + '/commit', { headers, data: {} })).status()).toBe(409);
+  const foreign = await browser.newContext(); const other = await foreign.newPage();
+  try {
+    await other.goto(origin); await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+    const otherId = (await (await other.request.get(origin + '/api/session')).json()).accountId;
+    const denied = await other.request.get(origin + '/api/imports/' + operationId, { headers: { 'X-Dali-Account': otherId } }); expect(await denied.json()).toEqual({ status: 'unknown' });
+    expect((await other.request.post(origin + '/api/imports/' + operationId + '/commit', { headers: { ...headers, 'X-Dali-Account': otherId }, data: {} })).status()).toBe(404);
+    expect((await other.request.post(origin + '/api/imports', { headers, data: { operationId: randomUUID(), title: 'Denied canary', manifest: [] } })).status()).toBe(409);
+  } finally { await foreign.close(); }
+  expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
+});
+
+test('oversized files are rejected before creating an import', async ({ page }) => {
+  await openBoardImport(page); const dialog = importDialog(page);
+  await dialog.locator('input[type=file]').setInputFiles({ name: 'oversized.zip', mimeType: 'application/zip', buffer: Buffer.alloc(32 * 1024 * 1024 + 1) });
+  await expect(dialog.getByRole('alert')).toContainText('up to 32 MB');
+  await expect(dialog.getByRole('button', { name: 'Import board', exact: true })).toBeDisabled();
+  expect(database.prepare('SELECT * FROM operations').all()).toEqual([]);
+});
+
+for (const identity of ['same', 'different'] as const) test(`expiry hides the import and ${identity} account must choose its own file`, async ({ page, context }) => {
+  const local = await seedLocal(page); const before = await originalState(page);
+  await page.route('**/api/imports/*/commit', async route => { database.prepare('UPDATE sessions SET expires_at=0').run(); await route.continue(); });
+  await chooseArchive(page, local.archive); await importDialog(page).getByRole('button', { name: 'Import board', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Sign in to continue', exact: true })).toBeVisible();
+  await expect(importDialog(page)).toHaveCount(0); expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
   await page.unroute('**/api/imports/*/commit');
   if (identity === 'different') await context.clearCookies({ name: 'dali_fixture_identity' });
   await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
   if (identity === 'different') { await page.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await page.getByRole('button', { name: 'Back to your boards', exact: true }).click(); }
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
-  await openLocalBoardCopy(page); dialog = page.getByRole('dialog', { name: 'Copy local boards' });
-  if (identity === 'same') {
-    await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(2);
-    await dialog.getByRole('button', { name: 'Resume copies', exact: true }).click();
-    await expect(dialog.getByText('2 boards copied. Originals remain in this browser.', { exact: true })).toBeVisible();
-    expect(database.prepare('SELECT status FROM operations WHERE operation_id=?').get(firstOperation)).toEqual({ status: 'completed' });
-    expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 2 });
-  } else {
-    await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(0); await expect(dialog.getByRole('link')).toHaveCount(0);
-    await dialog.getByRole('checkbox', { name: 'Legacy map canary', exact: true }).check(); await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
-    await expect(dialog.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toBeVisible();
-    const owner = (database.prepare('SELECT owner_id FROM boards').get() as { owner_id: string }).owner_id; expect(owner).not.toBe(accountId);
-    expect(database.prepare('SELECT status FROM operations WHERE operation_id=?').get(firstOperation)).toEqual({ status: 'staging' });
-  }
-  expect(await originalState(page)).toEqual(before);
-});
-
-test('@03-11-03 server image quota denial preserves originals and retries the same operation', async ({ page }) => {
-  await seedLocal(page, ['Quota canary']); const before = await originalState(page); const limit = IMAGE_LIMITS.boardBytes;
-  IMAGE_LIMITS.boardBytes = 1;
-  try {
-    await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-    await dialog.getByRole('checkbox').check(); await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
-    await expect(dialog.getByText('Failed', { exact: true })).toBeVisible(); expect(database.prepare('SELECT * FROM boards').all()).toEqual([]); expect(await originalState(page)).toEqual(before);
-    IMAGE_LIMITS.boardBytes = limit; await dialog.getByRole('button', { name: 'Retry failed boards', exact: true }).click();
-    await expect(dialog.getByText('1 board copied. Originals remain in this browser.', { exact: true })).toBeVisible();
-    expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
-  } finally { IMAGE_LIMITS.boardBytes = limit; }
-});
-
-test('@03-11-03 timed out commit checks authoritative status before acknowledging one copy', async ({ page }) => {
-  await seedLocal(page, ['Timeout canary']); const before = await originalState(page); await page.clock.install();
-  let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let committed = false;
-  await page.route('**/api/imports/*/commit', async route => { const response = await route.fetch(); expect(response.status()).toBe(200); committed = true; await barrier; await route.fulfill({ response }).catch(() => {}); });
-  try {
-    await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-    await dialog.getByRole('checkbox').check(); await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
-    await expect.poll(() => committed).toBe(true); await page.clock.fastForward(10001);
-    await expect(dialog.getByText('1 board copied. Originals remain in this browser.', { exact: true })).toBeVisible();
-    expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
-  } finally { release(); }
-});
-
-test('@03-11-03 identity switch during an acknowledged in-flight copy hides prior results and starts no further item', async ({ page, context }) => {
-  await seedLocal(page); const before = await originalState(page);
-  let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let committed = false;
-  await page.route('**/api/imports/*/commit', async route => { const response = await route.fetch(); expect(response.status()).toBe(200); committed = true; await barrier; await route.fulfill({ response }).catch(() => {}); });
-  await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-  for (const title of ['Legacy map canary', 'Unselected canary']) await dialog.getByRole('checkbox', { name: title, exact: true }).check();
-  await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click(); await expect.poll(() => committed).toBe(true);
-  const other = await context.newPage();
-  try {
-    await context.clearCookies({ name: 'dali_fixture_identity' }); await other.goto(origin + '/auth/start'); await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Back to your boards', exact: true })).toBeVisible(); release();
-    await expect(page.getByRole('dialog', { name: 'Copy local boards' })).toHaveCount(0); await expect(page.getByRole('link', { name: 'Open Legacy map canary', exact: true })).toHaveCount(0);
-    expect(database.prepare('SELECT owner_id FROM boards').all()).toEqual([{ owner_id: accountId }]);
-    expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='import'").get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
-  } finally { release(); await other.close(); }
-});
-
-test('@03-11-03 unavailable progress storage starts no upload and preserves originals', async ({ page }) => {
-  await seedLocal(page, ['Progress canary']); const before = await originalState(page); let imports = 0;
-  await page.route('**/api/imports', route => { imports++; return route.continue(); });
-  await page.evaluate(() => {
-    const set = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (key, value) { if (key.startsWith('dali-local-copy-intents:')) throw new DOMException('Synthetic quota', 'QuotaExceededError'); return set.call(this, key, value); };
-  });
-  await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-  await dialog.getByRole('checkbox').check(); await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toContainText('Copy progress could not be secured');
-  expect(imports).toBe(0); expect(database.prepare("SELECT * FROM operations WHERE kind='import'").all()).toEqual([]); expect(await originalState(page)).toEqual(before);
-});
-
-test('@03-11-03 unknown committed outcome keeps close context until authoritative reconciliation', async ({ page }) => {
-  await seedLocal(page, ['Unknown outcome canary']); const before = await originalState(page); let committed = false;
-  await page.route('**/api/imports/*', route => route.request().method() === 'GET' && committed ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }) : route.continue());
-  await page.route('**/api/imports/*/commit', async route => { const response = await route.fetch(); expect(response.status()).toBe(200); committed = true; await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); });
-  await openLocalBoardCopy(page); const dialog = page.getByRole('dialog');
-  await dialog.getByRole('checkbox').check(); await dialog.getByRole('button', { name: 'Copy selected boards', exact: true }).click();
-  await expect(dialog.getByRole('alert')).toContainText('copy outcome is not confirmed'); await expect(dialog.getByRole('button', { name: 'Close local copies', exact: true })).toBeDisabled();
-  await page.keyboard.press('Escape'); await expect(dialog).toBeVisible(); expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
-  await page.unrouteAll({ behavior: 'ignoreErrors' }); await dialog.getByRole('button', { name: 'Retry failed boards', exact: true }).click();
-  await expect(dialog.getByRole('link', { name: 'Open Unknown outcome canary', exact: true })).toBeVisible(); await expect(dialog.getByRole('button', { name: 'Close local copies', exact: true })).toBeEnabled();
-  expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
+  await openBoardImport(page); const dialog = importDialog(page);
+  await expect(dialog.getByRole('button', { name: 'Import board', exact: true })).toBeDisabled(); await expect(dialog.getByRole('link')).toHaveCount(0);
+  await dialog.locator('input[type=file]').setInputFiles(local.archive);
+  await dialog.getByRole('button', { name: 'Import board', exact: true }).click(); await expect(dialog.getByRole('link', { name: 'Open board', exact: true })).toBeVisible();
+  const current = await (await page.request.get(origin + '/api/session')).json();
+  expect(database.prepare('SELECT owner_id FROM boards').all()).toEqual([{ owner_id: current.accountId }]); expect(await originalState(page)).toEqual(before);
 });

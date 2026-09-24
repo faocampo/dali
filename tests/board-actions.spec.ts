@@ -81,6 +81,8 @@ for (const sourceRole of ['owner', 'editor']) test(`@CR-02 @CR-07 ${sourceRole} 
   await expect(page.getByRole('dialog', { name: 'Import board', exact: true }).getByRole('alert')).toContainText('image');
   expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(sourceState(board.summary.id)).toEqual(before);
   await page.getByRole('button', { name: 'Close import', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Main Menu', exact: true })).toBeFocused();
   const picker = page.waitForEvent('filechooser'); await fileAction(page, 'Import board');
   await (await picker).setFiles({ name: download.suggestedFilename(), mimeType: 'application/zip', buffer: archiveBytes });
   await expect(page.getByRole('button', { name: 'Import private copy', exact: true })).toBeVisible();

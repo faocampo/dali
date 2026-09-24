@@ -1,4 +1,4 @@
-import { boardAction, openBoardActions, editBoardTitle, openLocalBoardCopy } from './app-menu';
+import { boardAction, openBoardActions, editBoardTitle, openBoardImport } from './app-menu';
 import { randomUUID } from 'node:crypto';
 import { test, expect, acceptanceService } from './access-fixtures';
 import type { Page } from '@playwright/test';
@@ -78,7 +78,7 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeInViewport();
     await page.getByRole('heading', { name: 'Your boards', exact: true }).focus();
     await page.keyboard.press('Tab'); await expect(page.getByLabel('Board name', { exact: true })).toBeFocused();
-    await expect(page.locator('.board-library__header .board-library__import summary')).toBeVisible();
+    await expect(page.locator('.board-library__header .board-library__import')).toBeVisible();
     await page.getByRole('heading', { name: 'Your boards', exact: true }).focus();
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-style', 'none');
     await page.screenshot({ path: testInfo.outputPath(`synthetic-library-${width}.png`) });
@@ -117,10 +117,10 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     for (const button of await action.getByRole('button').all()) await expect(button).toHaveCSS('border-top-width', '1px');
     await expect(action.getByRole('button', { name: 'Save name' })).toHaveCSS('font-size', '13px'); await expect(action.getByRole('heading')).toHaveCSS('font-weight', '600');
     await page.screenshot({ path: testInfo.outputPath(`synthetic-action-${width}.png`) }); await action.getByRole('button', { name: 'Keep name' }).click();
-    await openLocalBoardCopy(page); const copy = page.getByRole('dialog', { name: 'Copy local boards' });
+    await openBoardImport(page); const copy = page.getByRole('dialog', { name: 'Import board' });
     await geometry(page, 'dialog'); expect((await copy.boundingBox())!.width).toBe(Math.min(640, width - 32)); await expect(copy.locator('header')).toHaveCSS('padding', '24px');
-    await expect(copy.getByRole('button', { name: 'Close local copies' })).toHaveCSS('border-top-width', '1px');
-    await page.screenshot({ path: testInfo.outputPath(`synthetic-local-copy-${width}.png`) }); await copy.getByRole('button', { name: 'Close local copies', exact: true }).click();
+    await expect(copy.getByRole('button', { name: 'Close import' })).toHaveCSS('border-top-width', '1px');
+    await page.screenshot({ path: testInfo.outputPath(`synthetic-board-import-${width}.png`) }); await copy.getByRole('button', { name: 'Close import', exact: true }).click();
   }
 });
 

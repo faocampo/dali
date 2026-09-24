@@ -256,9 +256,16 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
     [store]
   );
 
+  const closeImport = () => {
+    if (importBusy || importUnknown) return;
+    archiveDialog.current?.close();
+    setArchive(undefined); setActionError(null);
+    document.querySelector<HTMLButtonElement>('.dali-menu-trigger')?.focus();
+  };
+
   return (
     <>
-    {archive && <dialog ref={archiveDialog} className="board-action-dialog" aria-label="Import board" onCancel={event => { if (importBusy || importUnknown) event.preventDefault(); else setArchive(undefined); }}>
+    {archive && <dialog ref={archiveDialog} className="board-action-dialog" aria-label="Import board" onCancel={event => { event.preventDefault(); closeImport(); }}>
       <h2>Import board</h2><p>{archive.name}</p><p>Create a private copy in your account. Your open board stays available.</p>
       {actionError && <p role="alert">{actionError}</p>}
       {importBusy && <p role="status">Importing board…</p>}
@@ -268,7 +275,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
         catch (cause) { if (alive.current) { setImportUnknown(cause instanceof LocalCopyOutcomeUnknown); setActionError(cause instanceof Error ? cause.message : 'The archive could not be imported. Try again.'); } }
         finally { if (alive.current) setImportBusy(false); }
       }}>{importUnknown ? 'Check import again' : 'Import private copy'}</button>}
-      <button disabled={importBusy || importUnknown} onClick={() => { setArchive(undefined); document.querySelector<HTMLButtonElement>('.dali-menu-trigger')?.focus(); }}>Close import</button>
+      <button disabled={importBusy || importUnknown} onClick={closeImport}>Close import</button>
     </dialog>}
     {(imageError || actionError) && <div className="canvas-feedback" role="alert" data-testid={imageError ? 'image-import-error' : undefined}>
       <p>{imageError || actionError}</p>

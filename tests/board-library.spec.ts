@@ -6,7 +6,7 @@ import { proxyApplicationAssets, syntheticCanaries } from './access-fixtures';
 import { createOidcProvider } from './oidc-provider';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
-import { openBoardActions, openAccount, openLocalBoardCopy } from './app-menu';
+import { openBoardActions, openAccount, openBoardImport } from './app-menu';
 
 // The production shell and application use an isolated real HTTP listener and
 // repository in this test process; every browser completes signed OIDC login.
@@ -115,11 +115,11 @@ test('@library-compact top-bar Import and account fit desktop and narrow screens
     await expect(header.locator('.board-account__name')).toHaveText('Synthetic Owner');
     await expect(header.locator('.board-account__avatar')).toHaveText('SO');
     await expect(page.getByText('owner@example.org', { exact: true })).not.toBeVisible();
-    await expect(importMenu.locator('summary')).toBeVisible();
+    await expect(importMenu).toBeVisible();
     expect((await header.boundingBox())!.height).toBeLessThanOrEqual(76);
     expect((await card(page, id).boundingBox())!.height).toBeLessThan(310);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    for (const control of [account.locator('summary'), importMenu.locator('summary'), card(page, id).locator('.board-card__actions summary')]) {
+    for (const control of [account.locator('summary'), importMenu, card(page, id).locator('.board-card__actions summary')]) {
       const box = (await control.boundingBox())!; expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44);
     }
     await page.screenshot({ path: testInfo.outputPath(`library-compact-${width}.png`) });
@@ -132,9 +132,9 @@ test('@library-compact top-bar Import and account fit desktop and narrow screens
     expect(panel.x).toBeGreaterThanOrEqual(0); expect(panel.x + panel.width).toBeLessThanOrEqual(width);
     await page.screenshot({ path: testInfo.outputPath(`library-account-${width}.png`) });
     await page.keyboard.press('Escape'); await expect(account.locator('summary')).toBeFocused();
-    await openLocalBoardCopy(page); await expect(importMenu).not.toHaveAttribute('open', '');
-    await page.getByRole('dialog', { name: 'Copy local boards' }).getByRole('button', { name: 'Close local copies' }).click();
-    await expect(importMenu.locator('summary')).toBeFocused();
+    await openBoardImport(page); await expect(page.getByRole('button', { name: 'Copy local boards', exact: true })).toHaveCount(0);
+    await page.getByRole('dialog', { name: 'Import board' }).getByRole('button', { name: 'Close import' }).click();
+    await expect(importMenu).toBeFocused();
   }
 });
 

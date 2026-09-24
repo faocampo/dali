@@ -66,15 +66,16 @@ async function captureLocal(id: string) {
 
 export class LocalCopyOutcomeUnknown extends Error {}
 /** Archive conversion uses only a memory workspace; no legacy storage is opened. */
-export async function captureArchive(file: File, schema: Store['schema']) {
+export async function captureArchive(file: File, schema?: Store['schema']) {
   if (file.size > 32 * 1024 * 1024) throw new Error('Choose a board archive smaller than 32 MB.');
   const workspace = createLegacyReader(); workspace.meta.initialize();
   const stores: Store[] = [];
   try {
-    const imported = await ZipTransformer.importDocs(workspace, schema, file);
+    if (!schema) { const schemaStore = workspace.createDoc().getStore(); stores.push(schemaStore); schema = schemaStore.schema; }
+    const imported = await ZipTransformer.importDocs(workspace, schema, file).catch(() => { throw new Error('This file could not be read. Choose an exported Dalí board archive (.zip).'); });
     for (const store of imported) if (store) stores.push(store);
-    if (stores.length !== 1) throw new Error('Choose an archive containing exactly one board.');
-    const store = stores[0]!; store.load(); validateMindmapDocument(store);
+    if (imported.length !== 1 || !imported[0]) throw new Error('Choose an archive containing exactly one board.');
+    const store = imported[0]!; store.load(); validateMindmapDocument(store);
     const reader = store.getTransformer();
     let snapshot;
     try { snapshot = reader.docToSnapshot(store); } finally { reader[Symbol.dispose](); }
