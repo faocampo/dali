@@ -1024,7 +1024,7 @@ djai-image-visual-edit {
   z-index: 5;
   top: 0;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 1rem;
   min-height: 58px;
@@ -1033,21 +1033,15 @@ djai-image-visual-edit {
   background: var(--board-surface);
 }
 
-.board-library__header-copy {
+.board-library__header-actions {
   display: flex;
-  align-items: baseline;
-  gap: 0.65rem;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
   min-width: 0;
 }
-
-.board-library__header-copy strong {
-  font-size: var(--affine-font-sm);
-}
-
-.board-library__header-copy span {
-  color: var(--board-ink-soft);
-  font-size: var(--affine-font-xs);
-}
+.board-library__header-actions .board-account { min-width: 0; }
+.board-library__header-actions .board-account__name { min-width: 0; }
 
 .board-library__main {
   width: min(1240px, calc(100% - 2rem));
@@ -1373,8 +1367,8 @@ djai-image-visual-edit {
 }
 
 .board-card {
+  position: relative;
   min-width: 0;
-  overflow: hidden;
   border: 1px solid var(--board-line);
   border-radius: var(--board-radius);
   background: var(--board-surface);
@@ -1430,6 +1424,7 @@ djai-image-visual-edit {
   position: relative;
   height: 132px;
   overflow: hidden;
+  border-radius: var(--board-radius) var(--board-radius) 0 0;
   border-bottom: 1px solid var(--board-line);
   background-color: var(--affine-background-primary-color);
   background-image: radial-gradient(var(--affine-edgeless-grid-color) 1px, transparent 1px);
@@ -1439,11 +1434,13 @@ djai-image-visual-edit {
   color: #57534e;
 }
 .board-card__preview img { width: 100%; height: 132px; object-fit: contain; }
-.board-card__metadata { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; font-size: 13px; font-weight: 600; }
+.board-card__footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 8px 8px 16px; }
+.board-card__metadata { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; }
 .board-card--skeleton { min-height: 260px; background: #e3e1dc; }
-.board-card__actions details { width: 100%; min-width: 0; }
-.board-card__actions summary { cursor: pointer; padding: 8px; box-sizing: border-box; }
-.board-card__actions p { margin: 8px; overflow-wrap: anywhere; }
+.board-card:has(.board-card__actions[open]) { z-index: 2; }
+.board-card__actions summary { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; cursor: pointer; box-sizing: border-box; }
+.board-card__actions summary::-webkit-details-marker { display: none; }
+.board-card__actions > div { position: absolute; right: 0; bottom: calc(100% + 4px); width: 180px; padding: 8px; background: var(--board-surface); border-radius: 8px; box-shadow: var(--board-shadow); }
 
 .board-preview {
   --preview-index: 0;
@@ -1474,16 +1471,13 @@ djai-image-visual-edit {
 .board-preview--text { height: 14px; border-width: 0 0 3px; background: transparent; }
 
 .board-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px;
-  border-top: 1px solid var(--board-line);
+  position: relative;
+  flex: 0 0 44px;
 }
 
 .board-card__actions button {
-  flex: 1 1 auto;
-  min-width: 0;
+  width: 100%;
+  text-align: left;
   padding: 0.38rem 0.25rem;
   border: 0;
   border-radius: 6px;
@@ -1494,9 +1488,9 @@ djai-image-visual-edit {
 }
 
 .board-card__actions button:hover,
-.board-card__actions button:focus-visible {
+.board-card__actions summary:hover,
+.board-card__actions summary:focus-visible {
   background: var(--affine-hover-color);
-  color: var(--board-ink);
 }
 
 .board-card--new {
@@ -1520,10 +1514,6 @@ djai-image-visual-edit {
   .board-library__title-row, .board-library__create { align-items: stretch; flex-direction: column; }
   .djai-board-switcher {
     max-width: 28vw;
-  }
-
-  .board-library__header-copy span {
-    display: none;
   }
 
   .board-library__main {
@@ -1767,6 +1757,10 @@ djai-image-visual-edit {
 .board-account__name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .board-account > div { position: absolute; right: 0; top: 100%; width: min(260px, calc(100vw - 32px)); padding: 16px; box-sizing: border-box; background: var(--board-surface); border: 1px solid var(--board-line); border-radius: 12px; box-shadow: 0 8px 24px #0002; }
 .board-account p { overflow-wrap: anywhere; }
+.board-account__identity { margin: 0 0 4px; font-weight: 600; }
+.board-account__email { margin: 0 0 16px; color: #57534e; font-size: 13px; }
+.board-account button { width: 100%; text-align: left; border: 0; background: transparent; color: var(--board-ink); cursor: pointer; }
+.board-account summary:hover, .board-account button:hover { background: var(--affine-hover-color); }
 @media (max-width: 600px) { .djai-header-actions { width: 100%; justify-content: flex-end; } .board-title-label, .board-title-inline input { max-width: 48vw; } }
 @media (max-width: 400px) {
   .djai-header-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; }
@@ -1841,6 +1835,7 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 .share-dialog input, .board-action-dialog input { font: 400 15px/1.5 var(--affine-font-family); }
 .board-title-inline input { font: 600 15px/1.5 var(--affine-font-family); }
 .board-card__actions button { color: #1b1a18; }
+.board-card__actions .access-destructive { color: #b23b32; }
 .share-owner > span:first-of-type, .share-row > span:first-of-type, .board-card__open small { font: 400 12px/1.5 var(--affine-font-family); }
 .share-owner > span:not(:first-of-type), .share-row > span:not(:first-of-type), .board-card__metadata { font: 600 13px/1.5 var(--affine-font-family); }
 .share-dialog button:not(.djai-primary), .board-action-dialog button:not(.djai-primary), .local-copy-dialog button:not(.djai-primary) { border: 1px solid #76736e; }
@@ -1864,7 +1859,7 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 
 /* Library navigation focuses its heading without styling it as a control. */
 .board-library__title-row h1:focus { outline: none; }
-.board-library__import { position: relative; align-self: flex-start; }
+.board-library__import { position: relative; flex-shrink: 0; }
 .board-library__import summary { display: flex; align-items: center; gap: 8px; padding: 0 16px; border: 1px solid var(--board-line); background: var(--board-surface); cursor: pointer; }
 .board-library__import summary::after { content: ''; width: 6px; height: 6px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; transform: translateY(-2px) rotate(45deg); }
 .board-library__import summary::-webkit-details-marker { display: none; }

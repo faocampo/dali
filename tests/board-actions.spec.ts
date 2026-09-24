@@ -1,4 +1,4 @@
-import { editBoardTitle, fileAction } from './app-menu';
+import { boardAction, openBoardActions, editBoardTitle, fileAction } from './app-menu';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { Page } from '@playwright/test';
@@ -151,7 +151,7 @@ test('@CR-05 acknowledged rename follows authoritative recent order including ti
   database.prepare('UPDATE boards SET updated_at=1 WHERE id=?').run(first.summary.id); database.prepare('UPDATE boards SET updated_at=2 WHERE id=?').run(second.summary.id); await page.reload();
   const ids = () => page.locator('[data-board-id]').evaluateAll(rows => rows.map(row => row.getAttribute('data-board-id')));
   await expect.poll(ids).toEqual([second.summary.id, first.summary.id]);
-  const rename = async (id: string, name: string) => { await card(page, id).getByRole('button', { name: 'Rename board', exact: true }).click(); const dialog = page.getByRole('dialog', { name: 'Rename board', exact: true }); await dialog.getByRole('textbox').fill(name); await dialog.getByRole('button', { name: 'Save name', exact: true }).click(); await expect(dialog).not.toBeVisible(); };
+  const rename = async (id: string, name: string) => { await boardAction(card(page, id), 'Rename board'); const dialog = page.getByRole('dialog', { name: 'Rename board', exact: true }); await dialog.getByRole('textbox').fill(name); await dialog.getByRole('button', { name: 'Save name', exact: true }).click(); await expect(dialog).not.toBeVisible(); };
   await rename(first.summary.id, 'Newest board'); await expect.poll(ids).toEqual([first.summary.id, second.summary.id]);
   await page.route('**/api/boards/' + second.summary.id, async route => { if (route.request().method() !== 'PATCH') return route.continue(); const response = await route.fetch(); const value = await response.json(); database.prepare('UPDATE boards SET updated_at=? WHERE id=?').run(value.summary.updatedAt, first.summary.id); await route.fulfill({ response }); });
   await rename(second.summary.id, 'Tied board');
@@ -163,7 +163,7 @@ test('@CR-05 duplicate retains Shared with me membership without the private own
   database.prepare('INSERT INTO members(id,issuer,subject,email,canonical_email,display_name) VALUES(?,?,?,?,?,?)').run('synthetic-source-owner', provider.issuer, 'source-owner', 'source@example.org', 'source@example.org', 'Source Owner');
   database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run('synthetic-source-owner', board.summary.id); database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, accountId, 'editor');
   await page.reload(); await page.getByRole('button', { name: 'Shared with me', exact: true }).click(); await expect(card(page, board.summary.id)).toBeVisible();
-  await card(page, board.summary.id).getByRole('button', { name: 'Duplicate board', exact: true }).click(); await page.getByRole('dialog').getByRole('button', { name: 'Duplicate board', exact: true }).click(); await expect(page.getByText('Private copy created.', { exact: true })).toBeVisible();
+  await boardAction(card(page, board.summary.id), 'Duplicate board'); await page.getByRole('dialog').getByRole('button', { name: 'Duplicate board', exact: true }).click(); await expect(page.getByText('Private copy created.', { exact: true })).toBeVisible();
   const authoritative = await (await page.request.get(origin + '/api/boards?filter=shared', { headers: headers() })).json();
   await expect(page.getByRole('button', { name: 'Shared with me', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => page.locator('[data-board-id]').evaluateAll(rows => rows.map(row => row.getAttribute('data-board-id')))).toEqual(authoritative.map((row: { id: string }) => row.id));
@@ -171,7 +171,7 @@ test('@CR-05 duplicate retains Shared with me membership without the private own
 });
 test('@03-08-01 Unicode rename blank bounds acknowledgment and named safe-focus deletion', async ({ page }) => {
   const board = await create(page); await page.reload();
-  const open = async () => { await card(page, board.summary.id).getByRole('button', { name: 'Rename board' }).click(); return page.getByRole('dialog', { name: 'Rename board' }); };
+  const open = async () => { await boardAction(card(page, board.summary.id), 'Rename board'); return page.getByRole('dialog', { name: 'Rename board' }); };
   let dialog = await open(); const title = '👩🏽‍💻'.repeat(200);
   await dialog.getByRole('textbox').fill(title + '界'); await dialog.getByRole('button', { name: 'Save name' }).click();
   await expect(dialog.getByRole('alert')).toContainText('200'); await expect(dialog.getByRole('textbox')).toHaveValue(title + '界');
@@ -180,12 +180,12 @@ test('@03-08-01 Unicode rename blank bounds acknowledgment and named safe-focus 
   await expect(card(page, board.summary.id).getByRole('link', { name: 'Open ' + title, exact: true })).toBeVisible();
   dialog = await open(); await dialog.getByRole('textbox').fill('   '); await dialog.getByRole('button', { name: 'Save name' }).click(); await expect(dialog).not.toBeVisible();
   expect((await (await page.request.get(origin + '/api/boards/' + board.summary.id, { headers: headers() })).json()).summary.title).toBe(title);
-  await card(page, board.summary.id).getByRole('button', { name: 'Delete board' }).click(); dialog = page.getByRole('dialog', { name: 'Delete board' });
+  await boardAction(card(page, board.summary.id), 'Delete board'); dialog = page.getByRole('dialog', { name: 'Delete board' });
   await expect(dialog).toContainText(title); await expect(dialog.getByRole('button', { name: 'Keep board' })).toBeFocused();
   await expect(dialog).toContainText(`Delete “${title}”? This removes the board and its access grants for everyone. This cannot be undone.`);
   await expect(dialog.getByRole('button', { name: 'Delete board', exact: true })).toHaveCSS('color', 'rgb(178, 59, 50)');
-  await dialog.getByRole('button', { name: 'Keep board' }).click(); await expect(card(page, board.summary.id).getByRole('button', { name: 'Delete board' })).toBeFocused();
-  await card(page, board.summary.id).getByRole('button', { name: 'Delete board' }).click(); await dialog.getByRole('button', { name: 'Delete board', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Keep board' }).click(); await expect(card(page, board.summary.id).locator('.board-card__actions summary')).toBeFocused();
+  await boardAction(card(page, board.summary.id), 'Delete board'); await dialog.getByRole('button', { name: 'Delete board', exact: true }).click();
   await expect(card(page, board.summary.id)).toHaveCount(0); await expect(page.getByRole('button', { name: 'New board', exact: true })).toBeFocused();
   expect(sourceState(board.summary.id)).toEqual([[], [], [], [], []]);
 });
@@ -195,7 +195,7 @@ test('@03-08-01 visible role controls and crafted denials preserve canary conten
   database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run('synthetic-other', id);
   for (const role of ['viewer', 'editor']) {
     database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?) ON CONFLICT(board_id,member_id) DO UPDATE SET role=excluded.role').run(id, accountId, role);
-    await page.reload(); await expect(card(page, id).getByRole('button', { name: 'Delete board' })).toHaveCount(0); await expect(card(page, id).getByRole('button', { name: 'Share board' })).toHaveCount(0);
+    await page.reload(); if (role === 'editor') await openBoardActions(card(page, id)); await expect(card(page, id).getByRole('button', { name: 'Delete board' })).toHaveCount(0); await expect(card(page, id).getByRole('button', { name: 'Share board' })).toHaveCount(0);
     await expect(card(page, id).getByRole('button', { name: 'Rename board' })).toHaveCount(role === 'editor' ? 1 : 0); await expect(card(page, id).getByRole('button', { name: 'Duplicate board' })).toHaveCount(role === 'editor' ? 1 : 0);
     const before = sourceState(id);
     const denied = await page.request.delete(origin + '/api/boards/' + id, { headers: headers(), data: { revision: 1, operationId: randomUUID() } }); expect(denied.status()).toBe(403);
@@ -209,14 +209,14 @@ test('@03-08-01 visible role controls and crafted denials preserve canary conten
 });
 test('@03-08-01 lost rename response reconciles one result and failure retains draft and source', async ({ page }) => {
   const board = await create(page); await page.reload();
-  await card(page, board.summary.id).getByRole('button', { name: 'Rename board' }).click(); const dialog = page.getByRole('dialog');
+  await boardAction(card(page, board.summary.id), 'Rename board'); const dialog = page.getByRole('dialog');
   await dialog.getByRole('textbox').fill('Acknowledged canary'); let writes = 0;
   await page.route('**/api/boards/' + board.summary.id, async route => { if (route.request().method() !== 'PATCH') return route.continue(); writes++; await route.fetch(); await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); });
   await dialog.getByRole('button', { name: 'Save name' }).click(); await expect(dialog).not.toBeVisible(); expect(writes).toBe(1);
   await expect(card(page, board.summary.id).getByRole('link', { name: 'Open Acknowledged canary', exact: true })).toBeVisible();
   expect(database.prepare("SELECT count(*) AS n FROM operations WHERE kind='rename'").get()).toEqual({ n: 1 });
   await page.unroute('**/api/boards/' + board.summary.id); const before = sourceState(board.summary.id);
-  await card(page, board.summary.id).getByRole('button', { name: 'Rename board' }).click(); await dialog.getByRole('textbox').fill('Draft retained');
+  await boardAction(card(page, board.summary.id), 'Rename board'); await dialog.getByRole('textbox').fill('Draft retained');
   await page.route('**/api/boards/' + board.summary.id, route => route.request().method() === 'PATCH' ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }) : route.continue());
   await dialog.getByRole('button', { name: 'Save name' }).click(); await expect(dialog.getByRole('button', { name: 'Check again' })).toBeVisible(); await expect(dialog.getByRole('textbox')).toHaveValue('Draft retained');
   expect(sourceState(board.summary.id)).toEqual(before); await dialog.getByRole('button', { name: 'Check again' }).click(); await expect(dialog.getByRole('button', { name: 'Save name' })).toBeVisible();
@@ -251,7 +251,7 @@ test('@03-08-01 native map image duplicate has fresh identities private ownershi
     return { snapshot, relationships, connected: connectors.map(connector => [surface.getElementById(connector.source.id!)?.type, surface.getElementById(connector.target.id!)?.type]), ids: [...surface.elementModels].map(el => el.id), docs: [...host.store.workspace.docs.keys()] };
   });
   const original = await native(); await page.goto(origin); const before = sourceState(board.summary.id);
-  await card(page, board.summary.id).getByRole('button', { name: 'Duplicate board' }).click();
+  await boardAction(card(page, board.summary.id), 'Duplicate board');
   await page.getByRole('dialog').getByRole('button', { name: 'Duplicate board', exact: true }).click();
   await expect(page.getByText('Private copy created.', { exact: true })).toBeVisible();
   const rows = database.prepare('SELECT * FROM boards WHERE id<>?').all(board.summary.id) as { id: string; root_doc_id: string; content_doc_id: string; owner_id: string }[];
@@ -292,10 +292,10 @@ test('@03-08-02 inline naming is acknowledged composition-safe and responsive wi
 });
 test('@03-08-02 long library rename labels and errors wrap within 490px without losing draft', async ({ page }) => {
   const title = '👩🏽‍💻'.repeat(200); const board = await create(page, title); await page.setViewportSize({ width: 490, height: 800 }); await page.reload();
-  await card(page, board.summary.id).getByRole('button', { name: 'Rename board' }).click(); const dialog = page.getByRole('dialog', { name: 'Rename board' });
+  await boardAction(card(page, board.summary.id), 'Rename board'); const dialog = page.getByRole('dialog', { name: 'Rename board' });
   await dialog.getByRole('textbox').fill(title + '界'); await dialog.getByRole('button', { name: 'Save name' }).click(); await expect(dialog.getByRole('alert')).toContainText('200'); await expect(dialog.getByRole('textbox')).toHaveValue(title + '界');
   expect(await dialog.evaluate(el => { const r = el.getBoundingClientRect(); return r.x >= 0 && r.right <= innerWidth && el.scrollWidth <= el.clientWidth; })).toBe(true);
-  await dialog.getByRole('button', { name: 'Keep name' }).click(); await expect(card(page, board.summary.id).getByRole('button', { name: 'Rename board' })).toBeFocused();
+  await dialog.getByRole('button', { name: 'Keep name' }).click(); await expect(card(page, board.summary.id).locator('.board-card__actions summary')).toBeFocused();
   expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title });
 });
 test('@03-08-02 inline loading guards repeated commits and uncertain failure retains a correctable draft', async ({ page }) => {

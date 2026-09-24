@@ -1,4 +1,4 @@
-import { fileAction } from './app-menu';
+import { boardAction, fileAction } from './app-menu';
 import { test, expect } from './fixtures';
 import { prepareClipboard, pasteClipboard } from './clipboard-route';
 import type { Page } from '@playwright/test';
@@ -178,7 +178,7 @@ test('@02-01-02 board transformer copy keeps document-scoped hierarchy independe
   await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
   await fileAction(page, 'All boards');
   const original = page.locator(`.board-card[data-board-id="${new URL(sourceUrl).searchParams.get('board')}"]`);
-  await original.getByRole('button', { name: 'Duplicate board', exact: true }).click();
+  await boardAction(original, 'Duplicate board');
   const dialog = page.getByRole('dialog', { name: 'Duplicate board', exact: true }); const title = 'Synthetic hierarchy copy ' + crypto.randomUUID();
   await dialog.getByRole('textbox', { name: 'Board name', exact: true }).fill(title); await dialog.getByRole('button', { name: 'Duplicate board', exact: true }).click();
   await page.getByRole('link', { name: 'Open ' + title, exact: true }).click();

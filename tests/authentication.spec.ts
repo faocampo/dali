@@ -1,9 +1,22 @@
+import { openAccount } from './app-menu';
 import { test, expect, waitForAuthenticatedLibrary } from './fixtures';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 test.use({ expectErrors: ['Failed to load resource: the server responded with a status of 401 (Unauthorized)', 'Failed to load resource: the server responded with a status of 404 (Not Found)'] });
+
+test('@library-compact external accounts are rejected while approved internal members can sign in', async ({ page, context }) => {
+  await page.goto('/'); await page.getByRole('link', { name: 'Synthetic External Account', exact: true }).click();
+  await expect(page.getByRole('heading', { name: "We couldn't sign you in." })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Your boards' })).toHaveCount(0);
+  expect((await context.request.get('/api/session')).status()).toBe(401);
+  expect((await context.request.get('/api/boards')).status()).toBe(401);
+  await page.getByRole('button', { name: 'Sign in again', exact: true }).click();
+  await page.getByRole('link', { name: 'Synthetic Internal Member', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  expect((await context.request.get('/api/session')).status()).toBe(200);
+});
 
 test('@03-02-01 UI-AUTH-loading keeps protected content unmounted until session validation', async ({ page }) => {
   let release!: () => void;
@@ -122,7 +135,7 @@ test('@03-02-01 ordinary entry signs in through OIDC and explicit logout stays s
   await expect(page.getByRole('link', { name: 'Synthetic Owner', exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
-  await expect(page.getByText('owner@example.org', { exact: true })).toBeVisible();
+  await openAccount(page); await expect(page.getByText('owner@example.org', { exact: true })).toBeVisible();
   for (const width of [490, 1404]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

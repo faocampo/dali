@@ -1,4 +1,4 @@
-import { editBoardTitle, openLocalBoardCopy } from './app-menu';
+import { boardAction, openBoardActions, editBoardTitle, openLocalBoardCopy } from './app-menu';
 import { randomUUID } from 'node:crypto';
 import { test, expect, acceptanceService } from './access-fixtures';
 import type { Page } from '@playwright/test';
@@ -69,17 +69,20 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     await expect(page.locator('.board-library__header')).toHaveCSS('padding-right', width <= 700 ? '16px' : '24px');
     for (const label of await card.locator('.board-card__metadata > span').all()) { await expect(label).toHaveCSS('font-size', '13px'); await expect(label).toHaveCSS('font-weight', '600'); }
     await expect(card.locator('small')).toHaveCSS('font-size', '12px'); await expect(card.locator('small')).toHaveCSS('font-weight', '400');
+    await openBoardActions(card);
     const actions = await card.locator('.board-card__actions button').evaluateAll(nodes => nodes.map(node => { const s = getComputedStyle(node); return { color: s.color, size: s.fontSize, weight: s.fontWeight }; }));
-    expect(actions.length).toBe(4); for (const action of actions) expect(action).toEqual({ color: 'rgb(27, 26, 24)', size: '13px', weight: '600' });
+    expect(actions.length).toBe(4); for (const [index, action] of actions.entries()) expect(action).toEqual({ color: index === 3 ? 'rgb(178, 59, 50)' : 'rgb(27, 26, 24)', size: '13px', weight: '600' });
+    await page.keyboard.press('Escape');
     await expect(page.getByLabel('Board name', { exact: true })).toHaveCSS('border-top-color', 'rgb(118, 115, 110)');
     await page.getByRole('heading', { name: 'Your boards', exact: true }).evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeInViewport();
     await page.getByRole('heading', { name: 'Your boards', exact: true }).focus();
-    await page.keyboard.press('Tab'); await expect(page.locator('.board-library__import summary')).toBeFocused();
+    await page.keyboard.press('Tab'); await expect(page.getByLabel('Board name', { exact: true })).toBeFocused();
+    await expect(page.locator('.board-library__header .board-library__import summary')).toBeVisible();
     await page.getByRole('heading', { name: 'Your boards', exact: true }).focus();
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toHaveCSS('outline-style', 'none');
     await page.screenshot({ path: testInfo.outputPath(`synthetic-library-${width}.png`) });
-    await card.getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
+    await boardAction(card, 'Share board'); const dialog = page.getByRole('dialog', { name: 'Share board' });
     await expect(dialog.getByRole('combobox', { name: 'Access role', exact: true })).toHaveCount(50);
     for (const select of await dialog.locator('select').all()) await expect(select).toHaveCSS('height', '44px');
     await geometry(page, 'dialog');
@@ -107,8 +110,8 @@ test('rendered contrast, 44px targets and fifty long library/sharing rows fit bo
     await testInfo.attach(`contrast-${width}`, { body: JSON.stringify(contrast), contentType: 'application/json' });
     expect(contrast.length).toBeGreaterThan(5); for (const row of contrast) expect(row.ratio, row.text).toBeGreaterThanOrEqual(4.5);
     await page.screenshot({ path: testInfo.outputPath(`synthetic-sharing-${width}.png`) });
-    await dialog.getByRole('button', { name: 'Close', exact: true }).click(); await expect(card.getByRole('button', { name: 'Share board' })).toBeFocused();
-    await card.getByRole('button', { name: 'Rename board' }).click(); const action = page.getByRole('dialog', { name: 'Rename board' });
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click(); await expect(card.locator('.board-card__actions summary')).toBeFocused();
+    await boardAction(card, 'Rename board'); const action = page.getByRole('dialog', { name: 'Rename board' });
     await geometry(page, 'dialog'); await expect(action).toHaveCSS('font-size', '15px'); await expect(action.getByRole('textbox')).toHaveCSS('border-top-color', 'rgb(118, 115, 110)');
     await expect(action.getByRole('textbox')).toBeFocused(); await expect(action.getByRole('textbox')).toHaveCSS('outline-color', 'rgb(180, 69, 31)'); await expect(action.getByRole('textbox')).toHaveCSS('outline-width', '2px');
     for (const button of await action.getByRole('button').all()) await expect(button).toHaveCSS('border-top-width', '1px');

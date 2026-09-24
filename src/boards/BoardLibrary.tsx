@@ -3,6 +3,9 @@ import type { SessionDescriptor } from '../auth/AuthBoundary';
 import { ShareBoardDialog } from './ShareBoardDialog';
 import { BoardActionDialog } from './BoardActionDialog';
 import { LocalBoardCopyDialog } from './LocalBoardCopyDialog';
+import { AccountMenu } from '../header/AccountMenu';
+import { Dropdown } from '../header/Dropdown';
+import logo from '../../imgs/svg/dali-symbol-color.svg';
 
 export type BoardSummary = { id: string; title: string; updatedAt: number; role: 'owner' | 'editor' | 'viewer'; access: 'private' | 'shared'; pendingCount: number; accountId: string; thumbnailUrl?: string };
 export type BoardDescriptor = { summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number };
@@ -32,7 +35,7 @@ function ProtectedPreview({ board }: { board: BoardSummary }) {
   }, [board.id, board.accountId, board.role, board.thumbnailUrl]);
   return <span className="board-card__preview">{url ? <img src={url} alt="" onError={() => setUrl(undefined)} /> : 'Preview unavailable'}</span>;
 }
-export function BoardLibrary({ member }: { member: SessionDescriptor }) {
+export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; signOut: () => Promise<void> }) {
   const [localCopyOpen, setLocalCopyOpen] = useState(false);
   const [action, setAction] = useState<{ board: BoardSummary; kind: 'rename' | 'duplicate' | 'delete' }>();
   const [notice, setNotice] = useState('');
@@ -119,8 +122,16 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
       if (!controller.signal.aborted) setCreateError(operation.current ? "We couldn't confirm this change. Check again before retrying." : cause instanceof Error && cause.message.startsWith('Use a board') ? cause.message : "We couldn't create this board. Try again.");
     } finally { if (!controller.signal.aborted) setBusy(false); }
   };
-  return <>
-    <div className="board-library__title-row"><div><h1 ref={heading} tabIndex={-1}>Your boards</h1><p>Boards you can access with this account.</p></div><details className="board-library__import"><summary>Import</summary><div><button onClick={event => { event.currentTarget.focus(); setLocalCopyOpen(true); }}>Copy local boards</button></div></details></div>
+  return <div className="board-library">
+    <header className="board-library__header">
+      <a className="djai-brand" href="/" aria-label="Dalí"><img src={logo} alt="" height={34} /></a>
+      <nav className="board-library__header-actions" aria-label="Library controls">
+        <Dropdown className="board-library__import" summary="Import">{close => <button onClick={() => { close(); setLocalCopyOpen(true); }}>Copy local boards</button>}</Dropdown>
+        <AccountMenu member={member} signOut={signOut} />
+      </nav>
+    </header>
+    <main className="board-library__main">
+    <div className="board-library__title-row"><div><h1 ref={heading} tabIndex={-1}>Your boards</h1><p>Boards you can access with this account.</p></div></div>
     <form className="board-library__create" onSubmit={event => { event.preventDefault(); void create(); }}>
       <label htmlFor="new-board-title">Board name <input id="new-board-title" aria-describedby={createError ? 'board-create-error' : undefined} value={title} onChange={event => setTitle(event.target.value)} disabled={busy || !!operation.current} /></label>
       <button className="djai-primary" aria-describedby={createError ? 'board-create-error' : undefined} disabled={busy || loading} type="submit">{busy ? 'Creating board…' : operation.current ? 'Check again' : 'New board'}</button>
@@ -136,8 +147,18 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
         <a className="board-card__open" href={'/?board=' + encodeURIComponent(board.id)} aria-label={'Open ' + board.title}>
           <ProtectedPreview board={board} /><strong className="board-card__title" title={board.title}>{board.title}</strong>
           <small>Edited {new Date(board.updatedAt).toLocaleString()}</small>
-        </a><div className="board-card__metadata"><span>{board.access === 'private' ? 'Private' : 'Shared'}</span><span>{board.role[0]!.toUpperCase() + board.role.slice(1)}</span>{board.pendingCount > 0 && <span>Pending member sign-in</span>}</div>
-        <div className="board-card__actions">{board.role !== 'viewer' && <><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'rename' }); }}>Rename board</button><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'duplicate' }); }}>Duplicate board</button></>}{board.role === 'owner' && <><button onClick={event => { event.currentTarget.focus(); setSharing(board); }}>Share board</button><button onClick={event => { event.currentTarget.focus(); setAction({ board, kind: 'delete' }); }}>Delete board</button></>}</div>
+        </a><div className="board-card__footer"><div className="board-card__metadata"><span>{board.access === 'private' ? 'Private' : 'Shared'}</span><span>{board.role[0]!.toUpperCase() + board.role.slice(1)}</span>{board.pendingCount > 0 && <span>Pending member sign-in</span>}</div>
+          {board.role !== 'viewer' && <Dropdown className="board-card__actions" label={'Actions for ' + board.title} summary={<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.75" /><circle cx="12" cy="12" r="1.75" /><circle cx="19" cy="12" r="1.75" /></svg>}>
+            {close => <>
+              <button onClick={() => { close(); setAction({ board, kind: 'rename' }); }}>Rename board</button>
+              <button onClick={() => { close(); setAction({ board, kind: 'duplicate' }); }}>Duplicate board</button>
+              {board.role === 'owner' && <>
+                <button onClick={() => { close(); setSharing(board); }}>Share board</button>
+                <button className="access-destructive" onClick={() => { close(); setAction({ board, kind: 'delete' }); }}>Delete board</button>
+              </>}
+            </>}
+          </Dropdown>}
+        </div>
       </article>)}
     </div>}
     {localCopyOpen && <LocalBoardCopyDialog key={member.accountId} member={member} onClose={() => { setLocalCopyOpen(false); setRefresh(value => value + 1); }} />}
@@ -152,5 +173,6 @@ export function BoardLibrary({ member }: { member: SessionDescriptor }) {
       if (!state) { setRefresh(value => value + 1); return; }
       setBoards(current => current.map(row => row.id === sharing.id ? { ...row, access: state.grants.length ? 'shared' : 'private', pendingCount: state.grants.filter(grant => grant.status === 'pending').length } : row));
     }} />}
-  </>;
+    </main>
+  </div>;
 }

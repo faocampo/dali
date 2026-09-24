@@ -16,6 +16,7 @@ import type { SessionDescriptor } from '../auth/AuthBoundary';
 import { ShareBoardDialog } from '../boards/ShareBoardDialog';
 import { BoardActionDialog } from '../boards/BoardActionDialog';
 import { preserveBeforeNavigation } from '../auth/session';
+import { AccountMenu } from './AccountMenu';
 
 export function Header({
   boardTitle = 'Untitled board',
@@ -28,9 +29,6 @@ export function Header({
   onRenameBoard?: (title: string) => Promise<void>;
   board?: BoardDescriptor; member?: SessionDescriptor; signOut?: () => Promise<void>; onBoardChanged?: (board: BoardDescriptor) => void;
 }) {
-  const accountName = member?.displayName.trim() || member?.email || 'User';
-  const nameParts = accountName.split(/\s+/);
-  const initials = [nameParts[0], ...(nameParts.length > 1 ? [nameParts.at(-1)] : [])].map(part => Array.from(part ?? '')[0] ?? '').join('').toLocaleUpperCase();
   const [exportOpen, setExportOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [action, setAction] = useState<'rename' | 'duplicate' | 'delete'>();
@@ -108,7 +106,7 @@ export function Header({
       <nav className="djai-header-actions">
         {board && <span className="board-role">{board.summary.role[0]!.toUpperCase() + board.summary.role.slice(1)}{board.summary.role === 'viewer' ? ' · View only' : ''}</span>}
         {board?.summary.role === 'owner' && <button className="djai-ghost" onClick={event => { event.currentTarget.focus(); setSharing(true); }}>Share board</button>}
-        {member && <details className="board-account"><summary aria-label={`Account for ${accountName}`}><span className="board-account__avatar" aria-hidden="true">{initials}</span><span className="board-account__name">{accountName}</span></summary><div><p>{member.displayName}</p><p>{member.email}</p><button onClick={() => { void signOut?.(); }}>Sign out of Dalí</button></div></details>}
+        {member && <AccountMenu member={member} signOut={signOut} />}
         <div className="djai-save">
           <button
             type="button"

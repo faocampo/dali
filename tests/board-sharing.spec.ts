@@ -1,3 +1,4 @@
+import { boardAction, openBoardActions } from './app-menu';
 import { proxyApplicationAssets } from './access-fixtures';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
@@ -76,7 +77,7 @@ const card = (page: Page, id: string) => page.locator('[data-board-id="' + id + 
 for (const method of ['POST', 'PATCH', 'DELETE']) test(`@UI-X1 ${method} retains its original sharing operation through busy and uncertain dismissal attempts`, async ({ page }) => {
   const id = seed('Mutation lifetime');
   if (method !== 'POST') database.prepare('INSERT INTO pending_grants(board_id,issuer,canonical_email,role) VALUES(?,?,?,?)').run(id, provider.issuer, 'waiting@example.org', 'viewer');
-  await refresh(page); const trigger = card(page, id).getByRole('button', { name: 'Share board' }); await trigger.click();
+  await refresh(page); const trigger = card(page, id).locator('.board-card__actions summary'); await boardAction(card(page, id), 'Share board');
   const dialog = page.getByRole('dialog', { name: 'Share board' });
   let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
   const mutations: { operationId: string; role?: string; revision: number }[] = []; const receipts: string[] = []; let canCheck = false;
@@ -106,7 +107,7 @@ for (const method of ['POST', 'PATCH', 'DELETE']) test(`@UI-X1 ${method} retains
 test.describe('receipt authorization loss', () => {
 test.use({ expectErrors: ['401 (Unauthorized)', '404 (Not Found)', '409 (Conflict)', '503 (Service Unavailable)'] });
 for (const loss of ['expired', 'identity', 'deleted'] as const) test(`@UI-X1 receipt ${loss} invalidates uncertain sharing without a second mutation`, async ({ page }) => {
-  const id = seed('Receipt authorization'); await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click();
+  const id = seed('Receipt authorization'); await refresh(page); await boardAction(card(page, id), 'Share board');
   const dialog = page.getByRole('dialog', { name: 'Share board' }); let check = false; let posts = 0; let receiptStatus = 0; let operationId = '';
   await page.route('**/api/operations/*', async route => { if (!check) return route.fulfill({ status: 503, json: {} }); const response = await route.fetch(); receiptStatus = response.status(); await route.fulfill({ response }); });
   await page.route('**/grants', async route => { if (route.request().method() !== 'POST') return route.continue(); posts++; operationId = route.request().postDataJSON().operationId; await route.fetch(); await route.fulfill({ status: 503, json: {} }); });
@@ -128,7 +129,7 @@ for (const loss of ['expired', 'identity', 'deleted'] as const) test(`@UI-X1 rec
 test('@UI-X1 uncertain removed row remains reconcilable after another row saves', async ({ page }) => {
   const id = seed('Independent rows');
   for (const email of ['first@example.org', 'second@example.org']) database.prepare('INSERT INTO pending_grants(board_id,issuer,canonical_email,role) VALUES(?,?,?,?)').run(id, provider.issuer, email, 'viewer');
-  await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
+  await refresh(page); await boardAction(card(page, id), 'Share board'); const dialog = page.getByRole('dialog', { name: 'Share board' });
   const first = dialog.locator('[data-grant-id]').filter({ hasText: 'first@example.org' }); const second = dialog.locator('[data-grant-id]').filter({ hasText: 'second@example.org' });
   let check = false; let deletes = 0; let operationId = '';
   await page.route('**/api/operations/*', route => check ? route.continue() : route.fulfill({ status: 503, json: {} }));
@@ -146,8 +147,8 @@ test('@UI-X1 uncertain removed row remains reconcilable after another row saves'
 
 test('@03-07-01 owner grants pending Viewer access and revokes with acknowledgment', async ({ page }) => {
   const id = seed('Sharing board'); await refresh(page);
-  await expect(card(page, id).getByRole('button', { name: 'Share board' })).toBeVisible();
-  await card(page, id).getByRole('button', { name: 'Share board' }).click();
+  await openBoardActions(card(page, id)); await expect(card(page, id).getByRole('button', { name: 'Share board' })).toBeVisible();
+  await boardAction(card(page, id), 'Share board');
   const dialog = page.getByRole('dialog', { name: 'Share board' });
   await expect(dialog.getByText('Only you have access')).toBeVisible();
   await expect(dialog.getByText('Only the owner can manage access. A board link works only for people who already have access.', { exact: true })).toBeVisible();
@@ -170,7 +171,7 @@ test('@03-07-01 owner grants pending Viewer access and revokes with acknowledgme
 
 test('@03-07-01 existing members default Viewer and link copy preserves grants', async ({ page }) => {
   const id = seed('Active access'); await refresh(page);
-  await card(page, id).getByRole('button', { name: 'Share board' }).click();
+  await boardAction(card(page, id), 'Share board');
   const dialog = page.getByRole('dialog', { name: 'Share board' });
   await dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' }).fill('Other');
   await dialog.getByRole('option', { name: /Synthetic Other/ }).click();
@@ -192,7 +193,7 @@ test('@03-07-01 existing members default Viewer and link copy preserves grants',
   await expect(dialog.getByRole('status')).toHaveText("We couldn't copy the link. Select and copy the board address below.");
   expect(database.prepare('SELECT * FROM board_grants WHERE board_id=?').all(id)).toEqual(before);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  await expect(card(page, id).getByRole('button', { name: 'Share board' })).toBeFocused();
+  await expect(card(page, id).locator('.board-card__actions summary')).toBeFocused();
 });
 
 test('@03-07-01 direct non-owner grant reads and mutations deny with unchanged owner state', async ({ page }) => {
@@ -228,7 +229,7 @@ test('@03-07-01 direct non-owner grant reads and mutations deny with unchanged o
 });
 
 test('@03-07-02 UI-SHARE-empty partial keyboard and IME do not submit invalid recipients', async ({ page }) => {
-  const id = seed('Recipient validation'); await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click();
+  const id = seed('Recipient validation'); await refresh(page); await boardAction(card(page, id), 'Share board');
   const dialog = page.getByRole('dialog', { name: 'Share board' }); const input = dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' });
   for (const query of ['', 'invalid', 'outside@external.example']) {
     await input.fill(query); await expect(dialog.getByRole('button', { name: 'Grant access', exact: true })).toBeDisabled();
@@ -252,7 +253,7 @@ test('@03-07-02 UI-SHARE-empty partial keyboard and IME do not submit invalid re
 });
 
 test('@03-07-02 UI-SHARE-loading ignores stale search responses and recovers search failure', async ({ page }) => {
-  const id = seed('Search ordering'); await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click();
+  const id = seed('Search ordering'); await refresh(page); await boardAction(card(page, id), 'Share board');
   const dialog = page.getByRole('dialog', { name: 'Share board' }); const input = dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' });
   let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; }); let started!: () => void; const requested = new Promise<void>(resolve => { started = resolve; });
   await page.route('**/api/members?**', async route => {
@@ -270,7 +271,7 @@ test('@03-07-02 UI-SHARE-loading ignores stale search responses and recovers sea
 });
 
 test('@03-07-02 UI-SHARE-error grant and revoke failures preserve state and reconcile before retry', async ({ page }) => {
-  const id = seed('Access failures'); await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click();
+  const id = seed('Access failures'); await refresh(page); await boardAction(card(page, id), 'Share board');
   const dialog = page.getByRole('dialog', { name: 'Share board' }); let fail = true; const events: string[] = [];
   await page.route('**/api/operations/*', async route => { events.push('reconcile'); await route.continue(); });
   await page.route('**/grants{,/*}', async route => { const method = route.request().method(); if (method === 'GET') return route.continue(); events.push(method); if (fail) await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); else await route.continue(); });
@@ -293,7 +294,7 @@ test('@03-07-02 UI-SHARE-error grant and revoke failures preserve state and reco
 test('@03-07-02 owner control loss closes stale sharing and direct mutations preserve access', async ({ page }) => {
   const editor = seed('Editor actions', { role: 'editor' }); const viewer = seed('Viewer actions', { role: 'viewer' }); const id = seed('Ownership check'); await refresh(page);
   for (const boardId of [editor, viewer]) await expect(card(page, boardId).getByRole('button', { name: 'Share board' })).toHaveCount(0);
-  await card(page, id).getByRole('button', { name: 'Share board' }).click(); const dialog = page.getByRole('dialog', { name: 'Share board' });
+  await boardAction(card(page, id), 'Share board'); const dialog = page.getByRole('dialog', { name: 'Share board' });
   await dialog.getByRole('combobox', { name: 'Find an internal member or enter an internal email' }).fill('waiting@example.org'); await dialog.locator('[role=option]').click();
   database.prepare('UPDATE boards SET owner_id=? WHERE id=?').run('synthetic-other', id);
   await dialog.getByRole('button', { name: 'Grant access', exact: true }).click(); await expect(dialog).toHaveCount(0); await expect(card(page, id)).toHaveCount(0);
@@ -303,7 +304,7 @@ test('@03-07-02 owner control loss closes stale sharing and direct mutations pre
 test('@03-07-02 UI-SHARE-loading row isolation and lost-response reconciliation preserve acknowledged roles', async ({ page }) => {
   const id = seed('Row pending');
   for (const email of ['first@example.org', 'second@example.org']) database.prepare('INSERT INTO pending_grants(board_id,issuer,canonical_email,role) VALUES(?,?,?,?)').run(id, provider.issuer, email, 'viewer');
-  await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click();
+  await refresh(page); await boardAction(card(page, id), 'Share board');
   const dialog = page.getByRole('dialog', { name: 'Share board' }); const first = dialog.locator('[data-grant-id]').filter({ hasText: 'first@example.org' }); const second = dialog.locator('[data-grant-id]').filter({ hasText: 'second@example.org' });
   let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; }); let patches = 0; let reconciles = 0;
   await page.route('**/api/operations/*', async route => { reconciles++; await route.continue(); });
@@ -323,7 +324,7 @@ for (const count of [0, 1, 50]) test(`@03-07-02 UI-SHARE-zero-one-many ${count} 
     database.prepare('INSERT INTO pending_grants(board_id,issuer,canonical_email,role) VALUES(?,?,?,?)').run(id, provider.issuer, email, 'viewer');
     database.prepare('INSERT INTO members(id,issuer,subject,email,canonical_email,display_name) VALUES(?,?,?,?,?,?)').run('search-' + index, provider.issuer, 'search-' + index, email, email, 'Equal Name');
   }
-  await refresh(page); await card(page, id).getByRole('button', { name: 'Share board' }).click();
+  await refresh(page); await boardAction(card(page, id), 'Share board');
   const dialog = page.getByRole('dialog', { name: 'Share board' }); const rows = dialog.locator('[data-grant-id]'); await expect(rows).toHaveCount(count);
   await expect(dialog.locator('.share-owner')).toContainText('Owner'); await expect(dialog.locator('.share-owner button, .share-owner select')).toHaveCount(0);
   if (!count) await expect(dialog.getByText('Only you have access')).toBeVisible();

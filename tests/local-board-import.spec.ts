@@ -252,7 +252,7 @@ test('@03-11-03 in-flight close waits for the real outcome and stops before the 
   } finally { release(); }
   await expect(dialog).toHaveCount(0);
   expect(database.prepare('SELECT count(*) AS n FROM boards').get()).toEqual({ n: 1 }); expect(await originalState(page)).toEqual(before);
-  await expect(page.getByRole('button', { name: 'Copy local boards', exact: true })).toBeFocused();
+  await expect(page.locator('.board-library__import summary')).toBeFocused();
 });
 
 test('@03-11-03 fifty long rows fit at 490px with fixed actions keyboard focus and reduced motion', async ({ page }) => {
@@ -273,7 +273,7 @@ test('@03-11-03 fifty long rows fit at 490px with fixed actions keyboard focus a
   await dialog.getByRole('checkbox').last().focus(); await page.keyboard.press('Space'); await expect(dialog.getByText('1 board selected.', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Close local copies', exact: true }).focus(); await page.keyboard.press('Tab');
   expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
-  await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(page.getByRole('button', { name: 'Copy local boards', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(page.locator('.board-library__import summary')).toBeFocused();
   expect(await originalState(page)).toEqual(before);
 });
 

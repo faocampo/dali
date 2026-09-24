@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AuthBoundary, type SessionDescriptor } from './auth/AuthBoundary';
 import { BoardLibrary, validSummary, type BoardDescriptor } from './boards/BoardLibrary';
-import logo from '../imgs/svg/dali-symbol-color.svg';
 import BlockSuiteCanvas from './canvas/BlockSuiteCanvas';
 import { Header } from './header/Header';
 import { disposeCanvasRuntime, getCanvasRuntime, nextAccessGeneration, suspendAccessScope, type CanvasRuntime } from './canvas/runtime';
@@ -95,16 +94,5 @@ export default function App() {
   const [intent, setIntent] = useState(() => accountIntent());
   useEffect(() => { const changed = () => { void preserveBeforeNavigation().then(ok => { if (ok) setIntent(accountIntent()); }); }; window.addEventListener('popstate', changed); return () => window.removeEventListener('popstate', changed); }, []);
   const openBoards = () => { void preserveBeforeNavigation().then(ok => { if (ok) { window.history.pushState(null, '', '/'); setIntent({ kind: 'home' }); } }); };
-  return <AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId + session.revision} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId + session.revision} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} signOut={signOut} /> : <div className="board-library" key={member.accountId + session.revision}>
-    <header className="board-library__header" style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-      <a className="djai-brand" href="/" aria-label="Dalí"><img src={logo} alt="" height={34} /></a>
-      <div style={{ flex: 1, overflowWrap: 'anywhere', minWidth: 0, fontSize: 15 }}>
-        <p>{member.displayName}</p><p>{member.email}</p>
-      </div>
-      <button className="djai-ghost" style={{ minHeight: 44, fontSize: 13, fontWeight: 600 }} onClick={() => { void signOut(); }}>Sign out of Dalí</button>
-    </header>
-    <main className="board-library__main">
-      <BoardLibrary member={member} />
-    </main>
-  </div>}</AuthBoundary>;
+  return <AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId + session.revision} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId + session.revision} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} signOut={signOut} /> : <BoardLibrary key={member.accountId + session.revision} member={member} signOut={signOut} />}</AuthBoundary>;
 }

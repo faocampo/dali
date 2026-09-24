@@ -6,6 +6,7 @@ import { proxyApplicationAssets, syntheticCanaries } from './access-fixtures';
 import { createOidcProvider } from './oidc-provider';
 import { buildApp } from '../server/app';
 import { openDatabase, type AccountDatabase } from '../server/storage/database';
+import { openBoardActions, openAccount, openLocalBoardCopy } from './app-menu';
 
 // The production shell and application use an isolated real HTTP listener and
 // repository in this test process; every browser completes signed OIDC login.
@@ -72,6 +73,64 @@ function seed(title: string, options: { role?: 'owner' | 'editor' | 'viewer'; up
 }
 const refresh = (page: Page) => page.getByRole('button', { name: 'Refresh boards', exact: true }).click();
 const card = (page: Page, id: string) => page.locator('[data-board-id="' + id + '"]');
+
+test('@library-compact actions stay compact and support keyboard, dismissal and dialog return focus', async ({ page }) => {
+  const first = seed('Project notes'); const second = seed('Team workshop');
+  const editor = seed('Shared with an editor', { role: 'editor' }); const viewer = seed('Shared with a viewer', { role: 'viewer' });
+  await refresh(page);
+  const actions = card(page, first).locator('.board-card__actions'); const trigger = actions.locator('summary');
+  await expect(trigger).toHaveAccessibleName('Actions for Project notes');
+  await expect(card(page, viewer).locator('.board-card__actions')).toHaveCount(0);
+  await expect(actions.getByRole('button')).toHaveCount(0);
+  await trigger.focus(); await page.keyboard.press('Enter');
+  await expect(actions.getByRole('button')).toHaveText(['Rename board', 'Duplicate board', 'Share board', 'Delete board']);
+  await page.keyboard.press('Tab'); await expect(actions.getByRole('button', { name: 'Rename board' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Rename board' });
+  await expect(dialog).toBeVisible(); await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused(); await expect(actions).not.toHaveAttribute('open', '');
+  await trigger.press('Space'); await expect(actions.getByRole('button', { name: 'Share board' })).toBeVisible();
+  await page.keyboard.press('Escape'); await expect(trigger).toBeFocused();
+  await openBoardActions(card(page, first)); await openBoardActions(card(page, second));
+  await expect(actions).not.toHaveAttribute('open', '');
+  await page.getByRole('heading', { name: 'Your boards', exact: true }).click();
+  await expect(card(page, second).locator('.board-card__actions')).not.toHaveAttribute('open', '');
+  await openBoardActions(card(page, editor));
+  await expect(card(page, editor).getByRole('button')).toHaveText(['Rename board', 'Duplicate board']);
+  await page.keyboard.press('Escape');
+});
+
+test('@library-compact top-bar Import and account fit desktop and narrow screens', async ({ page }, testInfo) => {
+  const id = seed('Project notes'); seed('Team workshop'); await refresh(page);
+  const header = page.locator('.board-library__header'); const account = header.locator('.board-account');
+  const importMenu = header.locator('.board-library__import');
+  for (const width of [1404, 490, 320]) {
+    await page.setViewportSize({ width, height: 998 });
+    await expect(header.locator('.board-account__name')).toHaveText('Synthetic Owner');
+    await expect(header.locator('.board-account__avatar')).toHaveText('SO');
+    await expect(page.getByText('owner@example.org', { exact: true })).not.toBeVisible();
+    await expect(importMenu.locator('summary')).toBeVisible();
+    expect((await header.boundingBox())!.height).toBeLessThanOrEqual(76);
+    expect((await card(page, id).boundingBox())!.height).toBeLessThan(310);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    for (const control of [account.locator('summary'), importMenu.locator('summary'), card(page, id).locator('.board-card__actions summary')]) {
+      const box = (await control.boundingBox())!; expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+    await page.screenshot({ path: testInfo.outputPath(`library-compact-${width}.png`) });
+    await openBoardActions(card(page, id));
+    await page.screenshot({ path: testInfo.outputPath(`library-actions-${width}.png`) });
+    await openAccount(page);
+    await expect(card(page, id).locator('.board-card__actions')).not.toHaveAttribute('open', '');
+    await expect(account.getByText('owner@example.org', { exact: true })).toBeVisible();
+    const panel = (await account.locator('div').boundingBox())!;
+    expect(panel.x).toBeGreaterThanOrEqual(0); expect(panel.x + panel.width).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: testInfo.outputPath(`library-account-${width}.png`) });
+    await page.keyboard.press('Escape'); await expect(account.locator('summary')).toBeFocused();
+    await openLocalBoardCopy(page); await expect(importMenu).not.toHaveAttribute('open', '');
+    await page.getByRole('dialog', { name: 'Copy local boards' }).getByRole('button', { name: 'Close local copies' }).click();
+    await expect(importMenu.locator('summary')).toBeFocused();
+  }
+});
 
 test('@UI-X2 unknown creation keeps its receipt and opens the acknowledged private board', async ({ page }) => {
   const posts: { operationId: string; title: string }[] = []; const receipts: string[] = []; let reconcile = false;
@@ -167,7 +226,8 @@ test('@03-03-02 UI-HOME-zero-one-many overflow and long Unicode names work at de
   expect((await card(page, id).boundingBox())!.width).toBeLessThan(400);
   await expect(card(page, id).getByRole('link', { name: 'Open ' + title, exact: true })).toBeVisible();
   await expect(card(page, id).locator('strong')).toHaveAttribute('title', title);
-  await expect(card(page, id).locator('details')).toHaveCount(0);
+  await expect(card(page, id).locator('.board-card__actions')).toHaveCount(1);
+  await expect(card(page, id).getByText('Full board name', { exact: true })).toHaveCount(0);
   for (let index = 1; index < 50; index++) seed(index === 1 ? 'x'.repeat(120) : 'Synthetic board ' + index);
   database.prepare('UPDATE members SET email=? WHERE id=?').run('long'.repeat(40) + '@example.org', accountId);
   await page.reload(); await expect(page.locator('[data-board-id]')).toHaveCount(50);
@@ -176,7 +236,7 @@ test('@03-03-02 UI-HOME-zero-one-many overflow and long Unicode names work at de
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     const grid = await page.locator('.board-grid').evaluate(node => getComputedStyle(node).gridTemplateColumns.split(' ').length);
     expect(grid).toBe(width === 490 ? 1 : 5);
-    const sizes = await page.locator('.board-library button, .board-library summary').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
+    const sizes = await page.locator('.board-library button:visible, .board-library summary:visible').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
     expect(sizes.every(height => height >= 44)).toBe(true);
     await page.screenshot({ path: '.gsd/library-' + width + '.png', fullPage: false });
   }

@@ -1,3 +1,4 @@
+import { openAccount } from './app-menu';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { Page } from '@playwright/test';
@@ -168,7 +169,7 @@ for (const fallback of [false, true]) test(`@03-10-02 cross-tab logout preserves
   await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible(); await expect(page.locator('affine-edgeless-root')).toBeVisible();
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: {} })); await text(page, 'Stale tab pending canary');
   const before = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
-  await other.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
+  await openAccount(other); await other.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
   await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0); expect((await records(page)).length).toBeGreaterThan(0);
   expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before);
@@ -247,7 +248,7 @@ test('@03-10-02 late session response cannot override simultaneous logout and ac
   let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let received = false;
   await page.route('**/api/session', async route => { const response = await route.fetch(); received = true; await barrier; await route.fulfill({ response }).catch(() => {}); });
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))); await expect.poll(() => received).toBe(true);
-  await other.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click(); await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible();
+  await openAccount(other); await other.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click(); await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible();
   await context.clearCookies({ name: 'dali_fixture_identity' }); await other.getByRole('button', { name: 'Sign in again', exact: true }).click(); await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await other.getByRole('button', { name: 'Back to your boards', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   release(); await page.unrouteAll({ behavior: 'ignoreErrors' }); await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0); expect((await records(page)).length).toBeGreaterThan(0); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before); await other.close();
