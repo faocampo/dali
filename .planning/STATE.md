@@ -5,9 +5,9 @@ current_phase_name: Okta and Board Access
 current_plan: 12
 status: executing
 stopped_at: Phase 3 verified human_needed (99/104); ten UAT items pending
-last_updated: "2026-09-18T13:51:00.219083+00:00"
-last_activity: 2026-09-18
-last_activity_desc: Completed quick task 260918-eix header menus and library refinements; ten Phase 3 UAT items pending
+last_updated: "2026-09-24T10:58:07.431852+00:00"
+last_activity: 2026-09-24
+last_activity_desc: Completed quick task 260924-amb compact library controls and internal-member admission checks; ten Phase 3 UAT items pending
 progress:
   total_phases: 13
   completed_phases: 2
@@ -38,6 +38,8 @@ Progress: [██░░░░░░░░] 15% (2/13 phases complete; 25/26 plan
 Local development follow-up at `2d0dae4`: documented startup now launches the complete authenticated loopback stack and preserves development state. Four startup regressions, 63 adjacent server tests, four dev/preview authentication cases, static checks and a fresh build passed; the live browser reached Your boards. Full-matrix evidence retains revision `7341672`. See [resolved journal](debug/resolved/local-sign-in-startup.md) (startup cause, fix and validation). All ten Phase 3 acceptance items remain pending.
 
 UI refinement follow-up at `3c59e71`: all eight user comments are implemented. Static checks, production build and 146 distinct browser/project cases passed across focused runs, including a final 21-case header/menu run in Chromium, Firefox and WebKit. See [quick summary](quick/260918-eix-refine-board-header-menus-and-library-pr/260918-eix-SUMMARY.md) (changes, validation and preserved Phase 3 acceptance boundary).
+
+Library controls follow-up at `bfbe573` (with admission fixtures at `f224778`): compact card menus, top-bar Import and a shared account avatar/name control are verified. Static checks, production build, 105 unit tests, 113 server tests and 126 distinct focused browser/project cases passed. Signed external accounts are rejected; internal-member admission is separate from per-board permissions. See [quick summary](quick/260924-amb-compact-board-library-controls-and-verif/260924-amb-SUMMARY.md) (changes, evidence and preserved Phase 3 acceptance boundary).
 
 ## Performance Metrics
 
@@ -173,6 +175,7 @@ Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted
 | 11 | Rename header menu to Main Menu; typecheck, production build and two menu tests passed | 2026-09-15 | 46d2b7d | — | — |
 | 12 | Make Shapes palette icon-only with accessible names, tooltips and four-column keyboard navigation; static checks, build and two browser tests passed | 2026-09-15 | 51f2542 | — | — |
 | 260918-eix | Compact title, aligned roles, identity avatar, concise File menu and simpler library | 2026-09-18 | 3c59e71 | Complete | [Quick task](quick/260918-eix-refine-board-header-menus-and-library-pr/260918-eix-SUMMARY.md) |
+| 260924-amb | Compact card menus, top-bar Import/account controls and internal/external admission checks | 2026-09-24 | bfbe573 | Complete | [Quick task](quick/260924-amb-compact-board-library-controls-and-verif/260924-amb-SUMMARY.md) |
 
 Phase 2 was tested and approved on 2026-09-15. Canonical phase verification records the acceptance revision; subsequent quick tasks retain separate validation provenance. Quick task 260915-s9s passed 79 unit tests and 51 distinct browser/project cases across focused runs, with TypeScript checks and production build passing.
 

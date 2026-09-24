@@ -15,6 +15,10 @@ This contract defines AUTH-01 and BOARD-01 through BOARD-04. It carries forward 
 
 The eight browser comments recorded in quick task 260918-eix amend the presentation contract: click-to-edit borderless titles; vertically centered roles; an initials avatar and user name; Import/Export last in File; concise menu labels; an unoutlined library heading; no full-name disclosure; and local copying under Import instead of a separate section. Authorization, preservation and pending acceptance remain unchanged.
 
+## User-directed refinement — 2026-09-24
+
+Quick task 260924-amb moves card actions into a three-dot disclosure, places Import in the library top bar, and reuses the canvas avatar/name account control at the right. Email and sign-out are inside that disclosure. The user reaffirmed internal-member-only admission, independently of board roles. The synthetic user without board grants is explicitly labeled an internal member; a separate external fixture exercises rejection.
+
 ## Sources and Decision Status
 
 - [03-CONTEXT.md](03-CONTEXT.md) (D-01–D-16: authentication, roles, library and local-copy decisions) is authoritative for behavior.
@@ -168,9 +172,9 @@ If reauthentication returns a different identity, dispose the previous visible r
 
 Use the existing centered card grid. Order authorized account boards by most recently updated; break equal timestamps by stable board identity. All includes every accessible board; Mine includes owned boards; Shared with me includes non-owned explicit grants. Keep the selected filter while actions refresh the list. Empty filters use their matching copy and remain operable.
 
-The library's visual anchor is the Your boards heading paired with the accent-filled New board CTA in the existing heading/action layout. Reading order is Your boards and its subtitle, the compact Import disclosure, New board, the filter group and account-board cards. Preserve this order when the heading/actions stack on narrow viewports; secondary account and card actions remain visually subordinate to New board.
+The library's visual anchor is the Your boards heading paired with the accent-filled New board CTA in the existing heading/action layout. The top bar contains the brand at the left and Import plus the avatar/name account disclosure at the right. Email and sign-out appear inside the account disclosure. Main content order is Your boards and its subtitle, New board, the filter group and account-board cards. Preserve this order on narrow viewports; account names truncate with a full accessible name and readable identity in the dropdown. Secondary controls remain visually subordinate to New board.
 
-Each card includes a decorative preview, title, edited date/time, Private or Shared, and the current member's role. Private means owner-only with zero active or pending grants. Shared means at least one active or pending grant; pending-only sharing also exposes Pending member sign-in. Labels use authoritative summaries. A missing thumbnail gets a neutral placeholder and never blocks opening. Missing required permission/identity metadata prevents rendering an actionable card until refreshed.
+Each editable card has a 44-pixel three-dot disclosure beside its metadata, containing Rename board and Duplicate board, plus owner-only Share board and Delete board. Viewers have no mutation disclosure. Keyboard activation, Tab, Escape, outside-click dismissal and focus restoration to the disclosure after canceling dialogs remain supported. Actions never occupy a permanent stack. Each card includes a decorative preview, title, edited date/time, Private or Shared, and the current member's role. Private means owner-only with zero active or pending grants. Shared means at least one active or pending grant; pending-only sharing also exposes Pending member sign-in. Labels use authoritative summaries. A missing thumbnail gets a neutral placeholder and never blocks opening. Missing required permission/identity metadata prevents rendering an actionable card until refreshed.
 
 New board creates a private owned board with Untitled board and opens it. Library creation may use the current tab. Preserve File > New opening another tab while leaving the current board intact. Reserve the tab during the user gesture, show progress there and resolve it to the authorized board; if blocked, expose the resulting board link without creating another board. Creation failure offers a retry without abandoning the existing board.
 
@@ -200,7 +204,7 @@ Access rows show member identity, Editor/Viewer, and Active or Pending member si
 
 ### Selected local-board copy and identity isolation — D-16
 
-Place Copy local boards inside the compact Import disclosure beside the library heading. Open Copy local boards to enumerate legacy, unbound browser-local documents. Account-bound caches and recovery drafts never enter this inventory. Enumeration failures show an error and retry; they never imply an empty collection. No board is preselected. Show checkboxes, titles, local updated times, selected count, destination account and the preservation helper before any upload.
+Place Copy local boards inside the compact Import disclosure in the library top bar. Open Copy local boards to enumerate legacy, unbound browser-local documents. Account-bound caches and recovery drafts never enter this inventory. Enumeration failures show an error and retry; they never imply an empty collection. No board is preselected. Show checkboxes, titles, local updated times, selected count, destination account and the preservation helper before any upload.
 
 Copy selected boards processes only explicit selections into private owned account boards, preserving titles, canvas hierarchy, collapsed state and referenced images. Each row progresses through Waiting, Copying, Copied or Failed. Only acknowledge a copied board once its required content and images are complete. A failed item remains retryable; successful items are excluded from retry to prevent duplicates. Reconcile ambiguous outcomes by the original copy attempt. Partial completion keeps per-board results visible, with singular/plural counts and links to successful copies.
 
@@ -208,7 +212,7 @@ Keep every local original and its images intact. This phase introduces no automa
 
 ## Responsive Layout, Keyboard and Focus
 
-At 1404px viewport width, retain the 1240px centered library, 16px grid gap and auto-fill cards with minimum 220px width. At 700px and below use 16px gutters and stack the heading/actions. At 490px use one card column, a wrapping filter row and wrapping card actions; page content must not scroll horizontally. Preserve the board header's compact title and Main Menu; wrap role/account/share controls into a second row when needed rather than covering the canvas title.
+At 1404px viewport width, retain the 1240px centered library, 16px grid gap and auto-fill cards with minimum 220px width. At 700px and below use 16px gutters and stack the heading/actions. At 490px use one card column, a wrapping filter row and compact card action disclosures; page content must not scroll horizontally. Preserve the board header's compact title and Main Menu; wrap role/account/share controls into a second row when needed rather than covering the canvas title.
 
 Sharing and copy dialogs use width `min(640px, calc(100vw - 32px))`, maximum height `calc(100dvh - 32px)`, fixed header/footer and a vertically scrollable body. At 490px recipient fields and role/actions stack; emails wrap; action buttons retain 44px targets. No essential controls are hover-only. Sticky dialog regions may not cover focused content at 200% browser zoom.
 
