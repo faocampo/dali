@@ -4,11 +4,11 @@ current_phase: 03
 current_phase_name: Okta and Board Access
 current_plan: 12
 status: executing
-stopped_at: Phase 3 UAT: six passes, two deferred follow-ups, two pending items
-last_updated: "2026-09-24T22:46:56.092868+00:00"
+stopped_at: Phase 3 UAT: six passes, two deferred follow-ups, one waived item, one pending item
+last_updated: "2026-09-24T23:10:31.583905+00:00"
 last_activity: 2026-09-24
-last_activity_desc: Completed canvas editing and ownership follow-up; Phase 3 has six passes, two deferrals and two pending dispositions
-state_head: d071a44
+last_activity_desc: Completed text-box placement and editing; optional local-copy UAT waived, item 8 remains pending
+state_head: f26bd35
 progress:
   total_phases: 13
   completed_phases: 2
@@ -28,15 +28,17 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-15).
 
 ## Current Position
 
+Quick follow-up `f26bd35`: text placement now previews a drawn box, focuses native editing on release, reuses the last locally used text format, and preserves double-click editing. All three static checks, 110 unit tests, the production build and 87 focused browser cases across Chromium/Firefox/WebKit passed. See [quick summary](quick/260924-roh-draw-text-boxes-with-immediate-editing-a/260924-roh-SUMMARY.md) (implementation and validation).
+
 Quick follow-up `d071a44`: zoom presets/shortcuts, connector hover, custom colors, last shape fill, note focus and shape caret are verified. Creators retain Owner privileges on their existing boards; system Viewers remain read-only on shared boards and cannot create fresh boards/imports. All 110 unit tests, 116 server tests and 64 distinct focused browser/project cases passed; static checks and production build passed.
 
-Acceptance update (2026-09-24): five user-reported passes plus a scoped privacy-review pass; provider work and screen-reader testing are deferred. The exported snapshot is structurally valid with a hash-matched image asset, but the user tested export only. See [UAT review](phases/03-okta-and-board-access/03-UAT-REVIEW.md) (analysis, review scope and remaining copy procedure). Earlier progress notes below retain their historical status.
+Acceptance update (2026-09-24): five user-reported passes plus a scoped privacy-review pass; provider work and screen-reader testing are deferred. The exported snapshot is structurally valid with a hash-matched image asset; the user tested export only and subsequently waived optional local-copy human acceptance because that workflow is not needed. See [UAT review](phases/03-okta-and-board-access/03-UAT-REVIEW.md) (analysis, review scope and optional-copy waiver). Earlier progress notes below retain their historical status.
 
 Phase: 03 (Okta and Board Access) — HUMAN VERIFICATION PENDING
 Current Plan: 12
 Total Plans in Phase: 12
-Status: Human verification pending — six UAT passes, two approved deferrals, two pending dispositions (03-07 and 03-11). Historical automated score: 99/104.
-Last activity: 2026-09-24 - Completed quick task 260924-qq8: canvas editing and creator ownership; recorded Phase 3 UAT dispositions.
+Status: Human verification pending — six UAT passes, two approved deferrals, one optional-workflow waiver (03-11), one pending disposition (03-07). Historical automated score: 99/104.
+Last activity: 2026-09-24 - Completed quick task 260924-roh: drawn text boxes, immediate editing and reusable formatting; optional local-copy human acceptance waived.
 
 Progress: [██░░░░░░░░] 15% (2/13 phases complete; 25/26 plans complete)
 
@@ -136,7 +138,7 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ### Pending Todos
 
-- Final automated task 03-12-01 passed at 7341672. Resolve the two pending items in 03-UAT.md before accepting current Phase 3 scope; provider and assistive-technology acceptance are explicitly deferred; final verifier and audit disposition are recorded. Plans 03-01 through 03-11 remain complete; plan 03-12 and shared requirements remain open. Preserve dormant seeds and earlier TDD process deviations in WINDOWS.md.
+- Final automated task 03-12-01 passed at 7341672. Resolve the remaining pending item (8) in 03-UAT.md before accepting current Phase 3 scope; provider and assistive-technology acceptance are explicitly deferred; final verifier and audit disposition are recorded. Plans 03-01 through 03-11 remain complete; plan 03-12 and shared requirements remain open. Preserve dormant seeds and earlier TDD process deviations in WINDOWS.md.
 
 ### Blockers/Concerns
 
@@ -152,10 +154,10 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ## Session Continuity
 
-Last session: 2026-09-17T20:43:08.786425+00:00
-Stopped at: Phase 3 UAT: six passes, two deferred follow-ups, two pending items
+Last session: 2026-09-24T23:10:31.583905+00:00
+Stopped at: Phase 3 UAT: six passes, two deferred follow-ups, one waived item, one pending item
 Resume file: .planning/phases/03-okta-and-board-access/03-UAT.md
-Next action: $gsd-verify-work 3 — resolve pending-access presentation (item 8) and deliberate selected local copying (item 9). Backlog 999.3 and 999.4 hold the approved deferrals.
+Next action: $gsd-verify-work 3 — resolve pending-access presentation (item 8). Item 9 is skipped by user decision. Backlog 999.3 and 999.4 hold the approved deferrals.
 
 ## Phase 1 verification outcome
 
@@ -190,6 +192,7 @@ Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted
 | 260924-m9n | Canvas formatting layers, live thickness, placement and concise object menus | 2026-09-24 | 18bb38e | Complete | [Quick task](quick/260924-m9n-canvas-formatting-layers-live-thickness-/260924-m9n-SUMMARY.md) |
 
 | 260924-qq8 | Stable zoom, connector hints, color and text editing, creator ownership | 2026-09-24 | d071a44 | Complete | [Quick task](quick/260924-qq8-fix-zoom-menus-and-shortcuts-connector-h/260924-qq8-SUMMARY.md) |
+| 260924-roh | Draw text boxes, focus editing, reuse text format, waive optional-copy UAT | 2026-09-24 | f26bd35 | Complete | [Quick task](quick/260924-roh-draw-text-boxes-with-immediate-editing-a/260924-roh-SUMMARY.md) |
 
 Phase 2 was tested and approved on 2026-09-15. Canonical phase verification records the acceptance revision; subsequent quick tasks retain separate validation provenance. Quick task 260915-s9s passed 79 unit tests and 51 distinct browser/project cases across focused runs, with TypeScript checks and production build passing.
 

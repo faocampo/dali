@@ -19,7 +19,7 @@ Relevant implementation and regression evidence:
 
 A fresh production Chromium run passed all 19 local-board import regressions, including success, rollback, retry, partial copying and identity changes. The existing regression compares full legacy stores and catalog before and after copying, and verifies a single private destination owned by the importer. This supports the implementation but does not replace the outstanding user disposition or create a machine-proven GSD enforcement descriptor.
 
-Remaining acceptance: prepare two browser-local boards, including an image; select only one in **Copy local boards**; confirm exactly that board appears in the account; then reopen both local originals and verify their content and images. Record pass or the first failed step. Item 9 remains pending.
+Latest user disposition: the optional browser-local migration workflow is not needed, so item 9 is skipped by user decision and removed from required human acceptance. The entry is in **Your boards → Import → Copy local boards** for members allowed to create boards, rather than the open-board canvas menu. The implementation and its source-preservation/selective-upload regressions remain. If this workflow returns to required scope, verify a one-of-two selected copy and reopen both local originals with their images. This waiver supplies no new runtime or enforcement evidence.
 
 ## 03-12: scoped public-artifact privacy review
 
@@ -35,4 +35,4 @@ This is a scoped judgment review, not a certification of deployed services, exte
 
 ## Acceptance boundary
 
-[03-UAT.md](03-UAT.md) (current checklist) records six passes, two approved deferred follow-ups and two pending items. Historical automated verification remains 99/104 at its recorded revision; it has not been rerun or re-scored as a full phase gate by this review. Phase 3 remains open for items 8 and 9.
+[03-UAT.md](03-UAT.md) (current checklist) records six passes, three skips (two deferred follow-ups and one optional-workflow waiver), and one pending item. Historical automated verification remains 99/104 at its recorded revision; it has not been rerun or re-scored as a full phase gate by this review. Phase 3 remains open for item 8.

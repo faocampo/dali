@@ -132,7 +132,7 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
 
-**Plans**: 11/12 executed; plan 03-12 remains incomplete. Automated task 03-12-01 passed at 7341672: exact two-case smoke, both typechecks, 105 unit tests, 112 server tests, production build, standalone 123-case access suite and complete 1533-case five-project browser matrix (57.1m, zero failures/timeouts/skips/interruptions/unrun). Earlier failed and interrupted attempts remain in the checkpoint. Independent verification is **human_needed (99/104)** with no proved implementation blocker. The 2026-09-24 UAT update records five user passes and one scoped privacy-review pass; pending-access presentation and selected local-copy acceptance remain open. Actual-provider work and assistive-technology testing are deferred to backlog 999.4 and 999.3 respectively. The historical automated score retains its original revision scope. Resume with `$gsd-verify-work 3`. Overall progress remains 2/13 accepted phases and 25/26 completed plans.
+**Plans**: 11/12 executed; plan 03-12 remains incomplete. Automated task 03-12-01 passed at 7341672: exact two-case smoke, both typechecks, 105 unit tests, 112 server tests, production build, standalone 123-case access suite and complete 1533-case five-project browser matrix (57.1m, zero failures/timeouts/skips/interruptions/unrun). Earlier failed and interrupted attempts remain in the checkpoint. Independent verification is **human_needed (99/104)** with no proved implementation blocker. The 2026-09-24 UAT update records five user passes and one scoped privacy-review pass; pending-access presentation remains open; the user waived optional local-copy human acceptance. Actual-provider work and assistive-technology testing are deferred to backlog 999.4 and 999.3 respectively. The historical automated score retains its original revision scope. Resume with `$gsd-verify-work 3`. Overall progress remains 2/13 accepted phases and 25/26 completed plans.
 
 Plans:
 **Wave 1**
@@ -393,7 +393,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 - [config.json](config.json) (fine granularity and enabled research, plan-check, and verification settings).
 - [research/SUMMARY.md](research/SUMMARY.md) (research findings and risks, including the final scope update that supersedes the earlier phase proposal).
 
-*Last updated: 2026-09-24 — Phase 3 UAT has six passes, two deferred follow-ups and two pending items. Phase 1 and 2 acceptance is preserved.*
+*Last updated: 2026-09-24 — Phase 3 UAT has six passes, two deferred follow-ups, one optional-workflow waiver and one pending item. Phase 1 and 2 acceptance is preserved.*
 
 ## Backlog
 

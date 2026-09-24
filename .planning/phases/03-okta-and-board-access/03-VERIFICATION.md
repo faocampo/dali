@@ -9,6 +9,8 @@ source_head: 2d0dae437499830adc1d4a142d1765a30b5cf52d
 full_gate_source_head: 73416723411ca2c5b98de090f6d5327ed9e076c7
 application_head: 6d6dade1ea574e41123c252f36499e465adf5811
 flagged_prohibitions: 2
+waived_human_prohibitions: 1
+active_pending_prohibitions: 1
 acceptance_updated: 2026-09-24
 acceptance_source: 03-UAT.md
 covered_files:
@@ -201,6 +203,8 @@ prohibitions:
     status: unverified
     flagged: true
     enforcement_evidence: []
+    acceptance_disposition: skipped_by_user
+    disposition: User waived optional local-copy human acceptance on 2026-09-24; retained implementation safety rules and existing regression coverage remain required.
   - statement: "Public artifacts MUST NOT contain operator-specific identity settings, real organizational content, credentials or real-provider evidence."
     verification: judgment
     status: verified
@@ -250,7 +254,7 @@ human_verification:
     why_human: "Descriptor-less judgment prohibition; semantic test coverage does not supply the missing enforcement contract."
 ---
 
-> Acceptance update, 2026-09-24: [03-UAT.md](03-UAT.md) records five user passes and one scoped privacy-review pass, two approved deferrals, and two pending dispositions (03-07 and 03-11). [03-UAT-REVIEW.md](03-UAT-REVIEW.md) details export analysis and privacy scope. The score, covered digest and automated evidence below are the historical verification; this update does not claim a new full gate. Human-verification entries below describe the original checks, with current dispositions in the UAT file.
+> Acceptance update, 2026-09-24: [03-UAT.md](03-UAT.md) records five user passes and one scoped privacy-review pass, two approved deferrals, a user waiver for optional local-copy human acceptance (03-11), and one pending disposition (03-07). The two technically flagged prohibitions retain their evidence status; one is waived for human acceptance. [03-UAT-REVIEW.md](03-UAT-REVIEW.md) details export analysis and privacy scope. The score, covered digest and automated evidence below are the historical verification; this update does not claim a new full gate. Human-verification entries below describe the original checks, with current dispositions in the UAT file.
 
 
 # Phase 3: Okta and Board Access Verification Report
@@ -633,6 +637,8 @@ Every item remains **unverified-prohibition — human review recommended**. Non-
 **Why human:** The test-tier entry is descriptor-less. Its planned “resolved” label does not establish executable enforcement; related passing assertions cannot silently substitute for that contract.
 
 ### H9. 03-11 prohibition resolution
+
+**Current acceptance disposition (2026-09-24):** Skipped by user scope decision because optional browser-local copying is not needed. The safety prohibition and existing regression protections remain; see [03-UAT.md](03-UAT.md) (item 9 waiver). The original verification procedure below is retained as history.
 
 **Test:** Explicitly review and resolve “Selected local copying MUST NOT silently upload unselected browser boards or delete original local documents or images.”
 

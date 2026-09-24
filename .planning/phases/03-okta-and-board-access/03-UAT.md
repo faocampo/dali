@@ -3,12 +3,12 @@ status: testing
 phase: 03-okta-and-board-access
 source: [03-VERIFICATION.md]
 started: 2026-09-17T13:43:09.794134+00:00
-updated: 2026-09-24T22:32:51.224092+00:00
+updated: 2026-09-24T23:07:19.642633+00:00
 ---
 
 # Phase 3 acceptance checklist
 
-The complete automated gate passed at `7341672`. Independent verification is `human_needed`, with 99/104 truths verified and no established implementation blocker. The 2026-09-24 update records five user-reported passes and one scoped agent privacy-review pass, two approved deferred follow-ups, and two pending items. The historical automated score and revision remain unchanged. Keep operator settings, real identities, screenshots and protocol traces in operator-controlled storage outside this repository. Record only generic acceptance or the failed step here.
+The complete automated gate passed at `7341672`. Independent verification is `human_needed`, with 99/104 truths verified and no established implementation blocker. The 2026-09-24 update records five user-reported passes and one scoped agent privacy-review pass, two approved deferred follow-ups, one optional-workflow waiver, and one pending item. The historical automated score and revision remain unchanged. Keep operator settings, real identities, screenshots and protocol traces in operator-controlled storage outside this repository. Record only generic acceptance or the failed step here.
 
 ## Current Test
 
@@ -101,9 +101,9 @@ result: [pending]
 procedure: Explicitly review and resolve: Selected local copying MUST NOT silently upload unselected browser boards or delete original local documents or images.
 expected: Record human disposition or provide a wired enforcement descriptor and reverify.
 reason: Descriptor-less test prohibition; semantic test coverage does not supply the missing enforcement contract.
-result: [pending]
-source: attachment analysis and user clarification
-disposition: The user exported a board only. Snapshot is valid and its referenced image matches the adjacent asset; it cannot prove selected-copy behavior or preservation of local originals. See 03-UAT-REVIEW.md for bounded findings and the remaining acceptance procedure.
+result: skipped
+source: user scope decision
+disposition: User does not need the optional Copy local boards workflow and waived this human acceptance step. The earlier export analysis remains bounded evidence. Selective copying and source preservation remain required safety behavior for the retained implementation; this skip supplies no additional enforcement evidence.
 
 ### 10. 03-12 prohibition resolution
 
@@ -120,8 +120,8 @@ disposition: Scoped tracked-content and reachable-history privacy review found n
 total: 10
 passed: 6
 issues: 0
-pending: 2
-skipped: 2
+pending: 1
+skipped: 3
 blocked: 0
 
 ## Deferred Follow-Ups
@@ -131,6 +131,6 @@ blocked: 0
 
 ## Gaps
 
-No new implementation failure was reported in this UAT update. Items 8 and 9 remain pending. Item 9 needs a deliberate one-of-two local-board copy followed by account inventory and original-document/image checks. User-reported passes do not imply unreported browser versions or observation details. Phase 3 remains open until the two pending dispositions are resolved; deferred items retain explicit follow-up scope.
+No new implementation failure was reported in this UAT update. Item 8 remains pending. Item 9 is skipped by user scope decision: the optional browser-local migration workflow is not needed for acceptance. Its existing safety protections and regression coverage remain in place. User-reported passes do not imply unreported browser versions or observation details. Phase 3 remains open for item 8; the two deferred items retain explicit backlog follow-up scope.
 
 The earlier local startup defect remains resolved at `2d0dae4`; see [resolved startup journal](../../debug/resolved/local-sign-in-startup.md) (root cause and regression evidence).
