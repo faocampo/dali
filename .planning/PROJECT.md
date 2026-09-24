@@ -136,6 +136,7 @@ Keep the repository and its entire publishable history organization-neutral. Nev
 | Provide per-board owner/editor/viewer access and a board-library home | Support private and shared work with explicit access | Confirmed direction |
 | Treat mind maps as an initial-scope priority | User identified them as very important for daily work | Validated in Phase 2 |
 | Start with new boards and exported Miro images | User-selected initial migration approach | Confirmed direction |
+| Library Import accepts an exported Dalí board archive by file picker or drag and drop, creating a new privately owned canvas | User replaced optional browser-local copying with file-based import | Implemented in quick task 260924-s1x |
 | Defer MCP creation of editable diagrams and mind maps | User placed AI-agent creation after the initial release | Confirmed direction |
 | Include roadmap composition and the Gantt widget in the initial release | User confirmed both are needed at launch | Confirmed direction |
 | Build roadmaps from ordinary shapes and templates; implement Gantt as a task/date-driven widget | User clarified the distinct editing models | Confirmed direction |

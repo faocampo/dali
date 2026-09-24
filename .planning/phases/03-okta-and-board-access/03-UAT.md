@@ -103,7 +103,7 @@ expected: Record human disposition or provide a wired enforcement descriptor and
 reason: Descriptor-less test prohibition; semantic test coverage does not supply the missing enforcement contract.
 result: skipped
 source: user scope decision
-disposition: User does not need the optional Copy local boards workflow and waived this human acceptance step. The earlier export analysis remains bounded evidence. Selective copying and source preservation remain required safety behavior for the retained implementation; this skip supplies no additional enforcement evidence.
+disposition: User does not need the optional Copy local boards workflow and waived this human acceptance step. The user subsequently requested removal of that UI. Library Import now accepts an exported board file by picker or drop and creates a new private canvas. Existing browser-local documents and images remain untouched. The earlier export analysis remains bounded evidence; this skip supplies no additional enforcement evidence.
 
 ### 10. 03-12 prohibition resolution
 
@@ -131,6 +131,6 @@ blocked: 0
 
 ## Gaps
 
-No new implementation failure was reported in this UAT update. Item 8 remains pending. Item 9 is skipped by user scope decision: the optional browser-local migration workflow is not needed for acceptance. Its existing safety protections and regression coverage remain in place. User-reported passes do not imply unreported browser versions or observation details. Phase 3 remains open for item 8; the two deferred items retain explicit backlog follow-up scope.
+No new implementation failure was reported in this UAT update. Item 8 remains pending. Item 9 is skipped by user scope decision: the optional browser-local migration workflow is not needed for acceptance. The user subsequently replaced that UI with file-based board import; source preservation and import authorization retain regression coverage. User-reported passes do not imply unreported browser versions or observation details. Phase 3 remains open for item 8; the two deferred items retain explicit backlog follow-up scope.
 
 The earlier local startup defect remains resolved at `2d0dae4`; see [resolved startup journal](../../debug/resolved/local-sign-in-startup.md) (root cause and regression evidence).

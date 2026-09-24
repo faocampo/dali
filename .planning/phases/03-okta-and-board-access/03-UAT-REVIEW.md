@@ -12,14 +12,14 @@ The user-supplied local export parses as a single page snapshot: one page, one s
 
 This establishes snapshot structure and availability of the referenced source image. It does not establish a successful re-import, copied-board ownership, selective local-board upload, or preservation of the source IndexedDB content. The user clarified that only export was performed. The supplied content, file path, names, identifiers and images remain outside this public repository.
 
-Relevant implementation and regression evidence:
+Evidence at the original export-review revision:
 
 - [import-local.ts](../../../src/boards/import-local.ts) (read-only legacy capture, selected document conversion and referenced-blob manifest).
 - [local-board-import.spec.ts](../../../tests/local-board-import.spec.ts) (two-board fixture, one selected destination, source document membership and image bytes unchanged after success, failure and retry).
 
-A fresh production Chromium run passed all 19 local-board import regressions, including success, rollback, retry, partial copying and identity changes. The existing regression compares full legacy stores and catalog before and after copying, and verifies a single private destination owned by the importer. This supports the implementation but does not replace the outstanding user disposition or create a machine-proven GSD enforcement descriptor.
+At that review revision, a production Chromium run passed all 19 local-board import regressions, including success, rollback, retry, partial copying and identity changes. The existing regression compares full legacy stores and catalog before and after copying, and verifies a single private destination owned by the importer. This supports the implementation but does not replace the outstanding user disposition or create a machine-proven GSD enforcement descriptor.
 
-Latest user disposition: the optional browser-local migration workflow is not needed, so item 9 is skipped by user decision and removed from required human acceptance. The entry is in **Your boards → Import → Copy local boards** for members allowed to create boards, rather than the open-board canvas menu. The implementation and its source-preservation/selective-upload regressions remain. If this workflow returns to required scope, verify a one-of-two selected copy and reopen both local originals with their images. This waiver supplies no new runtime or enforcement evidence.
+Latest user disposition: the optional browser-local migration workflow is not needed, so item 9 stays skipped by user decision. The user subsequently requested removal of **Copy local boards** and replacement with a file picker and drop zone. Library **Import** now creates a new private canvas from a single exported Dalí archive (.zip), including its editable objects and images. The migration dialog is removed. File import uses the existing staged transaction and leaves browser-local storage untouched. Current implementation and regression evidence is recorded in [quick task 260924-s1x](../../quick/260924-s1x-replace-local-board-copying-with-file-se/260924-s1x-SUMMARY.md) (file import behavior, validation and scope). The superseded migration tests and 19-case result above retain their historical revision scope. The waiver supplies no machine-proven GSD enforcement descriptor.
 
 ## 03-12: scoped public-artifact privacy review
 

@@ -204,7 +204,7 @@ prohibitions:
     flagged: true
     enforcement_evidence: []
     acceptance_disposition: skipped_by_user
-    disposition: User waived optional local-copy human acceptance on 2026-09-24; retained implementation safety rules and existing regression coverage remain required.
+    disposition: User waived optional local-copy human acceptance on 2026-09-24 and subsequently replaced its UI with file-based import. File import retains authorization and source-preservation regression coverage; historical local-copy evidence keeps its original revision scope.
   - statement: "Public artifacts MUST NOT contain operator-specific identity settings, real organizational content, credentials or real-provider evidence."
     verification: judgment
     status: verified
