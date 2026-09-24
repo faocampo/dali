@@ -67,6 +67,9 @@ test('mind map creation keys work after canvas selection and menu focus', async 
 test('text bounds shrink to the content after editing', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Add text', exact: true }).click();
+  await page.mouse.move(650, 500); await page.mouse.down(); await page.mouse.move(900, 560, { steps: 6 }); await page.mouse.up();
+  await expect(page.locator('edgeless-text-editor [contenteditable="true"]')).toBeFocused();
+  await page.keyboard.type('Text'); await page.mouse.click(1000, 650); await page.mouse.click(670, 520);
   await page.locator('affine-edgeless-root').evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     const m = gfx.gfxElements.find(m => 'type' in m && m.type === 'text')!;

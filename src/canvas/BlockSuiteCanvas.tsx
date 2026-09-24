@@ -13,7 +13,7 @@ import { getActiveAccessScope, subscribeAccessScope, type CanvasRuntime } from '
 import { captureArchive, LocalBoardCopy, LocalCopyOutcomeUnknown } from '../boards/import-local';
 import { accessScopeCurrent } from './account/mutation-guard';
 import { insertSticky } from './sticky';
-import { insertText } from './text';
+import { TextBoxTool } from './text';
 import { insertMindmap } from './mindmap';
 import { installMindmapCompatibility } from './mindmap-compatibility';
 import { installMindmapShortcuts } from './mindmap-keyboard';
@@ -181,6 +181,9 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   const archiveCopy = useRef<LocalBoardCopy>();
   useEffect(() => { if (archive) archiveDialog.current?.showModal(); }, [archive]);
   const store = host.std.store;
+  const gfx = host.std.get(GfxControllerIdentifier);
+  const [activeTool, setActiveTool] = useState(gfx.tool.currentToolName$.peek());
+  useEffect(() => gfx.tool.currentToolName$.subscribe(setActiveTool), [gfx]);
   useEffect(() => {
     const command = (event: Event) => {
       const action = (event as CustomEvent<string>).detail;
@@ -322,8 +325,10 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
 
       <ControlButton
         label="Add text"
+        title="Text (T) — drag to draw a text box"
+        pressed={activeTool === 'text'}
         onClick={() => {
-          insertText(host.std);
+          if (!store.readonly) gfx.tool.setTool(TextBoxTool);
         }}
       >
         <path
@@ -370,11 +375,15 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
 
 function ControlButton({
   label,
+  title = label,
+  pressed,
   onClick,
   disabled = false,
   children,
 }: {
   label: string;
+  title?: string;
+  pressed?: boolean;
   onClick: () => void;
   disabled?: boolean;
   children: React.ReactNode;
@@ -383,7 +392,8 @@ function ControlButton({
     <button
       type="button"
       aria-label={label}
-      title={label}
+      title={title}
+      aria-pressed={pressed}
       disabled={disabled}
       onClick={onClick}
       className="board-control"
@@ -395,8 +405,8 @@ function ControlButton({
         flexShrink: 0,
         borderRadius: '8px',
         border: 'none',
-        background: 'transparent',
-        color: disabled ? 'var(--board-ink-disabled)' : 'var(--board-ink)',
+        background: pressed ? 'var(--dali-accent-soft)' : 'transparent',
+        color: disabled ? 'var(--board-ink-disabled)' : pressed ? 'var(--dali-accent)' : 'var(--board-ink)',
         cursor: disabled ? 'default' : 'pointer',
         transition: 'background 120ms ease',
       }}

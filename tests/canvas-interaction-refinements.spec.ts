@@ -70,7 +70,7 @@ test('automatic insertion avoids occupied viewport space and stays on top when f
   await page.goto('/');
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
-  await page.getByRole('button', { name: 'Add text', exact: true }).click();
+  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
   const bounds = await root(page).evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     return gfx.gfxElements.filter(m => ('flavour' in m && m.flavour === 'affine:note') || ('type' in m && m.type === 'text')).map(m => {
@@ -98,7 +98,7 @@ test('automatic insertion avoids occupied viewport space and stays on top when f
   expect(placed.x + placed.w).toBeLessThanOrEqual(placed.viewport.w - 24);
   expect(placed.y + placed.h).toBeLessThanOrEqual(placed.viewport.h - 80);
   await page.keyboard.press('ControlOrMeta+z');
-  await expect(page.locator('affine-edgeless-note')).toHaveCount(2);
+  await expect(page.locator('affine-edgeless-note')).toHaveCount(3);
 });
 
 test('resize shows dimensions only for the active gesture', async ({ page }) => {

@@ -54,6 +54,9 @@ test('notes offer t-shirt sizes with proportional text and no page action', asyn
 
 test('font options, thickness, connector endpoint position and eraser are usable', async ({ page }) => {
   await page.goto('/'); await page.getByRole('button', { name: 'Add text', exact: true }).click();
+  await page.mouse.move(650, 500); await page.mouse.down(); await page.mouse.move(900, 560, { steps: 6 }); await page.mouse.up();
+  await expect(page.locator('edgeless-text-editor [contenteditable="true"]')).toBeFocused();
+  await page.keyboard.type('Text'); await page.mouse.click(1000, 650); await page.mouse.click(670, 520);
   await page.getByRole('combobox', { name: 'Font', exact: true }).selectOption({ label: 'Kalam' });
   await expect.poll(() => page.evaluate(() => document.fonts.check('16px "blocksuite:surface:Kalam"'))).toBe(true);
   await page.getByRole('button', { name: 'Lines', exact: true }).click(); await page.getByRole('button', { name: 'Straight arrow', exact: true }).click();

@@ -84,6 +84,7 @@ import { ToolbarViewExtension } from '@blocksuite/affine/widgets/toolbar/view';
 import { FormattingControlsExtension } from './formatting-controls';
 import { ClassicalShapesViewExtension } from './classical-shapes';
 import { ObjectActionsToolbarExtension } from './object-actions-toolbar';
+import { TextBoxViewExtension } from './text';
 import {
   ImageVisualEditStoreExtension,
   ImageVisualEditViewExtension,
@@ -150,4 +151,5 @@ export const viewExtensions = [
   ImageVisualEditViewExtension,
   ClassicalShapesViewExtension,
   FormattingControlsExtension,
+  TextBoxViewExtension,
 ];

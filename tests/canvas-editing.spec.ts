@@ -83,6 +83,8 @@ for (const size of [{ width: 1280, height: 800 }, { width: 900, height: 700 }]) 
     await expect.poll(async () => (await read()).map(m => m.text)).toContain(text + ' bold');
     expect(JSON.stringify(await read())).toContain('"bold":true');
     await page.getByRole('button', { name: 'Add text', exact: true }).click();
+    await page.mouse.move(550, 470); await page.mouse.down(); await page.mouse.move(820, 540, { steps: 6 }); await page.mouse.up();
+    await expect(page.locator('edgeless-text-editor [contenteditable="true"]')).toBeFocused();
     await page.keyboard.insertText('Editable text');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
