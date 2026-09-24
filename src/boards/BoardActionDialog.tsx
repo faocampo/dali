@@ -38,7 +38,7 @@ export function BoardActionDialog({ board, kind, onClose, onComplete }: {
       {busy && <p role="status">{kind === 'rename' ? 'Saving name…' : kind === 'delete' ? 'Deleting board…' : 'Copying board…'}</p>}
       {error && <p id="board-action-error" role="alert">{error}</p>}
       <div className="board-action-dialog__actions"><button ref={initial} type="button" disabled={busy} onClick={onClose}>{kind === 'rename' ? 'Keep name' : 'Keep board'}</button>
-        <button className={kind === 'delete' ? 'access-destructive' : undefined} aria-describedby={error ? 'board-action-error' : undefined} type="submit" disabled={busy}>{uncertain ? 'Check again' : kind === 'rename' ? 'Save name' : heading}</button></div>
+        <button className={kind === 'delete' ? 'access-destructive' : 'djai-primary'} aria-describedby={error ? 'board-action-error' : undefined} type="submit" disabled={busy}>{uncertain ? 'Check again' : kind === 'rename' ? 'Save name' : heading}</button></div>
     </form>
   </dialog>, document.body);
 }

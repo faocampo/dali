@@ -291,7 +291,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
         boxSizing: 'border-box',
         overflowY: 'auto',
         borderRadius: 'var(--board-radius)',
-        border: '1px solid var(--board-line)',
+        border: '0',
         background: 'var(--board-surface)',
         boxShadow: 'var(--board-shadow)',
       }}

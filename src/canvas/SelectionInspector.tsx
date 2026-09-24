@@ -319,7 +319,6 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
       />
       <header className="selection-inspector__head">
         <div>
-          <span className="selection-inspector__eyebrow">Properties</span>
           <h2>{selection.title}</h2>
         </div>
         <button

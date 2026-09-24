@@ -61,7 +61,13 @@ test.beforeEach(async ({ page, baseURL }) => {
     .run('synthetic-other', provider.issuer, 'synthetic-other', 'other@example.org', 'other@example.org', 'Synthetic Other');
   await expect(page.getByRole('heading', { name: 'Create your first board' })).toBeVisible();
 });
-test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); closeProxy?.(); closeProxy = undefined; await app?.close(); database?.close(); await provider?.close(); });
+test.afterEach(async ({ page }) => {
+  // Keep the isolated asset proxy alive until UI and native canvas fonts settle.
+  // Closing it first turns successful board navigation into download errors.
+  await page.evaluate(() => document.fonts.ready);
+  await page.unrouteAll({ behavior: 'ignoreErrors' }); closeProxy?.(); closeProxy = undefined;
+  await app?.close(); database?.close(); await provider?.close();
+});
 function seed(title: string, options: { role?: 'owner' | 'editor' | 'viewer'; updatedAt?: number; pending?: boolean; foreign?: boolean; image?: Buffer } = {}) {
   const id = randomUUID(); const role = options.role ?? 'owner';
   database.prepare('INSERT INTO boards(id,owner_id,title,root_doc_id,content_doc_id,created_at,updated_at,revision) VALUES(?,?,?,?,?,?,?,1)')
