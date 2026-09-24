@@ -15,6 +15,7 @@
   --dali-logo-gold: #ffb74b;
 
   --dali-ink: var(--dali-logo-ink);
+  --dali-hover-overlay: rgb(104 64 232 / 8%);
   --dali-muted: #6b6179;
   --dali-disabled: #8c8498;
   --dali-surface: #ffffff;
@@ -101,7 +102,6 @@
   --affine-background-error-color: var(--dali-danger-soft);
   --affine-background-processing-color: var(--dali-accent-soft);
   --affine-tooltip: var(--dali-ink);
-  --affine-v2-icon-tertiary: var(--dali-muted);
   --affine-font-family: var(--dali-font);
   --affine-font-h-1: 28px;
   --affine-font-h-2: 24px;
@@ -146,4 +146,12 @@
   --affine-white-60: rgb(255 255 255 / 60%);
   --affine-white-80: rgb(255 255 255 / 80%);
   --affine-white-90: rgb(255 255 255 / 90%);
+}
+
+/* The native light-theme scope declares its own v2 icon colors. Map that scope
+   as well as the page root so enabled formatting controls inherit readable ink. */
+:root, .affine-edgeless-viewport[data-theme] {
+  --affine-v2-icon-tertiary: var(--dali-muted);
+  --affine-v2-icon-primary: var(--dali-ink);
+  --affine-v2-icon-secondary: var(--dali-muted);
 }

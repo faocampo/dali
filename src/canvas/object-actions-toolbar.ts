@@ -5,39 +5,20 @@ import { ActionPlacement, ToolbarModuleExtension } from '@blocksuite/affine/shar
 import { html } from 'lit';
 import { ViewExtensionProvider, type ViewExtensionContext } from '@blocksuite/affine/ext-loader';
 
-export const OBJECT_ACTIONS_EVENT = 'dali:object-actions';
-
-/** Add the canvas commands through BlockSuite's public More-menu registry. */
-const objectActionsToolbarModule = ToolbarModuleExtension({
+/** Keep topic properties directly in More without duplicating native object actions. */
+const topicPropertiesToolbarModule = ToolbarModuleExtension({
   id: BlockFlavourIdentifier('custom:affine:surface:*'),
-  config: {
-    actions: [{
-      id: 'dali.object-actions',
-      placement: ActionPlacement.More,
-      when: context => context.gfx.selection.selectedElements.length > 0,
-      content: context => {
-        const open = (event: Event) => {
-          event.stopPropagation();
-          const anchor = event.currentTarget as HTMLElement;
-          if (!context.host.isConnected) return;
-          context.host.dispatchEvent(new CustomEvent(OBJECT_ACTIONS_EVENT, { detail: { anchor } }));
-        };
-        return html`<style>
-          .native-object-actions { display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%; min-height:36px; padding:4px 8px; border:0; border-radius:4px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-          .native-object-actions:hover, .native-object-actions:focus-visible { background:var(--affine-hover-color,#eee9e3); outline:2px solid #6c503c; outline-offset:-2px; }
-        </style><button class="native-object-actions" role="menuitem" aria-haspopup="menu" aria-expanded="false"
-          @click=${open} @keydown=${(event: KeyboardEvent) => {
-            if (event.key === 'ArrowRight') { event.preventDefault(); event.stopPropagation(); open(event); }
-            if (event.key === 'Escape' || event.key === 'ArrowLeft') {
-              event.preventDefault(); event.stopPropagation();
-              const menu = (event.currentTarget as HTMLElement).closest('editor-menu-button') as HTMLElement & { hide(): void };
-              menu?.hide();
-              (menu?.shadowRoot?.querySelector('editor-icon-button') as HTMLElement | null)?.focus();
-            }
-          }}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M8 4v6M16 14v6" stroke="currentColor" stroke-width="1.6" /></svg>Object actions <span aria-hidden="true">›</span></button>`;
-      },
-    }],
-  },
+  config: { actions: [{
+    id: 'dali.topic-properties',
+    label: 'Topic properties',
+    icon: html`<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 17h16M8 4v6M16 14v6" stroke="currentColor" stroke-width="1.6" /></svg>`,
+    placement: ActionPlacement.More,
+    when: context => {
+      const selected = context.gfx.selection.selectedElements;
+      return selected.length === 1 && !!mindmapOwner(selected[0]!) && mindmapOwner(selected[0]!)!.id !== selected[0]!.id;
+    },
+    run: context => context.host.dispatchEvent(new Event('dali:mindmap-properties')),
+  }] },
 });
 
 const mindmapUnlockToolbarModule = ToolbarModuleExtension({
@@ -63,6 +44,6 @@ export class ObjectActionsToolbarExtension extends ViewExtensionProvider {
   override name = 'dali-object-actions-toolbar';
   override setup(context: ViewExtensionContext) {
     super.setup(context);
-    if (this.isEdgeless(context.scope)) context.register([objectActionsToolbarModule, mindmapUnlockToolbarModule]);
+    if (this.isEdgeless(context.scope)) context.register([topicPropertiesToolbarModule, mindmapUnlockToolbarModule]);
   }
 }

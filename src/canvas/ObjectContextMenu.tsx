@@ -4,7 +4,6 @@ import { createPortal } from 'react-dom';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, type GfxModel } from '@blocksuite/affine/std/gfx';
 import { summarizeCanvasSelection, canvasModelVisible, mindmapOwner } from './selection-summary';
-import { OBJECT_ACTIONS_EVENT } from './object-actions-toolbar';
 import {
   alignCanvasSelection, canvasSelectionEditable, duplicateCanvasSelection,
   groupCanvasSelection, ungroupCanvasSelection, selectedLayerCanGroup, canvasLayerLockTarget,
@@ -31,15 +30,7 @@ export function ObjectContextMenu({host}: {host:EditorHost}) {
   useLayoutEffect(()=>{
     if(!point||!ref.current)return;
     const menu=ref.current.getBoundingClientRect();
-    const anchor=trigger.current;
-    const parent=anchor?.closest('editor-menu-button')?.shadowRoot?.querySelector('editor-menu-content')?.getBoundingClientRect();
     let left=point.left,top=point.top;
-    if(parent&&anchor){
-      const item=anchor.getBoundingClientRect();
-      if(parent.right+8+menu.width<=window.innerWidth-8){left=parent.right+8;top=item.top;}
-      else if(parent.left-8-menu.width>=8){left=parent.left-8-menu.width;top=item.top;}
-      else {left=parent.left;top=parent.bottom+8+menu.height<=window.innerHeight-8?parent.bottom+8:parent.top-8-menu.height;}
-    }
     left=Math.max(8,Math.min(left,window.innerWidth-menu.width-8));
     top=Math.max(8,Math.min(top,window.innerHeight-menu.height-8));
     if(left!==point.left||top!==point.top)setPoint({left,top});
@@ -49,17 +40,6 @@ export function ObjectContextMenu({host}: {host:EditorHost}) {
     const selected=gfx.selection.slots.updated.subscribe(()=>{if(currentSelection()!==openedSelection.current)setPoint(null);updateSelection(value=>value+1);});
     const removed=gfx.surface?.elementRemoved.subscribe(()=>setPoint(null));
     return()=>{selected.unsubscribe();removed?.unsubscribe();};
-  },[host]);
-  useEffect(()=>{
-    const open=(event:Event)=>{
-      const anchor=(event as CustomEvent<{anchor:HTMLElement}>).detail?.anchor;
-      if(!host.isConnected||!anchor?.isConnected||!currentSelection())return;
-      trigger.current=anchor;
-      const rect=anchor.getBoundingClientRect();
-      openAt(rect.right+8,rect.top);
-    };
-    host.addEventListener(OBJECT_ACTIONS_EVENT,open);
-    return()=>host.removeEventListener(OBJECT_ACTIONS_EVENT,open);
   },[host]);
   useEffect(()=>{
     const open=(e:MouseEvent)=>{

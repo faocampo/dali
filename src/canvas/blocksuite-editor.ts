@@ -9,6 +9,7 @@
  */
 import { canvasFonts } from './canvas-fonts';
 import { installLineWidthControl } from './line-width-control';
+import { installFormattingTheme } from './formatting-theme';
 import { Subscription } from 'rxjs';
 import {
   DocModeExtension,
@@ -34,6 +35,7 @@ export async function mountEdgelessEditor(
 ): Promise<EdgelessEditorHandle> {
   installShapeTextTypography();
   installLineWidthControl();
+  installFormattingTheme();
   const { store, scope } = await getCanvasRuntime();
   const disposeGuard = installMutationGuard(store, scope);
 

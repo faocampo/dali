@@ -49,6 +49,9 @@ Control radius is 8px, floating surfaces and board cards 12px, dialogs 16px. Flo
 - **Menus:** 18px icon column, text, optional trailing shortcut/state. Group related actions with a subtle divider. Selected categories use violet tint and ink.
 - **Dialogs:** consistent title/action alignment, scrollable body, persistent footer where needed. Destructive actions are explicitly labeled and use danger ink.
 - **Inspectors and palettes:** white floating surface; compact labeled fields; selected tools share the same violet semantics.
+- **Canvas feedback:** dimensions and distances appear during moving and resizing, including arrow-key movement, when enabled in View. Formatting menus stay above canvas guides. Enabled native icons use plum ink; thickness combines a live numeric stepper with a line sample.
+- **Object placement:** automatic additions seek nearby free space within the visible canvas, clear of the tool rail and viewport controls. When space is full, new objects stay visible on the front layer. Drawing and dropping use the user's chosen coordinates.
+- **Object menus:** native More actions appear once, with topic properties directly available for mind maps. Right-click and Shift+F10 retain the arrangement menu. “Frame selection” creates a frame around selected objects.
 - **Recovery and feedback:** calm readable panel, explicit problem and recovery action. Canvas errors appear beside the toolbar without expanding it.
 
 ## Interaction and accessibility

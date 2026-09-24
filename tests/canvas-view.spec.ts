@@ -74,16 +74,13 @@ test('dimensions and gaps update with drag, resize, multi-selection, zoom and pa
   const doc = () => page.locator('editor-host').evaluate((host: any) => JSON.stringify(host.store.spaceDoc.toJSON()));
   const before = await doc();
   await enableMeasurements(page);
-  await expect(page.locator('.canvas-dimensions')).toHaveAttribute('data-width', '120');
-  await expect(page.locator('.canvas-dimensions')).toHaveAttribute('data-height', '80');
-  await expect(page.locator('.canvas-distance[data-direction="right"]')).toHaveAttribute('data-distance', '80');
+  await expect(page.locator('.canvas-measurements')).toHaveCount(0);
   expect(await doc()).toBe(before);
   await root(page).evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     gfx.viewport.setZoom(1.5); gfx.viewport.setCenter(450, 300);
   });
-  await expect(page.locator('.canvas-distance[data-direction="right"]')).toHaveAttribute('data-distance', '80');
-  await expect(page.locator('.canvas-dimensions')).toHaveAttribute('data-width', '120');
+  await expect(page.locator('.canvas-measurements')).toHaveCount(0);
   await expect(root(page).locator('.edgeless-background')).toHaveCSS('background-size', '30px 30px');
   const gridPosition = await root(page).evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
@@ -97,8 +94,8 @@ test('dimensions and gaps update with drag, resize, multi-selection, zoom and pa
   await page.mouse.move(position.x, position.y); await page.mouse.down();
   await page.mouse.move(position.x - 30, position.y, { steps: 6 });
   await expect(page.locator('.canvas-distance[data-direction="right"]')).toHaveAttribute('data-distance', '100');
-  await page.mouse.up();
-  await expect(page.locator('.canvas-distance[data-direction="right"]')).toHaveAttribute('data-distance', '100');
+  await expect(page.locator('.canvas-dimensions')).toHaveAttribute('data-width', '120');
+  await expect(page.locator('.canvas-dimensions')).toHaveAttribute('data-height', '80');
   if (test.info().project.name === 'prod') await page.screenshot({ path: test.info().outputPath('measurements.png') });
   await root(page).evaluate((el, ids) => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
@@ -109,6 +106,8 @@ test('dimensions and gaps update with drag, resize, multi-selection, zoom and pa
   await root(page).evaluate((el, ids) => (el as HTMLElement & { gfx: GfxController }).gfx.selection.set({ elements: ids, editing: false }), ids);
   await expect(page.locator('.canvas-dimensions')).toHaveAttribute('data-width', '300');
   await expect(page.locator('.canvas-distance')).toHaveCount(0);
+  await page.mouse.up();
+  await expect(page.locator('.canvas-measurements')).toHaveCount(0);
   await root(page).evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.selection.set({ elements: [], editing: false }));
   await expect(page.locator('.canvas-measurements')).toHaveCount(0);
 });
@@ -130,6 +129,7 @@ test('hidden collapsed topics and offscreen neighbors never become distance targ
     return child;
   }, ids);
   await enableMeasurements(page);
+  await page.locator('editor-host').focus(); await page.keyboard.down('ArrowRight');
   await expect(page.locator('.canvas-distance[data-direction="right"]')).toHaveAttribute('data-neighbor', ids[1]!);
   await expect(page.locator(`.canvas-distance[data-neighbor="${hidden}"]`)).toHaveCount(0);
   await root(page).evaluate((el, ids) => {
@@ -145,6 +145,8 @@ test('hidden collapsed topics and offscreen neighbors never become distance targ
   });
   await expect(page.locator('.canvas-dimensions')).toHaveAttribute('data-width', '100');
   await expect(page.locator('.canvas-dimensions')).toHaveAttribute('data-height', '40');
+  await page.keyboard.up('ArrowRight');
+  await expect(page.locator('.canvas-measurements')).toHaveCount(0);
 });
 
 for (const width of [390, 1280]) test(`View menu and Grid submenu fit a ${width}px viewport`, async ({ page }) => {
@@ -218,7 +220,7 @@ test('grid and measurement chrome never appears in exported PNG pixels', async (
   await seedShapes(page);
   const before = await pngPixels(page);
   await enableMeasurements(page);
-  await expect(page.locator('.canvas-dimensions')).toBeVisible();
+  await expect(page.locator('.canvas-dimensions')).toHaveCount(0);
   await openView(page); await page.getByRole('menuitem', { name: 'Grid', exact: true }).click();
   await page.getByRole('menuitemradio', { name: 'Lines', exact: true }).click();
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.keyboard.press('Escape');

@@ -115,11 +115,11 @@ test('@02-uat-properties context menu owns Escape and keyboard navigation', asyn
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
   await page.keyboard.press('Enter');
-  const trigger = page.getByRole('menuitem', { name: 'Object actions', exact: true });
+  const trigger = page.locator('editor-host');
   await openObjectActions(page); await page.keyboard.press('Escape');
   await expect(page.getByRole('menu', { name: 'Object actions', exact: true })).toHaveCount(0);
   await expect(trigger).toBeFocused();
-  await trigger.press('Enter');
+  await trigger.press('Shift+F10');
   const menu = page.getByRole('menu', { name: 'Object actions', exact: true });
   await expect(menu.getByRole('menuitem', { name: 'Properties', exact: true })).toBeFocused();
   await page.keyboard.press('End'); await expect(menu.getByRole('menuitem').last()).toBeFocused();

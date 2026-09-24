@@ -93,7 +93,7 @@ test('leaving the board during decode cancels insertion',async({page})=>{
   expect(await page.evaluate(()=>(window as Window & {syntheticImageCount?:()=>number}).syntheticImageCount!())).toBe(0);
 });
 
-test('multiple picker files preserve per-file results and sequential offsets',async({page})=>{
+test('multiple picker files preserve per-file results and find separate visible spaces',async({page})=>{
   await page.goto('/');
   const file=await raster(page);
   await page.locator('input[type=file][accept="image/*"]').setInputFiles([
@@ -102,8 +102,8 @@ test('multiple picker files preserve per-file results and sequential offsets',as
   await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
   await expect(page.getByTestId('image-import-error')).toContainText('Image 2:');
   const imported=await images(page);
-  expect(imported[1]!.bounds[0]!-imported[0]!.bounds[0]!).toBe(64);
-  expect(imported[1]!.bounds[1]!-imported[0]!.bounds[1]!).toBe(64);
+  const [a, b] = imported.map(image => image.bounds);
+  expect(a![0]! < b![0]! + b![2]! && a![0]! + a![2]! > b![0]! && a![1]! < b![1]! + b![3]! && a![1]! + a![3]! > b![1]!).toBe(false);
 });
 
 async function transfer(page: Page, type: 'drop'|'paste', file: Awaited<ReturnType<typeof raster>>) {

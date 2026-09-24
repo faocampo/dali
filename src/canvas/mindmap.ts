@@ -1,3 +1,4 @@
+import { canvasInsertionRect, serializeInsertionRect } from './insertion-placement';
 import { EdgelessCRUDIdentifier } from '@blocksuite/affine/blocks/surface';
 import { fitContent, mountShapeTextEditor } from '@blocksuite/affine/gfx/shape';
 import { LayoutType, MindmapStyle, MindmapElementModel, ShapeElementModel } from '@blocksuite/affine/model';
@@ -268,7 +269,7 @@ export function insertMindmap(host: EditorHost): string {
     const node = gfx.surface.getElementById(nodeId);
     if (!(node instanceof ShapeElementModel)) throw new Error(MINDMAP_CREATION_ERROR);
     fitContent(node);
-    node.xywh = `[${x - node.w / 2},${y - node.h / 2},${node.w},${node.h}]`;
+    node.xywh = serializeInsertionRect(canvasInsertionRect(std, node.w, node.h, [node.id]));
     mountShapeTextEditor(node, root);
     std.store.captureSync();
     return map.id;

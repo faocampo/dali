@@ -1,5 +1,6 @@
+import { canvasInsertionRect, serializeInsertionRect } from './insertion-placement';
 import type { EditorHost } from '@blocksuite/affine/std';
-import type { GfxController } from '@blocksuite/affine/std/gfx';
+import { GfxControllerIdentifier, type GfxController } from '@blocksuite/affine/std/gfx';
 import { getActiveBoardId } from '../boards/preferences';
 import { getActiveAccessScope, type AccessScope } from './runtime';
 
@@ -98,7 +99,17 @@ export async function importLocalImages(host: EditorHost, request: ImageImportRe
   // mutation, rather than checking only before an asynchronous native call.
   const store=new Proxy(host.std.store, {get(target,key) {
     if(key==='addBlocks') return (...args: Parameters<typeof target.addBlocks>) => {
-      assertCurrent(); return target.addBlocks(...args);
+      assertCurrent();
+      const gfx = host.std.get(GfxControllerIdentifier);
+      for (const block of args[0]) {
+        const props = block.blockProps;
+        if (block.flavour !== 'affine:image' || !props) continue;
+        if (request.source !== 'drop') {
+          props.xywh = serializeInsertionRect(canvasInsertionRect(host.std, Number(props.width), Number(props.height)));
+        }
+        props.index = gfx.layer.generateIndex();
+      }
+      return target.addBlocks(...args);
     };
     const value=Reflect.get(target,key,target);
     return typeof value==='function' ? value.bind(target) : value;

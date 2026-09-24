@@ -68,6 +68,9 @@ export class FormattingControlsExtension extends ViewExtensionProvider {
         };
       } }));
     } });
+    context.register(mergeToolbarModule({ id: BlockFlavourIdentifier('custom:affine:surface:*'), config: { actions: [{
+      id: 'Z.a.selection', actions: [{ id: 'a.create-frame', label: 'Frame selection', tooltip: 'Create a frame around the selected objects' }],
+    }] } }));
     for (const kind of ['shape', 'text'] as const) context.register(mergeToolbarModule({ id: BlockFlavourIdentifier(`custom:affine:surface:${kind}`), config: { actions: typographyActions(kind) } }));
     for (const kind of ['group', 'frame']) context.register(mergeToolbarModule({ id: BlockFlavourIdentifier(`custom:affine:surface:${kind}`), config: { actions: [{ id: 'a.insert-into-page', when: false }] } }));
     context.register(mergeToolbarModule({ id: BlockFlavourIdentifier('custom:affine:surface:note'), config: { actions: [

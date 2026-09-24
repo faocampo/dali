@@ -1,3 +1,4 @@
+import { canvasInsertionRect, serializeInsertionRect } from './insertion-placement';
 /**
  * Adding canvas text that can be sized.
  *
@@ -42,15 +43,15 @@ const PLACEHOLDER = 'Text';
 export function insertText(std: BlockStdScope): string | null {
   const gfx = std.get(GfxControllerIdentifier);
   const crud = std.get(EdgelessCRUDIdentifier);
-  const { x, y } = gfx.viewport.center;
 
   // Roughly the ink of PLACEHOLDER at DEFAULT_FONT_SIZE. It only has to be
   // close: the element re-measures itself the first time it is edited.
   const width = PLACEHOLDER.length * DEFAULT_FONT_SIZE * 0.6;
   const height = DEFAULT_FONT_SIZE * 1.5;
 
+  std.store.captureSync();
   const id = crud.addElement('text', {
-    xywh: `[${x - width / 2},${y - height / 2},${width},${height}]`,
+    xywh: serializeInsertionRect(canvasInsertionRect(std, width, height)),
     // The element stores a raw Y.Text; `Text` is BlockSuite's wrapper around
     // one, so this hands over the underlying shared type without taking a
     // direct dependency on yjs.
@@ -66,5 +67,6 @@ export function insertText(std: BlockStdScope): string | null {
   // toolbar -- font, size, colour -- immediately. Double-click to edit the
   // words, exactly like every other object on the board.
   gfx.selection.set({ elements: [id], editing: false });
+  std.host.focus();
   return id;
 }

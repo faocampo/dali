@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { EditorHost } from '@blocksuite/affine/std';
-import { GfxControllerIdentifier, isGfxGroupCompatibleModel, isPrimitiveModel } from '@blocksuite/affine/std/gfx';
+import { GfxControllerIdentifier, InteractivityIdentifier, isGfxGroupCompatibleModel, isPrimitiveModel } from '@blocksuite/affine/std/gfx';
 import { canvasModelVisible } from './selection-summary';
 import { gridMetrics, intersects, measurementLabel, nearbyDistances, selectionBounds, type DistanceGuide, type Rect } from './measurement-geometry';
 import { useViewPreferences } from './view-preferences';
@@ -25,6 +25,8 @@ export function CanvasMeasurements({ host }: { host: EditorHost }) {
     style.dataset.daliViewGrid = '';
     style.textContent = GRID_CSS;
     (root.shadowRoot ?? root).append(style);
+    const interaction = host.std.get(InteractivityIdentifier);
+    let keyboardMoving = false;
     let frame = 0;
     const sync = () => {
       frame = 0;
@@ -36,7 +38,8 @@ export function CanvasMeasurements({ host }: { host: EditorHost }) {
       root.style.setProperty('--dali-grid-size', `${grid.step}px ${grid.step}px`);
       root.style.setProperty('--dali-grid-position', `${grid.x}px ${grid.y}px`);
       root.dataset.gridStyle = prefs.grid;
-      if ((!prefs.dimensions && !prefs.distances) || gfx.selection.editing) { setState(EMPTY); return; }
+      const gesture = interaction.activeInteraction$.peek()?.type;
+      if ((!keyboardMoving && gesture !== 'move' && gesture !== 'resize') || (!prefs.dimensions && !prefs.distances) || gfx.selection.editing) { setState(EMPTY); return; }
       const selected = gfx.selection.selectedElements.filter(canvasModelVisible);
       // Group bounds can retain collapsed descendants; measure the visible leaves.
       const measured = selected.flatMap(model => isPrimitiveModel(model) && ['group', 'mindmap'].includes(model.type) && isGfxGroupCompatibleModel(model)
@@ -62,7 +65,13 @@ export function CanvasMeasurements({ host }: { host: EditorHost }) {
       setState({ bounds, world, guides, width: viewport.width, height: viewport.height });
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(sync); };
-    const drag = (event: PointerEvent) => { if (event.buttons && (prefs.dimensions || prefs.distances)) schedule(); };
+    const stopKeyboard = () => { keyboardMoving = false; schedule(); };
+    const keyDown = (event: KeyboardEvent) => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key) || event.metaKey || event.ctrlKey || event.altKey || host.store.readonly) return;
+      if (event.composedPath().some(node => node instanceof Element && node.matches('input,select,textarea,[contenteditable="true"],editor-toolbar,editor-menu-content'))) return;
+      if (!gfx.selection.editing && gfx.selection.selectedElements.some(model => !model.isLocked())) { keyboardMoving = true; schedule(); }
+    };
+    const stopInteraction = interaction.activeInteraction$.subscribe(schedule);
     sync();
     const subscriptions = [
       gfx.viewport.viewportUpdated.subscribe(schedule),
@@ -72,11 +81,16 @@ export function CanvasMeasurements({ host }: { host: EditorHost }) {
       gfx.surface?.elementAdded.subscribe(schedule),
       gfx.surface?.elementRemoved.subscribe(schedule),
     ];
-    host.addEventListener('pointermove', drag, true);
+    host.addEventListener('keydown', keyDown, true);
+    window.addEventListener('keyup', stopKeyboard);
+    window.addEventListener('blur', stopKeyboard);
     return () => {
       cancelAnimationFrame(frame);
       subscriptions.forEach(subscription => subscription?.unsubscribe());
-      host.removeEventListener('pointermove', drag, true);
+      stopInteraction();
+      host.removeEventListener('keydown', keyDown, true);
+      window.removeEventListener('keyup', stopKeyboard);
+      window.removeEventListener('blur', stopKeyboard);
       style.remove();
       delete root.dataset.gridStyle;
       ['--dali-grid-image', '--dali-grid-size', '--dali-grid-position'].forEach(key => root.style.removeProperty(key));

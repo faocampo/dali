@@ -1,9 +1,10 @@
+import { canvasInsertionRect, serializeInsertionRect } from './insertion-placement';
 /**
  * Adding a sticky note to the board.
  *
  * BlockSuite's bottom toolbar already offers stickies through its note-senior
  * button, which drops you into a template picker. This is the plain version:
- * one click, one yellow square at the viewport centre, ready to type into.
+ * one click, one yellow square in available viewport space, ready to type into.
  */
 import { DefaultTheme } from '@blocksuite/affine/model';
 import type { BlockStdScope } from '@blocksuite/affine/std';
@@ -21,13 +22,14 @@ export function insertSticky(std: BlockStdScope): string {
   if (!rootId) throw new Error('The board has no page block to add a sticky to.');
 
   const gfx = std.get(GfxControllerIdentifier);
-  const { x: cx, y: cy } = gfx.viewport.center;
-  const xywh = `[${cx - STICKY_SIZE / 2},${cy - STICKY_SIZE / 2},${STICKY_SIZE},${STICKY_SIZE}]`;
+  const xywh = serializeInsertionRect(canvasInsertionRect(std, STICKY_SIZE, STICKY_SIZE));
+  store.captureSync();
 
   const noteId = store.addBlock(
     'affine:note',
     {
       xywh,
+      index: gfx.layer.generateIndex(),
       // edgeless-only: a canvas object, not part of any page flow.
       displayMode: 'edgeless',
       background: DefaultTheme.NoteBackgroundColorMap.Yellow,
@@ -53,5 +55,7 @@ export function insertSticky(std: BlockStdScope): string {
   // cannot be typed into until the user finds the right double-click.
   store.addBlock('affine:paragraph', {}, noteId);
 
+  std.host.focus();
+  store.captureSync();
   return noteId;
 }
