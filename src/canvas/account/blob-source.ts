@@ -4,6 +4,7 @@ import { beginBlobWrite, finishBlobWrite } from '../save-status';
 
 export type BlobSourceOptions = Omit<SourceOptions, 'onPendingDocument'> & {
   onPendingBlob?: (key: string, value: Blob) => unknown | Promise<unknown>;
+  onFetchedBlob?: (key: string, value: Blob) => void | Promise<void>;
 };
 /** Pending durable images belong to this source's account/board/generation lifetime. */
 export class BoardBlobSource implements BlobSource {
@@ -46,19 +47,21 @@ export class BoardBlobSource implements BlobSource {
     if (this.pending.has(key)) return this.pending.get(key)!;
     const response = await this.request('GET', key); if (!response) return null;
     if (!['image/png', 'image/jpeg'].includes(response.headers.get('content-type')?.split(';')[0] ?? '')) throw new Error('Invalid image response');
-    const blob = await response.blob(); this.assertCurrent(); return blob;
+    const blob = await response.blob(); this.assertCurrent();
+    await this.options.onFetchedBlob?.(key, blob); this.assertCurrent(); return blob;
   }
   async set(key: string, value: Blob): Promise<string> {
     this.assertCurrent(true);
     if (!['image/png', 'image/jpeg'].includes(value.type) || value.size > 16 * 1024 * 1024 || !value.size) throw new Error('Invalid image');
     const epoch = sourceRecoveryEpoch(this.options);
+    this.pending.set(key, value);
     const token = await this.options.onPendingBlob?.(key, value);
     const upload = async () => {
       confirmRecoveryEpoch(this.options, epoch);
       const response = await this.request('PUT', key, value, epoch); const result: unknown = await response!.json(); this.assertCurrent(true);
       if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true || !('key' in result) || result.key !== key) throw new Error('Image commit unconfirmed');
       confirmRecoveryEpoch(this.options, epoch, response!);
-      await this.options.onAcknowledged?.(token); this.pending.delete(key);
+      await this.options.onAcknowledged?.(token); if (this.pending.get(key) === value) this.pending.delete(key);
     };
     if (this.options.durableLocalBlobs && token) {
       this.assertCurrent(true); this.pending.set(key, value); beginBlobWrite();

@@ -15,7 +15,7 @@ import { BoardBlobSource, type BlobSourceOptions } from './blob-source';
 import { BoardDoc } from './board-doc';
 import { BoardMeta } from './board-meta';
 
-export type AccountWorkspaceOptions = Omit<SourceOptions, 'boardId' | 'rootDocId' | 'contentDocId' | 'readonly'> & Pick<BlobSourceOptions, 'onPendingBlob'> & {
+export type AccountWorkspaceOptions = Omit<SourceOptions, 'boardId' | 'rootDocId' | 'contentDocId' | 'readonly'> & Pick<BlobSourceOptions, 'onPendingBlob' | 'onFetchedBlob'> & {
   descriptor: BoardDescriptor;
   onReadonlyMutation?: (error: Error) => void;
 };

@@ -8,7 +8,7 @@ import type { Page } from '@playwright/test';
 
 async function journalRecords(page: Page) {
   return page.evaluate(() => new Promise<{ boardId: string; kind: string }[]>((resolve, reject) => {
-    const request = indexedDB.open('dali-account-recovery-v1', 1);
+    const request = indexedDB.open('dali-account-recovery-v1', 2);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => {
       const db = request.result; const transaction = db.transaction('journal', 'readonly');

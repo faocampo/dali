@@ -9,7 +9,34 @@ export type RecoveryCheckpoint = { schemaVersion: 2; accountId: string; boardId:
   root: { docId: string; data: Uint8Array }; content: { docId: string; data: Uint8Array }; title: string;
   assets: Record<string, { mime?: string; data?: Uint8Array }> };
 export const recoveryDatabaseName = 'dali-account-recovery-v1';
-const tabId = crypto.randomUUID();
+const tabId = (() => {
+  const fresh = crypto.randomUUID();
+  try {
+    if (typeof window === 'undefined') return fresh;
+    const key = 'dali-recovery-tab-v2'; const previous = sessionStorage.getItem(key);
+    // A new opener can inherit sessionStorage; give that document its own identity.
+    const opened = !!window.opener && (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type === 'navigate';
+    const id = previous && !opened ? previous : fresh; sessionStorage.setItem(key, id); return id;
+  } catch { return fresh; }
+})();
+const invalidationChannel = 'dali-recovery-invalidation-v2';
+function invalidate() {
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
+  const channel = new BroadcastChannel(invalidationChannel); channel.postMessage({ type: 'changed' }); channel.close();
+}
+/** Signals carry no account, document or image data. Consumers reauthorize and reread. */
+export function subscribeJournalInvalidation(listener: () => void) {
+  if (typeof BroadcastChannel === 'undefined') return () => {};
+  const channel = new BroadcastChannel(invalidationChannel);
+  channel.onmessage = event => { if (event.data?.type === 'changed' && Object.keys(event.data).length === 1) listener(); };
+  return () => channel.close();
+}
+export async function requestRecoveryStorage() {
+  const storage = globalThis.navigator?.storage;
+  const persistent = await storage?.persist?.().catch(() => false) ?? false;
+  const estimate = await storage?.estimate?.().catch(() => undefined);
+  return { persistent, usage: estimate?.usage, quota: estimate?.quota };
+}
 export class RecoveryStorageError extends Error {
   constructor(readonly code: 'BLOCKED' | 'CORRUPT' | 'LEGACY' | 'FAILED') { super('Recovery storage ' + code.toLowerCase()); this.name = 'RecoveryStorageError'; }
 }
@@ -71,7 +98,7 @@ async function transaction<T>(stores: string[], mode: IDBTransactionMode, action
   try {
     return await new Promise<T>((resolve, reject) => {
       const tx = db.transaction(stores, mode, { durability: 'strict' }); let value: T;
-      tx.oncomplete = () => resolve(value);
+      tx.oncomplete = () => { if (mode === 'readwrite') invalidate(); resolve(value); };
       tx.onabort = tx.onerror = () => reject(tx.error ?? new RecoveryStorageError('FAILED'));
       try { action(tx, result => { value = result; }); } catch (error) { tx.abort(); reject(error); }
     });
@@ -112,9 +139,58 @@ export async function readCheckpoint(scope: JournalScope, tab: string): Promise<
     };
   });
 }
-export async function acknowledgeRecord(id: string) { await transaction(['journal'], 'readwrite', (tx, done) => { tx.objectStore('journal').delete(id); done(undefined); }); }
+const matchesScope = (record: JournalRecord, scope: JournalScope) => record.accountId === scope.accountId && record.boardId === scope.boardId && record.epoch === scope.recoveryEpoch;
+export async function acknowledgeRecords(scope: JournalScope, ids: readonly string[]) {
+  assertScope(scope); const exact = [...new Set(ids)];
+  if (exact.length > 10000 || !exact.every(bounded)) throw new RecoveryStorageError('CORRUPT');
+  if (!exact.length) return;
+  await transaction(['journal', 'checkpoints'], 'readwrite', (tx, done) => {
+    const store = tx.objectStore('journal'); const records: JournalRecord[] = []; let pending = exact.length;
+    for (const id of exact) {
+      const request = store.get(id);
+      request.onsuccess = () => {
+        if (request.result && matchesScope(request.result, scope)) records.push(request.result);
+        if (--pending) return;
+        if (records.some(record => !validRecord(record))) { tx.abort(); return; }
+        const tabs = [...new Set(records.map(record => record.tabId!))];
+        if (!tabs.length) { done(undefined); return; }
+        let baselines = tabs.length;
+        for (const tab of tabs) {
+          const checkpoints = tx.objectStore('checkpoints'); const cp = checkpoints.get(checkpointId(scope, tab));
+          cp.onsuccess = () => {
+            try {
+              if (cp.result) {
+                const value = cp.result as RecoveryCheckpoint; assertCheckpoint(value);
+                if (value.accountId !== scope.accountId || value.boardId !== scope.boardId || value.epoch !== scope.recoveryEpoch || value.tabId !== tab) throw new RecoveryStorageError('CORRUPT');
+                for (const record of records.filter(row => row.tabId === tab)) {
+                  if (record.kind === 'document') {
+                    const doc = [value.root, value.content].find(doc => doc.docId === record.resource);
+                    if (!doc || !(record.data instanceof Uint8Array)) throw new RecoveryStorageError('CORRUPT');
+                    doc.data = Y.mergeUpdates([doc.data, record.data]);
+                  } else if (record.data instanceof Uint8Array) value.assets[record.resource] = { data: record.data, mime: record.mime };
+                }
+                assertCheckpoint(value); checkpoints.put({ ...value, id: checkpointId(scope, tab) });
+              }
+              if (--baselines === 0) { for (const record of records) store.delete(record.id); done(undefined); }
+            } catch { tx.abort(); }
+          };
+        }
+      };
+    }
+  });
+}
+/** Explicit single-record compatibility wrapper also requires its captured scope. */
+export async function acknowledgeRecord(id: string, scope: JournalScope) { await acknowledgeRecords(scope, [id]); }
 export async function discardRecords(accountId: string, boardId: string) {
-  for (const record of await pendingRecords(accountId, boardId)) await acknowledgeRecord(record.id);
+  const ids = (await pendingRecords(accountId, boardId)).map(record => record.id);
+  // Explicit authorized discard also covers quarantined rows, without trusting epochs.
+  await transaction(['journal'], 'readwrite', (tx, done) => {
+    for (const id of ids) {
+      const store = tx.objectStore('journal'); const request = store.get(id);
+      request.onsuccess = () => { if (request.result?.accountId === accountId && request.result?.boardId === boardId) store.delete(id); };
+    }
+    done(undefined);
+  });
 }
 async function persistRecord(record: JournalRecord) {
   // Some engines cannot persist file-backed Blobs. Copy their bytes before
@@ -123,21 +199,30 @@ async function persistRecord(record: JournalRecord) {
     ? { ...record, data: new Uint8Array(await record.data.arrayBuffer()), mime: record.data.type }
     : record;
   return transaction<string>(['journal', 'sequences'], 'readwrite', (tx, done) => {
-    const sequences = tx.objectStore('sequences'); const id = scopeKey(record); const request = sequences.get(id);
-    request.onsuccess = () => {
-      try {
-        const sequence = (request.result?.sequence ?? 0) + 1;
-        if (!Number.isSafeInteger(sequence)) throw new RecoveryStorageError('CORRUPT');
-        stored.sequence = sequence; record.sequence = sequence;
-        if (!validRecord(stored)) throw new RecoveryStorageError('CORRUPT');
-        sequences.put({ id, sequence }); tx.objectStore('journal').put(stored); done(record.id);
-      } catch { tx.abort(); }
+    const journal = tx.objectStore('journal'); const existing = journal.get(record.id);
+    existing.onsuccess = () => {
+      if (existing.result) {
+        if (!validRecord(existing.result) || !matchesScope(existing.result, record)) { tx.abort(); return; }
+        record.sequence = existing.result.sequence; done(record.id); return;
+      }
+      const sequences = tx.objectStore('sequences'); const id = scopeKey(record); const request = sequences.get(id);
+      request.onsuccess = () => {
+        try {
+          const sequence = (request.result?.sequence ?? 0) + 1;
+          if (!Number.isSafeInteger(sequence)) throw new RecoveryStorageError('CORRUPT');
+          stored.sequence = sequence; record.sequence = sequence;
+          if (!validRecord(stored)) throw new RecoveryStorageError('CORRUPT');
+          sequences.put({ id, sequence }); journal.put(stored); done(record.id);
+        } catch { tx.abort(); }
+      };
     };
   });
 }
 /** Failed captures remain in memory until a successful explicit preservation retry. */
 export class AccountJournal {
   private memory = new Map<string, JournalRecord>();
+  private owned = new Map<string, JournalRecord>();
+  private assets = new Map<string, { mime: string; data: Uint8Array }>();
   private writes = new Set<Promise<unknown>>();
   private baseline?: RecoveryCheckpoint;
   private baselinePending = false;
@@ -145,21 +230,116 @@ export class AccountJournal {
   get tabId() { return tabId; }
   pendingMemory() { return [...this.memory.values()].map(record => structuredClone(record)); }
   captureUpdate(resource: string, data: Uint8Array) { return this.capture('document', resource, data); }
+  async captureSubmission(resource: string, data: Uint8Array) {
+    const update = new Uint8Array(data);
+    // Native sync may observe a Yjs event before the independent listener.
+    // Let all synchronous listeners capture it before freezing exact coverage.
+    await Promise.resolve();
+    const checkpoint = await readCheckpoint(this.scope, tabId);
+    const confirmed = checkpoint && [checkpoint.root, checkpoint.content].find(doc => doc.docId === resource);
+    const candidate = new Y.Doc();
+    let covered: string[];
+    try {
+      // Native sync may split one captured transaction or garbage-collect its
+      // deleted items. Compare operation clocks and deletes, not encoded bytes.
+      if (confirmed) Y.applyUpdate(candidate, confirmed.data);
+      Y.applyUpdate(candidate, update);
+      const snapshot = Y.snapshot(candidate);
+      covered = [...this.owned.values()].filter(record => record.kind === 'document' && record.resource === resource && record.data instanceof Uint8Array && Y.snapshotContainsUpdate(snapshot, record.data)).map(record => record.id);
+    } finally { candidate.destroy(); }
+    const id = await this.capture('document', resource, update, covered);
+    await this.preserve();
+    return Object.freeze({ scope: this.scope, ids: Object.freeze([id, ...covered]) });
+  }
+  async acknowledge(ids: readonly string[]) {
+    await acknowledgeRecords(this.scope, ids);
+    for (const id of ids) { this.owned.delete(id); this.memory.delete(id); }
+  }
+  async compact(ids: readonly string[]): Promise<string | undefined> {
+    const exact = [...new Set(ids)]; if (!exact.length) return;
+    if (exact.length > 10000 || !exact.every(bounded)) throw new RecoveryStorageError('CORRUPT');
+    const result = await transaction<{ record: JournalRecord; removed: string[] } | undefined>(['journal', 'sequences'], 'readwrite', (tx, done) => {
+      const store = tx.objectStore('journal'); const records: JournalRecord[] = []; let pending = exact.length;
+      for (const id of exact) {
+        const request = store.get(id);
+        request.onsuccess = () => {
+          const record = request.result as JournalRecord | undefined;
+          if (record && matchesScope(record, this.scope) && record.tabId === tabId) records.push(record);
+          if (--pending) return;
+          if (!records.length) { done(undefined); return; }
+          if (records.some(record => !validRecord(record) || record.kind !== 'document' || record.resource !== records[0]!.resource)) { tx.abort(); return; }
+          const sequences = tx.objectStore('sequences'); const key = scopeKey(this.scope); const sequence = sequences.get(key);
+          sequence.onsuccess = () => {
+            try {
+              const next: JournalRecord = { ...records[0]!, id: crypto.randomUUID(), sequence: (sequence.result?.sequence ?? 0) + 1, data: Y.mergeUpdates(records.map(record => record.data as Uint8Array)), coveredIds: records.map(record => record.id) };
+              if (!validRecord(next)) throw new RecoveryStorageError('CORRUPT');
+              sequences.put({ id: key, sequence: next.sequence }); store.put(next);
+              for (const record of records) store.delete(record.id);
+              done({ record: next, removed: next.coveredIds! });
+            } catch { tx.abort(); }
+          };
+        };
+      }
+    });
+    if (!result) return;
+    for (const id of result.removed) this.owned.delete(id);
+    this.owned.set(result.record.id, result.record); return result.record.id;
+  }
+  async cacheAsset(key: string, blob: Blob) {
+    // Retain a private copy before asynchronous validation or storage admission.
+    const asset = { mime: blob.type, data: new Uint8Array(await blob.arrayBuffer()) };
+    const hash = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', asset.data)))).replace(/\+/g, '-').replace(/\//g, '_');
+    if (hash !== key || !['image/png', 'image/jpeg'].includes(asset.mime) || !asset.data.length || asset.data.length > 16 * 1024 * 1024) throw new RecoveryStorageError('CORRUPT');
+    this.assets.set(key, asset);
+    if (!this.baseline) return;
+    const write = this.persistAsset(key, asset); this.writes.add(write);
+    try { await write; if (this.assets.get(key) === asset) this.assets.delete(key); }
+    catch (error) { this.onFailure(); throw error; } finally { this.writes.delete(write); }
+  }
+  private persistAsset(key: string, asset: { mime: string; data: Uint8Array }) {
+    return transaction(['checkpoints'], 'readwrite', (tx, done) => {
+      const store = tx.objectStore('checkpoints'); const request = store.get(checkpointId(this.scope));
+      request.onsuccess = () => {
+        try {
+          const value = request.result ?? this.baseline; if (!value) throw new RecoveryStorageError('FAILED');
+          assertCheckpoint(value);
+          if (value.accountId !== this.scope.accountId || value.boardId !== this.scope.boardId || value.epoch !== this.scope.recoveryEpoch || value.tabId !== tabId) throw new RecoveryStorageError('CORRUPT');
+          value.assets[key] = asset; assertCheckpoint(value);
+          store.put({ ...value, id: checkpointId(this.scope) }); done(undefined);
+        } catch { tx.abort(); }
+      };
+    });
+  }
   async checkpoint(value: Pick<RecoveryCheckpoint, 'root' | 'content' | 'title' | 'assets'>) {
     const baseline: RecoveryCheckpoint = { ...structuredClone(value), schemaVersion: 2, accountId: this.scope.accountId, boardId: this.scope.boardId, epoch: this.scope.recoveryEpoch!, tabId };
+    for (const [key, asset] of this.assets) baseline.assets[key] = asset;
     assertCheckpoint(baseline); this.baseline = baseline; this.baselinePending = true;
     const write = this.persistCheckpoint(baseline); this.writes.add(write);
     try { await write; if (this.baseline === baseline) this.baselinePending = false; }
     catch (error) { this.onFailure(); throw error; } finally { this.writes.delete(write); }
   }
   private persistCheckpoint(value: RecoveryCheckpoint) {
-    return transaction(['checkpoints'], 'readwrite', (tx, done) => { tx.objectStore('checkpoints').put({ ...value, id: checkpointId(this.scope) }); done(undefined); });
+    return transaction(['checkpoints'], 'readwrite', (tx, done) => {
+      const store = tx.objectStore('checkpoints'); const request = store.get(checkpointId(this.scope));
+      request.onsuccess = () => {
+        try {
+          if (request.result) {
+            assertCheckpoint(request.result);
+            if (request.result.accountId !== this.scope.accountId || request.result.boardId !== this.scope.boardId || request.result.epoch !== this.scope.recoveryEpoch || request.result.tabId !== tabId) throw new RecoveryStorageError('CORRUPT');
+          }
+          const assets = { ...request.result?.assets };
+          for (const [key, asset] of Object.entries(value.assets)) assets[key] = asset.data ? asset : assets[key] ?? asset;
+          const merged = { ...value, assets, id: checkpointId(this.scope) };
+          assertCheckpoint(merged); store.put(merged); done(undefined);
+        } catch { tx.abort(); }
+      };
+    });
   }
-  async capture(kind: JournalRecord['kind'], resource: string, data: Uint8Array | Blob): Promise<string> {
-    const record: JournalRecord = { ...this.scope, schemaVersion: 2, epoch: this.scope.recoveryEpoch, tabId, coveredIds: [], id: crypto.randomUUID(), sequence: 0, kind, resource,
+  async capture(kind: JournalRecord['kind'], resource: string, data: Uint8Array | Blob, coveredIds: string[] = []): Promise<string> {
+    const record: JournalRecord = { ...this.scope, schemaVersion: 2, epoch: this.scope.recoveryEpoch, tabId, coveredIds: [...coveredIds], id: crypto.randomUUID(), sequence: 0, kind, resource,
       data: data instanceof Uint8Array ? new Uint8Array(data) : data };
-    this.memory.set(record.id, record);
-    const write = persistRecord(record); this.writes.add(write);
+    this.memory.set(record.id, record); this.owned.set(record.id, record);
+    const write = (async () => { if (kind === 'blob' && data instanceof Blob) await this.cacheAsset(resource, data); await persistRecord(record); })(); this.writes.add(write);
     try { await write; this.memory.delete(record.id); return record.id; }
     catch (error) { this.onFailure(); throw error; }
     finally { this.writes.delete(write); }
@@ -167,6 +347,7 @@ export class AccountJournal {
   async preserve() {
     await Promise.allSettled([...this.writes]);
     if (this.baselinePending && this.baseline) { await this.persistCheckpoint(this.baseline); this.baselinePending = false; }
+    if (this.baseline) for (const [key, asset] of this.assets) { await this.persistAsset(key, asset); if (this.assets.get(key) === asset) this.assets.delete(key); }
     for (const record of this.memory.values()) {
       await persistRecord(record); this.memory.delete(record.id);
     }
@@ -201,7 +382,7 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
     if (descriptor.recoveryEpoch !== epoch || response.headers.get('X-Dali-Recovery-Epoch') !== epoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
     if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true ||
       (record.kind === 'blob' && (!('key' in result) || result.key !== record.resource))) throw new Error('Recovery commit unconfirmed');
-    await acknowledgeRecord(record.id);
+    await acknowledgeRecords({ accountId, boardId: descriptor.summary.id, recoveryEpoch: epoch, generation: record.generation }, [record.id]);
   }
   return true;
 }

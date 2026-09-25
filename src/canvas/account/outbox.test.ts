@@ -1,7 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { AccountJournal, readCheckpoint, replayJournal, type JournalRecord } from './outbox';
+import { AccountJournal, acknowledgeRecords, readCheckpoint, replayJournal, requestRecoveryStorage, type JournalRecord } from './outbox';
 import { attachLocalCapture, RECOVERY_REPLAY_ORIGIN } from './local-capture';
 import * as Y from 'yjs';
+import { createHash } from 'node:crypto';
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
 
 // Browser regressions cover native storage. This strict transaction double
@@ -47,7 +48,7 @@ function storage(initial: JournalRecord[] = []) {
   return { rows, fail(value: boolean) { fail = value; } };
 }
 afterEach(() => { vi.unstubAllGlobals(); });
-const imageKey = 'A'.repeat(43) + '=';
+const imageKey = createHash('sha256').update(new Uint8Array([0, 128, 255])).digest('base64url') + '=';
 const scope = { accountId: 'member', boardId: 'board', generation: 1, recoveryEpoch: '11111111-1111-4111-8111-111111111111' };
 const descriptor = { summary: { id: 'board', accountId: 'member', role: 'owner' }, rootDocId: 'root', contentDocId: 'content', capabilities: ['write'], recoveryEpoch: scope.recoveryEpoch } as BoardDescriptor;
 
@@ -74,6 +75,63 @@ it('@04-03-01 captures local updates independently and skips hydration and repla
   expect(rebuilt.getText('canary').toString()).toBe('local'); expect(rebuilt.getText('remote').toString()).toBe('');
   capture.dispose(); content.getText('canary').insert(0, 'after dispose'); await capture.preserve(); expect(db.rows.size).toBe(1);
   [root, content, remote, rebuilt].forEach(doc => doc.destroy());
+});
+
+it('@04-03-02 late exact acknowledgment advances the baseline and retains newer edits', async () => {
+  const db = storage(); const journal = new AccountJournal(scope, vi.fn());
+  const root = new Y.Doc({ guid: 'root' }); const content = new Y.Doc({ guid: 'content' });
+  const capture = attachLocalCapture({ journal, root, content, title: 'Synthetic late acknowledgment' }); await capture.ready;
+  content.getText('canary').insert(0, 'first'); await capture.preserve();
+  const submission = await journal.captureSubmission('content', Y.encodeStateAsUpdate(content));
+  content.getText('canary').insert(5, ' second'); await capture.preserve();
+  const later = [...db.rows.values()].find(row => !submission.ids.includes(row.id))!;
+  await journal.acknowledge(submission.ids); await journal.acknowledge(submission.ids);
+  expect([...db.rows.keys()]).toEqual([later.id]);
+  await acknowledgeRecords({ ...scope, accountId: 'another-account' }, [later.id]); expect(db.rows.has(later.id)).toBe(true);
+  const checkpoint = await readCheckpoint(scope, journal.tabId); const restored = new Y.Doc(); Y.applyUpdate(restored, checkpoint!.content.data);
+  expect(restored.getText('canary').toString()).toBe('first'); Y.applyUpdate(restored, later.data as Uint8Array);
+  expect(restored.getText('canary').toString()).toBe('first second');
+  capture.dispose(); [root, content, restored].forEach(doc => doc.destroy());
+});
+
+it('@04-03-02 compaction replaces exact own inputs while other-tab and newer rows survive', async () => {
+  const foreign: JournalRecord = { ...scope, schemaVersion: 2, epoch: scope.recoveryEpoch, tabId: 'other-tab', coveredIds: [], id: 'other-record', sequence: 1, kind: 'document', resource: 'content', data: new Uint8Array([0, 0]) };
+  const db = storage([foreign]); const journal = new AccountJournal(scope, vi.fn());
+  const first = await journal.captureUpdate('content', new Uint8Array([0, 0])); const second = await journal.captureUpdate('content', new Uint8Array([0, 0]));
+  const compacted = await journal.compact([first, second, foreign.id]);
+  const later = await journal.captureUpdate('content', new Uint8Array([0, 0]));
+  await journal.acknowledge([first, second]);
+  expect([...db.rows.keys()].sort()).toEqual([compacted, later, foreign.id].sort());
+});
+
+it('@04-03-02 submission coverage includes a later synchronous capture listener', async () => {
+  const db = storage(); const journal = new AccountJournal(scope, vi.fn());
+  const root = new Y.Doc({ guid: 'root' }); const content = new Y.Doc({ guid: 'content' });
+  let submission!: ReturnType<AccountJournal['captureSubmission']>;
+  content.on('update', data => { submission = journal.captureSubmission('content', data); });
+  const capture = attachLocalCapture({ journal, root, content, title: 'Synthetic event order' }); await capture.ready;
+  content.getText('canary').insert(0, 'captured');
+  const receipt = await submission; await capture.preserve();
+  expect(receipt.ids).toHaveLength(2);
+  await journal.acknowledge(receipt.ids); expect(db.rows.size).toBe(0);
+  capture.dispose(); root.destroy(); content.destroy();
+});
+
+it('@04-03-02 garbage-collected submissions cover the original captured operations', async () => {
+  const db = storage(); const journal = new AccountJournal(scope, vi.fn());
+  const root = new Y.Doc({ guid: 'root' }); const content = new Y.Doc({ guid: 'content' });
+  const capture = attachLocalCapture({ journal, root, content, title: 'Synthetic deleted content' }); await capture.ready;
+  content.getMap('values').set('key', new Y.Text('original'));
+  content.getMap('values').delete('key'); await capture.preserve();
+  const receipt = await journal.captureSubmission('content', Y.encodeStateAsUpdate(content));
+  expect(receipt.ids).toHaveLength(3);
+  await journal.acknowledge(receipt.ids); expect(db.rows.size).toBe(0);
+  capture.dispose(); root.destroy(); content.destroy();
+});
+
+it('@04-03-02 storage persistence denial and estimates remain advisory', async () => {
+  vi.stubGlobal('navigator', { storage: { persist: async () => false, estimate: async () => { throw new Error('unavailable'); } } });
+  await expect(requestRecoveryStorage()).resolves.toEqual({ persistent: false, usage: undefined, quota: undefined });
 });
 
 it('persists file bytes and MIME before reporting success and retries the same record after storage failure', async () => {

@@ -3,7 +3,7 @@ import type { BoardDescriptor, BoardSummary } from '../boards/BoardLibrary';
 import type { AccountWorkspaceOptions, BoardWorkspace } from './account/board-workspace';
 import { reportDocEngineStatus, resetSaveStatus } from './save-status';
 import * as Y from 'yjs';
-import { AccountJournal, acknowledgeRecord, replayJournal } from './account/outbox';
+import { AccountJournal, replayJournal, requestRecoveryStorage } from './account/outbox';
 import { interruptSession, revalidateSession } from '../auth/session';
 import { attachLocalCapture } from './account/local-capture';
 
@@ -96,9 +96,15 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     // Workspace lifetime is distinct from request cancellation while preservation is pending.
     durableLocalBlobs: true,
     fetch: (input, init) => (options.fetch ?? fetch)(input, { ...init, signal: requestAbort.signal }),
-    onPendingDocument: (id, data) => scopedJournal.capture('document', id, data),
+    onPendingDocument: (id, data) => scopedJournal.captureSubmission(id, data),
     onPendingBlob: (key, value) => scopedJournal.capture('blob', key, value),
-    onAcknowledged: token => typeof token === 'string' ? acknowledgeRecord(token) : Promise.resolve(),
+    onFetchedBlob: initial.canWrite ? (key, value) => scopedJournal.cacheAsset(key, value) : undefined,
+    onAcknowledged: token => {
+      if (typeof token === 'string') return scopedJournal.acknowledge([token]);
+      const receipt = token as Awaited<ReturnType<AccountJournal['captureSubmission']>>;
+      if (receipt?.scope !== scopedJournal.scope || !Array.isArray(receipt.ids)) return Promise.reject(new Error('Recovery acknowledgment scope changed'));
+      return scopedJournal.acknowledge(receipt.ids);
+    },
     beforeDocumentWrite: () => replayJournal(options.descriptor, options.accountId, requestAbort.signal, true).then(() => undefined),
     onAuthorizationLost: error => {
       if (isCurrent()) { suspendAccessScope('authorization'); if (error.status === 401) void interruptSession(); else if (error.status === 409) void revalidateSession(); }
@@ -108,7 +114,17 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     if (!isCurrent()) { workspace.dispose(); throw new Error('Board access changed'); }
     const store = workspace.getDoc(options.descriptor.contentDocId)!.getStore();
     const local = initial.canWrite ? attachLocalCapture({ journal: scopedJournal, root: workspace.doc, content: store.spaceDoc, title: options.descriptor.summary.title, isCurrent }) : undefined;
-    try { await local?.ready; if (!isCurrent()) throw new Error('Board access changed'); }
+    try {
+      await local?.ready;
+      if (local) {
+        void requestRecoveryStorage();
+        const keys = new Set<string>();
+        store.spaceDoc.getMap<Y.Map<unknown>>('blocks').forEach(block => { if (block.get('sys:flavour') === 'affine:image' && typeof block.get('prop:sourceId') === 'string') keys.add(block.get('prop:sourceId') as string); });
+        // Fetches cache available bytes; loading/missing images keep their existing visible retry flow.
+        void Promise.all([...keys].map(key => workspace.blobSync.get(key))).catch(() => undefined);
+      }
+      if (!isCurrent()) throw new Error('Board access changed');
+    }
     catch (error) { local?.dispose(); workspace.dispose(); throw error; }
     reportDocEngineStatus(workspace.docSync.status);
     const subscription = workspace.docSync.onStatusChange.subscribe(reportDocEngineStatus);
