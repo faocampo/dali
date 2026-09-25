@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 8
 waived_count: 1
-fixed_count: 2
-total_count: 11
-last_updated: 2026-09-25T21:19:17.375Z
+fixed_count: 3
+total_count: 12
+last_updated: 2026-09-25T21:44:49.417Z
 ---
 
 # Broken Windows Ledger
@@ -26,6 +26,7 @@ last_updated: 2026-09-25T21:19:17.375Z
 | 9 | 03 | unrun-verify | tests/session-recovery.spec.ts |  | Native 200% browser zoom and actual OS IME or screen-reader speech for recovery remain plan 03-12 acceptance; automated 490px geometry, keyboard focus, constructed composition and reduced motion are covered. | open |  | 2026-09-16T17:51:23.432Z |  |
 | 10 | 03 | unrun-verify | tests/local-board-import.spec.ts |  | Native 200% browser zoom and assistive-technology speech for local copy remain plan 03-12 acceptance; automated 490px geometry, keyboard focus and reduced motion passed. | open |  | 2026-09-16T19:01:59.856Z |  |
 | 11 | 04 | deviation | tests/durable-restart.spec.ts |  | Used existing browser cache and loopback escalation for owned synthetic listeners; corrected test title and PNG fixtures; all required gates passed. | fixed |  | 2026-09-25T21:18:33.385Z | 2026-09-25T21:19:17.375Z |
+| 12 | 04 | deviation | src/canvas/account/outbox.ts |  | Epoch integration required descriptor, journal, thumbnail, duplicate and explicit fixture-header changes; implemented and verified in plan 04-02. | fixed |  | 2026-09-25T21:44:43.562Z | 2026-09-25T21:44:49.417Z |
 
 ````json
 [
@@ -160,6 +161,19 @@ last_updated: 2026-09-25T21:19:17.375Z
     "reason": "",
     "recorded_at": "2026-09-25T21:18:33.385Z",
     "resolved_at": "2026-09-25T21:19:17.375Z",
+    "milestone": null
+  },
+  {
+    "id": 12,
+    "kind": "deviation",
+    "phase": "04",
+    "file": "src/canvas/account/outbox.ts",
+    "line": null,
+    "description": "Epoch integration required descriptor, journal, thumbnail, duplicate and explicit fixture-header changes; implemented and verified in plan 04-02.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-25T21:44:43.562Z",
+    "resolved_at": "2026-09-25T21:44:49.417Z",
     "milestone": null
   }
 ]
