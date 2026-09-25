@@ -44,6 +44,13 @@ export function validateDocument(doc: Y.Doc, board: BoardRow, docId: string) {
     if (pages !== 1 || surfaces !== 1) throw new Error('Invalid content identity');
   }
 }
+/** Validate a complete persisted document without exposing its decoded content. */
+export function validateStoredDocument(bytes: Buffer, board: BoardRow, docId: string): Set<string> {
+  if (!Buffer.isBuffer(bytes) || !bytes.length || bytes.length > DOCUMENT_LIMITS.update) throw new Error('Invalid document size');
+  const doc = new Y.Doc({ guid: docId });
+  try { Y.applyUpdate(doc, bytes); validateDocument(doc, board, docId); return referencedImageKeys(doc); }
+  finally { doc.destroy(); }
+}
 export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig, database: AccountDatabase, now: () => number, beforeCommit?: BeforeCommit) {
   app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
   type Params = { boardId: string; docId: string };

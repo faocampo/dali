@@ -82,6 +82,13 @@ export function validateImageBytes(bytes: Buffer, mime: string) {
   }
   throw new Error('Incomplete JPEG');
 }
+/** Shared persisted-image integrity check; identical key semantics to upload. */
+export function validateStoredImage(bytes: Buffer, mime: string, key: string, hash = key) {
+  if (!Buffer.isBuffer(bytes) || !validBlobKey(key) || !validBlobKey(hash)) throw new Error('Invalid image identity');
+  validateImageBytes(bytes, mime);
+  const actual = imageHash(bytes).replace(/=$/, '');
+  if (actual !== key.replace(/=$/, '') || actual !== hash.replace(/=$/, '')) throw new Error('Invalid image hash');
+}
 export class BlobRepository {
   constructor(private database: AccountDatabase) {}
   get(boardId: string, key: string) { return this.database.prepare('SELECT bytes,mime,hash FROM board_blobs WHERE board_id=? AND blob_key=?').get(boardId, key) as { bytes: Buffer; mime: string; hash: string } | undefined; }

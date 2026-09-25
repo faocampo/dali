@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, stat, copyFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
@@ -70,7 +70,8 @@ it('@04-10-01 online backup during writes publishes a complete independently reo
   expect(await readFile(join(target, 'COMPLETE'), 'utf8')).toBe(result.manifest.sha256 + '\n');
   expect((await stat(target)).mode & 0o777).toBe(0o700); expect((await stat(join(target, 'database.sqlite'))).mode & 0o777).toBe(0o600);
   expect(validateBackupDatabase(join(target, 'database.sqlite')).counts).toEqual(result.manifest.counts);
-  const freshDb = openDatabase(join(target, 'database.sqlite')); const fresh = await buildApp({ database: freshDb, config });
+  const restore = join(directory, 'fresh.sqlite'); await copyFile(join(target, 'database.sqlite'), restore);
+  const freshDb = openDatabase(restore); const fresh = await buildApp({ database: freshDb, config });
   try {
     for (const identity of ['owner', 'editor', 'viewer', 'nonMember']) {
       const actor = await signIn(fresh, identity); const access = { cookie: actor.cookie, 'x-dali-account': actor.accountId };
