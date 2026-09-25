@@ -1,0 +1,10 @@
+{
+  "command": "npm run test:server -- server/storage/durability.test.ts",
+  "exitCode": 1,
+  "targetTest": "@04-01-02 child can arm an exact transaction boundary over private IPC",
+  "targetFile": "server/storage/durability.test.ts",
+  "expected": "Private child IPC acknowledges the armed transaction barrier with true",
+  "actual": "false: child has no barrier command handler",
+  "normalization": "Vitest reporter normalized to TAP for the GSD TAP-only classifier; 2 selected tests, one assertion failure and one pass. This RED covers new fault-harness behavior; existing transactional correctness is assessed by subsequent regression oracles.",
+  "output": "not ok 1 - @04-01-02 child can arm an exact transaction boundary over private IPC\nok 2 - @04-01-02 incompatible persistent configuration closes and rejects the connection\n# tests 2\n# pass 1\n# fail 1\n"
+}

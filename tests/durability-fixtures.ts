@@ -22,6 +22,15 @@ export async function createDurabilityService(assets: string) {
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',
   };
   let child: ChildProcess;
+  async function command(mode: string) {
+    return new Promise<boolean>(resolve => {
+      const timer = setTimeout(() => { child.off('message', listener); resolve(false); }, 1000);
+      const listener = (message: unknown) => {
+        if ((message as { type: string }).type === 'armed') { clearTimeout(timer); child.off('message', listener); resolve(true); }
+      };
+      child.on('message', listener); child.send({ mode });
+    });
+  }
   async function start() {
     child = fork(join(process.cwd(), '.gsd/access-build/server/testing/durability-child.js'), [], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
     const ready = new Promise<{ type: string; pragmas: { journal: string; synchronous: number; foreignKeys: number } }>((resolve, reject) => {
@@ -38,7 +47,17 @@ export async function createDurabilityService(assets: string) {
   }
   try {
     const ready = await start();
-    return { origin, databasePath, pragmas: ready.pragmas,
+    return { origin, databasePath, pragmas: ready.pragmas, command,
+      waitForBoundary() {
+        return new Promise<string>((resolve, reject) => {
+          const timer = setTimeout(() => { child.off('message', listener); reject(new Error('Commit boundary not reached')); }, 10000);
+          const listener = (message: unknown) => {
+            const value = message as { type: string; boundary: string };
+            if (value.type === 'boundary') { clearTimeout(timer); child.off('message', listener); resolve(value.boundary); }
+          };
+          child.on('message', listener);
+        });
+      },
       async killAndRestart(signal: NodeJS.Signals = 'SIGKILL') { await stop(signal); return start(); },
       async close() { await stop(); await provider.close(); await rm(directory, { recursive: true, force: true }); },
     };
