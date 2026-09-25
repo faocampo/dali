@@ -195,7 +195,55 @@ Plans:
   3. An operator can follow the documented configuration and startup procedure to deploy Dali and its required services on operator-managed infrastructure, then open an authenticated board. (OPS-01)
   4. An operator can back up and restore board documents and images, and an authorized member can reopen the restored boards with their content and images intact. (OPS-02)
 
-**Plans**: TBD
+**Plans**: 16 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Prove acknowledged board and image survival through process restart
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-02-PLAN.md — Fence restored server state across document, image and metadata requests
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-03-PLAN.md — Capture reconstructable work before network synchronization
+- [ ] 04-10-PLAN.md — Publish verified complete SQLite backups to an independent destination
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04-04-PLAN.md — Recover authorized pending work and pause unsafe mutations
+- [ ] 04-11-PLAN.md — Schedule retained backups and enforce the one-hour recovery bound
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 04-05-PLAN.md — Make save state follow current document and image acknowledgments
+- [ ] 04-12-PLAN.md — Restore an operator-selected backup into a fenced fresh target
+- [ ] 04-13-PLAN.md — Build and run a production-only container boundary
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 04-06-PLAN.md — Download a complete authorized archive of pending recovery work
+- [ ] 04-09-PLAN.md — Show account-isolated pending work on authorized library cards
+- [ ] 04-14-PLAN.md — Deploy one durable writer with generic Kubernetes configuration
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 04-07-PLAN.md — Expose actionable title-adjacent save details and image failures
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 04-08-PLAN.md — Preserve title intent and warn before leaving unresolved saving
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 04-15-PLAN.md — Measure independent storage-loss recovery, operational targets and browser recovery after backup fencing
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 04-16-PLAN.md — Complete cross-browser recovery and source-mapped acceptance
+
 **UI hint**: yes
 
 ### Phase 5: Real-Time Collaborative Editing
