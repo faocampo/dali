@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 8
 waived_count: 1
-fixed_count: 3
-total_count: 12
-last_updated: 2026-09-25T21:44:49.417Z
+fixed_count: 4
+total_count: 13
+last_updated: 2026-09-25T22:17:42.532Z
 ---
 
 # Broken Windows Ledger
@@ -27,6 +27,7 @@ last_updated: 2026-09-25T21:44:49.417Z
 | 10 | 03 | unrun-verify | tests/local-board-import.spec.ts |  | Native 200% browser zoom and assistive-technology speech for local copy remain plan 03-12 acceptance; automated 490px geometry, keyboard focus and reduced motion passed. | open |  | 2026-09-16T19:01:59.856Z |  |
 | 11 | 04 | deviation | tests/durable-restart.spec.ts |  | Used existing browser cache and loopback escalation for owned synthetic listeners; corrected test title and PNG fixtures; all required gates passed. | fixed |  | 2026-09-25T21:18:33.385Z | 2026-09-25T21:19:17.375Z |
 | 12 | 04 | deviation | src/canvas/account/outbox.ts |  | Epoch integration required descriptor, journal, thumbnail, duplicate and explicit fixture-header changes; implemented and verified in plan 04-02. | fixed |  | 2026-09-25T21:44:43.562Z | 2026-09-25T21:44:49.417Z |
+| 13 | 04 | deviation | src/canvas/account/outbox.ts |  | Plan 04-03 integrated runtime callbacks and fixture schema checks; corrected Yjs semantic coverage and preserved image loading feedback; final 44 browser cases pass. | fixed |  | 2026-09-25T22:17:37.399Z | 2026-09-25T22:17:42.532Z |
 
 ````json
 [
@@ -174,6 +175,19 @@ last_updated: 2026-09-25T21:44:49.417Z
     "reason": "",
     "recorded_at": "2026-09-25T21:44:43.562Z",
     "resolved_at": "2026-09-25T21:44:49.417Z",
+    "milestone": null
+  },
+  {
+    "id": 13,
+    "kind": "deviation",
+    "phase": "04",
+    "file": "src/canvas/account/outbox.ts",
+    "line": null,
+    "description": "Plan 04-03 integrated runtime callbacks and fixture schema checks; corrected Yjs semantic coverage and preserved image loading feedback; final 44 browser cases pass.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-25T22:17:37.399Z",
+    "resolved_at": "2026-09-25T22:17:42.532Z",
     "milestone": null
   }
 ]
