@@ -1,10 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BoardBlobSource } from './blob-source';
+import { RecoveryEpochError } from './doc-source';
 
 const key = 'a'.repeat(43) + '=';
 const options = () => ({ boardId: 'board', rootDocId: 'root', contentDocId: 'content', accountId: 'member', generation: 1, isCurrent: () => true });
 const image = () => new Blob(['synthetic-raster'], { type: 'image/png' });
 describe('BoardBlobSource', () => {
+  it('@04-02-02 recovery mismatch stays distinct from access loss and never acknowledges', async () => {
+    const ack = vi.fn(); const lost = vi.fn();
+    const source = new BoardBlobSource({ ...options(), getRecoveryEpoch: () => '11111111-1111-4111-8111-111111111111', onAcknowledged: ack, onAuthorizationLost: lost,
+      fetch: vi.fn<typeof fetch>(async () => Response.json({ code: 'RECOVERY_EPOCH_MISMATCH' }, { status: 409 })) });
+    await expect(source.set(key, image())).rejects.toBeInstanceOf(RecoveryEpochError);
+    expect(ack).not.toHaveBeenCalled(); expect(lost).not.toHaveBeenCalled();
+  });
   it('persists pending bytes before PUT and acknowledges only the server-confirmed key', async () => {
     const events: string[] = []; const fetcher = vi.fn<typeof fetch>(async () => { events.push('request'); return Response.json({ acknowledged: true, key }); });
     const source = new BoardBlobSource({ ...options(), fetch: fetcher, onPendingBlob: async (pendingKey, blob) => { expect(pendingKey).toBe(key); expect(await blob.text()).toBe('synthetic-raster'); events.push('pending'); return 4; }, onAcknowledged: token => { expect(token).toBe(4); events.push('ack'); } });
