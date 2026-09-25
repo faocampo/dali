@@ -492,3 +492,22 @@ Plans:
 Plans:
 
 - [ ] TBD (promote with $gsd-review-backlog when ready)
+
+### Phase 999.5: Third-party branding and material cleanup (BACKLOG)
+
+**Goal:** Read [LEGAL_REVIEW.md](../LEGAL_REVIEW.md) (legal analysis supplied for cleanup planning), then use its findings to identify and clean references to third-party material, brands and names that could confuse the origin of Dali's work, including references to Miro.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+**Captured context:** Inventory affected code, documentation, UI text, examples and assets; propose and implement the appropriate removal, replacement or clarification based on the review. Treat the review as analysis input and reconcile its recommendations with the user's instructions and applicable upstream notice requirements.
+
+**Explicit constraints:**
+
+- Obtain the user's confirmation before deleting any file. Present the exact proposed file deletions and reasons for review.
+- Preserve Dali's name and logo. The user states they created both using AI and asserts copyright protection for them; retain this as user-provided ownership context.
+- Preserve required upstream licenses, copyright notices and attribution. Surface any conflict between a proposed cleanup and those obligations before changing the affected notice.
+- Keep this work in the backlog until promoted; capture does not authorize cleanup execution or file deletion.
+
+Plans:
+
+- [ ] TBD (promote with $gsd-review-backlog when ready)
