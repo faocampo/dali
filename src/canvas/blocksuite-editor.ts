@@ -24,9 +24,9 @@ import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { signal } from '@preact/signals-core';
 import { viewExtensions } from './extensions';
-import { getCanvasRuntime } from './runtime';
+import type { CanvasRuntime } from './runtime';
 import { installShapeTextTypography } from './shape-text-editor';
-import { installMutationGuard, installReadOnlyInputs } from './account/mutation-guard';
+import { accessScopeCurrent, installMutationGuard, installReadOnlyInputs } from './account/mutation-guard';
 
 export type EdgelessEditorHandle = {
   host: EditorHost;
@@ -34,15 +34,21 @@ export type EdgelessEditorHandle = {
 };
 
 export async function mountEdgelessEditor(
-  container: HTMLElement
+  container: HTMLElement,
+  runtime: CanvasRuntime,
+  mountSignal: AbortSignal,
 ): Promise<EdgelessEditorHandle> {
   await ensureCanvasFonts();
+  // StrictMode and navigation can cancel setup while fonts are loading. A
+  // cancelled mount must never attach a view or acquire a different board.
+  mountSignal.throwIfAborted();
+  if (!accessScopeCurrent(runtime.scope)) throw new Error('Board access changed');
   installShapeTextTypography();
   installTextBoxEditing();
   installLineWidthControl();
   installFormattingTheme();
   installCanvasColorPicker();
-  const { store, scope } = await getCanvasRuntime();
+  const { store, scope } = runtime;
   const disposeGuard = installMutationGuard(store, scope);
 
   const viewManager = new ViewExtensionManager(viewExtensions);
@@ -98,7 +104,6 @@ export async function mountEdgelessEditor(
   viewport.dataset.theme = 'light';
   viewport.style.cssText = 'position:relative;width:100%;height:100%;overflow:hidden;';
   viewport.append(host);
-  container.append(viewport);
 
   // Keep the browser's native middle-click auto-scroll UI out of the canvas.
   // BlockSuite still receives the event and uses it for its own temporary pan
@@ -109,51 +114,54 @@ export async function mountEdgelessEditor(
   viewport.addEventListener('mousedown', preventMiddleMouseDefault, true);
   viewport.addEventListener('auxclick', preventMiddleMouseDefault, true);
 
-  // BlockSuite deliberately initializes the standard Select tool. Keep that
-  // default: Space-drag and middle-drag temporarily pan, while ordinary clicks,
-  // drags and double-clicks continue to select, move and edit objects.
-  await host.updateComplete;
-  const disposeEditing = installEditingInteractions(host);
-  const disposeTextFormatting = installTextFormattingMemory(host);
-
-  // Pinned BlockSuite 0.22.4 caches the host rectangle on a one-second poll.
-  // Header/font/layout changes can move the host between polls, displacing
-  // drawing and hit testing. Refresh before its bubbling pointer controllers.
-  const pointer = (std.event as unknown as { _pointerControl?: { _updateRect?: () => void } })._pointerControl;
-  if (typeof pointer?._updateRect !== 'function') {
-    viewport.remove();
-    throw new Error('This editor version cannot synchronize canvas pointer coordinates.');
-  }
-  const gfxViewport = std.get(GfxControllerIdentifier).viewport;
-  const refreshPointerRect = () => {
-    pointer._updateRect!();
-    // Selection/resize paths convert client coordinates through the separate
-    // viewport origin. ResizeObserver does not observe position-only changes.
-    const rect = viewport.getBoundingClientRect();
-    if (gfxViewport.left !== rect.left || gfxViewport.top !== rect.top)
-      gfxViewport.setRect(rect.left, rect.top, rect.width, rect.height);
-  };
-  const pointerEvents = ['pointerdown','pointermove','pointerup','wheel'] as const;
-  pointerEvents.forEach(name => host.addEventListener(name, refreshPointerRect, true));
-
   let destroyed = false;
-  return {
-    host,
-    destroy: () => {
-      if (destroyed) return;
-      destroyed = true;
-      disposeEditing();
-      disposeTextFormatting();
-      pointerEvents.forEach(name => host.removeEventListener(name, refreshPointerRect, true));
-      viewport.removeEventListener('mousedown', preventMiddleMouseDefault, true);
-      viewport.removeEventListener('auxclick', preventMiddleMouseDefault, true);
-      // Removing the viewport disconnects <editor-host>, and
-      // EditorHost.disconnectedCallback() already calls std.unmount(). Calling
-      // it here as well would run every lifecycle watcher's unmounted() hook
-      // twice.
-      viewport.remove();
-      disposeInputs();
-      disposeGuard();
-    },
+  let disposeEditing = () => {};
+  let disposeTextFormatting = () => {};
+  let disposePointer = () => {};
+  const destroy = () => {
+    if (destroyed) return;
+    destroyed = true;
+    mountSignal.removeEventListener('abort', destroy);
+    disposeEditing();
+    disposeTextFormatting();
+    disposePointer();
+    viewport.removeEventListener('mousedown', preventMiddleMouseDefault, true);
+    viewport.removeEventListener('auxclick', preventMiddleMouseDefault, true);
+    // Removing the viewport disconnects the host and unmounts its scope once.
+    viewport.remove();
+    disposeInputs();
+    disposeGuard();
   };
+  mountSignal.addEventListener('abort', destroy, { once: true });
+  container.append(viewport);
+
+  try {
+    // Keep native Select: Space/middle-drag pan, ordinary gestures edit.
+    await host.updateComplete;
+    mountSignal.throwIfAborted();
+    if (!accessScopeCurrent(scope)) throw new Error('Board access changed');
+    disposeEditing = installEditingInteractions(host);
+    disposeTextFormatting = installTextFormattingMemory(host);
+
+    // Pinned BlockSuite caches the host rectangle on a one-second poll.
+    // Refresh before pointer controllers so layout changes cannot shift hits.
+    const pointer = (std.event as unknown as { _pointerControl?: { _updateRect?: () => void } })._pointerControl;
+    if (typeof pointer?._updateRect !== 'function') {
+      throw new Error('This editor version cannot synchronize canvas pointer coordinates.');
+    }
+    const gfxViewport = std.get(GfxControllerIdentifier).viewport;
+    const refreshPointerRect = () => {
+      pointer._updateRect!();
+      const rect = viewport.getBoundingClientRect();
+      if (gfxViewport.left !== rect.left || gfxViewport.top !== rect.top)
+        gfxViewport.setRect(rect.left, rect.top, rect.width, rect.height);
+    };
+    const pointerEvents = ['pointerdown','pointermove','pointerup','wheel'] as const;
+    pointerEvents.forEach(name => host.addEventListener(name, refreshPointerRect, true));
+    disposePointer = () => pointerEvents.forEach(name => host.removeEventListener(name, refreshPointerRect, true));
+    return { host, destroy };
+  } catch (cause) {
+    destroy();
+    throw cause;
+  }
 }

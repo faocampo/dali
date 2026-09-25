@@ -67,8 +67,9 @@ export default function BlockSuiteCanvas({ runtime }: { runtime: CanvasRuntime }
     let handle: EdgelessEditorHandle | null = null;
     let disposeMindmaps: (() => void) | undefined;
     let cancelled = false;
+    const controller = new AbortController();
 
-    mountEdgelessEditor(el)
+    mountEdgelessEditor(el, runtime, controller.signal)
       .then((h) => {
         // StrictMode double-invokes effects. The workspace and document are
         // created once in the shared runtime, so a cancelled mount only has a
@@ -90,13 +91,14 @@ export default function BlockSuiteCanvas({ runtime }: { runtime: CanvasRuntime }
 
     return () => {
       cancelled = true;
+      controller.abort();
       disposeMindmaps?.();
       handle?.destroy();
       // The host is about to be torn down; leaving it in state would let the
       // picker act on a detached editor.
       setHost(null);
     };
-  }, [attempt]);
+  }, [attempt, runtime]);
 
   if (error) return <StartupFailure error={error} onRetry={retry} />;
 

@@ -41,6 +41,14 @@ Firefox event tracing reproduced the focus race on rename 87 in a 400-rename str
 
 The final title correction passed the frontend static check and **28/28 focused title/role/recovery cases** across development Chromium, production Chromium, Firefox and WebKit (84.7s). Existing Enter, Escape, blur-save, composition, uncertain-operation, responsive header, source-persistence and canvas-lifetime checks remain unchanged. The next blocking run includes the new repeated-rename regression in all four general browser projects.
 
+## Cancelled editor lifecycle at `e5a0739` — 2026-09-25
+
+Both typechecks, 110 unit tests, 116 server tests, build and 124 standalone access tests passed. The next complete matrix found an intermittent duplicate editor during rapid board switching and was deliberately stopped before modifying source: **332 passed, 1 failed, 1 interrupted, 1,320 unrun** in 562.2s. The strict singleton locator observed two native hosts while the board was opening. This attempt remains failed evidence.
+
+A new observational regression reproduced the defect deterministically: a document mutation observer saw a maximum of two attached editor hosts during development StrictMode setup. Cancellation was previously checked only after asynchronous mounting finished. The correction binds mounting to the supplied authorized runtime, checks cancellation and scope after font loading, and immediately disposes an in-progress view on cancellation. Completed handles retain idempotent cleanup; setup failures release installed listeners and guards. The singleton, board-identity, saved-content and recovery assertions remain intact. Focused multi-engine validation and a fresh full chain are required before closure.
+
+The correction passed both static checks and **144/144 focused browser cases** across development Chromium, production Chromium, Firefox and WebKit (427.3s), with zero failures, skips or retries. This includes the new attachment-count regression, interrupted switching with exact board IDs/content, delayed-font timeout/retry and all session-recovery scenarios. A fresh complete gate remains required.
+
 ## Current pending-access review — 2026-09-24
 
 Resumed through `$gsd-progress --next` at revision `5c7fe7a`. Phases 1 and 2 have matching plan/summary counts; 03-12 is the first incomplete plan. Previously approved deferrals remain effective.

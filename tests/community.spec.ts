@@ -74,6 +74,20 @@ test('repeated editor reopen preserves IDs without duplicate objects or handlers
 });
 
 // Explicit opt-in negative control: normal passing suites never inject errors.
+test('cancelled editor setup never attaches a second host', async ({ page }) => {
+  await page.addInitScript(() => {
+    const probe = { maximumHosts: 0 };
+    Object.assign(window, { mountProbe: probe });
+    new MutationObserver(() => {
+      probe.maximumHosts = Math.max(probe.maximumHosts, document.querySelectorAll('editor-host').length);
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.reload();
+  await expect(page.getByTestId('board-action-menu')).toBeVisible();
+  await expect(page.locator('editor-host')).toHaveCount(1);
+  expect(await page.evaluate(() => (window as unknown as { mountProbe: { maximumHosts: number } }).mountProbe.maximumHosts)).toBe(1);
+});
+
 test('interrupted mounting and rapid board switching keep the final board isolated', async ({ page }) => {
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
