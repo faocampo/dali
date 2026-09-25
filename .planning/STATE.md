@@ -4,11 +4,11 @@ current_phase: 03
 current_phase_name: Okta and Board Access
 current_plan: 12
 status: executing
-stopped_at: Phase 3 UAT: six passes, two deferred follow-ups, one waived item, one pending item
-last_updated: "2026-09-24T23:44:12.324354+00:00"
+stopped_at: Phase 3 UAT accepted; refreshing final automated gate
+last_updated: "2026-09-25T01:08:43.063993+00:00"
 last_activity: 2026-09-24
-last_activity_desc: Resumed Phase 3 acceptance; pending-access checks passed, awaiting item 8 wording review
-state_head: 5c7fe7a
+last_activity_desc: User passed pending-access wording; seven UAT passes and three approved skips
+state_head: 601b588
 progress:
   total_phases: 13
   completed_phases: 2
@@ -28,19 +28,19 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-15).
 
 ## Current Position
 
-Pending-access acceptance resumed at `5c7fe7a`: 3/3 browser checks across Chromium, Firefox and WebKit and 16/16 grant server tests passed. Synthetic UI capture reviewed; item 8 remains pending the user's wording review. Approved provider/assistive-technology deferrals and the local-copy waiver are preserved. See [checkpoint](phases/03-okta-and-board-access/03-12-CHECKPOINT.md) (current review and historical gate boundary).
+Pending-access acceptance resumed at `5c7fe7a`: 3/3 browser checks across Chromium, Firefox and WebKit and 16/16 grant server tests passed. Synthetic UI capture reviewed; the user explicitly passed item 8. Approved provider/assistive-technology deferrals and the local-copy waiver are preserved. See [checkpoint](phases/03-okta-and-board-access/03-12-CHECKPOINT.md) (current review and historical gate boundary).
 
 Quick follow-up `f26bd35`: text placement now previews a drawn box, focuses native editing on release, reuses the last locally used text format, and preserves double-click editing. All three static checks, 110 unit tests, the production build and 87 focused browser cases across Chromium/Firefox/WebKit passed. See [quick summary](quick/260924-roh-draw-text-boxes-with-immediate-editing-a/260924-roh-SUMMARY.md) (implementation and validation).
 
 Quick follow-up `d071a44`: zoom presets/shortcuts, connector hover, custom colors, last shape fill, note focus and shape caret are verified. Creators retain Owner privileges on their existing boards; system Viewers remain read-only on shared boards and cannot create fresh boards/imports. All 110 unit tests, 116 server tests and 64 distinct focused browser/project cases passed; static checks and production build passed.
 
-Acceptance update (2026-09-24): five user-reported passes plus a scoped privacy-review pass; provider work and screen-reader testing are deferred. The exported snapshot is structurally valid with a hash-matched image asset; the user tested export only and subsequently waived optional local-copy human acceptance because that workflow is not needed. See [UAT review](phases/03-okta-and-board-access/03-UAT-REVIEW.md) (analysis, review scope and optional-copy waiver). Earlier progress notes below retain their historical status.
+Acceptance update (2026-09-24): six user-reported passes plus a scoped privacy-review pass; provider work and screen-reader testing are deferred. The exported snapshot is structurally valid with a hash-matched image asset; the user tested export only and subsequently waived optional local-copy human acceptance because that workflow is not needed. See [UAT review](phases/03-okta-and-board-access/03-UAT-REVIEW.md) (analysis, review scope and optional-copy waiver). Earlier progress notes below retain their historical status.
 
-Phase: 03 (Okta and Board Access) — HUMAN VERIFICATION PENDING
+Phase: 03 (Okta and Board Access) — FINAL REGRESSION IN PROGRESS
 Current Plan: 12
 Total Plans in Phase: 12
-Status: Human verification pending — six UAT passes, two approved deferrals, one optional-workflow waiver (03-11), one pending disposition (03-07). Historical automated score: 99/104.
-Last activity: 2026-09-24 - Resumed Phase 3 acceptance: 3 browser and 16 server pending-access checks passed; item 8 awaits human wording review.
+Status: Human acceptance complete — seven UAT passes, two approved deferrals, one optional-workflow waiver (03-11). Refreshing the final automated gate. Historical automated score: 99/104.
+Last activity: 2026-09-24 - Resumed Phase 3 acceptance: 3 browser and 16 server pending-access checks passed; item 8 passed by the user.
 
 Progress: [██░░░░░░░░] 15% (2/13 phases complete; 25/26 plans complete)
 
@@ -156,10 +156,10 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ## Session Continuity
 
-Last session: 2026-09-24T23:44:12.324354+00:00
-Stopped at: Phase 3 UAT: six passes, two deferred follow-ups, one waived item, one pending item
+Last session: 2026-09-25T01:08:43.063993+00:00
+Stopped at: Phase 3 UAT accepted; refreshing final automated gate
 Resume file: .planning/phases/03-okta-and-board-access/03-UAT.md
-Next action: $gsd-verify-work 3 — resolve pending-access presentation (item 8). Item 9 is skipped by user decision. Backlog 999.3 and 999.4 hold the approved deferrals.
+Next action: finish the refreshed Phase 3 automated gate, reconcile verification, and complete Plan 03-12. Human acceptance is complete; backlog 999.3 and 999.4 hold the approved deferrals.
 
 ## Phase 1 verification outcome
 

@@ -1,21 +1,18 @@
 ---
-status: testing
+status: complete
 phase: 03-okta-and-board-access
 source: [03-VERIFICATION.md]
 started: 2026-09-17T13:43:09.794134+00:00
-updated: 2026-09-24T23:44:12.324354+00:00
+updated: 2026-09-25T01:08:43.063993+00:00
 ---
 
 # Phase 3 acceptance checklist
 
-The complete automated gate passed at `7341672`. Independent verification is `human_needed`, with 99/104 truths verified and no established implementation blocker. The 2026-09-24 update records five user-reported passes and one scoped agent privacy-review pass, two approved deferred follow-ups, one optional-workflow waiver, and one pending item. The historical automated score and revision remain unchanged. Keep operator settings, real identities, screenshots and protocol traces in operator-controlled storage outside this repository. Record only generic acceptance or the failed step here.
+The complete automated gate passed at `7341672`. Independent verification is `human_needed`, with 99/104 truths verified and no established implementation blocker. The 2026-09-24 update records six user-reported passes and one scoped agent privacy-review pass, two approved deferred follow-ups, and one optional-workflow waiver. The historical automated score and revision remain unchanged. Keep operator settings, real identities, screenshots and protocol traces in operator-controlled storage outside this repository. Record only generic acceptance or the failed step here.
 
 ## Current Test
 
-number: 8
-name: 03-07 prohibition resolution
-expected: Pending access is described as pending access, without implying an email invitation or active membership before verified internal sign-in.
-awaiting: user review of pending-access wording after fresh focused checks
+[testing complete]
 
 ## Tests
 
@@ -94,8 +91,11 @@ disposition: User reported OK. Environment versions and additional protocol deta
 procedure: Explicitly review and resolve: Pending access MUST NOT be presented as an emailed invitation or active membership before verified internal sign-in.
 expected: Record human disposition or provide a wired enforcement descriptor and reverify.
 reason: Descriptor-less test prohibition; semantic test coverage does not supply the missing enforcement contract.
-result: [pending]
-agent_check: 2026-09-24 — 3/3 pending-access browser checks and 16/16 grant server tests passed. Synthetic capture reviewed; human wording acceptance remains pending. See 03-UAT-REVIEW.md.
+result: pass
+source: user
+observed: 2026-09-24
+disposition: User replied "pass" after reviewing the synthetic pending-access wording and focused browser/server evidence.
+agent_check: 2026-09-24 — 3/3 pending-access browser checks and 16/16 grant server tests passed. Synthetic capture reviewed; user subsequently accepted the wording. See 03-UAT-REVIEW.md.
 
 ### 9. 03-11 prohibition resolution
 
@@ -119,9 +119,9 @@ disposition: Scoped tracked-content and reachable-history privacy review found n
 ## Summary
 
 total: 10
-passed: 6
+passed: 7
 issues: 0
-pending: 1
+pending: 0
 skipped: 3
 blocked: 0
 
@@ -132,6 +132,6 @@ blocked: 0
 
 ## Gaps
 
-No new implementation failure was reported in this UAT update. Item 8 remains pending. Item 9 is skipped by user scope decision: the optional browser-local migration workflow is not needed for acceptance. The user subsequently replaced that UI with file-based board import; source preservation and import authorization retain regression coverage. User-reported passes do not imply unreported browser versions or observation details. Phase 3 remains open for item 8; the two deferred items retain explicit backlog follow-up scope.
+No new implementation failure was reported in this UAT update. Item 8 passed by explicit user acceptance. Item 9 is skipped by user scope decision: the optional browser-local migration workflow is not needed for acceptance. The user subsequently replaced that UI with file-based board import; source preservation and import authorization retain regression coverage. User-reported passes do not imply unreported browser versions or observation details. Human acceptance is complete within approved scope. Phase 3 completion awaits the refreshed final automated gate; the two deferred items retain explicit backlog follow-up scope.
 
 The earlier local startup defect remains resolved at `2d0dae4`; see [resolved startup journal](../../debug/resolved/local-sign-in-startup.md) (root cause and regression evidence).
