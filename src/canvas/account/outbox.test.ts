@@ -35,6 +35,15 @@ afterEach(() => { vi.unstubAllGlobals(); });
 const scope = { accountId: 'member', boardId: 'board', generation: 1, recoveryEpoch: '11111111-1111-4111-8111-111111111111' };
 const descriptor = { summary: { id: 'board', accountId: 'member', role: 'owner' }, rootDocId: 'root', contentDocId: 'content', capabilities: ['write'], recoveryEpoch: scope.recoveryEpoch } as BoardDescriptor;
 
+it('@04-03-01 captures immutable versioned epoch and tab identity', async () => {
+  const db = storage(); const journal = new AccountJournal(scope, vi.fn());
+  const data = new Uint8Array([0, 0]); const first = journal.capture('document', 'content', data); data[0] = 255;
+  await first; await journal.capture('document', 'content', new Uint8Array([0, 0]));
+  const records = [...db.rows.values()];
+  expect(records[0]).toMatchObject({ schemaVersion: 2, epoch: scope.recoveryEpoch, data: new Uint8Array([0, 0]) });
+  expect(records[0]).toHaveProperty('tabId'); expect(records[1]!.sequence).toBeGreaterThan(records[0]!.sequence);
+});
+
 it('persists file bytes and MIME before reporting success and retries the same record after storage failure', async () => {
   const db = storage(); const failure = vi.fn(); const journal = new AccountJournal(scope, failure);
   const bytes = new Uint8Array([0, 128, 255]); const blob = new Blob([bytes], { type: 'image/png' });
