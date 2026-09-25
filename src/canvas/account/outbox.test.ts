@@ -32,8 +32,8 @@ function storage(initial: JournalRecord[] = []) {
   return { rows, fail(value: boolean) { fail = value; } };
 }
 afterEach(() => { vi.unstubAllGlobals(); });
-const scope = { accountId: 'member', boardId: 'board', generation: 1 };
-const descriptor = { summary: { id: 'board', accountId: 'member', role: 'owner' }, rootDocId: 'root', contentDocId: 'content', capabilities: ['write'] } as BoardDescriptor;
+const scope = { accountId: 'member', boardId: 'board', generation: 1, recoveryEpoch: '11111111-1111-4111-8111-111111111111' };
+const descriptor = { summary: { id: 'board', accountId: 'member', role: 'owner' }, rootDocId: 'root', contentDocId: 'content', capabilities: ['write'], recoveryEpoch: scope.recoveryEpoch } as BoardDescriptor;
 
 it('persists file bytes and MIME before reporting success and retries the same record after storage failure', async () => {
   const db = storage(); const failure = vi.fn(); const journal = new AccountJournal(scope, failure);
@@ -54,10 +54,19 @@ for (const legacy of [false, true]) it(`replays ${legacy ? 'legacy Blob' : 'byte
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
     expect(new Headers(init.headers).get('Content-Type')).toBe('image/png');
     expect(new Uint8Array(await new Response(init.body).arrayBuffer())).toEqual(bytes);
-    return Response.json({ acknowledged: acknowledge, key: 'image' });
+    return Response.json({ acknowledged: acknowledge, key: 'image' }, { headers: { 'X-Dali-Recovery-Epoch': scope.recoveryEpoch } });
   }));
   await expect(replayJournal(descriptor, 'member', new AbortController().signal)).rejects.toThrow('unconfirmed');
   expect(db.rows.get('pending')).toBe(record);
   acknowledge = true; await expect(replayJournal(descriptor, 'member', new AbortController().signal)).resolves.toBe(true);
   expect(db.rows.size).toBe(0);
+});
+
+it('@04-02-02 epoch-less and stale journal records remain intact without network replay', async () => {
+  for (const recoveryEpoch of [undefined, '22222222-2222-4222-8222-222222222222']) {
+    const record: JournalRecord = { ...scope, recoveryEpoch, id: 'retained', sequence: 1, kind: 'document', resource: 'content', data: new Uint8Array([0]) };
+    const db = storage([record]); const request = vi.fn(); vi.stubGlobal('fetch', request);
+    await expect(replayJournal(descriptor, 'member', new AbortController().signal)).rejects.toThrow('recovery state');
+    expect(request).not.toHaveBeenCalled(); expect(db.rows.get(record.id)).toBe(record);
+  }
 });

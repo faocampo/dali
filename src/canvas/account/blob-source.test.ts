@@ -3,9 +3,19 @@ import { BoardBlobSource } from './blob-source';
 import { RecoveryEpochError } from './doc-source';
 
 const key = 'a'.repeat(43) + '=';
-const options = () => ({ boardId: 'board', rootDocId: 'root', contentDocId: 'content', accountId: 'member', generation: 1, isCurrent: () => true });
+const epoch = '11111111-1111-4111-8111-111111111111';
+const options = () => ({ boardId: 'board', rootDocId: 'root', contentDocId: 'content', accountId: 'member', generation: 1, isCurrent: () => true, getRecoveryEpoch: () => epoch });
 const image = () => new Blob(['synthetic-raster'], { type: 'image/png' });
 describe('BoardBlobSource', () => {
+  it.each(['other-key', 'missing-epoch', 'other-epoch', 'late-epoch'])('@04-02-02 %s image response cannot clear pending records', async fault => {
+    let currentEpoch = epoch; const ack = vi.fn();
+    const source = new BoardBlobSource({ ...options(), getRecoveryEpoch: () => currentEpoch, onAcknowledged: ack, fetch: vi.fn<typeof fetch>(async (_input, init) => {
+      expect(new Headers(init?.headers).get('X-Dali-Recovery-Epoch')).toBe(epoch);
+      if (fault === 'late-epoch') currentEpoch = '22222222-2222-4222-8222-222222222222';
+      return Response.json({ acknowledged: true, key: fault === 'other-key' ? 'b'.repeat(43) + '=' : key }, { headers: fault === 'missing-epoch' ? {} : { 'X-Dali-Recovery-Epoch': fault === 'other-epoch' ? 'other' : epoch } });
+    }) });
+    await expect(source.set(key, image())).rejects.toThrow(); expect(ack).not.toHaveBeenCalled();
+  });
   it('@04-02-02 recovery mismatch stays distinct from access loss and never acknowledges', async () => {
     const ack = vi.fn(); const lost = vi.fn();
     const source = new BoardBlobSource({ ...options(), getRecoveryEpoch: () => '11111111-1111-4111-8111-111111111111', onAcknowledged: ack, onAuthorizationLost: lost,
@@ -14,7 +24,7 @@ describe('BoardBlobSource', () => {
     expect(ack).not.toHaveBeenCalled(); expect(lost).not.toHaveBeenCalled();
   });
   it('persists pending bytes before PUT and acknowledges only the server-confirmed key', async () => {
-    const events: string[] = []; const fetcher = vi.fn<typeof fetch>(async () => { events.push('request'); return Response.json({ acknowledged: true, key }); });
+    const events: string[] = []; const fetcher = vi.fn<typeof fetch>(async () => { events.push('request'); return Response.json({ acknowledged: true, key }, { headers: { 'X-Dali-Recovery-Epoch': epoch } }); });
     const source = new BoardBlobSource({ ...options(), fetch: fetcher, onPendingBlob: async (pendingKey, blob) => { expect(pendingKey).toBe(key); expect(await blob.text()).toBe('synthetic-raster'); events.push('pending'); return 4; }, onAcknowledged: token => { expect(token).toBe(4); events.push('ack'); } });
     expect(await source.set(key, image())).toBe(key); expect(events).toEqual(['pending', 'request', 'ack']);
     expect(fetcher.mock.calls[0]![0]).toBe('/api/boards/board/blobs/' + encodeURIComponent(key));

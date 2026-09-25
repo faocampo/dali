@@ -156,7 +156,7 @@ function AccountImagesAndPreview({ host, runtime }: { host: EditorHost; runtime:
         const blob = await new Promise<Blob | null>(resolve => preview.toBlob(resolve, 'image/png'));
         if (!blob || blob.size > 512 * 1024 || !active() || controller.signal.aborted || version !== revision || !getActiveAccessScope()?.canWrite) return;
         await fetch(`/api/boards/${encodeURIComponent(runtime.scope.boardId)}/thumbnail`, { method: 'PUT', cache: 'no-store', signal: controller.signal,
-          headers: { 'X-Dali-Account': runtime.scope.accountId, 'X-Dali-Request': '1', 'Content-Type': 'image/png' }, body: blob });
+          headers: { 'X-Dali-Account': runtime.scope.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': runtime.descriptor.recoveryEpoch, 'Content-Type': 'image/png' }, body: blob });
       } catch { /* Preview failure does not alter document acknowledgement. */ }
     };
     const changed = () => { const version = ++revision; clearTimeout(timer); timer = window.setTimeout(() => { void publish(version); }, 800); };

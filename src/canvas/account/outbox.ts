@@ -1,7 +1,7 @@
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
-import { SourceAccessError } from './doc-source';
+import { SourceAccessError, RecoveryEpochError, validRecoveryEpoch } from './doc-source';
 
-export type JournalScope = { accountId: string; boardId: string; generation: number };
+export type JournalScope = { accountId: string; boardId: string; generation: number; recoveryEpoch?: string };
 export type JournalRecord = JournalScope & { id: string; sequence: number; kind: 'document' | 'blob'; resource: string; data: Uint8Array | Blob; mime?: string };
 const databaseName = 'dali-account-recovery-v1';
 async function database(): Promise<IDBDatabase> {
@@ -71,6 +71,8 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
   const records = (await pendingRecords(accountId, descriptor.summary.id)).filter(record => !blobsOnly || record.kind === 'blob');
   if (!records.length) return false;
   if (descriptor.summary.role === 'viewer' || !descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
+  const epoch = descriptor.recoveryEpoch;
+  if (!validRecoveryEpoch(epoch) || records.some(record => record.recoveryEpoch !== epoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
   const ordered = [...records.filter(r => r.kind === 'blob'), ...records.filter(r => r.kind === 'document')];
   for (const record of ordered) {
     if (signal.aborted) throw new Error('Recovery interrupted');
@@ -78,12 +80,17 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
     const base = `/api/boards/${encodeURIComponent(descriptor.summary.id)}`;
     const response = await fetch(record.kind === 'blob' ? `${base}/blobs/${encodeURIComponent(record.resource)}` : `${base}/docs/${encodeURIComponent(record.resource)}/push`, {
       method: record.kind === 'blob' ? 'PUT' : 'POST', credentials: 'same-origin', cache: 'no-store', signal,
-      headers: { 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': record.data instanceof Blob ? record.data.type : record.kind === 'blob' ? record.mime || 'application/octet-stream' : 'application/octet-stream' },
+      headers: { 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': epoch, 'Content-Type': record.data instanceof Blob ? record.data.type : record.kind === 'blob' ? record.mime || 'application/octet-stream' : 'application/octet-stream' },
       body: record.data instanceof Blob ? record.data : new Uint8Array(record.data),
     });
-    if (!response.ok) throw [401, 403, 404, 409].includes(response.status) ? new SourceAccessError(response.status) : new Error('Pending changes could not be applied. Try again.');
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as { code?: string };
+      if (body.code === 'RECOVERY_EPOCH_REQUIRED' || body.code === 'RECOVERY_EPOCH_MISMATCH') throw new RecoveryEpochError(body.code);
+      throw [401, 403, 404].includes(response.status) || (response.status === 409 && body.code === 'IDENTITY_CHANGED') ? new SourceAccessError(response.status) : new Error('Pending changes could not be applied. Try again.');
+    }
     const result: unknown = await response.json();
     if (signal.aborted) throw new Error('Recovery interrupted');
+    if (descriptor.recoveryEpoch !== epoch || response.headers.get('X-Dali-Recovery-Epoch') !== epoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
     if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true ||
       (record.kind === 'blob' && (!('key' in result) || result.key !== record.resource))) throw new Error('Recovery commit unconfirmed');
     await acknowledgeRecord(record.id);

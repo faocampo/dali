@@ -9,6 +9,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { initializeRecoveryState, readRecoveryEpoch } from '../storage/recovery-state.js';
+import { syntheticCanaries } from '../../tests/access-fixtures.js';
+import { imageHash } from './blobs.js';
 
 let app: FastifyInstance; let database: AccountDatabase;
 let provider: Awaited<ReturnType<typeof createOidcProvider>>;
@@ -89,4 +91,24 @@ it('@04-02-01 request held across epoch rotation cannot commit', async () => {
   const response = Promise.resolve(request); await waiting;
   database.prepare('UPDATE recovery_state SET epoch=?').run(randomUUID()); release();
   expect((await response).json()).toEqual({ code: 'RECOVERY_EPOCH_MISMATCH' }); expect(snapshot()).toEqual(before); doc.destroy();
+});
+
+it('@04-02-02 old image and metadata epochs reject while current actions stay usable', async () => {
+  const png = syntheticCanaries().imageBytes; const key = imageHash(png); const base = '/api/boards/' + board.summary.id;
+  const before = snapshot();
+  for (const epoch of ['', randomUUID()]) {
+    for (const [method, url, payload, mime] of [
+      ['PUT', base + '/blobs/' + key, png, 'image/png'], ['DELETE', base + '/blobs/' + key, '{}', 'application/json'],
+      ['PUT', base + '/thumbnail', png, 'image/png'],
+      ['PATCH', base, { operationId: randomUUID(), revision: 1, title: 'stale' }, 'application/json'],
+      ['DELETE', base, { operationId: randomUUID(), revision: 1 }, 'application/json'],
+    ] as const) {
+      const result = await app.inject({ method, url, headers: { ...headers('owner', epoch), 'content-type': mime }, payload });
+      expect(result.statusCode).toBe(409); expect(result.json().code).toBe(epoch ? 'RECOVERY_EPOCH_MISMATCH' : 'RECOVERY_EPOCH_REQUIRED'); expect(snapshot()).toEqual(before);
+    }
+  }
+  const image = await app.inject({ method: 'PUT', url: base + '/blobs/' + key, headers: { ...headers(), 'content-type': 'image/png' }, payload: png });
+  expect(image.statusCode).toBe(200); expect(image.headers['x-dali-recovery-epoch']).toBe(board.recoveryEpoch);
+  expect((await app.inject({ method: 'PATCH', url: base, headers: headers(), payload: { operationId: randomUUID(), revision: 1, title: 'current' } })).statusCode).toBe(200);
+  expect((await app.inject({ method: 'DELETE', url: base, headers: headers(), payload: { operationId: randomUUID(), revision: 2 } })).statusCode).toBe(200);
 });

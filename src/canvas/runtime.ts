@@ -88,7 +88,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   abort = new AbortController(); const requestAbort = abort;
   options.signal?.addEventListener('abort', () => requestAbort.abort(), { once: true });
   capture = [];
-  const scopedJournal = new AccountJournal(initial, () => { queueMicrotask(() => { void interruptSession(); }); });
+  const scopedJournal = new AccountJournal({ ...initial, recoveryEpoch: options.descriptor.recoveryEpoch }, () => { queueMicrotask(() => { void interruptSession(); }); });
   journal = scopedJournal;
   const isCurrent = () => scope?.generation === initial.generation && scope.phase === 'active';
   const promise = replayJournal(options.descriptor, options.accountId, requestAbort.signal).then(() => import('./account/board-workspace')).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, isCurrent,

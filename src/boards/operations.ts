@@ -20,6 +20,7 @@ import { validSummary, type BoardDescriptor } from './BoardLibrary';
 import * as Y from 'yjs';
 import { createAccountWorkspace, createStagingWorkspace } from '../canvas/account/board-workspace';
 import { synchronizeActiveBoard } from '../canvas/runtime';
+import { authenticatedRecoveryEpoch, RecoveryEpochError, validRecoveryEpoch } from '../canvas/account/doc-source';
 
 export function validateBoardTitle(draft: string, acknowledged: string): string {
   const title = draft.trim() || acknowledged;
@@ -67,19 +68,22 @@ export class AccountBoardAction {
   readonly operationId = crypto.randomUUID();
   private payload?: { title?: string; revision: number; operationId: string };
   private assertActive?: () => void;
+  private epoch?: string;
   constructor(readonly accountId: string, readonly boardId: string, readonly kind: 'rename' | 'delete' | 'duplicate') {}
   private async request(path: string, init: RequestInit = {}) {
     this.assertActive?.();
     let response: Response;
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 10000);
-    try { response = await fetch(path, { ...init, signal: controller.signal, cache: 'no-store', headers: { 'X-Dali-Account': this.accountId, 'X-Dali-Request': '1', 'Content-Type': 'application/json', ...init.headers } }); }
+    try { response = await fetch(path, { ...init, signal: controller.signal, cache: 'no-store', headers: { 'X-Dali-Account': this.accountId, 'X-Dali-Request': '1', 'Content-Type': 'application/json', ...(this.epoch ? { 'X-Dali-Recovery-Epoch': this.epoch } : {}), ...init.headers } }); }
     catch { throw new BoardActionError("We couldn't confirm this change. Check again before retrying.", true); }
     finally { clearTimeout(timer); }
     this.assertActive?.();
     if (!response.ok) {
       const error = await response.json().catch(() => ({})) as { code?: string };
+      if (error.code === 'RECOVERY_EPOCH_REQUIRED' || error.code === 'RECOVERY_EPOCH_MISMATCH') throw new RecoveryEpochError(error.code);
       throw new BoardActionError(error.code === 'TITLE_TOO_LONG' ? 'Use a board name of 200 characters or fewer.' : ['SOURCE_CHANGED', 'BOARD_CHANGED'].includes(error.code ?? '') ? 'This board changed. Try again with a fresh copy.' : response.status >= 500 ? "We couldn't confirm this change. Check again before retrying." : 'This change could not be saved. Refresh board access and try again.', response.status >= 500);
     }
+    if (init.method && init.method !== 'GET' && this.epoch && response.headers.get('X-Dali-Recovery-Epoch') !== this.epoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
     return response;
   }
   async check(): Promise<{ status: string; result?: BoardDescriptor & { deleted?: boolean; boardId?: string } }> {
@@ -91,6 +95,8 @@ export class AccountBoardAction {
     if (this.kind !== 'duplicate') {
       if (!this.payload) {
         const descriptor = await (await this.request(path)).json() as BoardDescriptor;
+        if (!validRecoveryEpoch(descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_REQUIRED');
+        this.epoch = descriptor.recoveryEpoch;
         this.payload = { operationId: this.operationId, revision: descriptor.revision, ...(this.kind === 'rename' ? { title: validateBoardTitle(title ?? '', descriptor.summary.title) } : {}) };
       }
       try { return await (await this.request(path, { method: this.kind === 'rename' ? 'PATCH' : 'DELETE', body: JSON.stringify(this.payload) })).json(); }
@@ -98,6 +104,9 @@ export class AccountBoardAction {
     }
     this.assertActive = await synchronizeActiveBoard(this.accountId, this.boardId);
     const exported = await (await this.request(path + '/editable-export')).json() as { descriptor: BoardDescriptor; root: string; content: string; manifest: string[] };
+    if (!validRecoveryEpoch(exported.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_REQUIRED');
+    if (this.epoch && this.epoch !== exported.descriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+    this.epoch ??= exported.descriptor.recoveryEpoch;
     const copyTitle = validateBoardTitle(title ?? exported.descriptor.summary.title, exported.descriptor.summary.title);
     const reserved = previous.status === 'staging' ? previous : await (await this.request(path + '/duplicate', { method: 'POST', body: JSON.stringify({ operationId: this.operationId, revision: exported.descriptor.revision, title: copyTitle }) })).json() as { status: string; result: BoardDescriptor };
     if (reserved.status === 'completed') return reserved.result!;
@@ -157,10 +166,11 @@ export async function createAccountBoard(accountId: string, operationId: string,
     if (known.status !== 'unknown') throw new Error('Board creation is pending');
   };
   const previous = await reconcile(); if (previous) return previous;
+  const epoch = await authenticatedRecoveryEpoch(accountId, signal);
   const timeout = new AbortController(); const abort = () => timeout.abort();
   signal?.addEventListener('abort', abort, { once: true }); const timer = setTimeout(abort, 10_000);
   try {
-    const response = await fetch('/api/boards', { method: 'POST', headers, signal: timeout.signal, body: JSON.stringify({ operationId, title: 'Untitled board' }) });
+    const response = await fetch('/api/boards', { method: 'POST', headers: { ...headers, 'X-Dali-Recovery-Epoch': epoch }, signal: timeout.signal, body: JSON.stringify({ operationId, title: 'Untitled board' }) });
     if (!response.ok) throw new Error('Board creation is unavailable');
     return validate(await response.json() as BoardDescriptor);
   } catch (cause) {
