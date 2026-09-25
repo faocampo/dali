@@ -6,6 +6,20 @@ import { join } from 'node:path';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { createOidcProvider } from './oidc-provider.js';
+import { IDENTITY_COOKIE } from './oidc-provider.js';
+
+/** Signed OIDC authorization-code flow for HTTP-only crash tests. */
+export async function durabilityActor(origin: string, identity = 'owner') {
+  const start = await fetch(origin + '/auth/start', { redirect: 'manual' });
+  const browserCookie = start.headers.getSetCookie().at(-1)!.split(';')[0]!;
+  const authorize = await fetch(start.headers.get('location')!, { redirect: 'manual', headers: { cookie: `${IDENTITY_COOKIE}=${identity}` } });
+  const callback = await fetch(authorize.headers.get('location')!, { redirect: 'manual', headers: { cookie: browserCookie } });
+  const cookie = callback.headers.getSetCookie().at(-1)!.split(';')[0]!;
+  const session = await fetch(origin + '/api/session', { headers: { cookie } });
+  if (session.status !== 200) throw new Error('Synthetic signed authentication failed');
+  const member = await session.json() as { accountId: string };
+  return { cookie, 'x-dali-account': member.accountId, 'x-dali-request': '1', origin };
+}
 
 export async function createDurabilityService(assets: string) {
   const directory = await mkdtemp(join(tmpdir(), 'dali-durability-'));

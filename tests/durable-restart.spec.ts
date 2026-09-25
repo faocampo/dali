@@ -1,9 +1,20 @@
 import { test, expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { createHash, randomUUID } from 'node:crypto';
 import { createDurabilityService } from './durability-fixtures';
 import { syntheticCanaries } from './access-fixtures';
+import { imageHash } from '../server/boards/blobs';
+
+function collectErrors(context: BrowserContext, errors: string[]) {
+  context.on('page', page => {
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => {
+      // An unauthenticated entry intentionally checks /api/session before OIDC.
+      if (message.type() === 'error' && !message.text().includes('401 (Unauthorized)')) errors.push(message.text());
+    });
+  });
+}
 
 async function snapshot(page: Page) {
   return page.locator('affine-edgeless-root').evaluate(async el => {
@@ -21,6 +32,7 @@ async function snapshot(page: Page) {
 test('@04-01-01 acknowledged native sticky and PNG survive SIGKILL and cold sign-in', async ({ browser, baseURL }) => {
   const service = await createDurabilityService(baseURL!);
   const first = await browser.newContext({ baseURL: service.origin });
+  const errors: string[] = []; collectErrors(first, errors);
   try {
     expect(service.pragmas, 'persistent connections require verified WAL/FULL/foreign keys').toEqual({ journal: 'wal', synchronous: 2, foreignKeys: 1 });
     const page = await first.newPage(); await page.goto('/auth/start');
@@ -44,6 +56,7 @@ test('@04-01-01 acknowledged native sticky and PNG survive SIGKILL and cold sign
     expect(before.images[0]!.hash).toBe(createHash('sha256').update(png).digest('hex'));
     await first.close(); await service.killAndRestart();
     const cold = await browser.newContext({ baseURL: service.origin });
+    collectErrors(cold, errors);
     try {
       expect((await cold.storageState()).origins).toEqual([]);
       const reopened = await cold.newPage(); await reopened.goto('/?board=' + board.summary.id);
@@ -54,5 +67,48 @@ test('@04-01-01 acknowledged native sticky and PNG survive SIGKILL and cold sign
       const descriptor = await (await cold.request.get('/api/boards/' + board.summary.id, { headers })).json();
       expect(descriptor.rootDocId).toBe(board.rootDocId); expect(descriptor.contentDocId).toBe(board.contentDocId);
     } finally { await cold.close(); }
-  } finally { await first.close(); await service.close(); }
+  } finally { await first.close(); await service.close(); expect(errors).toEqual([]); }
+});
+
+test('@04-01-02 normal restart preserves data and denies another cold account', async ({ browser, baseURL }) => {
+  const service = await createDurabilityService(baseURL!);
+  const first = await browser.newContext({ baseURL: service.origin });
+  const errors: string[] = []; collectErrors(first, errors);
+  const png = syntheticCanaries().imageBytes; const key = imageHash(png);
+  try {
+    const page = await first.newPage(); await page.goto('/auth/start');
+    await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+    const owner = await (await first.request.get('/api/session')).json();
+    const headers = { Origin: service.origin, 'X-Dali-Account': owner.accountId, 'X-Dali-Request': '1' };
+    const created = await first.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Private durable canary' } });
+    expect(created.status()).toBe(201); const board = await created.json();
+    const blobPath = `/api/boards/${board.summary.id}/blobs/${key}`;
+    expect(await (await first.request.put(blobPath, { headers: { ...headers, 'Content-Type': 'image/png' }, data: png })).json()).toEqual({ acknowledged: true, key });
+    await first.close(); await service.killAndRestart('SIGTERM');
+    for (const identity of ['Synthetic Internal Member', 'Synthetic Owner']) {
+      const cold = await browser.newContext({ baseURL: service.origin });
+      collectErrors(cold, errors);
+      try {
+        expect(await cold.storageState()).toEqual({ cookies: [], origins: [] });
+        const tab = await cold.newPage(); await tab.goto('/auth/start');
+        await tab.getByRole('link', { name: identity, exact: true }).click();
+        await expect(tab.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+        const member = await (await cold.request.get('/api/session')).json();
+        const scoped = { ...headers, 'X-Dali-Account': member.accountId };
+        const descriptor = await cold.request.get('/api/boards/' + board.summary.id, { headers: scoped });
+        const image = await cold.request.get(blobPath, { headers: scoped });
+        const document = await cold.request.post(`/api/boards/${board.summary.id}/docs/${board.contentDocId}/pull`, { headers: { ...scoped, 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0]) });
+        if (identity === 'Synthetic Owner') {
+          expect(descriptor.status()).toBe(200); expect(document.status()).toBe(200); expect(image.status()).toBe(200);
+          expect((await descriptor.json()).contentDocId).toBe(board.contentDocId);
+          expect(createHash('sha256').update(await image.body()).digest('hex')).toBe(createHash('sha256').update(png).digest('hex'));
+          await tab.goto('/?board=' + board.summary.id); await expect(tab.locator('editor-host')).toBeVisible();
+        } else {
+          for (const response of [descriptor, document, image]) { expect(response.status()).toBe(404); expect(await response.text()).not.toContain('Private durable canary'); }
+          expect((await image.body()).includes(png)).toBe(false);
+        }
+      } finally { await cold.close(); }
+    }
+  } finally { await first.close(); await service.close(); expect(errors).toEqual([]); }
 });
