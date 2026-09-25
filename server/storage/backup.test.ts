@@ -86,6 +86,11 @@ it('@04-10-01 online backup during writes publishes a complete independently reo
   } finally { await fresh.close(); freshDb.close(); }
 });
 
+it('@04-10-02 concurrent triggers share one complete publication', async () => {
+  const [first, second] = await Promise.all([publishBackup(options()), publishBackup(options())]);
+  expect(second.id).toBe(first.id); expect(second.manifest).toEqual(first.manifest);
+});
+
 for (const corruption of ['missing-image', 'document', 'image-hash', 'schema', 'binding', 'foreign-key'] as const) it(`@04-10-01 rejects ${corruption} in a real SQLite copy`, async () => {
   const path = join(directory, 'invalid.sqlite'); await database.backup(path); const copy = new Database(path); copy.pragma('foreign_keys=OFF');
   if (corruption === 'missing-image') copy.prepare('DELETE FROM board_blobs').run();
