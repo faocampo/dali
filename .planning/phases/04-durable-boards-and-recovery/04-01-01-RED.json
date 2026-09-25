@@ -1,0 +1,10 @@
+{
+  "command": "npm exec playwright test -- tests/durable-restart.spec.ts --project=prod --grep @04-01-01",
+  "exitCode": 1,
+  "targetTest": "@04-01-01 acknowledged native sticky and PNG survive SIGKILL and cold sign-in",
+  "targetFile": "tests/durable-restart.spec.ts",
+  "expected": "journal=wal, synchronous=2, foreignKeys=1",
+  "actual": "journal=delete, synchronous=2, foreignKeys=1",
+  "normalization": "Playwright list reporter result normalized to TAP for the GSD TAP-only classifier; one selected test failed at the pragma equality assertion.",
+  "output": "not ok 1 - @04-01-01 acknowledged native sticky and PNG survive SIGKILL and cold sign-in\n# tests 1\n# pass 0\n# fail 1\n"
+}

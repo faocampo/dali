@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const DEV_URL = 'http://127.0.0.1:5494';
 const PROD_URL = 'http://127.0.0.1:5493';
 const DEV_ONLY = /account-workspace\.spec\.ts/;
-const ACCESS_SUITES = /(?:authentication|board-access|board-library|board-sharing|board-actions|board-roles|session-recovery|local-board-import|access-boundaries|accessibility-access)\.spec\.ts/;
+const ACCESS_SUITES = /(?:authentication|board-access|board-library|board-sharing|board-actions|board-roles|session-recovery|local-board-import|access-boundaries|accessibility-access|durable-restart)\.spec\.ts/;
 
 export default defineConfig({
   testDir: './tests',
