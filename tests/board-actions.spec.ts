@@ -1,4 +1,4 @@
-import { boardAction, openBoardActions, editBoardTitle, fileAction } from './app-menu';
+import { boardAction, openBoardActions, editBoardTitle, fileAction, openAccount } from './app-menu';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { Page } from '@playwright/test';
@@ -185,7 +185,7 @@ test('@03-08-01 Unicode rename blank bounds acknowledgment and named safe-focus 
   await boardAction(card(page, board.summary.id), 'Delete board'); dialog = page.getByRole('dialog', { name: 'Delete board' });
   await expect(dialog).toContainText(title); await expect(dialog.getByRole('button', { name: 'Keep board' })).toBeFocused();
   await expect(dialog).toContainText(`Delete “${title}”? This removes the board and its access grants for everyone. This cannot be undone.`);
-  await expect(dialog.getByRole('button', { name: 'Delete board', exact: true })).toHaveCSS('color', 'rgb(178, 59, 50)');
+  await expect(dialog.getByRole('button', { name: 'Delete board', exact: true })).toHaveCSS('color', 'rgb(177, 45, 82)');
   await dialog.getByRole('button', { name: 'Keep board' }).click(); await expect(card(page, board.summary.id).locator('.board-card__actions summary')).toBeFocused();
   await boardAction(card(page, board.summary.id), 'Delete board'); await dialog.getByRole('button', { name: 'Delete board', exact: true }).click();
   await expect(card(page, board.summary.id)).toHaveCount(0); await expect(page.getByRole('button', { name: 'New board', exact: true })).toBeFocused();
@@ -285,11 +285,18 @@ test('@03-08-02 inline naming is acknowledged composition-safe and responsive wi
   // Collapse the initially selected name to its end; End only scrolls on macOS Firefox.
   await input.press('ArrowRight');
   expect(await input.evaluate(el => { const field = el as HTMLInputElement; return { caret: field.selectionStart, length: field.value.length, scroll: field.scrollLeft > 0 }; })).toEqual({ caret: title.length, length: title.length, scroll: true });
-  await expect(page.getByText('Owner', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Share board', exact: true }).click();
+  await openAccount(page); await expect(page.getByText('Owner', { exact: true })).toBeVisible(); await page.getByRole('button', { name: 'Share board', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Share board' })).toBeVisible(); await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Share board', exact: true })).toBeFocused();
   await page.locator('.board-account summary').click(); await expect(page.getByRole('button', { name: 'Sign out of Dalí', exact: true })).toBeVisible();
-  expect(await page.locator('.djai-header').evaluate(el => { const bounds = el.getBoundingClientRect(); return [...el.querySelectorAll('button, summary, input')].filter(node => (node as HTMLElement).offsetParent).every(node => { const rect = node.getBoundingClientRect(); return rect.x >= 0 && rect.right <= innerWidth && rect.height >= 44 && rect.y >= bounds.y; }); })).toBe(true);
+  expect(await page.locator('.djai-header').evaluate(el => {
+    const bounds = el.getBoundingClientRect();
+    return [...el.querySelectorAll('button, summary, input')].filter(node => (node as HTMLElement).offsetParent).flatMap(node => {
+      const rect = node.getBoundingClientRect();
+      return rect.x >= 0 && rect.right <= innerWidth && rect.height >= 44 && rect.y >= bounds.y ? []
+        : [{ control: (node.getAttribute('aria-label') || node.textContent || '').slice(0, 60), x: rect.x, right: rect.right, height: rect.height, y: rect.y }];
+    });
+  })).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 test('@03-08-02 long library rename labels and errors wrap within 490px without losing draft', async ({ page }) => {
@@ -312,6 +319,8 @@ test('@03-08-02 inline loading guards repeated commits and uncertain failure ret
   expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Pending name' }); await page.getByRole('button', { name: 'Check again' }).click(); await expect(input).toBeEnabled();
   await page.unroute('**/api/boards/' + board.summary.id); await input.fill('Corrected draft'); await input.press('Tab');
   await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Corrected draft' });
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Share board', exact: true })).toBeFocused();
   await editBoardTitle(page); await input.fill('界'.repeat(201)); await input.press('Enter'); await expect(input).toHaveValue('界'.repeat(201)); await expect(page.getByRole('alert')).toContainText('200');
   await expect(input).toHaveAttribute('aria-describedby', 'board-title-error');
@@ -326,7 +335,7 @@ test('@03-08-02 Viewer readable title account controls and Main Menu preserve ro
   await page.setViewportSize({ width: 490, height: 800 }); await page.goto(origin + '/?board=' + board.summary.id);
   await expect(page.locator('affine-edgeless-root')).toBeVisible(); await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: title, exact: true })).toHaveCSS('font-weight', '600');
-  await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveCount(0); await expect(page.getByText('Viewer · View only', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: 'Share board' })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveCount(0); await openAccount(page); await expect(page.getByText('Viewer · View only', { exact: true })).toBeVisible(); await expect(page.getByRole('button', { name: 'Share board' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Main Menu', exact: true }).click(); await page.getByRole('menuitem', { name: 'File', exact: true }).click();
   await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeVisible(); await expect(page.getByRole('menuitem', { name: 'Duplicate board' })).toHaveCount(0); await expect(page.getByRole('menuitem', { name: 'Delete board' })).toHaveCount(0);
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.locator('.board-account summary').click(); await expect(page.getByRole('button', { name: 'Sign out of Dalí' })).toBeVisible();

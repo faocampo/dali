@@ -144,7 +144,9 @@ test('@03-02-01 ordinary entry signs in through OIDC and explicit logout stays s
   }
   const session = await context.request.get('/api/session');
   expect(session.status()).toBe(200);
-  expect(Object.keys(await session.json()).sort()).toEqual(['accountId', 'displayName', 'email', 'expiresAt']);
+  const descriptor = await session.json();
+  expect(Object.keys(descriptor).sort()).toEqual(['accountId', 'displayName', 'email', 'expiresAt', 'systemRole']);
+  expect(descriptor.systemRole).toBe('member');
   expect(session.headers()['cache-control']).toBe('private, no-store');
   await page.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
   await expect(page.getByRole('heading', { name: "You're signed out of Dalí" })).toBeFocused();

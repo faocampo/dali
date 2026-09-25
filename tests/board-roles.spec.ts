@@ -61,8 +61,8 @@ test('@CR-07 Viewer import is disabled with an accessible reason and keyboard na
   await page.getByRole('button', { name: 'Main Menu', exact: true }).focus(); await page.keyboard.press('Enter');
   await expect(page.getByRole('menuitem', { name: 'File', exact: true })).toBeFocused(); await page.keyboard.press('ArrowRight');
   const item = page.getByRole('menuitem', { name: 'Import board', exact: true });
-  await expect(item).toBeDisabled(); await expect(item).toHaveAccessibleDescription('Board import requires Owner or Editor access.');
-  await expect(page.getByText('Board import requires Owner or Editor access.', { exact: true })).toBeHidden();
+  await expect(item).toBeDisabled(); await expect(item).toHaveAccessibleDescription('Board import requires permission to create boards.');
+  await expect(page.getByText('Board import requires permission to create boards.', { exact: true })).toBeHidden();
   await expect(page.getByRole('menuitem', { name: 'New', exact: true })).toBeFocused(); await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'All boards', exact: true })).toBeFocused(); await page.keyboard.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'Export board', exact: true })).toBeFocused(); await page.keyboard.press('ArrowUp');

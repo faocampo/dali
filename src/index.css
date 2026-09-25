@@ -1756,8 +1756,8 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 .djai-header .djai-brand img { width: 40px; height: 40px; }
 .djai-header .dali-menu-trigger { background: transparent; border-color: var(--dali-line); border-radius: 10px; color: var(--dali-ink); }
 .board-document-heading { display:flex; align-items:center; gap:8px; flex:1; min-width:0; }
-.board-document-heading .board-title-inline { flex:0 1 auto; margin-right:0; }
-.board-document-heading .board-title-label, .board-document-heading .board-title-inline input { min-height:36px; }
+.board-document-heading .board-title-inline { flex:0 1 auto; margin-right:0; max-width:100%; }
+.board-document-heading .board-title-label, .board-document-heading .board-title-inline input { min-height:44px; }
 .board-document-heading .board-title-readable { margin:0; }
 .djai-header .djai-header-actions { margin-left:auto; flex-wrap:nowrap; gap:12px; }
 .djai-header-actions > .djai-ghost { background:var(--dali-accent); border:1px solid var(--dali-accent); color:var(--dali-surface); border-radius:10px; }
@@ -1778,7 +1778,7 @@ main.session-recovery, section.session-recovery { margin: 16px auto; }
 affine-edgeless-note { --affine-font-base:24px; --affine-font-h-1:32px; --affine-line-height:1.35; }
 @media (max-width: 900px) {
   .board-document-heading { align-items:flex-start; flex-direction:column; gap:0; }
-  .board-document-heading .djai-save__status { min-height:20px; padding:0 8px; }
+  .board-document-heading .djai-save__status { min-height:44px; padding:0 8px; }
   .djai-header .board-account__name { display:none; }
 }
 @media (max-width: 600px) {

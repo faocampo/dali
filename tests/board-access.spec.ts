@@ -18,7 +18,7 @@ async function journalRecords(page: Page) {
   }));
 }
 async function expectAcknowledgedJournal(page: Page, retained: unknown[] = []) {
-  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   expect(await page.evaluate(async () => (await indexedDB.databases()).map(db => db.name))).toEqual(['dali-account-recovery-v1']);
   await expect.poll(() => journalRecords(page)).toEqual(retained);
 }
@@ -31,7 +31,7 @@ test('@03-06-02 two New commands create distinct private tabs and preserve the s
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Preserved source title' } })).json();
   await page.goto('/?board=' + board.summary.id); await expect(page.locator('editor-host')).toBeVisible();
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.press('Escape');
-  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const sourceBytes = await (await context.request.post(`/api/boards/${board.summary.id}/docs/${board.contentDocId}/pull`, { headers: { ...headers, 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0]) })).body();
   const destinations: string[] = []; const errors: string[] = [];
   for (let index = 0; index < 2; index++) {
@@ -106,7 +106,7 @@ test('@03-06-01 authorized deep link mounts native editing and cold reopen retai
   await expect(page.locator('editor-host'), 'authorized account board mounts the native canvas').toBeVisible();
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
   await expect.poll(() => page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.surface!.elementModels.filter(model => model.type === 'mindmap').length)).toBe(1);
-  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   const cold = await browser.newContext({ baseURL });
   try {
     const tab = await cold.newPage();
@@ -143,7 +143,7 @@ test('@03-06-01 loading blank board gates mutations and native history publishes
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   const push = page.waitForResponse(response => response.url().includes('/docs/') && response.url().endsWith('/push') && response.ok());
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.press('Escape'); await push;
-  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   await expect.poll(async () => (await context.request.get(`/api/boards/${board.summary.id}/thumbnail`, { headers })).status()).toBe(200);
   const preview = await context.request.get(`/api/boards/${board.summary.id}/thumbnail`, { headers });
   expect((await preview.body()).subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
@@ -181,7 +181,7 @@ test('@03-06-01 image loading missing retry and lost authorization clear protect
   await page.goto('/?board=' + board.summary.id);
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic-canary.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes });
   await expect(page.locator('affine-edgeless-image img')).toBeVisible();
-  await expect(page.getByText('Saved', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   let release!: () => void; const hold = new Promise<void>(resolve => { release = resolve; });
   let phase: 'missing' | 'ready' | 'denied' = 'missing'; let reads = 0;
   await page.route('**/api/boards/*/blobs/*', async route => {
