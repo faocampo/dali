@@ -280,3 +280,14 @@ Positive source evidence: loading library cards are decorative/noninteractive; f
 ## Final automated gate disposition
 
 The acceptance executor subsequently completed **1,533/1,533 browser cases in 57.1m**, at source/test candidate `73416723411ca2c5b98de090f6d5327ed9e076c7`, with no failure, timeout, skip, interruption or unrun case. Application UI is unchanged from reviewed `6d6dade`; the intervening six-file change concerns fixture readiness only. This executor evidence is separate from the auditor’s source and screenshot inspection above. Newly generated synthetic screenshots have not been relabeled as independently inspected. Actual native zoom, OS IME, assistive-technology speech, persisted BFCache and provider acceptance remain pending.
+
+
+## Acceptance refresh: header geometry — 2026-09-24
+
+At `e1f0cd5`, the final acceptance refresh restored 44px targets for the inline board name and narrow-screen save status and bounded the title wrapper to its available width. The regression uses a 200-grapheme Unicode title and reports each overflowing or undersized control. All **18/18** focused responsive cases passed in Chromium, Firefox and WebKit: long-title editing and role/share/account focus, library/editor controls at 390/768/1456px, and sharing controls at 390/1456px. The parent inspected fresh narrow-screen WebKit header/menu and Chromium sharing screenshots: title/save/share/account controls fit, and the share dialog keeps wrapped content and fixed actions readable.
+
+The later logo-derived design system and file-import UX are recorded in their quick-task summaries. The historical six-pillar score above retains its original review scope; this bounded correction does not claim a new six-pillar score for every later feature. User-reported native zoom, IME, BFCache and clipboard passes are recorded in 03-UAT.md. Actual-provider and spoken assistive-technology acceptance are explicitly deferred. The full regression matrix is running separately and remains required before phase completion.
+
+## Accepted refresh delta — 2026-09-25
+
+Parent review through `63f352b` closes the regressions found during acceptance: bounded 44px header targets, stable font-ready connector geometry, Layers precedence, Firefox title focus after delayed blur and single native editor attachment. Focused results and inspected responsive captures are recorded in the checkpoint. The complete 1,658-case browser matrix now passes with no failures, skips or retries. Current file import replaces optional local migration as approved by the user. The original independent 24/24 score retains its source scope; this delta supplies current execution evidence without assigning a new independent visual score. Native behavior has the user's recorded acceptance; spoken assistive-technology testing remains backlog 999.3.

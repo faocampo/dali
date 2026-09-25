@@ -10,11 +10,11 @@ Initial release includes the capabilities below. Delivery proceeds through small
 
 ### Identity and board access
 
-- [ ] **AUTH-01**: Members can sign in through configurable OIDC SSO with Okta compatibility and sign out of Dali. Real-provider configuration and acceptance are deferred by the user (2026-09-24) to backlog 999.4 until operator access is available; existing generic OIDC behavior remains in scope.
-- [ ] **BOARD-01**: Members can create named boards and reopen boards they are authorized to access from a home view.
-- [ ] **BOARD-02**: The home view identifies private and shared boards and the member's role on each board.
-- [ ] **BOARD-03**: Board owners can grant and revoke editor or viewer access for internal members.
-- [ ] **BOARD-04**: Editors can modify board content, viewers can view it, and members without access cannot retrieve board content or its images.
+- [x] **AUTH-01**: Members can sign in through configurable OIDC SSO with Okta compatibility and sign out of Dali. Real-provider configuration and acceptance are deferred by the user (2026-09-24) to backlog 999.4 until operator access is available; existing generic OIDC behavior remains in scope.
+- [x] **BOARD-01**: Eligible internal members can create named boards and reopen boards they are authorized to access from a home view.
+- [x] **BOARD-02**: The home view identifies private and shared boards and the member's role on each board.
+- [x] **BOARD-03**: Board owners can grant and revoke editor or viewer access for internal members.
+- [x] **BOARD-04**: Editors can modify board content, viewers can view it, and members without access cannot retrieve board content or its images.
 
 ### Canvas and images
 
@@ -120,15 +120,15 @@ All deliverables must be organization-neutral. Keep real organizational informat
 
 ## Traceability
 
-The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential MVP capabilities and success criteria). Five Phase 1 requirements and four Phase 2 requirements are complete; the remaining 33 requirements are pending.
+The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential MVP capabilities and success criteria). Five Phase 1, four Phase 2 and five approved Phase 3 requirements are complete; the remaining 28 requirements are pending. Actual-provider and spoken assistive-technology acceptance retain their separate approved backlog dispositions.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 3 | Pending |
-| BOARD-01 | Phase 3 | Pending |
-| BOARD-02 | Phase 3 | Pending |
-| BOARD-03 | Phase 3 | Pending |
-| BOARD-04 | Phase 3 | Pending |
+| AUTH-01 | Phase 3 | Complete |
+| BOARD-01 | Phase 3 | Complete |
+| BOARD-02 | Phase 3 | Complete |
+| BOARD-03 | Phase 3 | Complete |
+| BOARD-04 | Phase 3 | Complete |
 | CAN-01 | Phase 1 | Complete |
 | CAN-02 | Phase 1 | Complete |
 | CAN-03 | Phase 5 | Pending |
@@ -184,4 +184,4 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 User scope decisions supersede earlier research proposals, particularly the deferral of MCP creation and use of ordinary shapes for roadmaps.
 
 ---
-*Last updated: 2026-09-15 after Phase 2 testing and approval; all 42 initial-release requirements retain their approved scope.*
+*Last updated: 2026-09-25 after Phase 3 acceptance; 14 requirements complete, 28 pending, with actual-provider and spoken assistive-technology acceptance explicitly deferred.*

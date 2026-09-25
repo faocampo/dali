@@ -21,6 +21,14 @@ Product and engineering teams can collaboratively turn ideas into clear product 
 - ✓ MIND-03: Automatic measured layout as nodes and visibility change — Phase 2.
 - ✓ MIND-04: Persistent topic typography and branch styling — Phase 2.
 
+- ✓ AUTH-01: Configurable OIDC sign-in, trusted internal admission and deliberate Dali-only sign-out — Phase 3. Actual-provider configuration/acceptance remains backlog 999.4.
+- ✓ BOARD-01: Eligible members create named private boards and reopen authorized work — Phase 3.
+- ✓ BOARD-02: Home identifies private/shared boards and effective Owner/Editor/Viewer roles — Phase 3.
+- ✓ BOARD-03: Owners grant/revoke internal Editor/Viewer access, including clearly identified pending grants — Phase 3.
+- ✓ BOARD-04: Effective roles protect board content, images and actions — Phase 3. Existing creators retain Owner privileges; system Viewers remain read-only on shared boards and cannot create new boards or imports.
+
+Evidence: [Phase 3 verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (fresh complete automated gate, user acceptance and explicit deferrals).
+
 Evidence: [Phase 2 verification](phases/02-daily-mind-maps/02-VERIFICATION.md) (four requirements, corrective regressions and final user approval).
 
 Evidence: [Phase 1 verification](phases/01-editable-canvas-and-image-portability/01-VERIFICATION.md) (regression results and user acceptance).
@@ -28,14 +36,6 @@ Evidence: [Phase 1 verification](phases/01-editable-canvas-and-image-portability
 ### Active
 
 These are the agreed capabilities to scope into requirements and phases, rather than a commitment to deliver all capabilities in the first development phase.
-
-#### Access and board library
-
-- [ ] Internal team members sign in using operator-configured OIDC SSO with Okta compatibility.
-- [ ] Each board has individual owner, editor, and viewer access settings.
-- [ ] Owners manage board access, editors edit content, and viewers view content. Detailed permissions for facilitation and comments remain to be defined.
-- [ ] A home view lists accessible boards and clearly distinguishes private and shared boards.
-- [ ] Users create new boards and reopen persisted work across sessions.
 
 #### Collaboration and facilitation
 
@@ -133,10 +133,13 @@ Keep the repository and its entire publishable history organization-neutral. Nev
 | Build Dali by extending DJAI Open Canvas | Reuse an existing single-user canvas foundation | Validated in Phase 1 |
 | Use the defined product workflows to scope the Miro replacement | Prioritize daily diagramming and product-development needs | Confirmed direction |
 | Deploy on operator-managed infrastructure with Okta SSO | Matches the requested internal deployment and identity model | Confirmed direction |
-| Provide per-board owner/editor/viewer access and a board-library home | Support private and shared work with explicit access | Confirmed direction |
+| Provide per-board owner/editor/viewer access and a board-library home | Support private and shared work with explicit access | Validated in Phase 3 |
 | Treat mind maps as an initial-scope priority | User identified them as very important for daily work | Validated in Phase 2 |
 | Start with new boards and exported Miro images | User-selected initial migration approach | Confirmed direction |
 | Library Import accepts an exported Dalí board archive by file picker or drag and drop, creating a new privately owned canvas | User replaced optional browser-local copying with file-based import | Implemented in quick task 260924-s1x |
+| Creators retain Owner privileges on existing boards; system Viewers remain read-only on shared boards and cannot create boards/imports | Latest explicit user role decision | Accepted and verified in Phase 3 |
+| Copies are available to effective Owners/Editors and create private boards owned by the copier | Explicit user ownership and capability decision | Accepted and verified in Phase 3 |
+| Real-provider and spoken assistive-technology acceptance stay in backlog 999.4 and 999.3 | User-approved acceptance deferrals | Deferred; no actual-environment pass claimed |
 | Defer MCP creation of editable diagrams and mind maps | User placed AI-agent creation after the initial release | Confirmed direction |
 | Include roadmap composition and the Gantt widget in the initial release | User confirmed both are needed at launch | Confirmed direction |
 | Build roadmaps from ordinary shapes and templates; implement Gantt as a task/date-driven widget | User clarified the distinct editing models | Confirmed direction |
@@ -153,7 +156,7 @@ Keep the repository and its entire publishable history organization-neutral. Nev
 
 ### Remaining design details
 
-- Private-by-default new boards was proposed during discussion; confirm in access-control requirements.
+- Private-by-default new boards and explicit internal grants are accepted and verified in Phase 3.
 - Research and requirements should resolve persistence/recovery, collaboration conflict behavior, shared versus personal collapse state, precise keyboard shortcuts, voting rules, comment permissions, board organization, MCP authorization and target-board selection, and supported export formats.
 - Public synthetic examples will define template and editable-object acceptance criteria.
 
@@ -175,4 +178,6 @@ After each milestone:
 4. Update context with actual usage and feedback.
 
 ---
-*Last updated: 2026-09-15 after Phase 2 acceptance.*
+*Last updated: 2026-09-25 after Phase 3 acceptance within approved scope.*
+
+Phase 3 accepted on 2026-09-25 with its approved scope and explicit deferred follow-ups. Phase 4 discussion is next.

@@ -164,3 +164,18 @@ The remaining 24 threat dispositions retain their prior closures. The auditor ra
 ## Final automated gate disposition
 
 After the independent source audit above, the acceptance executor completed the unchanged `7341672` candidate: both type checks, 105 unit tests, 112 server tests, production build, standalone access **123/123**, and complete browser matrix **1,533/1,533 (57.1m)** passed. There were zero failed, timed-out, skipped, interrupted or unrun cases. The orchestrator reconciled the full event record. Earlier pending statements describe their audit-time state; this separately attributed execution evidence closes the automated gate. Actual-provider and native observations retain their checkpoint status.
+
+
+## Acceptance refresh delta — 2026-09-24
+
+The parent reviewed the post-baseline role policy, import authorization and final header/test correction through `e1f0cd5`. Internal admission remains separate from system editing eligibility. Session roles come from configured trusted claims; new-board/file-import endpoints require a system writer, while board capability checks preserve creator ownership and clamp non-owner system Viewers to view-only access. Import staging rechecks either source duplication capability or system-writer eligibility before documents, blobs and commit. Current account/generation/session checks remain in the UI and import transaction path. The file dialog uses an isolated archive reader and preserves original browser storage; its uncertain-outcome state reconciles one operation before allowing a fresh import.
+
+The corrected test expectations retain exact session fields plus the system-role value, acknowledged save state, source-byte canaries, role denials, keyboard navigation and focus-return checks. The production correction changes only title containment and 44px header targets. No timeout, project selection, error allowance, authentication route or mutation policy changed in that correction.
+
+Fresh evidence at `e1f0cd5`: frontend/server static checks, 110 unit tests, 116 server tests, production build and **124/124 access browser cases** passed. The full five-project browser matrix is still running. This source/test delta introduces no identified open threat; the 31 registered mitigations retain their prior disposition. This is a parent delta review, distinct from the historical independent audit.
+
+A bounded privacy scan of the 51 changed tracked text files since the earlier UAT review found no examined host-path, private-key or token patterns. Only synthetic fixtures and generic code/documentation were included. Actual provider settings and evidence remain external and deferred to backlog 999.4; assistive-technology speech remains backlog 999.3.
+
+## Accepted refresh delta — 2026-09-25
+
+Parent review through `63f352b` covers bundled-font readiness/retry, contextual panel order, delayed title blur and cancelled editor setup. The final mount receives the already-authorized runtime and rechecks its account/board/generation scope after waiting for fonts and native readiness. Cancellation before attachment creates no view; cancellation during setup immediately removes the attached viewport and installed listeners/guards. Existing mutation guards and session-recovery authorization remain in force. The final full gate passed all 116 server, 124 standalone access and 1,658 browser cases with no skipped required cases, including stale identity, denied replay, protected image cleanup and exact board isolation. The 31 historical threat dispositions remain closed; this is a parent delta review, not a repeated independent security audit. Actual provider/deployment evidence remains outside this scope.

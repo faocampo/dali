@@ -41,4 +41,4 @@ This is a scoped judgment review, not a certification of deployed services, exte
 
 ## Acceptance boundary
 
-[03-UAT.md](03-UAT.md) (current checklist) records seven passes, three skips (two deferred follow-ups and one optional-workflow waiver), and zero pending items. Historical automated verification remains 99/104 at its recorded revision; it has not been rerun or re-scored as a full phase gate by this review. Phase 3 awaits the refreshed final automated gate.
+[03-UAT.md](03-UAT.md) (current checklist) records seven passes, three skips (two deferred follow-ups and one optional-workflow waiver), and zero pending items. Historical automated verification remains 99/104 at its recorded revision; it has not been rerun or re-scored as a full phase gate by this review. The subsequent complete gate passed at `63f352b`; [03-VERIFICATION.md](03-VERIFICATION.md) records the current acceptance scope without re-scoring this historical review.

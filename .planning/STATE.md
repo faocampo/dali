@@ -1,64 +1,50 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 03
-current_phase_name: Okta and Board Access
-current_plan: 12
-status: executing
-stopped_at: Phase 3 UAT accepted; refreshing final automated gate
-last_updated: "2026-09-25T01:08:43.063993+00:00"
-last_activity: 2026-09-24
-last_activity_desc: User passed pending-access wording; seven UAT passes and three approved skips
-state_head: 601b588
+current_phase: 04
+current_phase_name: Durable Boards and Recovery
+current_plan: Not started
+status: ready_to_discuss
+stopped_at: Phase 3 complete; Phase 4 ready for discussion
+last_updated: "2026-09-25T05:10:30.350956+00:00"
+last_activity: 2026-09-25
+last_activity_desc: Phase 3 accepted after final 1658-case browser gate and completed UAT
+state_head: 63f352b
 progress:
   total_phases: 13
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 26
-  completed_plans: 25
-  percent: 15
+  completed_plans: 26
+  percent: 23
 ---
 
 # Project State
 
 ## Project Reference
 
-See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-15).
+See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
-**Current focus:** Phase 03 — Okta and Board Access
+**Current focus:** Phase 04 — Durable Boards and Recovery
 
 ## Current Position
 
-Pending-access acceptance resumed at `5c7fe7a`: 3/3 browser checks across Chromium, Firefox and WebKit and 16/16 grant server tests passed. Synthetic UI capture reviewed; the user explicitly passed item 8. Approved provider/assistive-technology deferrals and the local-copy waiver are preserved. See [checkpoint](phases/03-okta-and-board-access/03-12-CHECKPOINT.md) (current review and historical gate boundary).
+Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
-Quick follow-up `f26bd35`: text placement now previews a drawn box, focuses native editing on release, reuses the last locally used text format, and preserves double-click editing. All three static checks, 110 unit tests, the production build and 87 focused browser cases across Chromium/Firefox/WebKit passed. See [quick summary](quick/260924-roh-draw-text-boxes-with-immediate-editing-a/260924-roh-SUMMARY.md) (implementation and validation).
+Phase: 04 (Durable Boards and Recovery)
+Current Plan: Not started
+Status: Ready for discussion
+Next action: `$gsd-discuss-phase 4`
+Last activity: 2026-09-25 — Closed Phase 3 after the complete regression gate and accepted human dispositions.
 
-Quick follow-up `d071a44`: zoom presets/shortcuts, connector hover, custom colors, last shape fill, note focus and shape caret are verified. Creators retain Owner privileges on their existing boards; system Viewers remain read-only on shared boards and cannot create fresh boards/imports. All 110 unit tests, 116 server tests and 64 distinct focused browser/project cases passed; static checks and production build passed.
-
-Acceptance update (2026-09-24): six user-reported passes plus a scoped privacy-review pass; provider work and screen-reader testing are deferred. The exported snapshot is structurally valid with a hash-matched image asset; the user tested export only and subsequently waived optional local-copy human acceptance because that workflow is not needed. See [UAT review](phases/03-okta-and-board-access/03-UAT-REVIEW.md) (analysis, review scope and optional-copy waiver). Earlier progress notes below retain their historical status.
-
-Phase: 03 (Okta and Board Access) — FINAL REGRESSION IN PROGRESS
-Current Plan: 12
-Total Plans in Phase: 12
-Status: Human acceptance complete — seven UAT passes, two approved deferrals, one optional-workflow waiver (03-11). Refreshing the final automated gate. Historical automated score: 99/104.
-Last activity: 2026-09-24 - Resumed Phase 3 acceptance: 3 browser and 16 server pending-access checks passed; item 8 passed by the user.
-
-Progress: [██░░░░░░░░] 15% (2/13 phases complete; 25/26 plans complete)
-
-Local development follow-up at `2d0dae4`: documented startup now launches the complete authenticated loopback stack and preserves development state. Four startup regressions, 63 adjacent server tests, four dev/preview authentication cases, static checks and a fresh build passed; the live browser reached Your boards. Full-matrix evidence retains revision `7341672`. See [resolved journal](debug/resolved/local-sign-in-startup.md) (startup cause, fix and validation). All ten Phase 3 acceptance items remain pending.
-
-UI refinement follow-up at `3c59e71`: all eight user comments are implemented. Static checks, production build and 146 distinct browser/project cases passed across focused runs, including a final 21-case header/menu run in Chromium, Firefox and WebKit. See [quick summary](quick/260918-eix-refine-board-header-menus-and-library-pr/260918-eix-SUMMARY.md) (changes, validation and preserved Phase 3 acceptance boundary).
-
-Library controls follow-up at `bfbe573` (with admission fixtures at `f224778`): compact card menus, top-bar Import and a shared account avatar/name control are verified. Static checks, production build, 105 unit tests, 113 server tests and 126 distinct focused browser/project cases passed. Signed external accounts are rejected; internal-member admission is separate from per-board permissions. See [quick summary](quick/260924-amb-compact-board-library-controls-and-verif/260924-amb-SUMMARY.md) (changes, evidence and preserved Phase 3 acceptance boundary).
-
-Viewer test follow-up: the user confirmed that the board being edited by Synthetic Viewer showed Owner. Added Shared role test with actual Owner/Editor/Viewer grants to the local launcher and removed the empty-canvas mind-map message. All three typechecks, four startup tests, 79 targeted server tests, the production build and 21 focused browser cases across Chromium/Firefox/WebKit passed. See [resolved journal](debug/resolved/viewer-role-test.md) (cause, local fixture correction and validation). The user confirmed local external-account rejection; the ten broader Phase 3 UAT items remain pending.
+Progress: [██░░░░░░░░] 23% (3/13 phases complete; 26/26 currently planned plans complete; later phases remain unplanned)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 25
+- Total plans completed: 26
 - Average duration: —
-- Total execution time: 0 hours
+- Total execution time: not consistently recorded across sessions.
 
 **By Phase:**
 
@@ -67,12 +53,12 @@ Viewer test follow-up: the user confirmed that the board being edited by Synthet
 | — | 0 | — | — |
 | 1 | 5 | - | - |
 | 2 | 9 | - | - |
-| 3 | 11 | 333min | 30min |
+| 3 | 12 | - | - |
 
 **Recent Trend:**
 
-- Last 5 plans: None
-- Trend: No execution history
+- Last 5 plans: 03-08, 03-09, 03-10, 03-11, 03-12
+- Trend: Phase 3 accepted; Phase 4 awaits discussion and planning.
 
 **Per-Plan Metrics:**
 
@@ -105,47 +91,22 @@ Viewer test follow-up: the user confirmed that the board being edited by Synthet
 
 ### Decisions
 
-See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.md](REQUIREMENTS.md) (approved requirements and validation obligations).
+See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) and [REQUIREMENTS.md](REQUIREMENTS.md) (42 approved requirements and acceptance obligations).
 
-- All 42 v1 requirements are user-approved. The 13-phase roadmap is approved; all five Phase 1 plans are accepted and complete.
-- Deliver small sequential MVP capability phases; independent tasks may run in parallel within an approved phase. Prioritize daily mind maps immediately after core canvas editing.
-- Extend DJAI Open Canvas with applicable attribution; deploy on operator-managed infrastructure using Okta and per-board owner/editor/viewer permissions.
-- Collaboration has no product-enforced concurrent-user cap; validate 20 concurrent authenticated editors. Comments attach to specific entities, and image export includes selected shapes only when requested.
-- v1 includes ordinary-object roadmaps/templates and a task/date-driven Gantt widget. MCP and Plane are deferred; ClickUp imports are excluded.
-- [Phase 1]: Retain BlockSuite 0.22.4 and browser storage identifiers; verify local persistence through native UI and IndexedDB reload.
-- [Phase 1]: Use maintained Vite 7.3 with esbuild native decorators and a scoped BlockSuite CSS optimizer hook.
-- [Phase 1]: Keep optional sharing empty and attribution linked to pinned public source.
-- [Phase 1]: Use the accessible left rail with native BlockSuite tools and contextual style controls.
-- [Phase 1]: Use guarded BlockSuite 0.22.4 native raster seams for explicit PNG source scale; rerun fidelity tests on upgrade.
-- [Phase 1]: Accept validated PNG/JPEG with bounded decode, native model-space insertion and a final native mutation guard; retain explicit native OS evidence limits alongside user acceptance.
-- [Phase 1]: Preserve native selected IDs and layer order; clip frame output and preflight each intermediate DOM raster before allocation.
-- [Phase 2]: Phase 2 preserves native fontSize/fontWeight/color and runs collapse plus layout synchronously inside one captured transaction.
-- [Phase 2]: Capture native duplicate source identities at invocation and validate native hierarchy before duplicate, paste and board snapshot conversion.
-- [Phase 2]: Phase 2 commands validate native topology iteratively, preserve omitted defaults on rollback, and remove failed additions after native add observers flush.
-- [Phase 2]: Preserve native typography and full child records through both contextual and upstream layout controls; scope composition to the native topic editor.
-
-- [Phase 3]: Context complete: direct Okta entry, persistent sessions, private boards, explicit internal grants and role-specific board actions. Remaining home/import defaults were delegated; see phases/03-okta-and-board-access/03-CONTEXT.md.
-- [Phase 03]: Phase 3 harness validates signed OIDC with explicit non-repudiation checks; buildApp receives server-only environment-shaped config and injected clock from a lazy test launcher.
-- [Phase 03]: Phase 03 auth uses exact issuer/subject identity, persistent absolute Unix-millisecond expiry and POST /api/logout; real provider acceptance remains pending.
-- [Phase 03]: Private board creation stores creator ownership and independent root/content Yjs bytes transactionally; plan 03-06 now mounts the authorized account runtime.
-- [Phase 03]: Board HTTP resources use exact root/content and board/blob associations with same-transaction authorization; native padded SHA-256 keys and pending/acknowledgment source hooks are established.
-- [Phase 03]: Account workspaces use public native composition, authoritative readonly hydration without SyncPeer pushes, generation-bound disposal and isolated reserved-destination snapshot staging.
-
-- [Phase 03]: Authorized native runtime freezes AccessScope for plans 09/10; New uses gesture-reserved tabs and operation reconciliation; previews publish after acknowledged edits with transactional capability checks.
-- [Phase 03]: Plan 03-07 uses monotonic board-derived grant revisions and issuer-scoped observed email history for stable-account activation; header trigger remains plan 03-08.
-- [Phase 03]: Plan 03-08 uses source-bound staged private copies and field-specific native surface ID remapping; inline names reconcile through SQL authority.
-- [Phase 03]: Native mutation guards consume immutable active account/board/generation scope; supported downloads revalidate server capability immediately before dispatch.
-- [Phase 03]: Recovery acknowledges durable local image capture separately from committed server writes; pause and preserve precede authentication or logout, and original-account fresh write authorization precedes replay.
-- [Phase 03]: Legacy originals use existing-database-only reads; account-scoped operation intents reconcile private copies without source writes.
+- Deliver the 13 phases sequentially; next discuss Phase 4 durability, save acknowledgment, deployment and backup/restore.
+- Actual-provider acceptance is deferred to 999.4; spoken assistive-technology acceptance is deferred to 999.3. Neither is claimed as tested.
+- Creators retain Owner privileges on existing boards. System Viewers remain read-only on shared boards and cannot create boards/imports. Owner/Editor copies are privately owned by the copier.
+- Library Import accepts a Dalí archive by picker or drop and creates a new private canvas; optional Copy local boards was removed by user request.
+- Keep public code, documentation and evidence organization-neutral; operator identity/deployment settings remain outside the repository.
 
 ### Pending Todos
 
-- Final automated task 03-12-01 passed at 7341672. Resolve the remaining pending item (8) in 03-UAT.md before accepting current Phase 3 scope; provider and assistive-technology acceptance are explicitly deferred; final verifier and audit disposition are recorded. Plans 03-01 through 03-11 remain complete; plan 03-12 and shared requirements remain open. Preserve dormant seeds and earlier TDD process deviations in WINDOWS.md.
+- Discuss Phase 4, then research and plan its four requirements: SAVE-01, SAVE-02, OPS-01 and OPS-02. No Phase 4 implementation is authorized by a plan yet.
 
 ### Blockers/Concerns
 
-- Account workspace and authentication-interruption recovery are verified with synthetic signed accounts; real Okta, deployment, native zoom/input details, broader durability and concurrent collaboration remain unverified.
-- Automated Phase 1 evidence covers dependencies, native APIs, export bounds and fidelity. Image import was approved by the user on 2026-09-12; copy/paste is also user-approved; approved metadata remediation is complete.
+- No remaining Phase 3 blocker within approved scope. Real-provider and spoken assistive-technology acceptance have explicit backlog follow-ups.
+- Cross-browser/service-restart durability, deployment and backup/restore require Phase 4 evidence. Simultaneous collaboration and reconnect convergence require Phase 5 evidence.
 
 ## Deferred Items
 
@@ -156,10 +117,10 @@ See [PROJECT.md](PROJECT.md) (full decisions and constraints) and [REQUIREMENTS.
 
 ## Session Continuity
 
-Last session: 2026-09-25T01:08:43.063993+00:00
-Stopped at: Phase 3 UAT accepted; refreshing final automated gate
-Resume file: .planning/phases/03-okta-and-board-access/03-UAT.md
-Next action: finish the refreshed Phase 3 automated gate, reconcile verification, and complete Plan 03-12. Human acceptance is complete; backlog 999.3 and 999.4 hold the approved deferrals.
+Last session: 2026-09-25T05:10:30.350956+00:00
+Stopped at: Phase 3 complete; Phase 4 ready for discussion.
+Resume file: None
+Next action: `$gsd-discuss-phase 4`
 
 ## Phase 1 verification outcome
 

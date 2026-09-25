@@ -16,7 +16,7 @@
     {
       "number": "3",
       "name": "Okta and Board Access",
-      "status": "in_progress"
+      "status": "complete"
     },
     {
       "number": "4",
@@ -70,9 +70,9 @@
     }
   ],
   "next": {
-    "command": "$gsd-verify-work 3",
-    "label": "Complete the ten Phase 3 acceptance items",
-    "reason": "Local startup corrected and live-verified at 2d0dae4 with bounded regression checks; full 1533-case gate retains revision 7341672. Phase verification remains human_needed (99/104); actual-provider/native observations and four prohibition dispositions pending in 03-UAT.md."
+    "command": "$gsd-discuss-phase 4",
+    "label": "Discuss Durable Boards and Recovery",
+    "reason": "Phase 3 is accepted within approved scope. Phase 4 has no context or plans; discuss SAVE-01, SAVE-02, OPS-01 and OPS-02 before research and planning."
   },
-  "updated_at": "2026-09-17T20:43:08.786425+00:00"
+  "updated_at": "2026-09-25T05:11:05.247878+00:00"
 }

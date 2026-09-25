@@ -10,7 +10,7 @@
 
 Dali will deliver the approved canvas workflows through small sequential phases, each with an end-to-end capability that can be demonstrated. Core canvas editing and image portability come first, followed immediately by daily mind maps. Authenticated board access, durable recovery, and real-time collaboration establish shared use before facilitation, reusable planning content, mockups, technical diagrams, and the Gantt widget complete the initial release.
 
-All 42 v1 requirements are approved; the phase allocation and order below are user-approved. Phases 1 and 2 retain their recorded implementation evidence and user acceptance. Remaining phase success criteria are future acceptance obligations.
+All 42 v1 requirements are approved; the phase allocation and order below are user-approved. Phases 1 through 3 retain their recorded implementation evidence and user acceptance. Remaining phase success criteria are future acceptance obligations.
 
 ## Phases
 
@@ -18,7 +18,7 @@ All 42 v1 requirements are approved; the phase allocation and order below are us
 
 - [x] **Phase 1: Editable Canvas and Image Portability** - Compose boards, import reference images, and export board content or selected shapes. (completed 2026-09-12)
 - [x] **Phase 2: Daily Mind Maps** - Create styled hierarchical mind maps with keyboard input, branch collapse, and automatic layout. (completed 2026-09-15)
-- [ ] **Phase 3: Okta and Board Access** - Sign in, discover authorized boards, and manage owner/editor/viewer access.
+- [x] **Phase 3: Okta and Board Access** - Sign in, discover authorized boards, and manage owner/editor/viewer access. (completed 2026-09-25)
 - [ ] **Phase 4: Durable Boards and Recovery** - Reopen saved work across browsers and service restarts, and deploy, back up, and restore it.
 - [ ] **Phase 5: Real-Time Collaborative Editing** - Coedit with presence, personal undo, safe reconnect, and active access revocation.
 - [ ] **Phase 6: Follow Me** - Follow a presenter's viewport and return to independent navigation.
@@ -127,12 +127,12 @@ Each wave depends on the preceding plan; shared browser/build execution uses one
 **Success Criteria** (what must be TRUE):
 
   1. A member can sign in through configurable OIDC SSO with Okta compatibility and sign out. Public validation uses synthetic settings; operator-specific validation and evidence remain outside the public repository. (AUTH-01)
-  2. A signed-in member can create a named board and reopen an authorized board from the home view. (BOARD-01)
+  2. An eligible signed-in member can create a named board and reopen an authorized board from the home view. (BOARD-01)
   3. The home view distinguishes private and shared boards and displays the member's role for each accessible board. (BOARD-02)
   4. A board owner can grant an internal member editor or viewer access and revoke that grant. (BOARD-03)
   5. In separate authenticated contexts, editors can modify board content, viewers can read it but cannot change it through either the interface or direct requests, and members without access cannot retrieve the board or its images through direct document, synchronization, or image requests. (BOARD-04)
 
-**Plans**: 11/12 executed; plan 03-12 remains incomplete. Automated task 03-12-01 passed at 7341672: exact two-case smoke, both typechecks, 105 unit tests, 112 server tests, production build, standalone 123-case access suite and complete 1533-case five-project browser matrix (57.1m, zero failures/timeouts/skips/interruptions/unrun). Earlier failed and interrupted attempts remain in the checkpoint. Independent verification is **human_needed (99/104)** with no proved implementation blocker. The 2026-09-24 UAT update records five user passes and one scoped privacy-review pass; pending-access presentation remains open; the user waived optional local-copy human acceptance. Actual-provider work and assistive-technology testing are deferred to backlog 999.4 and 999.3 respectively. The historical automated score retains its original revision scope. Resume with `$gsd-verify-work 3`. Overall progress remains 2/13 accepted phases and 25/26 completed plans.
+**Plans**: 12/12 complete. Approved Phase 3 scope passed the fresh gate at `63f352b`: both static checks, 110 unit tests, 116 server tests, production build, 124 standalone access cases and the complete 1,658-case browser matrix with zero failures, skips or retries. UAT records seven passes and three approved skips. Actual-provider acceptance remains backlog 999.4; spoken assistive-technology acceptance remains 999.3; optional local copying was waived and replaced with file import. [Phase 3 verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current evidence and historical limits) and [plan 12 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (accepted outcomes) record closure. Overall progress is 3/13 phases and 26/26 currently planned plans complete; later phases remain to be planned.
 
 Plans:
 **Wave 1**
@@ -178,7 +178,7 @@ Plans:
 
 **Wave 11** *(blocked on Wave 10 completion)*
 
-- [ ] 03-12-PLAN.md — Verify all access boundaries and record actual-provider acceptance.
+- [x] 03-12-PLAN.md — Verify all access boundaries and record actual-provider acceptance.
 
 **UI hint**: yes
 
@@ -372,7 +372,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 |-------|----------------|--------|-----------|
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
-| 3. Okta and Board Access | 11/12 | In Progress|  |
+| 3. Okta and Board Access | 12/12 | Complete    | 2026-09-25 |
 | 4. Durable Boards and Recovery | 0/TBD | Not started | - |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
 | 6. Follow Me | 0/TBD | Not started | - |
@@ -393,7 +393,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 - [config.json](config.json) (fine granularity and enabled research, plan-check, and verification settings).
 - [research/SUMMARY.md](research/SUMMARY.md) (research findings and risks, including the final scope update that supersedes the earlier phase proposal).
 
-*Last updated: 2026-09-24 — Phase 3 UAT has six passes, two deferred follow-ups, one optional-workflow waiver and one pending item. Phase 1 and 2 acceptance is preserved.*
+*Last updated: 2026-09-25 — Phase 3 accepted within approved scope; next is Phase 4 discussion. Provider and assistive-technology follow-ups remain in the backlog.*
 
 ## Backlog
 

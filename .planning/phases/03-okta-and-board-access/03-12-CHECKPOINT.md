@@ -1,15 +1,39 @@
 ---
 phase: 03-okta-and-board-access
 plan: "12"
-status: incomplete
-automated_task: passed-at-7341672
+status: complete
+automated_task: passed-at-63f352b
 actual_provider: deferred-backlog-999.4
 human_acceptance: accepted-with-approved-deferrals
 ---
 
 # Phase 3 Plan 12 acceptance checkpoint
 
-The automated gate for task 03-12-01 passed on source/test revision `73416723411ca2c5b98de090f6d5327ed9e076c7`. Plan 12 and Phase 3 remain incomplete with **the refreshed final automated gate pending; all human acceptance items have dispositions**. Current dispositions are **7 passes and 3 skips**: actual-provider acceptance is deferred to backlog 999.4, assistive-technology acceptance to 999.3, and the removed optional local-copy workflow is waived. Progress remains **2/13 accepted phases**, **25/26 completed plans**, and **11/12 Phase 3 plans**. Independent verification remains **human_needed**, with its historical 99/104 score preserved. [03-UAT.md](03-UAT.md) (current acceptance checklist) is authoritative over the historical obligations below.
+The refreshed final gate for task 03-12-01 passed at `63f352b`. Plan 12 is complete within the approved scope: **7 human/judgment passes, 3 approved skips, 0 pending**; actual-provider acceptance is deferred to 999.4, assistive-technology speech to 999.3, and the removed optional local-copy workflow is waived. [03-VERIFICATION.md](03-VERIFICATION.md) (current requirement evidence) and [03-12-SUMMARY.md](03-12-SUMMARY.md) (completed plan) supersede the historical gate and incomplete statuses retained below.
+
+## Accepted complete refresh — 2026-09-25
+
+All seven blocking commands passed on source/test commit `63f352b7a955bff176143d51bd64431b04777d81`. The 190 tracked source/test/configuration hashes matched before and after execution. Commands ran sequentially with isolated synthetic services and the configured single worker. No required case was skipped, retried or left unrun.
+
+| Command | Result | Outer duration |
+| --- | --- | ---: |
+| `npm run typecheck` | Passed | 4.5s |
+| `npm run typecheck:server` | Passed | 1.3s |
+| `npm test` | Passed | 1.9s |
+| `npm run test:server` | Passed | 8.2s |
+| `npm run build` | Passed | 12.9s |
+| `npm run test:access -- --reporter=list,json` | Passed | 271.5s |
+| `npm run test:browser -- --reporter=list,json` | Passed | 3808.9s |
+
+Unit tests: **110/110**. Server tests: **116/116**. Standalone access: **124/124** (270.9s runner duration). Full browser matrix: **1,658/1,658** (3808.3s; 63.5m runner duration). Full-matrix projects: development 388, production Chromium 382, Firefox 382, WebKit 382, access 124. Failures, timeouts, skips, retries, interruptions and unrun cases: **zero**. Standalone access cases also appear in the full matrix; these are separate runs, not disjoint coverage totals.
+
+The validated working tree retained pre-existing package-script additions. They were included in the source fingerprint and left outside acceptance commits, alongside the user's README/artwork changes. Existing build warnings remain documented in raw execution output; the build exited successfully.
+
+The GSD 1.14.0 UAT predicate recognizes only pass/passed for active numbered tests and initially classified the three user-approved skips as blockers. The checklist now separates its seven active passing items from an explicit approved-scope section containing the three original skipped entries, their original IDs, user decisions and backlog links. No skipped result was changed to pass, no test expectation was relaxed, and no completion force flag was used.
+
+The canonical phase-completion command accepted 12/12 plans and advanced to Phase 4 without a force flag. Its summary-file advisory misclassified quoted test commands as missing file paths, including the intentional nonexistent-suite negative control. Two additional references are explicitly installed upstream sources; both were confirmed present under `node_modules/@blocksuite`. These advisory references do not identify missing project deliverables. Current UAT and verification predicates are rechecked after the documentation transition.
+
+The following attempts retain their original results and revision boundaries.
 
 ## Current final-gate refresh — 2026-09-24
 

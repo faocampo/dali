@@ -1,18 +1,22 @@
 ---
 phase: 03-okta-and-board-access
-verified: 2026-09-17
-status: human_needed
-score: 99/104 must-haves verified
-behavior_unverified: 4
+verified: 2026-09-25
+status: passed
+score: "5/5 approved Phase 3 requirements verified"
+historical_score: "99/104 at the original independent verification revision"
+behavior_unverified: 0
+behavior_unverified_items: []
 overrides_applied: 0
-source_head: 2d0dae437499830adc1d4a142d1765a30b5cf52d
-full_gate_source_head: 73416723411ca2c5b98de090f6d5327ed9e076c7
-application_head: 6d6dade1ea574e41123c252f36499e465adf5811
-flagged_prohibitions: 2
+source_head: 63f352b7a955bff176143d51bd64431b04777d81
+full_gate_source_head: 63f352b7a955bff176143d51bd64431b04777d81
+application_head: 63f352b7a955bff176143d51bd64431b04777d81
+flagged_prohibitions: 1
 waived_human_prohibitions: 1
-active_pending_prohibitions: 1
-acceptance_updated: 2026-09-24
+active_pending_prohibitions: 0
+acceptance_updated: 2026-09-25
 acceptance_source: 03-UAT.md
+deferred_acceptance: [999.3, 999.4]
+human_verification: []
 covered_files:
   - ".planning/PROJECT.md"
   - ".planning/REQUIREMENTS.md"
@@ -45,6 +49,7 @@ covered_files:
   - ".planning/phases/03-okta-and-board-access/03-11-SUMMARY.md"
   - ".planning/phases/03-okta-and-board-access/03-12-CHECKPOINT.md"
   - ".planning/phases/03-okta-and-board-access/03-12-PLAN.md"
+  - ".planning/phases/03-okta-and-board-access/03-12-SUMMARY.md"
   - ".planning/phases/03-okta-and-board-access/03-CONTEXT.md"
   - ".planning/phases/03-okta-and-board-access/03-DISCUSSION-LOG.md"
   - ".planning/phases/03-okta-and-board-access/03-PATTERNS.md"
@@ -55,6 +60,7 @@ covered_files:
   - ".planning/phases/03-okta-and-board-access/03-REVIEW-FIX.md"
   - ".planning/phases/03-okta-and-board-access/03-REVIEW.md"
   - ".planning/phases/03-okta-and-board-access/03-SECURITY.md"
+  - ".planning/phases/03-okta-and-board-access/03-UAT-REVIEW.md"
   - ".planning/phases/03-okta-and-board-access/03-UAT.md"
   - ".planning/phases/03-okta-and-board-access/03-UI-FIX.md"
   - ".planning/phases/03-okta-and-board-access/03-UI-REVIEW.md"
@@ -66,12 +72,17 @@ covered_files:
   - "AGENTS.md"
   - "README.md"
   - "docs/access-acceptance.md"
+  - "index.html"
   - "package-lock.json"
   - "package.json"
   - "playwright.config.ts"
+  - "scripts/dev-role-board.ts"
   - "scripts/dev-server.ts"
   - "scripts/dev-startup.test.mjs"
   - "scripts/dev.mjs"
+  - "scripts/gen-blocksuite-paths.mjs"
+  - "scripts/start.sh"
+  - "scripts/stop.sh"
   - "server/app.ts"
   - "server/auth/identity-policy.ts"
   - "server/auth/oidc.test.ts"
@@ -91,18 +102,31 @@ covered_files:
   - "server/preflight.test.ts"
   - "server/storage/database.ts"
   - "src/App.tsx"
+  - "src/assets/djai-design-logo.png"
   - "src/auth/AuthBoundary.tsx"
   - "src/auth/session.ts"
   - "src/boards/BoardActionDialog.tsx"
+  - "src/boards/BoardImportDialog.tsx"
   - "src/boards/BoardLibrary.tsx"
-  - "src/boards/LocalBoardCopyDialog.tsx"
   - "src/boards/ShareBoardDialog.tsx"
   - "src/boards/catalog.ts"
   - "src/boards/import-local.ts"
   - "src/boards/operations.ts"
   - "src/boards/preferences.ts"
+  - "src/boards/templates.ts"
   - "src/canvas/BlockSuiteCanvas.tsx"
+  - "src/canvas/CanvasMeasurements.tsx"
+  - "src/canvas/ConnectorQuickAdd.tsx"
+  - "src/canvas/DrawingPalette.tsx"
+  - "src/canvas/EdgelessToolbarDragHandle.tsx"
+  - "src/canvas/FrameBorderOverlay.tsx"
+  - "src/canvas/ImageCropOverlay.tsx"
+  - "src/canvas/LayersInspector.tsx"
   - "src/canvas/MindMapInspector.tsx"
+  - "src/canvas/ObjectContextMenu.tsx"
+  - "src/canvas/SelectionInspector.tsx"
+  - "src/canvas/Tooltips.tsx"
+  - "src/canvas/ViewportControls.tsx"
   - "src/canvas/account/blob-source.test.ts"
   - "src/canvas/account/blob-source.ts"
   - "src/canvas/account/board-doc.ts"
@@ -114,23 +138,74 @@ covered_files:
   - "src/canvas/account/mutation-guard.ts"
   - "src/canvas/account/outbox.test.ts"
   - "src/canvas/account/outbox.ts"
+  - "src/canvas/arrangement.ts"
   - "src/canvas/blocksuite-editor.ts"
+  - "src/canvas/canvas-affordances.ts"
+  - "src/canvas/canvas-fonts.ts"
+  - "src/canvas/chrome-drag.ts"
+  - "src/canvas/classical-shape-geometry.ts"
+  - "src/canvas/classical-shapes.ts"
+  - "src/canvas/color-picker.ts"
+  - "src/canvas/connector-labels.ts"
+  - "src/canvas/editing-interactions.ts"
   - "src/canvas/export-board.test.ts"
   - "src/canvas/export-board.ts"
+  - "src/canvas/export-plan.test.ts"
+  - "src/canvas/export-plan.ts"
+  - "src/canvas/extensions.ts"
+  - "src/canvas/formatting-controls.ts"
+  - "src/canvas/formatting-theme.ts"
+  - "src/canvas/image-input.test.ts"
   - "src/canvas/image-input.ts"
+  - "src/canvas/image-visual-edits.ts"
+  - "src/canvas/insertion-geometry.test.ts"
+  - "src/canvas/insertion-geometry.ts"
+  - "src/canvas/insertion-placement.ts"
   - "src/canvas/legacy-runtime.ts"
+  - "src/canvas/line-width-control.ts"
+  - "src/canvas/measurement-geometry.test.ts"
+  - "src/canvas/measurement-geometry.ts"
+  - "src/canvas/mindmap-compatibility.ts"
+  - "src/canvas/mindmap-export.test.ts"
+  - "src/canvas/mindmap-export.ts"
+  - "src/canvas/mindmap-keyboard.ts"
+  - "src/canvas/mindmap-node-copy.ts"
+  - "src/canvas/mindmap-state.test.ts"
+  - "src/canvas/mindmap-state.ts"
+  - "src/canvas/mindmap.ts"
+  - "src/canvas/object-actions-toolbar.ts"
+  - "src/canvas/presentation-export.ts"
+  - "src/canvas/resize-affordance.ts"
   - "src/canvas/runtime.ts"
+  - "src/canvas/save-status.test.ts"
+  - "src/canvas/save-status.ts"
+  - "src/canvas/selection-summary.test.ts"
+  - "src/canvas/selection-summary.ts"
+  - "src/canvas/shape-text-editor.ts"
+  - "src/canvas/sticky.ts"
+  - "src/canvas/text.ts"
+  - "src/canvas/view-preferences.ts"
   - "src/canvas/workspace.ts"
+  - "src/header/AccountMenu.tsx"
   - "src/header/BoardTitleMenu.tsx"
   - "src/header/DaliMenu.tsx"
+  - "src/header/Dropdown.tsx"
   - "src/header/ExportDialog.tsx"
   - "src/header/Header.tsx"
+  - "src/header/MenuIcon.tsx"
+  - "src/header/ViewMenu.tsx"
+  - "src/header/links.ts"
   - "src/index.css"
+  - "src/main.tsx"
+  - "src/styles/controls.css"
+  - "src/styles/tokens.css"
+  - "src/vite-env.d.ts"
   - "tests/access-boundaries.spec.ts"
   - "tests/access-fixtures.ts"
   - "tests/accessibility-access.spec.ts"
   - "tests/account-workspace-harness.ts"
   - "tests/account-workspace.spec.ts"
+  - "tests/app-menu.ts"
   - "tests/authentication.spec.ts"
   - "tests/board-access.spec.ts"
   - "tests/board-actions.spec.ts"
@@ -139,123 +214,153 @@ covered_files:
   - "tests/board-sharing.spec.ts"
   - "tests/board-title.spec.ts"
   - "tests/canvas-arrangement.spec.ts"
+  - "tests/canvas-controls-accessibility.spec.ts"
   - "tests/canvas-editing.spec.ts"
   - "tests/canvas-feedback.spec.ts"
+  - "tests/canvas-interaction-refinements.spec.ts"
   - "tests/canvas-view.spec.ts"
+  - "tests/classical-shapes.spec.ts"
+  - "tests/clipboard-route.ts"
   - "tests/community.spec.ts"
   - "tests/connector-labels.spec.ts"
   - "tests/dali-menu.spec.ts"
+  - "tests/design-system.spec.ts"
+  - "tests/drawing-palettes.spec.ts"
+  - "tests/editing-followups.spec.ts"
+  - "tests/export-dialog-accessibility.spec.ts"
   - "tests/fixtures.ts"
   - "tests/image-export.spec.ts"
   - "tests/image-import.spec.ts"
   - "tests/image-visual-edits.spec.ts"
   - "tests/local-board-import.spec.ts"
+  - "tests/menu-sharing-refinement.spec.ts"
   - "tests/mindmap-accessibility.spec.ts"
   - "tests/mindmap-collapse.spec.ts"
   - "tests/mindmap-compatibility.spec.ts"
   - "tests/mindmap-copy.spec.ts"
+  - "tests/mindmap-edit-format.spec.ts"
+  - "tests/mindmap-export.spec.ts"
   - "tests/mindmap-formatting.spec.ts"
   - "tests/mindmap-keyboard.spec.ts"
   - "tests/mindmap-layout.spec.ts"
+  - "tests/mindmap-lock.spec.ts"
   - "tests/mindmap-node-copy.spec.ts"
+  - "tests/mindmap-properties.spec.ts"
+  - "tests/mindmap-properties.ts"
+  - "tests/mindmap-visibility.spec.ts"
   - "tests/mindmap-workflow.spec.ts"
   - "tests/mindmap.spec.ts"
+  - "tests/note-resize-refinement.spec.ts"
+  - "tests/object-actions-submenu.spec.ts"
+  - "tests/object-actions.ts"
   - "tests/oidc-provider.ts"
   - "tests/session-recovery.spec.ts"
   - "tests/sticky-shadow.spec.ts"
+  - "tests/text-placement.spec.ts"
   - "tests/topic-focus-new-board.spec.ts"
+  - "tests/ui-refinements.spec.ts"
   - "tsconfig.dev.json"
+  - "tsconfig.json"
   - "tsconfig.server.json"
   - "vite.config.ts"
   - "vitest.server.config.ts"
-covered_digest: "v1:sha256:817abede715dfca1fae8bb1c4d1f0820b2c12f0a3cefc1155d94803c1590de3c"
-behavior_unverified_items:
-  - truth: "UI-SHARE-overflow: Sharing dialog body scrolls vertically with visible fixed actions and keyboard-focused rows unobscured at 490px and 200% zoom."
-    test: "At browser UI zoom 200%, exercise long sharing lists and authentication/recovery at narrow and wide windows, keyboard through all controls."
-    expected: "Vertical scrolling keeps focus and fixed recovery/share actions visible and operable without horizontal clipping."
-    why_human: "Native 200% zoom unobserved; H2."
-  - truth: "D-16: Account caches, previews and outbox records remain isolated across identities, stale tabs and restored BFCache documents."
-    test: "Navigate away from an authorized board, revoke or change its identity/access, then restore a genuinely persisted history entry and record pageshow.persisted true."
-    expected: "Protected content stays paused until fresh session and descriptor authorization; no stale image, content or outbox replay crosses identity or role."
-    why_human: "Genuine persisted BFCache restoration unobserved; H3."
-  - truth: "UI-AUTH-overflow: Authentication and expiry content fits a 490px viewport and scrolls vertically at 200% zoom without hiding the active recovery control."
-    test: "At browser UI zoom 200%, exercise long sharing lists and authentication/recovery at narrow and wide windows, keyboard through all controls."
-    expected: "Vertical scrolling keeps focus and fixed recovery/share actions visible and operable without horizontal clipping."
-    why_human: "Native 200% zoom unobserved; H2."
-  - truth: "The completed interface satisfies all 39 UI state predicates and retains accepted native canvas/mind-map/image behaviors."
-    test: "At browser UI zoom 200%, exercise long sharing lists and authentication/recovery at narrow and wide windows, keyboard through all controls."
-    expected: "Vertical scrolling keeps focus and fixed recovery/share actions visible and operable without horizontal clipping."
-    why_human: "Aggregate 39-predicate assertion includes native zoom predicates not observed; H2. Native environment limits H3–H6 remain explicit."
+covered_digest: "v1:sha256:ebaede90aafe7c6c2395bb1c5e06cfe10e37564bdccc99f788cd6b274420b2af"
 prohibitions:
   - statement: "Explicit Dali sign-out MUST NOT silently sign the member back in or terminate their provider-wide session."
     verification: test
     status: verified
     flagged: false
     enforcement_evidence: []
-    disposition: User explicitly accepted UAT item 7 on 2026-09-24; no wired automated descriptor claimed.
+    disposition: User accepted UAT item 7; no wired automated descriptor claimed.
   - statement: "Pending access MUST NOT be presented as an emailed invitation or active membership before verified internal sign-in."
     verification: test
-    status: unverified
-    flagged: true
+    status: verified
+    flagged: false
     enforcement_evidence: []
+    disposition: User accepted UAT item 8 after the focused synthetic wording review; no wired automated descriptor claimed.
   - statement: "Selected local copying MUST NOT silently upload unselected browser boards or delete original local documents or images."
     verification: test
     status: unverified
     flagged: true
     enforcement_evidence: []
     acceptance_disposition: skipped_by_user
-    disposition: User waived optional local-copy human acceptance on 2026-09-24 and subsequently replaced its UI with file-based import. File import retains authorization and source-preservation regression coverage; historical local-copy evidence keeps its original revision scope.
+    disposition: User waived optional local-copy acceptance and replaced its UI with file-based import; historical scope retained.
   - statement: "Public artifacts MUST NOT contain operator-specific identity settings, real organizational content, credentials or real-provider evidence."
     verification: judgment
     status: verified
     flagged: false
     enforcement_evidence: []
-    disposition: Scoped judgment review in 03-UAT-REVIEW.md on 2026-09-24; publication recheck remains required.
-human_verification:
-  - name: "Actual configured Okta-compatible provider"
-    test: "Complete docs/access-acceptance.md A1–A9 using private operator-controlled registration, assignments, claim mapping and settings."
-    expected: "Stable issuer+subject identity, trusted internal verified email, denied identity rejection, pending activation once, grants/revocation, deep target, persistent absolute session, same-account recovery and deliberate Dali-only logout."
-    why_human: "The signed synthetic provider proves protocol/application behavior; no actual provider configuration or acceptance result was supplied."
-  - name: "Native 200% browser zoom"
-    test: "At browser UI zoom 200%, exercise long sharing lists and authentication/recovery at narrow and wide windows, keyboard through all controls."
-    expected: "Vertical scrolling keeps focus and fixed recovery/share actions visible and operable without horizontal clipping."
-    why_human: "Viewport resizing, short viewport and CSS scaling evidence do not establish native browser zoom."
-  - name: "Genuine BFCache restoration"
-    test: "Navigate away from an authorized board, revoke or change its identity/access, then restore a genuinely persisted history entry and record pageshow.persisted true."
-    expected: "Protected content stays paused until fresh session and descriptor authorization; no stale image, content or outbox replay crosses identity or role."
-    why_human: "All five final real-history cases took ordinary reload. Constructed persisted pageshow verifies the handler but does not prove an actual browser restoration."
-  - name: "Native OS IME"
-    test: "Use an actual OS composition session in inline title, native topic, sharing and recovery; expire or change access mid-composition."
-    expected: "Enter during composition does not commit accidentally, readonly recovery blocks writes, and acknowledged same-account resume restores the exact permitted edit range."
-    why_human: "Automated composition events exercise application handlers without an OS IME."
-  - name: "Assistive-technology speech and interaction"
-    test: "Use a screen reader through login/recovery, library, sharing, named destructive confirmation and copy progress."
-    expected: "Names, role/access state, errors, progress and resume announcements are understandable; focus remains contained and returns appropriately."
-    why_human: "DOM ARIA, focus and contrast assertions do not demonstrate the spoken experience."
-  - name: "Firefox/WebKit native clipboard"
-    test: "Use OS copy/paste with native text, image and mind-map data as Editor and Viewer in Firefox and WebKit, including delayed completion after access loss."
-    expected: "Permitted copy/paste preserves content; Viewer and stale scope cannot mutate or write backend data."
-    why_human: "Final engine annotations distinguish clipboard payload-route simulation from native OS clipboard observation."
-  - name: "03-02 prohibition resolution"
-    test: "Explicitly review and resolve: Explicit Dali sign-out MUST NOT silently sign the member back in or terminate their provider-wide session."
-    expected: "Record human disposition or provide a wired enforcement descriptor and reverify."
-    why_human: "Descriptor-less test prohibition; semantic test coverage does not supply the missing enforcement contract."
-  - name: "03-07 prohibition resolution"
-    test: "Explicitly review and resolve: Pending access MUST NOT be presented as an emailed invitation or active membership before verified internal sign-in."
-    expected: "Record human disposition or provide a wired enforcement descriptor and reverify."
-    why_human: "Descriptor-less test prohibition; semantic test coverage does not supply the missing enforcement contract."
-  - name: "03-11 prohibition resolution"
-    test: "Explicitly review and resolve: Selected local copying MUST NOT silently upload unselected browser boards or delete original local documents or images."
-    expected: "Record human disposition or provide a wired enforcement descriptor and reverify."
-    why_human: "Descriptor-less test prohibition; semantic test coverage does not supply the missing enforcement contract."
-  - name: "03-12 prohibition resolution"
-    test: "Explicitly review and resolve: Public artifacts MUST NOT contain operator-specific identity settings, real organizational content, credentials or real-provider evidence."
-    expected: "Record human disposition or provide a wired enforcement descriptor and reverify."
-    why_human: "Descriptor-less judgment prohibition; semantic test coverage does not supply the missing enforcement contract."
+    disposition: Scoped UAT privacy review and subsequent staged-content delta reviews; publication recheck remains required.
 ---
 
-> Acceptance update, 2026-09-24: [03-UAT.md](03-UAT.md) records five user passes and one scoped privacy-review pass, two approved deferrals, a user waiver for optional local-copy human acceptance (03-11), and one pending disposition (03-07). The two technically flagged prohibitions retain their evidence status; one is waived for human acceptance. [03-UAT-REVIEW.md](03-UAT-REVIEW.md) details export analysis and privacy scope. The score, covered digest and automated evidence below are the historical verification; this update does not claim a new full gate. Human-verification entries below describe the original checks, with current dispositions in the UAT file.
+# Phase 3: approved-scope acceptance refresh
 
+Current result: **PASSED** on source/test commit `63f352b`. The original independent assessment remains preserved below with its original 99/104 denominator and revision. This refresh evaluates the five currently approved Phase 3 requirements, the subsequent user-approved changes, the complete current regression suite, and every remaining human disposition. It does not re-label the earlier 104-truth audit as a newly executed independent audit.
+
+## Requirements and current evidence
+
+| Requirement | Implemented outcome | Evidence |
+| --- | --- | --- |
+| AUTH-01 | Configurable OIDC, trusted internal admission, persistent Dali sessions and deliberate Dali-only sign-out. Actual provider setup/acceptance is deferred to 999.4. | Signed synthetic provider, `server/auth/oidc.test.ts`, `tests/authentication.spec.ts`, `tests/session-recovery.spec.ts`; user UAT item 7. |
+| BOARD-01 | Eligible members create named private boards and reopen authorized persisted content; imported files create separate private boards owned by the importer. | `tests/board-access.spec.ts`, `tests/board-actions.spec.ts`, `tests/board-title.spec.ts`, `tests/local-board-import.spec.ts`, development account-workspace harness. |
+| BOARD-02 | Library identifies private/shared boards and effective roles, with bounded titles, filters and responsive controls. | `tests/board-library.spec.ts`, `tests/accessibility-access.spec.ts`, `tests/board-roles.spec.ts`. |
+| BOARD-03 | Owners grant/revoke Editor or Viewer access; pending grants activate only after verified internal sign-in. | `server/boards/grants.test.ts`, `tests/board-sharing.spec.ts`; user UAT item 8. |
+| BOARD-04 | Effective board roles and current account/generation protect content, images, actions and import staging. | `tests/access-boundaries.spec.ts`, `tests/board-roles.spec.ts`, server access/actions/receipt tests; denied operations preserve authoritative canaries and state. |
+
+Creators retain Owner privileges on their existing boards. A system Viewer remains read-only on shared boards and cannot create a fresh board or file import. Owner/Editor copies produce a private destination owned by the copier. These are the latest explicit user decisions and supersede earlier conflicting role interpretations.
+
+## Final automated gate
+
+All seven blocking commands passed on source/test commit `63f352b7a955bff176143d51bd64431b04777d81`. The 190 tracked source/test/configuration hashes matched before and after execution. Commands ran sequentially with isolated synthetic services and the configured single worker. No required case was skipped, retried or left unrun.
+
+| Command | Result | Outer duration |
+| --- | --- | ---: |
+| `npm run typecheck` | Passed | 4.5s |
+| `npm run typecheck:server` | Passed | 1.3s |
+| `npm test` | Passed | 1.9s |
+| `npm run test:server` | Passed | 8.2s |
+| `npm run build` | Passed | 12.9s |
+| `npm run test:access -- --reporter=list,json` | Passed | 271.5s |
+| `npm run test:browser -- --reporter=list,json` | Passed | 3808.9s |
+
+Unit tests: **110/110**. Server tests: **116/116**. Standalone access: **124/124** (270.9s runner duration). Full browser matrix: **1,658/1,658** (3808.3s; 63.5m runner duration). Full-matrix projects: development 388, production Chromium 382, Firefox 382, WebKit 382, access 124. Failures, timeouts, skips, retries, interruptions and unrun cases: **zero**. Standalone access cases also appear in the full matrix; these are separate runs, not disjoint coverage totals.
+
+The validated working tree retained pre-existing package-script additions. They were included in the source fingerprint and left outside acceptance commits, alongside the user's README/artwork changes. Existing build warnings remain documented in raw execution output; the build exited successfully.
+
+
+The approved file-import replacement supersedes the removed optional browser-local migration interface. Its current tests cover picker/drop validation, bounded archives, destination ownership, image/content preservation, authorization and uncertain-operation recovery. Original UI-COPY inventory/selection predicates and D-16's migration-specific UI statements retain their historical scope below; they are not claimed as current controls. The active import requirement is recorded in the file-import quick summary and current UAT dispositions.
+
+## Acceptance corrections
+
+- Header target size and long-title containment: `e1f0cd5`; focused responsive checks and inspected synthetic narrow-screen captures.
+- Font-ready native measurement and bounded retry: `b4755ab`; exact connector geometry survives reload, slow fonts and timeout/retry.
+- Contextual properties and Layers ordering: `f8e87db`; native panel clicks, keyboard navigation and arrangement remain exercised.
+- Firefox title focus after delayed blur: `e5a0739`; a failing instrumented sequence was reproduced, corrected and repeated successfully for 400 renames; the permanent suite retains a bounded 40-rename regression.
+- Cancelled native mounting: `63f352b`; a mutation observer reproduced two attached hosts before the fix and verifies one afterward. Mount cancellation is checked before attachment and immediately disposes an in-progress view. Mounting remains bound to the supplied authorized runtime.
+
+The checkpoint retains all failed/interrupted attempts and their exact revision boundaries. No failure was converted into a pass through forced clicks, relaxed timeouts, new console-error allowances or removed state-preservation assertions.
+
+## Human acceptance and deferred scope
+
+`03-UAT.md` records **7 passes, 3 approved skips, 0 issues, 0 pending**. Six passes are user-reported: native browser 200% zoom, genuine BFCache restoration, OS IME, Firefox/WebKit native clipboard, Dali-only logout and pending-access wording. The seventh is scoped agent privacy judgment. Browser versions and detailed native traces were not supplied. Automated handler simulations and ordinary history reloads keep their narrower evidence limits.
+
+- Real-provider configuration and acceptance: deferred by the user to **999.4** until operator access is available.
+- Assistive-technology speech and interaction: deferred by the user to **999.3**.
+- Optional Copy local boards acceptance: waived by the user, then removed from the interface in favor of explicit file import. Historical prohibition remains technically flagged with its waiver; no machine enforcement descriptor is invented.
+
+The logout and pending-access prohibitions are resolved through explicit user acceptance. Public-artifact privacy is resolved by the scoped judgment review and subsequent staged-diff reviews. All enforcement descriptor arrays remain empty where no deterministic descriptor was wired.
+
+## Review scope and next capability
+
+Historical independent code/security/UI reviews retain their own source revisions and scopes. The current parent delta review and fresh regression suite cover the subsequent changes; no new independent audit score is claimed. Public automation uses synthetic accounts and example domains; operator configuration and actual-provider evidence remain external. Existing user artwork, README and package-script changes remain outside the acceptance commits.
+
+Phase 4 remains responsible for SAVE-01, SAVE-02, OPS-01 and OPS-02: cross-browser/service-restart durability, save-state reliability, deployment and backup/restore. Current Phase 3 recovery evidence does not close those later requirements.
+
+---
+
+# Historical independent verification — 2026-09-17
+
+The following report is retained as revision-specific history. Its 99/104 score, human-needed wording, original local-copy interface and original pending observations describe that earlier assessment. The current refresh and UAT dispositions above govern present acceptance.
 
 # Phase 3: Okta and Board Access Verification Report
 
