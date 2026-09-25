@@ -7,9 +7,16 @@ import { BoardImportDialog } from './BoardImportDialog';
 import { AccountMenu } from '../header/AccountMenu';
 import { Dropdown } from '../header/Dropdown';
 import logo from '../../imgs/svg/dali-logo-light.svg';
+import { authenticatedRecoveryEpoch, validRecoveryEpoch } from '../canvas/account/doc-source';
 
 export type BoardSummary = { id: string; title: string; updatedAt: number; role: 'owner' | 'editor' | 'viewer'; access: 'private' | 'shared'; pendingCount: number; accountId: string; thumbnailUrl?: string };
-export type BoardDescriptor = { summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number };
+export type BoardDescriptor = { summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number; recoveryEpoch: string };
+export function validDescriptor(value: BoardDescriptor, accountId: string) {
+  return value && validSummary(value.summary, accountId) && typeof value.rootDocId === 'string' && !!value.rootDocId &&
+    typeof value.contentDocId === 'string' && !!value.contentDocId && value.rootDocId !== value.contentDocId &&
+    Array.isArray(value.capabilities) && value.capabilities.every(capability => typeof capability === 'string') &&
+    Number.isSafeInteger(value.revision) && value.revision > 0 && validRecoveryEpoch(value.recoveryEpoch);
+}
 export function validSummary(value: BoardSummary, accountId: string) {
   return value && value.accountId === accountId && typeof value.id === 'string' && value.id.length > 0 && typeof value.title === 'string'
     && ['owner', 'editor', 'viewer'].includes(value.role) && ['private', 'shared'].includes(value.access)
@@ -49,7 +56,7 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState('');
-  const operation = useRef<{ id: string; title: string } | null>(null);
+  const operation = useRef<{ id: string; title: string; epoch: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (!new URLSearchParams(window.location.search).has('focusBoard')) heading.current?.focus(); }, [member.accountId]);
   const actionFocus = useRef<{ id?: string }>();
@@ -96,13 +103,13 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
     try {
       let result: BoardDescriptor | undefined;
       if (operation.current) result = await reconcile();
-      else operation.current = { id: crypto.randomUUID(), title };
+      else operation.current = { id: crypto.randomUUID(), title, epoch: await authenticatedRecoveryEpoch(member.accountId, controller.signal) };
       if (!result) {
         const timeout = new AbortController();
         const abort = () => timeout.abort(); controller.signal.addEventListener('abort', abort, { once: true });
         const timer = window.setTimeout(abort, 10000);
         try {
-          const response = await fetch('/api/boards', { method: 'POST', headers, signal: timeout.signal,
+          const response = await fetch('/api/boards', { method: 'POST', headers: { ...headers, 'X-Dali-Recovery-Epoch': operation.current!.epoch }, signal: timeout.signal,
             body: JSON.stringify({ title: operation.current!.title, operationId: operation.current!.id }) });
           if (!response.ok) {
             if (response.status === 400) { operation.current = null; throw new Error('Use a board name of 200 characters or fewer.'); }
@@ -114,7 +121,7 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
           result = await reconcile(); if (!result) throw cause;
         } finally { clearTimeout(timer); controller.signal.removeEventListener('abort', abort); }
       }
-      if (!result || !validSummary(result.summary, member.accountId)) throw new Error('Invalid result');
+      if (!validDescriptor(result!, member.accountId)) throw new Error('Invalid result');
       if (!controller.signal.aborted) {
         operation.current = null;
         window.location.assign('/?board=' + encodeURIComponent(result.summary.id));

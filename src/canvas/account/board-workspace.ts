@@ -55,7 +55,7 @@ export class BoardWorkspace implements Workspace {
     this.doc = new Y.Doc({ guid: d.rootDocId });
     this.awarenessStore = new AwarenessStore(new Awareness(this.doc));
     this.storeExtensions = new StoreExtensionManager(storeExtensions).get('store');
-    const sourceOptions = { ...options, boardId: d.summary.id, rootDocId: d.rootDocId, contentDocId: d.contentDocId,
+    const sourceOptions = { ...options, getRecoveryEpoch: options.getRecoveryEpoch ?? (() => d.recoveryEpoch), boardId: d.summary.id, rootDocId: d.rootDocId, contentDocId: d.contentDocId,
       readonly: this.readonly, signal: this.abort.signal, onAuthorizationLost: (error: Parameters<NonNullable<SourceOptions['onAuthorizationLost']>>[0]) => {
         // Runtime must freeze/capture buffered updates before destroying native documents.
         if (options.onAuthorizationLost) options.onAuthorizationLost(error);

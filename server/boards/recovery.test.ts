@@ -5,6 +5,10 @@ import * as Y from 'yjs';
 import { buildApp } from '../app.js';
 import { openDatabase, type AccountDatabase } from '../storage/database.js';
 import { createOidcProvider, IDENTITY_COOKIE } from '../../tests/oidc-provider.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { initializeRecoveryState, readRecoveryEpoch } from '../storage/recovery-state.js';
 
 let app: FastifyInstance; let database: AccountDatabase;
 let provider: Awaited<ReturnType<typeof createOidcProvider>>;
@@ -43,6 +47,16 @@ beforeEach(async () => {
   for (const role of ['editor', 'viewer']) database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, actors[role]!.accountId, role);
 });
 afterEach(async () => { await app?.close(); database?.close(); await provider?.close(); });
+
+it('@04-02-01 file-backed recovery epoch is initialized once and retained on reopen', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'dali-epoch-'));
+  try {
+    const first = openDatabase(join(directory, 'db.sqlite')); const initial = initializeRecoveryState(first);
+    expect(initializeRecoveryState(first)).toEqual(initial); first.close();
+    const reopened = openDatabase(join(directory, 'db.sqlite'));
+    expect(initializeRecoveryState(reopened)).toEqual(initial); expect(readRecoveryEpoch(reopened)).toBe(initial.epoch); reopened.close();
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 
 it('@04-02-01 missing epoch rejects document mutation without changing durable bytes', async () => {
   const before = snapshot(); const response = await push('');

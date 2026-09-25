@@ -8,6 +8,7 @@ import { registerDocumentRoutes, type BeforeCommit } from './documents.js';
 import { registerBlobRoutes, validateImageBytes } from './blobs.js';
 import { registerGrantRoutes, grantState } from './grants.js';
 import { registerActionRoutes } from './actions.js';
+import { initializeRecoveryState, readRecoveryEpoch, requireRecoveryEpoch } from '../storage/recovery-state.js';
 
 export type BoardRole = 'owner' | 'editor' | 'viewer';
 export type BoardCapability = 'read' | 'image' | 'presentation-export' | 'write' | 'rename' | 'editable-export' | 'duplicate' | 'grants' | 'delete';
@@ -29,6 +30,8 @@ export function requireBoardCapability(database: AccountDatabase, request: Fasti
   if (!board) { reply.code(404).send({ code: 'BOARD_UNAVAILABLE' }); return; }
   if (member!.systemRole === 'viewer' && board.role !== 'owner') board.role = 'viewer';
   if (!canBoard(board.role, capability)) { reply.code(403).send({ code: 'CAPABILITY_REQUIRED' }); return; }
+  if (database.inTransaction && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) &&
+      ['write', 'rename', 'duplicate', 'grants', 'delete'].includes(capability) && !requireRecoveryEpoch(database, request, reply)) return;
   return board;
 }
 function summary(database: AccountDatabase, board: BoardRow, accountId: string): BoardSummary {
@@ -41,7 +44,7 @@ function summary(database: AccountDatabase, board: BoardRow, accountId: string):
 }
 export function descriptor(database: AccountDatabase, board: BoardRow, accountId: string) {
   return { summary: summary(database, board, accountId), rootDocId: board.root_doc_id, contentDocId: board.content_doc_id,
-    capabilities: boardCapabilities.filter(capability => canBoard(board.role, capability)), revision: board.revision };
+    capabilities: boardCapabilities.filter(capability => canBoard(board.role, capability)), revision: board.revision, recoveryEpoch: readRecoveryEpoch(database) };
 }
 /** Receipts acknowledge an actor's operation; their resource data uses current authority. */
 export function operationReceipt(database: AccountDatabase, request: FastifyRequest, reply: FastifyReply, operationId: string, now: () => number, importsOnly = false) {
@@ -98,6 +101,11 @@ export function seedDocuments(database: AccountDatabase, board: BoardRow) {
   } finally { root.destroy(); content.destroy(); }
 }
 export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, database: AccountDatabase, now: () => number, beforeCommit?: BeforeCommit) {
+  initializeRecoveryState(database);
+  app.get('/api/recovery-state', async (request, reply) => {
+    const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
+    return { epoch: readRecoveryEpoch(database), schemaVersion: 1 };
+  });
   runMigrations(database, [{ version: 2, sql: `
     CREATE TABLE boards (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES members(id), title TEXT NOT NULL,
       root_doc_id TEXT NOT NULL UNIQUE, content_doc_id TEXT NOT NULL UNIQUE, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, revision INTEGER NOT NULL DEFAULT 1);

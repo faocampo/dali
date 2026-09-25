@@ -1,0 +1,24 @@
+import { randomUUID } from 'node:crypto';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import { runMigrations, type AccountDatabase } from './database.js';
+
+export type RecoveryState = { epoch: string; schemaVersion: number };
+export function initializeRecoveryState(database: AccountDatabase): RecoveryState {
+  runMigrations(database, [{ version: 8, sql: `CREATE TABLE recovery_state (
+    singleton INTEGER PRIMARY KEY CHECK(singleton=1), schema_version INTEGER NOT NULL CHECK(schema_version=1), epoch TEXT NOT NULL);` }]);
+  database.prepare('INSERT INTO recovery_state(singleton,schema_version,epoch) VALUES(1,1,?) ON CONFLICT(singleton) DO NOTHING').run(randomUUID());
+  return { epoch: readRecoveryEpoch(database), schemaVersion: 1 };
+}
+export function readRecoveryEpoch(database: AccountDatabase): string {
+  const state = database.prepare('SELECT epoch,schema_version FROM recovery_state WHERE singleton=1').get() as { epoch: string; schema_version: number } | undefined;
+  if (!state || state.schema_version !== 1 || !/^[0-9a-f-]{36}$/.test(state.epoch)) throw new Error('Recovery state unavailable');
+  return state.epoch;
+}
+/** Call only after current authorization, and again inside the write transaction. */
+export function requireRecoveryEpoch(database: AccountDatabase, request: FastifyRequest, reply: FastifyReply): string | undefined {
+  const supplied = request.headers['x-dali-recovery-epoch'];
+  if (typeof supplied !== 'string' || !supplied) { reply.code(409).send({ code: 'RECOVERY_EPOCH_REQUIRED' }); return; }
+  const epoch = readRecoveryEpoch(database);
+  if (supplied !== epoch) { reply.code(409).send({ code: 'RECOVERY_EPOCH_MISMATCH' }); return; }
+  reply.header('X-Dali-Recovery-Epoch', epoch); return epoch;
+}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AuthBoundary, type SessionDescriptor } from './auth/AuthBoundary';
-import { BoardLibrary, validSummary, type BoardDescriptor } from './boards/BoardLibrary';
+import { BoardLibrary, validDescriptor, type BoardDescriptor } from './boards/BoardLibrary';
 import BlockSuiteCanvas from './canvas/BlockSuiteCanvas';
 import { Header } from './header/Header';
 import { disposeCanvasRuntime, getCanvasRuntime, nextAccessGeneration, suspendAccessScope, type CanvasRuntime } from './canvas/runtime';
@@ -70,7 +70,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
         if (response.status === 404) { setState('denied'); return; }
         if (!response.ok) throw new Error('Board unavailable');
         const descriptor = await response.json() as BoardDescriptor;
-        if (!validSummary(descriptor.summary, member.accountId) || descriptor.summary.id !== target || !descriptor.rootDocId || !descriptor.contentDocId) throw new Error('Invalid descriptor');
+        if (!validDescriptor(descriptor, member.accountId) || descriptor.summary.id !== target) throw new Error('Invalid descriptor');
         if (!controller.signal.aborted) {
           const loaded = await getCanvasRuntime({ descriptor, accountId: member.accountId, generation, signal: controller.signal,
             onAuthorizationLost: error => { if (!controller.signal.aborted) { setRuntime(undefined); setBoard(undefined); setState(error.status === 401 ? 'expired' : 'denied'); } } });
