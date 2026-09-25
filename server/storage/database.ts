@@ -1,6 +1,21 @@
 import Database from 'better-sqlite3';
 export type AccountDatabase = Database.Database;
 export type Migration = { version: number; sql: string };
+/** Refuse startup when persistent writes cannot use the required durability policy. */
+export function configureDurableDatabase(database: AccountDatabase, persistent: boolean) {
+  try {
+    database.pragma('foreign_keys = ON');
+    if (persistent) {
+      database.pragma('journal_mode = WAL');
+      database.pragma('synchronous = FULL');
+    }
+    if (database.pragma('foreign_keys', { simple: true }) !== 1 ||
+        (persistent && (database.pragma('journal_mode', { simple: true }) !== 'wal' ||
+          database.pragma('synchronous', { simple: true }) !== 2))) {
+      throw new Error('Required database durability configuration unavailable');
+    }
+  } catch (error) { database.close(); throw error; }
+}
 const migrations: Migration[] = [{ version: 1, sql: `
 CREATE TABLE members (id TEXT PRIMARY KEY, issuer TEXT NOT NULL, subject TEXT NOT NULL,
  email TEXT NOT NULL, canonical_email TEXT NOT NULL, display_name TEXT NOT NULL, UNIQUE(issuer,subject));
@@ -25,6 +40,6 @@ export function runMigrations(database: AccountDatabase, additional: Migration[]
 }
 export function openDatabase(path: string): AccountDatabase {
   const database = new Database(path);
-  try { runMigrations(database); return database; }
-  catch (error) { database.close(); throw error; }
+  try { configureDurableDatabase(database, path !== ':memory:'); runMigrations(database); return database; }
+  catch (error) { if (database.open) database.close(); throw error; }
 }
