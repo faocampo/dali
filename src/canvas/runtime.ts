@@ -5,6 +5,7 @@ import { reportDocEngineStatus, resetSaveStatus } from './save-status';
 import * as Y from 'yjs';
 import { AccountJournal, acknowledgeRecord, replayJournal } from './account/outbox';
 import { interruptSession, revalidateSession } from '../auth/session';
+import { attachLocalCapture } from './account/local-capture';
 
 export type BoardRole = BoardSummary['role'];
 export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed' }>;
@@ -88,7 +89,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   abort = new AbortController(); const requestAbort = abort;
   options.signal?.addEventListener('abort', () => requestAbort.abort(), { once: true });
   capture = [];
-  const scopedJournal = new AccountJournal({ ...initial, recoveryEpoch: options.descriptor.recoveryEpoch }, () => { queueMicrotask(() => { void interruptSession(); }); });
+  const scopedJournal = new AccountJournal({ ...initial, recoveryEpoch: options.descriptor.recoveryEpoch }, () => { queueMicrotask(() => { suspendAccessScope('storage'); }); });
   journal = scopedJournal;
   const isCurrent = () => scope?.generation === initial.generation && scope.phase === 'active';
   const promise = replayJournal(options.descriptor, options.accountId, requestAbort.signal).then(() => import('./account/board-workspace')).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, isCurrent,
@@ -103,13 +104,16 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (isCurrent()) { suspendAccessScope('authorization'); if (error.status === 401) void interruptSession(); else if (error.status === 409) void revalidateSession(); }
       if (![401, 409].includes(error.status)) options.onAuthorizationLost?.(error);
     },
-  })).then(workspace => {
+  })).then(async workspace => {
     if (!isCurrent()) { workspace.dispose(); throw new Error('Board access changed'); }
     const store = workspace.getDoc(options.descriptor.contentDocId)!.getStore();
+    const local = initial.canWrite ? attachLocalCapture({ journal: scopedJournal, root: workspace.doc, content: store.spaceDoc, title: options.descriptor.summary.title, isCurrent }) : undefined;
+    try { await local?.ready; if (!isCurrent()) throw new Error('Board access changed'); }
+    catch (error) { local?.dispose(); workspace.dispose(); throw error; }
     reportDocEngineStatus(workspace.docSync.status);
     const subscription = workspace.docSync.onStatusChange.subscribe(reportDocEngineStatus);
     const value: CanvasRuntime = { workspace, store, descriptor: structuredClone(options.descriptor), scope: scope!,
-      stopSaveStatus: () => subscription.unsubscribe(), dispose: () => { subscription.unsubscribe(); workspace.dispose(); } };
+      stopSaveStatus: () => subscription.unsubscribe(), dispose: () => { local?.dispose(); subscription.unsubscribe(); workspace.dispose(); } };
     current = value; return value;
   }).catch(error => { if (pending?.key === key) pending = null; throw error; });
   pending = { key, promise }; return promise;
