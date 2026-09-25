@@ -81,3 +81,37 @@ test('label layout retains explicit line breaks and stays stable under zoom', as
   await page.reload();
   await expect.poll(async () => (await labels(page))[0]).toEqual(before);
 });
+
+for (const timeout of [false, true]) test(`slow bundled fonts preserve connector geometry${timeout ? ' after timeout and retry' : ' on reload'}`, async ({ page }) => {
+  await page.goto('/');
+  await page.locator('affine-edgeless-root').evaluate(el => {
+    const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+    gfx.surface!.addElement({ type: 'connector', source: { position: [250, 250] }, target: { position: [1000, 350] }, mode: 0, text: 'Release\nplan', labelXYWH: [0, 0, 16, 16] });
+  });
+  await expect.poll(async () => (await labels(page))[0]?.bounds?.[3]).toBeGreaterThan(30);
+  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  const before = (await labels(page))[0]!;
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let requests = 0;
+  await page.route('**/*.ttf*', async route => {
+    if (route.request().resourceType() === 'font') { requests++; await held; }
+    await route.continue();
+  });
+  try {
+    if (timeout) await page.clock.install();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect.poll(() => requests).toBeGreaterThan(0);
+    await expect(page.getByText('Opening board…', { exact: true })).toBeVisible();
+    await expect(page.locator('editor-host')).toHaveCount(0);
+    if (timeout) {
+      await page.clock.fastForward(15_001);
+      await expect(page.getByRole('heading', { name: 'The canvas could not start' })).toBeVisible();
+      await expect(page.getByText('Canvas fonts could not be loaded. Please try opening the board again.', { exact: true })).toBeVisible();
+      await expect(page.locator('editor-host')).toHaveCount(0);
+    }
+    release();
+    if (timeout) { await page.clock.resume(); await page.getByRole('button', { name: 'Try again', exact: true }).click(); }
+    await expect.poll(async () => (await labels(page))[0]).toEqual(before);
+  } finally { release(); }
+});

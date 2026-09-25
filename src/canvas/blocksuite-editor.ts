@@ -7,7 +7,7 @@
  * and the viewport wrapper -- so mounting twice is wasteful but never creates
  * persistent content.
  */
-import { canvasFonts } from './canvas-fonts';
+import { ensureCanvasFonts } from './canvas-fonts';
 import { installLineWidthControl } from './line-width-control';
 import { installFormattingTheme } from './formatting-theme';
 import { installCanvasColorPicker } from './color-picker';
@@ -36,6 +36,7 @@ export type EdgelessEditorHandle = {
 export async function mountEdgelessEditor(
   container: HTMLElement
 ): Promise<EdgelessEditorHandle> {
+  await ensureCanvasFonts();
   installShapeTextTypography();
   installTextBoxEditing();
   installLineWidthControl();
@@ -51,7 +52,6 @@ export async function mountEdgelessEditor(
     store,
     extensions: [
       ...viewManager.get('edgeless'),
-      canvasFonts,
       // TELL BLOCKSUITE WE ARE IN EDGELESS MODE.
       //
       // The default DocModeService.getEditorMode() returns `null`, so
