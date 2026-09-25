@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, stat, copyFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, stat, copyFile, readdir, writeFile, chmod } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { build } from 'esbuild';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
@@ -8,7 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import * as Y from 'yjs';
 import { buildApp } from '../app.js';
 import { openDatabase, type AccountDatabase } from './database.js';
-import { publishBackup } from './backup.js';
+import { publishBackup, inspectBackupSet, type BackupBoundary } from './backup.js';
 import { validateBackupDatabase } from './backup-validation.js';
 import { readRecoveryEpoch } from './recovery-state.js';
 import { createOidcProvider, IDENTITY_COOKIE } from '../../tests/oidc-provider.js';
@@ -68,6 +71,7 @@ it('@04-10-01 online backup during writes publishes a complete independently reo
   expect(result.manifest.byteLength).toBe(bytes.length); expect(result.manifest.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
   expect(JSON.parse(await readFile(join(target, 'manifest.json'), 'utf8'))).toEqual(result.manifest);
   expect(await readFile(join(target, 'COMPLETE'), 'utf8')).toBe(result.manifest.sha256 + '\n');
+  expect((await readdir(target)).sort()).toEqual(['COMPLETE', 'database.sqlite', 'manifest.json']);
   expect((await stat(target)).mode & 0o777).toBe(0o700); expect((await stat(join(target, 'database.sqlite'))).mode & 0o777).toBe(0o600);
   expect(validateBackupDatabase(join(target, 'database.sqlite')).counts).toEqual(result.manifest.counts);
   const restore = join(directory, 'fresh.sqlite'); await copyFile(join(target, 'database.sqlite'), restore);
@@ -89,6 +93,74 @@ it('@04-10-01 online backup during writes publishes a complete independently reo
 it('@04-10-02 concurrent triggers share one complete publication', async () => {
   const [first, second] = await Promise.all([publishBackup(options()), publishBackup(options())]);
   expect(second.id).toBe(first.id); expect(second.manifest).toEqual(first.manifest);
+  expect(await inspectBackupSet(options().destination)).toEqual([first]);
+});
+
+for (const boundary of ['snapshot', 'verification', 'digest', 'file-sync', 'manifest-sync', 'rename', 'directory-sync', 'completion-marker', 'completion-sync'] as BackupBoundary[]) it(`@04-10-02 ${boundary} failure preserves the last verified recovery point`, async () => {
+  const old = await publishBackup({ ...options(), now: () => 1_700_000_000_000 });
+  let injected = false;
+  await expect(publishBackup({ ...options(), now: () => 1_700_000_001_000, onBoundary: point => {
+    if (point === boundary) { injected = true; throw Object.assign(new Error('Synthetic destination failure'), { code: boundary === 'manifest-sync' ? 'ENOSPC' : 'EIO' }); }
+  } })).rejects.toThrow('Backup publication failed');
+  expect(injected).toBe(true); expect(await inspectBackupSet(options().destination)).toEqual([old]);
+  expect(await readdir(destination)).toEqual([old.id]);
+});
+
+it('@04-10-02 unavailable and unrestricted destinations never replace a stale good backup', async () => {
+  const old = await publishBackup({ ...options(), now: () => 1_700_000_000_000 });
+  await expect(publishBackup({ ...options(), destination: { directory: join(directory, 'unavailable'), independentStorage: true } })).rejects.toThrow('Backup publication failed');
+  await chmod(destination, 0o755); await expect(publishBackup(options())).rejects.toThrow('Backup publication failed'); await chmod(destination, 0o700);
+  await expect(publishBackup({ ...options(), destination: { ...options().destination, independentStorage: false as unknown as true } })).rejects.toThrow('Backup publication failed');
+  expect(await inspectBackupSet(options().destination)).toEqual([old]);
+});
+
+it('@04-10-02 inspection ignores partial, tampered and unsupported sets without editing them', async () => {
+  const old = await publishBackup(options()); const bad = await publishBackup(options());
+  await writeFile(join(destination, bad.id, 'manifest.json'), JSON.stringify({ ...bad.manifest, schemaVersion: 999 }));
+  const partial = join(destination, `backup-123-${randomUUID()}`); await mkdir(partial, { mode: 0o700 }); await writeFile(join(partial, 'manifest.json'), '{}', { mode: 0o600 });
+  const before = await readFile(join(destination, old.id, 'database.sqlite')); const names = await readdir(destination);
+  expect(await inspectBackupSet(options().destination)).toEqual([old]);
+  expect(await readFile(join(destination, old.id, 'database.sqlite'))).toEqual(before); expect(await readdir(destination)).toEqual(names);
+  await writeFile(join(destination, bad.id, 'manifest.json'), JSON.stringify(bad.manifest));
+  await writeFile(join(destination, bad.id, 'database.sqlite'), Buffer.from('synthetic corruption'));
+  expect(await inspectBackupSet(options().destination)).toEqual([old]);
+});
+
+it('@04-10-02 preserves pending access, unfinished imports and receipts for deleted boards', async () => {
+  database.prepare('INSERT INTO pending_grants(board_id,issuer,canonical_email,role) VALUES(?,?,?,?)').run(board.summary.id, provider.issuer, 'pending@example.org', 'viewer');
+  const staged = await app.inject({ method: 'POST', url: '/api/imports', headers: headers(), payload: { operationId: randomUUID(), title: 'Synthetic unfinished import', manifest: [] } }); expect(staged.statusCode).toBe(200);
+  const current = await app.inject({ url: '/api/boards/' + board.summary.id, headers: headers() });
+  const duplicate = await app.inject({ method: 'POST', url: '/api/boards/' + board.summary.id + '/duplicate', headers: headers(), payload: { operationId: randomUUID(), revision: current.json().revision } }); expect(duplicate.statusCode).toBe(200);
+  const created = await app.inject({ method: 'POST', url: '/api/boards', headers: headers(), payload: { operationId: randomUUID(), title: 'Synthetic deleted board' } }); expect(created.statusCode).toBe(201);
+  const deleted = await app.inject({ method: 'DELETE', url: '/api/boards/' + created.json().summary.id, headers: headers(), payload: { operationId: randomUUID(), revision: 1 } }); expect(deleted.statusCode).toBe(200);
+  const published = await publishBackup(options());
+  expect(published.manifest.counts).toMatchObject({ boards: 1, pendingGrants: 1, stagedImports: 2, receipts: 5 });
+  expect(await inspectBackupSet(options().destination)).toEqual([published]);
+});
+
+for (const boundary of ['snapshot', 'completion-marker'] as const) it(`@04-10-02 SIGKILL at ${boundary} leaves only the old verified set selectable`, async () => {
+  const old = await publishBackup(options()); const childDatabase = join(directory, 'child-live.sqlite'); await database.backup(childDatabase);
+  const source = `import Database from 'better-sqlite3'; import { publishBackup } from './server/storage/backup.ts';
+    const keepAlive = setInterval(() => {}, 1000);
+    const database = new Database(process.env.SYNTHETIC_DATABASE);
+    await publishBackup({ database, destination: { directory: process.env.SYNTHETIC_DESTINATION, independentStorage: true }, applicationVersion: '0.1.0',
+      progress: () => { if (process.env.SYNTHETIC_BOUNDARY === 'snapshot') { process.send('ready'); return 0; } return 16; },
+      onBoundary: async point => { if (point === process.env.SYNTHETIC_BOUNDARY && point !== 'snapshot') { process.send('ready'); await new Promise(() => {}); } } }); clearInterval(keepAlive);`;
+  const compiled = await build({ stdin: { contents: source, resolveDir: process.cwd() }, bundle: true, write: false, platform: 'node', format: 'esm', packages: 'external' });
+  const child = spawn(process.execPath, ['--input-type=module'], { stdio: ['pipe', 'ignore', 'pipe', 'ipc'], env: { ...process.env, SYNTHETIC_DATABASE: childDatabase, SYNTHETIC_DESTINATION: destination, SYNTHETIC_BOUNDARY: boundary } });
+  child.stdin!.end(compiled.outputFiles[0]!.text);
+  let errors = ''; child.stderr?.on('data', chunk => { errors += chunk.toString(); });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Child backup barrier timed out: ' + errors)), 10000);
+      child.once('message', () => { clearTimeout(timer); resolve(); }); child.once('error', error => { clearTimeout(timer); reject(error); });
+      child.once('exit', code => { clearTimeout(timer); reject(new Error('Child exited before barrier: ' + code + ' ' + errors)); });
+    });
+    const exited = once(child, 'exit'); child.kill('SIGKILL'); expect((await exited)[1]).toBe('SIGKILL');
+    expect(await inspectBackupSet(options().destination)).toEqual([old]);
+    expect((await readdir(destination)).length).toBeGreaterThan(1);
+    const next = await publishBackup(options()); expect((await inspectBackupSet(options().destination)).map(row => row.id)).toContain(next.id);
+  } finally { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); }
 });
 
 for (const corruption of ['missing-image', 'document', 'image-hash', 'schema', 'binding', 'foreign-key'] as const) it(`@04-10-01 rejects ${corruption} in a real SQLite copy`, async () => {
