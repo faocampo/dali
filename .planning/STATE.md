@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 4
+current_phase: 04
 current_phase_name: Durable Boards and Recovery
-current_plan: Not started
+current_plan: 2
 status: executing
-stopped_at: Phase 4 planned and independently verified; ready to execute
-last_updated: "2026-09-25T20:57:53.402Z"
+stopped_at: Completed 04-01-PLAN.md; Phase 04 remains executing
+last_updated: "2026-09-25T21:18:46.293Z"
 last_activity: 2026-09-25
-last_activity_desc: "Phase 4 planning verified: 16 plans, 36 tasks, 10 waves; ready for execution."
-state_head: 3fddb3c1b3087cebfa35320bd50f85549902835d
+last_activity_desc: Completed 04-01 durable restart evidence
+state_head: c23f8ffca34d87b5caf57b52e85c70380ff96b57
 progress:
   total_phases: 13
   completed_phases: 3
   total_plans: 42
-  completed_plans: 26
+  completed_plans: 27
   percent: 23
 ---
 
@@ -30,19 +30,20 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
-Phase: 4 (Durable Boards and Recovery) — READY TO EXECUTE
-Current Plan: Not started
+Phase: 04 (Durable Boards and Recovery) — EXECUTING
+Current Plan: 2
+Total Plans in Phase: 16
 Status: Ready to execute
 Next action: $gsd-execute-phase 4
-Last activity: 2026-09-25 — Phase 4 planning verified: 16 plans, 36 tasks, 10 waves; ready for execution.
+Last activity: 2026-09-25 — Completed 04-01 durable restart evidence; plan 04-02 is next
 
-Progress: [██░░░░░░░░] 23% (3/13 phases complete; 26/42 currently planned plans complete; later phases remain unplanned)
+Progress: [██░░░░░░░░] 23% (3/13 phases complete; 27/42 currently planned plans complete; later phases remain unplanned)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 26
+- Total plans completed: 27
 - Average duration: —
 - Total execution time: not consistently recorded across sessions.
 
@@ -58,7 +59,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 26/42 curr
 **Recent Trend:**
 
 - Last 5 plans: 03-08, 03-09, 03-10, 03-11, 03-12
-- Trend: Phase 3 accepted; Phase 4 context is approved; research and planning are next.
+- Trend: Phase 3 accepted; Phase 4 plan 04-01 proves ordinary restart durability; remaining Phase 4 plans are executing sequentially.
 
 **Per-Plan Metrics:**
 
@@ -86,6 +87,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 26/42 curr
 | Phase 03 P09 | 26min | 2 tasks | 9 files |
 | Phase 03 P10 | 79min | 3 tasks | 12 files |
 | Phase 03 P11 | 33min | 3 tasks | 9 files |
+| Phase 04 P01 | 14min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -98,6 +100,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 - Creators retain Owner privileges on existing boards. System Viewers remain read-only on shared boards and cannot create boards/imports. Owner/Editor copies are privately owned by the copier.
 - Library Import accepts a Dalí archive by picker or drop and creates a new private canvas; optional Copy local boards was removed by user request.
 - Keep public code, documentation and evidence organization-neutral; operator identity/deployment settings remain outside the repository.
+- [Phase 04]: Persistent SQLite opens with verified WAL/FULL/foreign keys; crash fault controls remain private to test child processes.
 
 ### Pending Todos
 
@@ -117,9 +120,9 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-09-25T20:57:13.702Z
-Stopped at: Phase 4 planned and independently verified; ready to execute
-Resume file: .planning/phases/04-durable-boards-and-recovery/04-01-PLAN.md
+Last session: 2026-09-25T21:18:33.037Z
+Stopped at: Completed 04-01-PLAN.md; Phase 04 remains executing
+Resume file: None
 Next action: `$gsd-execute-phase 4`
 
 ## Phase 1 verification outcome
