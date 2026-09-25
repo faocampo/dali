@@ -3,12 +3,12 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Durable Boards and Recovery
 current_plan: Not started
-status: ready_to_discuss
-stopped_at: Phase 3 complete; Phase 4 ready for discussion
-last_updated: "2026-09-25T05:10:30.350956+00:00"
+status: ready_to_plan
+stopped_at: Phase 4 context gathered; ready for research and planning
+last_updated: "2026-09-25T18:52:23.071Z"
 last_activity: 2026-09-25
-last_activity_desc: Phase 3 accepted after final 1658-case browser gate and completed UAT
-state_head: 63f352b
+last_activity_desc: "Phase 4 context approved: saving, local recovery, Kubernetes deployment and backup/restore targets."
+state_head: 133c1c0c1e36a55a069a473ad9747ed58936d8e4
 progress:
   total_phases: 13
   completed_phases: 3
@@ -32,9 +32,9 @@ Phase 3 is complete within approved scope. Its final source/test commit `63f352b
 
 Phase: 04 (Durable Boards and Recovery)
 Current Plan: Not started
-Status: Ready for discussion
-Next action: `$gsd-discuss-phase 4`
-Last activity: 2026-09-25 — Closed Phase 3 after the complete regression gate and accepted human dispositions.
+Status: ready_to_plan
+Next action: $gsd-plan-phase 4
+Last activity: 2026-09-25 — Phase 4 context approved: saving, local recovery, Kubernetes deployment and backup/restore targets.
 
 Progress: [██░░░░░░░░] 23% (3/13 phases complete; 26/26 currently planned plans complete; later phases remain unplanned)
 
@@ -58,7 +58,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 26/26 curr
 **Recent Trend:**
 
 - Last 5 plans: 03-08, 03-09, 03-10, 03-11, 03-12
-- Trend: Phase 3 accepted; Phase 4 awaits discussion and planning.
+- Trend: Phase 3 accepted; Phase 4 context is approved; research and planning are next.
 
 **Per-Plan Metrics:**
 
@@ -93,7 +93,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 26/26 curr
 
 See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) and [REQUIREMENTS.md](REQUIREMENTS.md) (42 approved requirements and acceptance obligations).
 
-- Deliver the 13 phases sequentially; next discuss Phase 4 durability, save acknowledgment, deployment and backup/restore.
+- Deliver the 13 phases sequentially; next research and plan the approved Phase 4 durability, recovery, Kubernetes deployment and backup/restore decisions.
 - Actual-provider acceptance is deferred to 999.4; spoken assistive-technology acceptance is deferred to 999.3. Neither is claimed as tested.
 - Creators retain Owner privileges on existing boards. System Viewers remain read-only on shared boards and cannot create boards/imports. Owner/Editor copies are privately owned by the copier.
 - Library Import accepts a Dalí archive by picker or drop and creates a new private canvas; optional Copy local boards was removed by user request.
@@ -101,7 +101,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ### Pending Todos
 
-- Discuss Phase 4, then research and plan its four requirements: SAVE-01, SAVE-02, OPS-01 and OPS-02. No Phase 4 implementation is authorized by a plan yet.
+- Research and plan Phase 4 from its approved 04-CONTEXT.md: SAVE-01, SAVE-02, OPS-01 and OPS-02. Phase 4 plans remain to be created and checked.
 
 ### Blockers/Concerns
 
@@ -117,10 +117,10 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-09-25T05:10:30.350956+00:00
-Stopped at: Phase 3 complete; Phase 4 ready for discussion.
-Resume file: None
-Next action: `$gsd-discuss-phase 4`
+Last session: 2026-09-25T18:50:25.391Z
+Stopped at: Phase 4 context gathered; ready for research and planning
+Resume file: .planning/phases/04-durable-boards-and-recovery/04-CONTEXT.md
+Next action: `$gsd-plan-phase 4`
 
 ## Phase 1 verification outcome
 
