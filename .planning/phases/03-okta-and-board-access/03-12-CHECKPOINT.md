@@ -33,6 +33,14 @@ The next complete chain again passed both typechecks, 110 unit tests, 116 server
 
 The shared-layer correction passed the frontend static check, **88/88 panel/navigation/daily-workflow cases** across all four browser modes (195.1s), and **60/60 adjacent native arrangement cases** (127.7s). The layer-order fix changes the common inspector rule; Layers retains its later DOM precedence over mind-map properties, and both stay above the native formatting toolbar. No test force-click, timeout change or assertion removal was used. Another complete gate is required on this final source.
 
+## Complete matrix at `f8e87db` — 2026-09-25
+
+Both typechecks, 110 unit tests, 116 server tests, build and 124 standalone access tests passed. The complete browser matrix finished **1,649 passed / 1 failed / 0 skipped / 0 interrupted / 0 unrun** in 3,791.2s (63.2m). Development passed 386/386; production Chromium 380/380; Firefox 379/380; WebKit 380/380; the access project 124/124. All 190 frozen tracked source/test/configuration hashes matched at completion. The sole failure was Firefox `board-title.spec.ts`: saving with Enter updated the title, but focus did not return to the title button. Every prior header, font, inspector and Layers regression passed. This remains a failed gate; focused event tracing and a subsequent fresh gate are required before completion.
+
+Firefox event tracing reproduced the focus race on rename 87 in a 400-rename stress attempt (51.5s including the failed 20-second focus assertion). A preceding 40-rename diagnostic passed. Firefox delivers blur from the disabled input asynchronously; when that blur arrives after the save promise settles but before React removes the field, the blur handler clears the Enter-key focus-return flag. The correction marks the closing transition synchronously and ignores its late blur, preserving ordinary blur-save and cancellation behavior. The same instrumented **400-rename sequence passed** after the fix (62.2s total; 43.3s case execution). Diagnostic instrumentation remains outside committed tests; a bounded 40-rename browser regression retains the focus and reload-persistence oracles.
+
+The final title correction passed the frontend static check and **28/28 focused title/role/recovery cases** across development Chromium, production Chromium, Firefox and WebKit (84.7s). Existing Enter, Escape, blur-save, composition, uncertain-operation, responsive header, source-persistence and canvas-lifetime checks remain unchanged. The next blocking run includes the new repeated-rename regression in all four general browser projects.
+
 ## Current pending-access review — 2026-09-24
 
 Resumed through `$gsd-progress --next` at revision `5c7fe7a`. Phases 1 and 2 have matching plan/summary counts; 03-12 is the first incomplete plan. Previously approved deferrals remain effective.

@@ -18,6 +18,20 @@ test('inline title saves with Enter and survives reload without replacing canvas
   await expect(boardLink).toHaveAttribute('href', '/' + boardUrl.search);
 });
 
+test('rapid acknowledged title edits retain keyboard focus between commits', async ({ page }) => {
+  await page.goto('/');
+  for (let i = 0; i < 40; i++) {
+    const name = `Synthetic keyboard rename ${i}`;
+    await (await editBoardTitle(page)).fill(name);
+    await page.getByRole('textbox', { name: 'Board name' }).press('Enter');
+    const trigger = page.getByRole('button', { name: `Rename board: ${name}`, exact: true });
+    await expect(trigger).toBeFocused();
+    await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveCount(0);
+  }
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Rename board: Synthetic keyboard rename 39', exact: true })).toBeVisible();
+});
+
 test('inline title cancels on Escape, rejects blanks, and saves on blur', async ({ page }) => {
   await page.goto('/');
   const label = page.getByRole('button', { name: /^Rename board:/ });
