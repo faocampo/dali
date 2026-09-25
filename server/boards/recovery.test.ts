@@ -112,3 +112,14 @@ it('@04-02-02 old image and metadata epochs reject while current actions stay us
   expect((await app.inject({ method: 'PATCH', url: base, headers: headers(), payload: { operationId: randomUUID(), revision: 1, title: 'current' } })).statusCode).toBe(200);
   expect((await app.inject({ method: 'DELETE', url: base, headers: headers(), payload: { operationId: randomUUID(), revision: 2 } })).statusCode).toBe(200);
 });
+
+it('@04-02-03 pre-board creation and import reservations reject missing epochs', async () => {
+  const before = snapshot();
+  for (const [url, payload] of [
+    ['/api/boards', { operationId: randomUUID(), title: 'rejected' }],
+    ['/api/imports', { operationId: randomUUID(), title: 'rejected', manifest: [] }],
+  ] as const) {
+    const response = await app.inject({ method: 'POST', url, headers: headers('owner', ''), payload });
+    expect(response.statusCode).toBe(409); expect(response.json().code).toBe('RECOVERY_EPOCH_REQUIRED'); expect(snapshot()).toEqual(before);
+  }
+});
