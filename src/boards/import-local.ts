@@ -5,7 +5,8 @@ import type { Store } from '@blocksuite/affine/store';
 import { validateMindmapDocument } from '../canvas/mindmap-compatibility';
 import { createStagingWorkspace } from '../canvas/account/board-workspace';
 import { regenerateSurfaceIdentities } from './operations';
-import { validSummary, type BoardDescriptor } from './BoardLibrary';
+import { validDescriptor, type BoardDescriptor } from './BoardLibrary';
+import { authenticatedRecoveryEpoch, RecoveryEpochError } from '../canvas/account/doc-source';
 import { getSessionState } from '../auth/session';
 import { ZipTransformer } from '@blocksuite/affine/widgets/linked-doc';
 
@@ -93,6 +94,7 @@ export async function captureArchive(file: File, schema?: Store['schema']) {
   } finally { workspace.forceStop(); stores.forEach(store => store.dispose()); workspace.dispose(); workspace.doc.destroy(); }
 }
 export class LocalBoardCopy {
+  private epoch?: string;
   constructor(readonly accountId: string, readonly source: LocalBoard, readonly operationId: string = crypto.randomUUID(),
     private capture?: () => ReturnType<typeof captureLocal>, private assertScope?: () => void, private authorize?: () => Promise<void>) {}
   private assertAccount() {
@@ -105,8 +107,13 @@ export class LocalBoardCopy {
     await this.authorize?.(); this.assertAccount();
     const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 10000);
     try {
-      const response = await fetch(path, { ...init, signal: controller.signal, cache: 'no-store', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Dali-Request': '1', 'X-Dali-Account': this.accountId, ...init?.headers } });
+      const response = await fetch(path, { ...init, signal: controller.signal, cache: 'no-store', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Dali-Request': '1', 'X-Dali-Account': this.accountId, ...(this.epoch ? { 'X-Dali-Recovery-Epoch': this.epoch } : {}), ...init?.headers } });
+      if (response.status === 409) {
+        const body = await response.clone().json() as { code?: string };
+        if (body.code === 'RECOVERY_EPOCH_REQUIRED' || body.code === 'RECOVERY_EPOCH_MISMATCH') throw new RecoveryEpochError(body.code);
+      }
       if (!response.ok) throw new Error('We couldn’t copy this board. Try again.');
+      if (init?.method && init.method !== 'GET' && response.headers.get('X-Dali-Recovery-Epoch') !== this.epoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
       this.assertAccount(); return response;
     } finally { clearTimeout(timer); }
   }
@@ -115,14 +122,18 @@ export class LocalBoardCopy {
     const check = async () => (await this.request(path)).json() as Promise<{ status: string; result?: BoardDescriptor }>;
     const validate = (result: BoardDescriptor) => {
       this.assertAccount();
-      if (!validSummary(result.summary, this.accountId) || result.summary.access !== 'private' || result.summary.role !== 'owner') throw new Error('The private copy could not be confirmed.');
+      if (!validDescriptor(result, this.accountId) || result.summary.access !== 'private' || result.summary.role !== 'owner') throw new Error('The private copy could not be confirmed.');
       return result;
     };
     const known = await check(); if (known.status === 'completed') return validate(known.result!);
+    const currentEpoch = await authenticatedRecoveryEpoch(this.accountId);
+    this.epoch ??= known.status === 'staging' ? known.result?.recoveryEpoch : currentEpoch;
+    if (this.epoch !== currentEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
     const captured = await (this.capture ? this.capture() : captureLocal(this.source.id)); this.assertAccount();
     const manifest = [...captured.blobs.keys()];
     const reserved = known.status === 'staging' ? known : await (await this.request('/api/imports', { method: 'POST', body: JSON.stringify({ operationId: this.operationId, title: this.source.title, manifest }) })).json() as { status: string; result: BoardDescriptor };
     if (reserved.status === 'completed') return validate(reserved.result!);
+    if (reserved.result?.recoveryEpoch !== this.epoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
     const staging = createStagingWorkspace({ descriptor: reserved.result!, accountId: this.accountId, generation: 0 });
     const transformer = staging.createImportTransformer(captured.schema);
     try {

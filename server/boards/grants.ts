@@ -5,6 +5,7 @@ import { runMigrations, type AccountDatabase } from '../storage/database.js';
 import { currentSession, requireMutation } from '../auth/session-store.js';
 import { requireBoardCapability } from './routes.js';
 import type { BeforeCommit } from './documents.js';
+import { readRecoveryEpoch } from '../storage/recovery-state.js';
 
 export function canonicalInternalEmail(config: Pick<AuthConfig, 'domains' | 'emailCaseFold'>, email: unknown): string | undefined {
   if (typeof email !== 'string' || email.length > 254) return;
@@ -37,7 +38,7 @@ export function grantState(database: AccountDatabase, boardId: string) {
   const grants: Grant[] = [...active.map(row => ({ id: grantId('active', row.id), memberId: row.id, email: row.email, displayName: row.display_name, role: row.role, status: 'active' as const, revision: row.revision })),
     ...pending.map(row => ({ id: grantId('pending', JSON.stringify([row.issuer, row.canonical_email])), issuer: row.issuer, email: row.canonical_email, displayName: row.canonical_email, role: row.role, status: 'pending' as const, revision: row.revision }))];
   grants.sort((a, b) => a.displayName < b.displayName ? -1 : a.displayName > b.displayName ? 1 : a.email < b.email ? -1 : a.email > b.email ? 1 : a.id < b.id ? -1 : 1);
-  return { revision: board.revision, owner: { memberId: owner.id, email: owner.email, displayName: owner.display_name, role: 'owner' }, grants };
+  return { recoveryEpoch: readRecoveryEpoch(database), revision: board.revision, owner: { memberId: owner.id, email: owner.email, displayName: owner.display_name, role: 'owner' }, grants };
 }
 export function registerGrantRoutes(app: FastifyInstance, config: AuthConfig, database: AccountDatabase, now: () => number, beforeCommit?: BeforeCommit) {
   runMigrations(database, [{ version: 5, sql: `ALTER TABLE members ADD COLUMN email_history TEXT NOT NULL DEFAULT '[]'; UPDATE members SET email_history=json_array(canonical_email); CREATE INDEX members_canonical_email ON members(issuer,canonical_email);` }]);

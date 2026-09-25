@@ -8,6 +8,7 @@ import { type AccountDatabase } from '../storage/database.js';
 import { descriptor, requireBoardCapability } from './routes.js';
 import { documentBytes, referencedImageKeys, type BeforeCommit } from './documents.js';
 import { BlobRepository } from './blobs.js';
+import { readRecoveryEpoch } from '../storage/recovery-state.js';
 
 type Mutation = { operationId: string; revision: number; title?: string };
 const operationSchema = { type: 'string', minLength: 1, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' };
@@ -67,7 +68,7 @@ export function registerActionRoutes(app: FastifyInstance, config: AuthConfig, d
       if (board.revision !== request.body.revision) return reply.code(409).send({ code: 'SOURCE_CHANGED' });
       const title = request.body.title?.trim() || board.title;
       if (titleLength(title) > 200) return reply.code(400).send({ code: 'TITLE_TOO_LONG' });
-      const result = { summary: { id: randomUUID(), accountId: member.accountId, title, updatedAt: now(), role: 'owner', access: 'private', pendingCount: 0 }, rootDocId: randomUUID(), contentDocId: randomUUID(), revision: 1, capabilities: ['read', 'write', 'duplicate', 'rename', 'delete', 'grants', 'editable-export', 'image', 'presentation-export'] };
+      const result = { recoveryEpoch: readRecoveryEpoch(database), summary: { id: randomUUID(), accountId: member.accountId, title, updatedAt: now(), role: 'owner', access: 'private', pendingCount: 0 }, rootDocId: randomUUID(), contentDocId: randomUUID(), revision: 1, capabilities: ['read', 'write', 'duplicate', 'rename', 'delete', 'grants', 'editable-export', 'image', 'presentation-export'] };
       const doc = new Y.Doc(); let manifest: string[];
       try { Y.applyUpdate(doc, documentBytes(database, board, board.content_doc_id)!); manifest = [...referencedImageKeys(doc)]; } finally { doc.destroy(); }
       database.prepare('INSERT INTO import_staging(member_id,operation_id,source_id,source_revision,descriptor,manifest) VALUES(?,?,?,?,?,?)').run(member.accountId, request.body.operationId, board.id, board.revision, JSON.stringify(result), JSON.stringify(manifest));

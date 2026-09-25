@@ -177,6 +177,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
     if ([...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length > 200) return reply.code(400).send({ code: 'TITLE_TOO_LONG' });
     return database.transaction(() => {
       const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member) || !requireSystemWriter(reply, member)) return;
+      if (!requireRecoveryEpoch(database, request, reply)) return;
       const previous = database.prepare('SELECT kind,result FROM operations WHERE member_id=? AND operation_id=?')
         .get(member!.accountId, request.body.operationId) as { kind: string; result: string } | undefined;
       if (previous) {

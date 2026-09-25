@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { boardAction, openBoardActions, editBoardTitle, openBoardImport } from './app-menu';
 import { randomUUID } from 'node:crypto';
 import { test, expect, acceptanceService } from './access-fixtures';
@@ -12,7 +13,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   accountId = (await (await page.request.get(service.origin + '/api/session')).json()).accountId;
 });
 test.afterEach(async () => { await service.close(); });
-const headers = () => ({ Origin: service.origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' });
+const headers = () => ({ Origin: service.origin, 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(service.database), 'X-Dali-Request': '1' });
 async function create(page: Page, title: string) {
   const response = await page.request.post(service.origin + '/api/boards', { headers: headers(), data: { title, operationId: randomUUID() } });
   expect(response.status()).toBe(201); return response.json();

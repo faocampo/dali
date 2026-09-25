@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../storage/recovery-state.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPublicKey, randomBytes, verify } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -52,7 +53,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   it('trusted system Viewer preserves ownership and limits shared grants, including existing sessions', async () => {
     const flow = await begin('/', 'viewer'); const first = await finish(flow); const oldCookie = cookieOf(first);
     const actor = (await session(oldCookie)).json();
-    const headers = { cookie: oldCookie, origin: env.DALI_ORIGIN!, 'x-dali-account': actor.accountId, 'x-dali-request': '1' };
+    const headers = { "x-dali-recovery-epoch": readRecoveryEpoch(database), cookie: oldCookie, origin: env.DALI_ORIGIN!, 'x-dali-account': actor.accountId, 'x-dali-request': '1' };
     const created = await app.inject({ method: 'POST', url: '/api/boards', headers, payload: { title: 'Previously owned', operationId: '11111111-1111-4111-8111-111111111111' } });
     expect(created.statusCode).toBe(201); const board = created.json();
     await app.close();
@@ -241,7 +242,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   });
   it('AUTH-01 idempotency exact-origin local logout denies forgery and stale account, then remains harmless', async () => {
     const flow = await signIn(); const account = (await session(flow.authenticated)).json(); const before = members();
-    const headers = { cookie: flow.authenticated, origin: env.DALI_ORIGIN!, 'x-dali-request': '1', 'x-dali-account': account.accountId, 'content-type': 'application/json' };
+    const headers = { "x-dali-recovery-epoch": readRecoveryEpoch(database), cookie: flow.authenticated, origin: env.DALI_ORIGIN!, 'x-dali-request': '1', 'x-dali-account': account.accountId, 'content-type': 'application/json' };
     for (const change of [{ origin: 'https://foreign.example.org' }, { 'x-dali-request': '' }, { 'content-type': 'text/plain' }, { 'x-dali-account': 'stale-account' }]) {
       const response = await app.inject({ method: 'POST', url: '/api/logout', headers: { ...headers, ...change }, payload: '{}' });
       expect([403, 409]).toContain(response.statusCode); expect((await session(flow.authenticated)).statusCode).toBe(200); expect(members()).toEqual(before);

@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import type { Page, Route } from '@playwright/test';
@@ -289,7 +290,7 @@ test('@03-03-02 protected previews reject denied and delayed generations and rev
 });
 test('@03-03-02 UI-HOME-partial denied preview keeps the authorized open action usable', async ({ page }) => {
   const canary = syntheticCanaries();
-  const created = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' }, data: { title: 'Missing preview board', operationId: randomUUID() } });
+  const created = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(database), 'X-Dali-Request': '1' }, data: { title: 'Missing preview board', operationId: randomUUID() } });
   expect(created.status()).toBe(201);
   const id = (await created.json()).summary.id as string;
   database.prepare('INSERT INTO board_thumbnails(board_id,bytes,mime) VALUES(?,?,?)').run(id, canary.imageBytes, 'image/png');

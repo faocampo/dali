@@ -22,7 +22,7 @@ const actors: Record<string, { cookie: string; accountId: string }> = {};
 const headers = (actor = 'owner', epoch: string | undefined = board?.recoveryEpoch) => ({ cookie: actors[actor]!.cookie, 'x-dali-account': actors[actor]!.accountId, 'x-dali-request': '1', origin, ...(epoch ? { 'x-dali-recovery-epoch': epoch } : {}) });
 const bytes = () => (database.prepare('SELECT update_bytes FROM board_documents WHERE board_id=? AND doc_id=?').get(board.summary.id, board.contentDocId) as { update_bytes: Buffer }).update_bytes;
 const push = (epoch: string | undefined, actor = 'owner') => app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/docs/${board.contentDocId}/push`, headers: { ...headers(actor, epoch), 'content-type': 'application/octet-stream' }, payload: bytes() });
-const snapshot = () => ({ boards: database.prepare('SELECT * FROM boards ORDER BY id').all(), docs: database.prepare('SELECT * FROM board_documents ORDER BY board_id,doc_id').all(), blobs: database.prepare('SELECT * FROM board_blobs ORDER BY board_id,blob_key').all() });
+const snapshot = () => ['boards', 'board_documents', 'board_blobs', 'board_thumbnails', 'board_grants', 'pending_grants', 'import_staging', 'import_staging_blobs', 'operations'].map(table => database.prepare('SELECT * FROM ' + table).all());
 beforeEach(async () => {
   barrier = async () => {};
   const registration = { clientId: 'synthetic-recovery', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
@@ -113,13 +113,82 @@ it('@04-02-02 old image and metadata epochs reject while current actions stay us
   expect((await app.inject({ method: 'DELETE', url: base, headers: headers(), payload: { operationId: randomUUID(), revision: 2 } })).statusCode).toBe(200);
 });
 
-it('@04-02-03 pre-board creation and import reservations reject missing epochs', async () => {
+it('@04-02-03 pre-board creation and import reservations reject missing and stale epochs', async () => {
   const before = snapshot();
-  for (const [url, payload] of [
+  for (const epoch of ['', randomUUID()]) for (const [url, payload] of [
     ['/api/boards', { operationId: randomUUID(), title: 'rejected' }],
     ['/api/imports', { operationId: randomUUID(), title: 'rejected', manifest: [] }],
+    [`/api/boards/${board.summary.id}/duplicate`, { operationId: randomUUID(), revision: 1 }],
   ] as const) {
-    const response = await app.inject({ method: 'POST', url, headers: headers('owner', ''), payload });
-    expect(response.statusCode).toBe(409); expect(response.json().code).toBe('RECOVERY_EPOCH_REQUIRED'); expect(snapshot()).toEqual(before);
+    const response = await app.inject({ method: 'POST', url, headers: headers('owner', epoch), payload });
+    expect(response.statusCode).toBe(409); expect(response.json().code).toBe(epoch ? 'RECOVERY_EPOCH_MISMATCH' : 'RECOVERY_EPOCH_REQUIRED'); expect(snapshot()).toEqual(before);
   }
+});
+
+it.each(['import', 'duplicate'])('@04-02-03 %s stages bind their original epoch for every write and publish', async kind => {
+  const operationId = randomUUID(); const key = imageHash(syntheticCanaries().imageBytes);
+  const reservation = await app.inject({ method: 'POST', url: kind === 'import' ? '/api/imports' : `/api/boards/${board.summary.id}/duplicate`, headers: headers(), payload: { operationId, ...(kind === 'import' ? { title: 'Synthetic import', manifest: [key] } : { revision: 1 }) } });
+  expect(reservation.statusCode).toBe(200); expect(reservation.json().result.recoveryEpoch).toBe(board.recoveryEpoch);
+  const before = snapshot(); const base = '/api/imports/' + operationId;
+  const requests = [
+    { method: 'PUT' as const, url: base + '/document', payload: { root: '', content: '', manifest: [] }, mime: 'application/json' },
+    { method: 'PUT' as const, url: base + '/blobs/' + key, payload: syntheticCanaries().imageBytes, mime: 'image/png' },
+    { method: 'POST' as const, url: base + '/commit', payload: {}, mime: 'application/json' },
+  ];
+  for (const epoch of ['', randomUUID()]) for (const request of requests) {
+    const response = await app.inject({ ...request, headers: { ...headers('owner', epoch), 'content-type': request.mime } });
+    expect(response.statusCode).toBe(409); expect(response.json().code).toBe(epoch ? 'RECOVERY_EPOCH_MISMATCH' : 'RECOVERY_EPOCH_REQUIRED'); expect(snapshot()).toEqual(before);
+  }
+  const nextEpoch = randomUUID(); database.prepare('UPDATE recovery_state SET epoch=?').run(nextEpoch);
+  for (const request of requests) {
+    const response = await app.inject({ ...request, headers: { ...headers('owner', nextEpoch), 'content-type': request.mime } });
+    expect(response.json()).toEqual({ code: 'RECOVERY_EPOCH_MISMATCH' }); expect(snapshot()).toEqual(before);
+  }
+  expect((await app.inject({ url: base, headers: headers() })).json().status).toBe('staging');
+});
+
+it.each(['document', 'image', 'commit'])('@04-02-03 import %s checks epoch again after its scheduling barrier', async step => {
+  const operationId = randomUUID(); const png = syntheticCanaries().imageBytes; const key = imageHash(png);
+  const reserved = await app.inject({ method: 'POST', url: '/api/imports', headers: headers(), payload: { operationId, title: 'Synthetic import', manifest: [key] } });
+  const d = reserved.json().result as Descriptor;
+  const root = new Y.Doc(); root.getMap('spaces').set(d.contentDocId, new Y.Doc({ guid: d.contentDocId }));
+  root.getMap('meta').set('pages', Y.Array.from([{ id: d.contentDocId, title: 'Synthetic import', createDate: 1, tags: [] }]));
+  const content = new Y.Doc(); Y.applyUpdate(content, bytes()); const id = randomUUID();
+  const image = new Y.Map(); image.set('sys:id', id); image.set('sys:flavour', 'affine:image'); image.set('prop:sourceId', key); content.getMap('blocks').set(id, image);
+  const payload = { root: Buffer.from(Y.encodeStateAsUpdate(root)).toString('base64'), content: Buffer.from(Y.encodeStateAsUpdate(content)).toString('base64'), manifest: [key] };
+  root.destroy(); content.destroy();
+  const base = '/api/imports/' + operationId;
+  const document = () => app.inject({ method: 'PUT', url: base + '/document', headers: headers(), payload });
+  const blob = () => app.inject({ method: 'PUT', url: base + '/blobs/' + key, headers: { ...headers(), 'content-type': 'image/png' }, payload: png });
+  const commit = () => app.inject({ method: 'POST', url: base + '/commit', headers: headers(), payload: {} });
+  if (step === 'commit') { expect((await document()).statusCode).toBe(200); expect((await blob()).statusCode).toBe(200); }
+  const before = snapshot(); barrier = async () => { database.prepare('UPDATE recovery_state SET epoch=?').run(randomUUID()); };
+  const response = await (step === 'document' ? document() : step === 'image' ? blob() : commit());
+  expect(response.json()).toEqual({ code: 'RECOVERY_EPOCH_MISMATCH' }); expect(snapshot()).toEqual(before);
+  barrier = async () => {}; database.prepare('UPDATE recovery_state SET epoch=?').run(board.recoveryEpoch);
+  expect((await document()).statusCode).toBe(200); expect((await blob()).statusCode).toBe(200);
+  const completed = await commit(); expect(completed.statusCode).toBe(200); expect((await commit()).json()).toEqual(completed.json());
+});
+
+it('@04-02-03 grant and revoke epochs retain access and revision distinctions', async () => {
+  const base = `/api/boards/${board.summary.id}/grants`;
+  const current = (await app.inject({ url: base, headers: headers() })).json();
+  const grant = current.grants.find((row: { memberId: string }) => row.memberId === actors.viewer!.accountId);
+  expect(current.recoveryEpoch).toBe(board.recoveryEpoch); const before = snapshot();
+  for (const epoch of ['', randomUUID()]) for (const method of ['POST', 'PATCH', 'DELETE'] as const) {
+    const response = await app.inject({ method, url: base + (method === 'POST' ? '' : '/' + grant.id), headers: headers('owner', epoch), payload: { operationId: randomUUID(), revision: 1, ...(method === 'POST' ? { email: 'synthetic@example.org' } : {}), ...(method !== 'DELETE' ? { role: 'editor' } : {}) } });
+    expect(response.json().code).toBe(epoch ? 'RECOVERY_EPOCH_MISMATCH' : 'RECOVERY_EPOCH_REQUIRED'); expect(snapshot()).toEqual(before);
+  }
+  expect((await app.inject({ method: 'PATCH', url: base + '/' + grant.id, headers: headers(), payload: { operationId: randomUUID(), revision: 999, role: 'editor' } })).json().code).toBe('GRANT_CONFLICT');
+  expect((await app.inject({ method: 'DELETE', url: base + '/' + grant.id, headers: headers('viewer'), payload: { operationId: randomUUID(), revision: 1 } })).statusCode).toBe(403);
+  expect(snapshot()).toEqual(before);
+  barrier = async () => { database.prepare('UPDATE recovery_state SET epoch=?').run(randomUUID()); };
+  for (const method of ['POST', 'PATCH', 'DELETE'] as const) {
+    database.prepare('UPDATE recovery_state SET epoch=?').run(board.recoveryEpoch);
+    const response = await app.inject({ method, url: base + (method === 'POST' ? '' : '/' + grant.id), headers: headers(), payload: { operationId: randomUUID(), revision: grant.revision, ...(method === 'POST' ? { email: 'synthetic@example.org' } : {}), ...(method !== 'DELETE' ? { role: 'editor' } : {}) } });
+    expect(response.json()).toEqual({ code: 'RECOVERY_EPOCH_MISMATCH' }); expect(snapshot()).toEqual(before);
+  }
+  barrier = async () => {}; database.prepare('UPDATE recovery_state SET epoch=?').run(board.recoveryEpoch);
+  const changed = await app.inject({ method: 'PATCH', url: base + '/' + grant.id, headers: headers(), payload: { operationId: randomUUID(), revision: grant.revision, role: 'editor' } });
+  expect(changed.statusCode).toBe(200); expect(changed.headers['x-dali-recovery-epoch']).toBe(board.recoveryEpoch);
 });

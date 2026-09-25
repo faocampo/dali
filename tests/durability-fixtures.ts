@@ -18,7 +18,10 @@ export async function durabilityActor(origin: string, identity = 'owner') {
   const session = await fetch(origin + '/api/session', { headers: { cookie } });
   if (session.status !== 200) throw new Error('Synthetic signed authentication failed');
   const member = await session.json() as { accountId: string };
-  return { cookie, 'x-dali-account': member.accountId, 'x-dali-request': '1', origin };
+  const state = await fetch(origin + '/api/recovery-state', { headers: { cookie, 'x-dali-account': member.accountId } });
+  if (!state.ok) throw new Error('Synthetic recovery metadata unavailable');
+  const { epoch } = await state.json() as { epoch: string };
+  return { cookie, 'x-dali-account': member.accountId, 'x-dali-request': '1', 'x-dali-recovery-epoch': epoch, origin };
 }
 
 export async function createDurabilityService(assets: string) {

@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { openAccount } from './app-menu';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
@@ -28,7 +29,7 @@ test.beforeEach(async ({ page, baseURL }) => {
 });
 test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); closeProxy?.(); closeProxy = undefined; await app?.close(); database?.close(); await provider?.close(); });
 async function board(page: Page) {
-  const response = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' }, data: { title: 'Recovery canary', operationId: randomUUID() } });
+  const response = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(database), 'X-Dali-Request': '1' }, data: { title: 'Recovery canary', operationId: randomUUID() } });
   expect(response.status()).toBe(201); const result = await response.json();
   await page.goto(origin + '/?board=' + result.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible(); return result;
 }
@@ -204,7 +205,7 @@ for (const resource of ['document', 'image', 'thumbnail'] as const) test.describ
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'canary.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes }); await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
   if (resource === 'thumbnail') {
-    const thumbnail = await page.request.put(origin + '/api/boards/' + descriptor.summary.id + '/thumbnail', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': 'image/png' }, data: syntheticCanaries().imageBytes }); expect(thumbnail.status()).toBe(200);
+    const thumbnail = await page.request.put(origin + '/api/boards/' + descriptor.summary.id + '/thumbnail', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(database), 'X-Dali-Request': '1', 'Content-Type': 'image/png' }, data: syntheticCanaries().imageBytes }); expect(thumbnail.status()).toBe(200);
   }
   const before = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
   let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let received = false;
@@ -222,7 +223,7 @@ for (const resource of ['document', 'image', 'thumbnail'] as const) test.describ
   release(); await page.unrouteAll({ behavior: 'ignoreErrors' });
   await expect(page.locator('editor-host')).toHaveCount(0); await expect(page.locator('.board-card')).toHaveCount(0); await expect(page.getByText('Delayed identity canary')).toHaveCount(0);
   expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before);
-  const denied = await page.request.post(origin + '/api/boards/' + descriptor.summary.id + '/docs/' + descriptor.contentDocId + '/push', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0, 0]) });
+  const denied = await page.request.post(origin + '/api/boards/' + descriptor.summary.id + '/docs/' + descriptor.contentDocId + '/push', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(database), 'X-Dali-Request': '1', 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0, 0]) });
   expect(denied.status()).toBe(409); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(before); await other.close();
   await Promise.all(cancellationReads);
   expect(cancellationPhases.every(Boolean)).toBe(true);

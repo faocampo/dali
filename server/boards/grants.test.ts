@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../storage/recovery-state.js';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
@@ -11,7 +12,7 @@ let barrier: () => Promise<void>; let clock: number; let board: string;
 const origin = 'http://127.0.0.1:5499';
 const actors: Record<string, { cookie: string; accountId: string }> = {};
 const cookieOf = (response: { headers: Record<string, unknown> }) => { const cookies = response.headers['set-cookie']; return (Array.isArray(cookies) ? cookies.at(-1) : cookies)?.split(';')[0] as string; };
-const headers = (actor = 'owner') => ({ cookie: actors[actor]!.cookie, 'x-dali-account': actors[actor]!.accountId, 'x-dali-request': '1', origin });
+const headers = (actor = 'owner') => ({ "x-dali-recovery-epoch": readRecoveryEpoch(database), cookie: actors[actor]!.cookie, 'x-dali-account': actors[actor]!.accountId, 'x-dali-request': '1', origin });
 async function login(identity: IdentityName) {
   const start = await app.inject('/auth/start');
   const authorize = await fetch(start.headers.location!, { redirect: 'manual', headers: { cookie: `${IDENTITY_COOKIE}=${identity}` } });

@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { boardAction, openBoardActions, editBoardTitle, fileAction, openAccount } from './app-menu';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
@@ -27,7 +28,7 @@ test.beforeEach(async ({ page, baseURL }) => {
   accountId = (await (await page.request.get(origin + '/api/session')).json()).accountId;
 });
 test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); closeProxy?.(); closeProxy = undefined; await app?.close(); database?.close(); await provider?.close(); });
-const headers = () => ({ Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' });
+const headers = () => ({ Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(database), 'X-Dali-Request': '1' });
 async function create(page: Page, title = 'Synthetic actions') {
   const response = await page.request.post(origin + '/api/boards', { headers: headers(), data: { title, operationId: randomUUID() } }); expect(response.status()).toBe(201); return response.json();
 }

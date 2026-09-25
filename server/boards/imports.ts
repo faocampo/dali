@@ -7,6 +7,7 @@ import { runMigrations, type AccountDatabase } from '../storage/database.js';
 import { requireBoardCapability, operationReceipt, type BoardRow } from './routes.js';
 import { referencedImageKeys, validateDocument, DOCUMENT_LIMITS, type BeforeCommit } from './documents.js';
 import { BlobRepository, imageHash, validateImageBytes, IMAGE_LIMITS } from './blobs.js';
+import { readRecoveryEpoch, requireRecoveryEpoch } from '../storage/recovery-state.js';
 
 type Stage = { member_id: string; operation_id: string; source_id: string; source_revision: number; descriptor: string; manifest: string; root: Buffer | null; content: Buffer | null };
 const operationSchema = { type: 'string', minLength: 1, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' };
@@ -31,20 +32,26 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
     if (!requireMutation(request, reply, config)) return;
     return database.transaction(() => {
       const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member) || !requireSystemWriter(reply, member)) return;
+      if (!requireRecoveryEpoch(database, request, reply)) return;
       const { operationId, title, manifest } = request.body;
       if (![...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length || [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length > 200) return reply.code(400).send({ code: 'INVALID_TITLE' });
       const old = previous(member!.accountId, operationId);
       if (old) return old.kind === 'import' ? { status: old.status, result: JSON.parse(old.result) } : reply.code(409).send({ code: 'OPERATION_CONFLICT' });
-      const result = { summary: { id: randomUUID(), accountId: member!.accountId, title, updatedAt: now(), role: 'owner', access: 'private', pendingCount: 0 }, rootDocId: randomUUID(), contentDocId: randomUUID(), revision: 1, capabilities: ['read', 'write', 'duplicate', 'rename', 'delete', 'grants', 'editable-export', 'image', 'presentation-export'] };
+      const result = { recoveryEpoch: readRecoveryEpoch(database), summary: { id: randomUUID(), accountId: member!.accountId, title, updatedAt: now(), role: 'owner', access: 'private', pendingCount: 0 }, rootDocId: randomUUID(), contentDocId: randomUUID(), revision: 1, capabilities: ['read', 'write', 'duplicate', 'rename', 'delete', 'grants', 'editable-export', 'image', 'presentation-export'] };
       database.prepare('INSERT INTO import_staging(member_id,operation_id,descriptor,manifest) VALUES(?,?,?,?)').run(member!.accountId, operationId, JSON.stringify(result), JSON.stringify(manifest));
       record(member!.accountId, operationId, 'import', result.summary.id, result, 'staging');
       return { status: 'staging', result };
     })();
   });
   const stageFor = (member: string, id: string) => database.prepare('SELECT * FROM import_staging WHERE member_id=? AND operation_id=?').get(member, id) as Stage | undefined;
-  const canStage = (stage: Stage, request: FastifyRequest, reply: FastifyReply) => stage.source_id
-    ? !!requireBoardCapability(database, request, reply, stage.source_id, 'duplicate', now)
-    : requireSystemWriter(reply, currentSession(database, request, now));
+  const canStage = (stage: Stage, request: FastifyRequest, reply: FastifyReply) => {
+    const member = currentSession(database, request, now);
+    if (!requireExpectedMember(request, reply, member)) return false;
+    if (!(stage.source_id ? !!requireBoardCapability(database, request, reply, stage.source_id, 'duplicate', now) : requireSystemWriter(reply, member))) return false;
+    const epoch = requireRecoveryEpoch(database, request, reply); if (!epoch) return false;
+    if (JSON.parse(stage.descriptor).recoveryEpoch !== epoch) { reply.code(409).send({ code: 'RECOVERY_EPOCH_MISMATCH' }); return false; }
+    return true;
+  };
   app.get<{ Params: { operationId: string } }>('/api/imports/:operationId', async (request, reply) => {
     return operationReceipt(database, request, reply, request.params.operationId, now, true);
   });
@@ -81,7 +88,13 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
       }
     } catch { return reply.code(400).send({ code: 'INVALID_DOCUMENT' }); }
     finally { docs.forEach(doc => doc.destroy()); }
-    database.prepare('UPDATE import_staging SET root=?,content=? WHERE member_id=? AND operation_id=?').run(root, content, member!.accountId, request.params.operationId); return { acknowledged: true };
+    await beforeCommit?.();
+    return database.transaction(() => {
+      const current = stageFor(member!.accountId, request.params.operationId);
+      if (!current) return reply.code(404).send({ code: 'STAGING_UNAVAILABLE' });
+      if (!canStage(current, request, reply)) return;
+      database.prepare('UPDATE import_staging SET root=?,content=? WHERE member_id=? AND operation_id=?').run(root, content, member!.accountId, request.params.operationId); return { acknowledged: true };
+    })();
   });
   app.put<{ Params: { operationId: string; key: string }; Body: Buffer }>('/api/imports/:operationId/blobs/:key', { bodyLimit: IMAGE_LIMITS.bytes,
     onRequest: async (request, reply) => { requireMutation(request, reply, config, ['image/png', 'image/jpeg']); },
@@ -92,15 +105,22 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
     const mime = (request.headers['content-type'] ?? '').split(';')[0]!;
     try { if (!Buffer.isBuffer(request.body) || !(JSON.parse(stage.manifest) as string[]).includes(request.params.key) || imageHash(request.body) !== request.params.key) throw new Error(); validateImageBytes(request.body, mime); }
     catch { return reply.code(400).send({ code: 'INVALID_IMAGE' }); }
-    const used = (database.prepare('SELECT coalesce(sum(length(bytes)),0) AS n FROM import_staging_blobs WHERE member_id=? AND operation_id=? AND blob_key<>?').get(member!.accountId, request.params.operationId, request.params.key) as { n: number }).n;
-    if (used + request.body.length > IMAGE_LIMITS.boardBytes) return reply.code(413).send({ code: 'BOARD_IMAGE_QUOTA' });
-    database.prepare('INSERT INTO import_staging_blobs(member_id,operation_id,blob_key,mime,bytes) VALUES(?,?,?,?,?) ON CONFLICT(member_id,operation_id,blob_key) DO NOTHING').run(member!.accountId, request.params.operationId, request.params.key, mime, request.body); return { acknowledged: true };
+    await beforeCommit?.();
+    return database.transaction(() => {
+      const current = stageFor(member!.accountId, request.params.operationId);
+      if (!current) return reply.code(404).send({ code: 'STAGING_UNAVAILABLE' });
+      if (!canStage(current, request, reply)) return;
+      const used = (database.prepare('SELECT coalesce(sum(length(bytes)),0) AS n FROM import_staging_blobs WHERE member_id=? AND operation_id=? AND blob_key<>?').get(member!.accountId, request.params.operationId, request.params.key) as { n: number }).n;
+      if (used + request.body.length > IMAGE_LIMITS.boardBytes) return reply.code(413).send({ code: 'BOARD_IMAGE_QUOTA' });
+      database.prepare('INSERT INTO import_staging_blobs(member_id,operation_id,blob_key,mime,bytes) VALUES(?,?,?,?,?) ON CONFLICT(member_id,operation_id,blob_key) DO NOTHING').run(member!.accountId, request.params.operationId, request.params.key, mime, request.body); return { acknowledged: true };
+    })();
   });
   app.post<{ Params: { operationId: string } }>('/api/imports/:operationId/commit', async (request, reply) => {
     if (!requireMutation(request, reply, config)) return;
     await beforeCommit?.();
     return database.transaction(() => {
       const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
+      if (!requireRecoveryEpoch(database, request, reply)) return;
       const old = previous(member!.accountId, request.params.operationId);
       if (old && !['import', 'duplicate'].includes(old.kind)) return reply.code(409).send({ code: 'OPERATION_CONFLICT' });
       if (old?.status === 'completed') return operationReceipt(database, request, reply, request.params.operationId, now, true)?.result;

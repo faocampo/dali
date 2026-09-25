@@ -16,7 +16,7 @@ import {
   templatePreviewKinds,
   type TemplateId,
 } from './templates';
-import { validSummary, type BoardDescriptor } from './BoardLibrary';
+import { validDescriptor, type BoardDescriptor } from './BoardLibrary';
 import * as Y from 'yjs';
 import { createAccountWorkspace, createStagingWorkspace } from '../canvas/account/board-workspace';
 import { synchronizeActiveBoard } from '../canvas/runtime';
@@ -111,6 +111,7 @@ export class AccountBoardAction {
     const reserved = previous.status === 'staging' ? previous : await (await this.request(path + '/duplicate', { method: 'POST', body: JSON.stringify({ operationId: this.operationId, revision: exported.descriptor.revision, title: copyTitle }) })).json() as { status: string; result: BoardDescriptor };
     if (reserved.status === 'completed') return reserved.result!;
     const destination = reserved.result!;
+    if (destination.recoveryEpoch !== this.epoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
     const headers = { 'X-Dali-Account': this.accountId };
     const blobs = new Map<string, Blob>();
     for (const key of exported.manifest) {
@@ -151,11 +152,12 @@ export class AccountBoardAction {
 }
 
 /** Retries reconcile the caller-owned operation before submitting any new create. */
+const creationEpochs = new Map<string, string>();
 export async function createAccountBoard(accountId: string, operationId: string, signal?: AbortSignal): Promise<BoardDescriptor> {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(operationId)) throw new Error('Invalid creation request');
   const headers = { 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'Content-Type': 'application/json' };
   const validate = (result: BoardDescriptor) => {
-    if (!result || !validSummary(result.summary, accountId) || result.summary.role !== 'owner' || !result.rootDocId || !result.contentDocId || signal?.aborted) throw new Error('Board creation is unavailable');
+    if (!validDescriptor(result, accountId) || result.summary.role !== 'owner' || signal?.aborted) throw new Error('Board creation is unavailable');
     return result;
   };
   const reconcile = async (): Promise<BoardDescriptor | undefined> => {
@@ -165,17 +167,25 @@ export async function createAccountBoard(accountId: string, operationId: string,
     if (known.status === 'completed') return validate(known.result!);
     if (known.status !== 'unknown') throw new Error('Board creation is pending');
   };
-  const previous = await reconcile(); if (previous) return previous;
-  const epoch = await authenticatedRecoveryEpoch(accountId, signal);
+  const scope = JSON.stringify([accountId, operationId]);
+  const previous = await reconcile(); if (previous) { creationEpochs.delete(scope); return previous; }
+  let epoch = creationEpochs.get(scope);
+  if (!epoch) { epoch = await authenticatedRecoveryEpoch(accountId, signal); creationEpochs.set(scope, epoch); }
   const timeout = new AbortController(); const abort = () => timeout.abort();
   signal?.addEventListener('abort', abort, { once: true }); const timer = setTimeout(abort, 10_000);
   try {
     const response = await fetch('/api/boards', { method: 'POST', headers: { ...headers, 'X-Dali-Recovery-Epoch': epoch }, signal: timeout.signal, body: JSON.stringify({ operationId, title: 'Untitled board' }) });
+    if (response.status === 409) {
+      const body = await response.clone().json() as { code?: string };
+      if (body.code === 'RECOVERY_EPOCH_REQUIRED' || body.code === 'RECOVERY_EPOCH_MISMATCH') throw new RecoveryEpochError(body.code);
+    }
     if (!response.ok) throw new Error('Board creation is unavailable');
-    return validate(await response.json() as BoardDescriptor);
+    const result = validate(await response.json() as BoardDescriptor);
+    if (result.recoveryEpoch !== epoch || response.headers.get('X-Dali-Recovery-Epoch') !== epoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+    creationEpochs.delete(scope); return result;
   } catch (cause) {
     if (signal?.aborted) throw cause;
-    const committed = await reconcile(); if (committed) return committed;
+    const committed = await reconcile(); if (committed) { creationEpochs.delete(scope); return committed; }
     throw cause;
   } finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); }
 }

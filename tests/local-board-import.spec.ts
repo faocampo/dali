@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { fileAction, openBoardImport } from './app-menu';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import * as Y from 'yjs';
@@ -32,7 +33,7 @@ import { unzipSync, zipSync } from 'fflate';
 test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); closeProxy?.(); closeProxy = undefined; await app?.close(); database?.close(); await provider?.close(); });
 
 async function seedLocal(page: Page, titles = ['Legacy map canary', 'Unselected canary']) {
-  const response = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' }, data: { title: 'Fixture source', operationId: randomUUID() } });
+  const response = await page.request.post(origin + '/api/boards', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(database), 'X-Dali-Request': '1' }, data: { title: 'Fixture source', operationId: randomUUID() } });
   const board = await response.json();
   await page.goto(origin + '/?board=' + board.summary.id);
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
@@ -221,13 +222,13 @@ test('system Viewers cannot open or submit library imports', async ({ page, cont
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Import', exact: true })).toHaveCount(0);
   const member = await (await page.request.get(origin + '/api/session')).json();
-  const response = await page.request.post(origin + '/api/imports', { headers: { Origin: origin, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1' }, data: { operationId: randomUUID(), title: 'Denied import', manifest: [] } });
+  const response = await page.request.post(origin + '/api/imports', { headers: { Origin: origin, 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(database), 'X-Dali-Request': '1' }, data: { operationId: randomUUID(), title: 'Denied import', manifest: [] } });
   expect(response.status()).toBe(403); expect(database.prepare('SELECT * FROM boards').all()).toEqual([]);
 });
 
 test('@03-11-01 staging validates complete manifest and binds every operation to the authenticated importer', async ({ page, browser }) => {
   const local = await seedLocal(page); const before = await originalState(page);
-  const headers = { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Request': '1' };
+  const headers = { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(database), 'X-Dali-Request': '1' };
   const operationId = randomUUID();
   const reserved = await page.request.post(origin + '/api/imports', { headers, data: { operationId, title: 'Manifest canary', manifest: [local.key] } }); expect(reserved.status()).toBe(200);
   expect((await page.request.post(origin + '/api/imports/' + operationId + '/commit', { headers, data: {} })).status()).toBe(409);

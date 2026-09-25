@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../storage/recovery-state.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
@@ -20,7 +21,7 @@ describe('protected board resources', () => {
     const values = response.headers['set-cookie'];
     return (Array.isArray(values) ? values.at(-1) : values)?.split(';')[0] as string;
   };
-  const headers = (actor = 'owner') => ({ cookie: actors[actor]!.cookie, 'x-dali-account': actors[actor]!.accountId, 'x-dali-request': '1', origin });
+  const headers = (actor = 'owner') => ({ "x-dali-recovery-epoch": readRecoveryEpoch(database), cookie: actors[actor]!.cookie, 'x-dali-account': actors[actor]!.accountId, 'x-dali-request': '1', origin });
   const bytes = (id = board.contentDocId, b = board) => (database.prepare('SELECT update_bytes FROM board_documents WHERE board_id=? AND doc_id=?').get(b.summary.id, id) as { update_bytes: Buffer }).update_bytes;
   const snapshot = () => ({ docs: database.prepare('SELECT * FROM board_documents ORDER BY board_id,doc_id').all(), boards: database.prepare('SELECT * FROM boards ORDER BY id').all(), previews: database.prepare('SELECT * FROM board_thumbnails ORDER BY board_id').all() });
   const requestDoc = (action: string, payload: Uint8Array, actor = 'owner', id = board.contentDocId, b = board, extra = {}) => app.inject({ method: 'POST', url: `/api/boards/${b.summary.id}/docs/${id}/${action}`, headers: { ...headers(actor), 'content-type': 'application/octet-stream', ...extra }, payload: Buffer.from(payload) });

@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { randomUUID } from 'node:crypto';
 import * as Y from 'yjs';
 import { imageHash } from '../server/boards/blobs';
@@ -9,7 +10,7 @@ test('operation receipts reauthorize revoked resources and reject wrong-kind imp
   try {
     const { contexts } = identities;
     const accounts = Object.fromEntries(await Promise.all(Object.entries(contexts).map(async ([role, context]) => [role, (await (await context.request.get('/api/session')).json()).accountId as string])));
-    const headers = (role: string) => ({ Origin: service.origin, 'X-Dali-Request': '1', 'X-Dali-Account': accounts[role]! });
+    const headers = (role: string) => ({ Origin: service.origin, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(service.database), 'X-Dali-Request': '1', 'X-Dali-Account': accounts[role]! });
     const createId = randomUUID();
     const created = await contexts.owner.request.post('/api/boards', { headers: headers('owner'), data: { operationId: createId, title: 'Synthetic receipt canary' } });
     expect(created.status()).toBe(201); const board = await created.json();
@@ -33,7 +34,7 @@ test('staging, operation replay, current role and commit-time denial preserve re
   try {
     const { contexts } = identities;
     const accounts = Object.fromEntries(await Promise.all(Object.entries(contexts).map(async ([role, context]) => [role, (await (await context.request.get('/api/session')).json()).accountId as string])));
-    const h = (role: AccessIdentity, mime = 'application/json') => ({ Origin: service.origin, 'X-Dali-Request': '1', 'X-Dali-Account': accounts[role]!, 'Content-Type': mime });
+    const h = (role: AccessIdentity, mime = 'application/json') => ({ Origin: service.origin, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(service.database), 'X-Dali-Request': '1', 'X-Dali-Account': accounts[role]!, 'Content-Type': mime });
     const createId = randomUUID(); const createBody = { operationId: createId, title: 'Synthetic transaction canary' };
     const board = await (await contexts.owner.request.post('/api/boards', { headers: h('owner'), data: createBody })).json();
     const id = board.summary.id;
@@ -104,7 +105,7 @@ test('@03-12-smoke independent role/resource canaries preserve owner state on ev
     const { contexts } = identities;
     const accounts = Object.fromEntries(await Promise.all(Object.entries(contexts).map(async ([role, context]) => [role, (await (await context.request.get('/api/session')).json()).accountId as string])));
     expect(new Set(Object.values(accounts)).size).toBe(4);
-    const headers = (role: AccessIdentity, mime = 'application/json') => ({ Origin: service.origin, 'X-Dali-Request': '1', 'X-Dali-Account': accounts[role]!, 'Content-Type': mime });
+    const headers = (role: AccessIdentity, mime = 'application/json') => ({ Origin: service.origin, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(service.database), 'X-Dali-Request': '1', 'X-Dali-Account': accounts[role]!, 'Content-Type': mime });
     const boards: { d: { summary: { id: string }; rootDocId: string; contentDocId: string }; canary: ReturnType<typeof syntheticCanaries>; key: string; role: 'owner' | 'nonMember'; operationId: string }[] = [];
     for (const role of ['owner', 'nonMember'] as const) {
       const canary = syntheticCanaries(); const operationId = randomUUID();

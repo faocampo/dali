@@ -1,3 +1,4 @@
+import { fixtureRecoveryEpoch } from './fixtures';
 import { randomUUID } from 'node:crypto';
 import { readdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,7 +14,7 @@ async function signIn(page: Page, identity: 'Owner' | 'Editor' | 'Viewer') {
 }
 async function createBoard(context: BrowserContext, baseURL: string) {
   const member = await (await context.request.get('/api/session')).json();
-  const headers = { Origin: baseURL, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1' };
+  const headers = { Origin: baseURL, 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(context.request, member.accountId), 'X-Dali-Request': '1' };
   const response = await context.request.post('/api/boards', { headers, data: { title: 'Synthetic native board', operationId: randomUUID() } });
   expect(response.status()).toBe(201);
   return { descriptor: await response.json(), accountId: member.accountId, headers };
@@ -41,7 +42,7 @@ test('@03-05-02 destination staging reserves one content document without changi
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   const member = await (await context.request.get('/api/session')).json();
   const create = async () => (await (await context.request.post('/api/boards', {
-    headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1' },
+    headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(context.request, member.accountId), 'X-Dali-Request': '1' },
     data: { title: 'Synthetic staging conformance', operationId: randomUUID() },
   })).json());
   const source = await create(); const destination = await create();
@@ -63,7 +64,7 @@ test('@03-05-01 authorized native workspace edits survive disposal and fresh reo
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   const member = await (await context.request.get('/api/session')).json();
   const response = await context.request.post('/api/boards', {
-    headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1' },
+    headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(context.request, member.accountId), 'X-Dali-Request': '1' },
     data: { title: 'Native conformance board', operationId: randomUUID() },
   });
   expect(response.status()).toBe(201);

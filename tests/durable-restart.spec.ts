@@ -39,7 +39,8 @@ test('@04-01-01 acknowledged native sticky and PNG survive SIGKILL and cold sign
     await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
     const member = await (await first.request.get('/api/session')).json();
-    const headers = { Origin: service.origin, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1' };
+    const { epoch } = await (await first.request.get('/api/recovery-state', { headers: { 'X-Dali-Account': member.accountId } })).json();
+    const headers = { Origin: service.origin, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': epoch };
     const created = await first.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Durable synthetic canvas' } });
     expect(created.status()).toBe(201); const board = await created.json();
     await page.goto('/?board=' + board.summary.id); await expect(page.locator('editor-host')).toBeVisible();
@@ -80,7 +81,8 @@ test('@04-01-02 normal restart preserves data and denies another cold account', 
     await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
     const owner = await (await first.request.get('/api/session')).json();
-    const headers = { Origin: service.origin, 'X-Dali-Account': owner.accountId, 'X-Dali-Request': '1' };
+    const { epoch } = await (await first.request.get('/api/recovery-state', { headers: { 'X-Dali-Account': owner.accountId } })).json();
+    const headers = { Origin: service.origin, 'X-Dali-Account': owner.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': epoch };
     const created = await first.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Private durable canary' } });
     expect(created.status()).toBe(201); const board = await created.json();
     const blobPath = `/api/boards/${board.summary.id}/blobs/${key}`;

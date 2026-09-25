@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { boardAction, openBoardActions } from './app-menu';
 import { proxyApplicationAssets } from './access-fixtures';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -199,7 +200,7 @@ test('@03-07-01 existing members default Viewer and link copy preserves grants',
 test('@03-07-01 direct non-owner grant reads and mutations deny with unchanged owner state', async ({ page }) => {
   const id = seed('Private sharing canary'); await refresh(page);
   const cookieOf = (response: { headers: Record<string, unknown> }) => { const cookies = response.headers['set-cookie']; return (Array.isArray(cookies) ? cookies.at(-1) : cookies)?.split(';')[0] as string; };
-  const ownerHeaders = { 'x-dali-account': accountId, 'x-dali-request': '1', origin };
+  const ownerHeaders = { 'x-dali-account': accountId, 'x-dali-recovery-epoch': readRecoveryEpoch(database), 'x-dali-request': '1', origin };
   const url = origin + '/api/boards/' + id + '/grants';
   const added = await page.request.post(url, { headers: ownerHeaders, data: { email: 'waiting@example.org', revision: 1, operationId: randomUUID() } });
   expect(added.status()).toBe(200); const state = await added.json(); const target = state.grants[0];
@@ -212,7 +213,7 @@ test('@03-07-01 direct non-owner grant reads and mutations deny with unchanged o
     const member = session.json().accountId;
     if (actor !== 'nonMember') database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(id, member, actor);
     const before = await (await page.request.get(url, { headers: ownerHeaders })).json();
-    const headers = { cookie, origin, 'x-dali-account': member, 'x-dali-request': '1' };
+    const headers = { cookie, origin, 'x-dali-account': member, 'x-dali-recovery-epoch': readRecoveryEpoch(database), 'x-dali-request': '1' };
     for (const method of ['GET', 'POST', 'PATCH', 'DELETE'] as const) {
       const response = await app.inject({ method, url: '/api/boards/' + id + '/grants' + (['PATCH', 'DELETE'].includes(method) ? '/' + target.id : ''), headers,
         ...(method === 'GET' ? {} : { payload: { revision: target.revision, operationId: randomUUID(), role: 'editor' } }) });

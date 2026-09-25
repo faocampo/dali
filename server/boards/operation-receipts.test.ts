@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../storage/recovery-state.js';
 import { beforeEach, afterEach, describe, it, expect } from 'vitest';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
@@ -22,7 +23,7 @@ describe('@03-12-receipts current authority and acknowledgment reconciliation', 
     }
   });
   afterEach(async () => { await app.close(); database.close(); await provider.close(); });
-  const h = (role = 'owner') => ({ cookie: actors[role]!.cookie, origin, 'x-dali-request': '1', 'x-dali-account': actors[role]!.accountId });
+  const h = (role = 'owner') => ({ "x-dali-recovery-epoch": readRecoveryEpoch(database), cookie: actors[role]!.cookie, origin, 'x-dali-request': '1', 'x-dali-account': actors[role]!.accountId });
   const create = async () => { const response = await app.inject({ method: 'POST', url: '/api/boards', headers: h(), payload: { operationId: randomUUID(), title: 'Synthetic receipt source' } }); expect(response.statusCode).toBe(201); return response.json(); };
   it('returns current grant state and denies a former owner access to stored grant identities', async () => {
     const board = await create(); const operationId = randomUUID();

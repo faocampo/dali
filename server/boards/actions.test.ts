@@ -1,3 +1,4 @@
+import { readRecoveryEpoch } from '../storage/recovery-state.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
@@ -37,7 +38,7 @@ describe('@03-08-01 board action transactions', () => {
     }
   });
   afterEach(async () => { await app?.close(); database?.close(); await provider?.close(); });
-  const headers = (identity = 'owner') => ({ cookie: actors[identity]!.cookie, 'x-dali-account': actors[identity]!.accountId, 'x-dali-request': '1', origin });
+  const headers = (identity = 'owner') => ({ "x-dali-recovery-epoch": readRecoveryEpoch(database), cookie: actors[identity]!.cookie, 'x-dali-account': actors[identity]!.accountId, 'x-dali-request': '1', origin });
   const create = async (identity = 'owner', title = 'Synthetic board') => {
     const response = await app.inject({ method: 'POST', url: '/api/boards', headers: headers(identity), payload: { title, operationId: randomUUID() } });
     expect(response.statusCode).toBe(201); return response.json();

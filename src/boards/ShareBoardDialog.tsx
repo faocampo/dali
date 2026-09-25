@@ -2,11 +2,12 @@ import { MenuIcon } from '../header/MenuIcon';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { BoardSummary } from './BoardLibrary';
+import { validRecoveryEpoch } from '../canvas/account/doc-source';
 
 type Recipient = { memberId?: string; email: string; displayName: string };
 type Grant = Recipient & { id: string; role: 'editor' | 'viewer'; status: 'active' | 'pending'; revision: number };
-type Access = { revision: number; owner: Recipient; grants: Grant[] };
-type Operation = { id: string; method: string; path: string; body: object; recipient?: string };
+type Access = { revision: number; recoveryEpoch: string; owner: Recipient; grants: Grant[] };
+type Operation = { id: string; method: string; path: string; body: object; epoch: string; recipient?: string };
 export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSummary; onClose: () => void; onChanged: (state?: Access) => void }) {
   const dialog = useRef<HTMLDialogElement>(null); const input = useRef<HTMLInputElement>(null);
   const lifetime = useRef(new AbortController()); const sequence = useRef(0); const loadSequence = useRef(0);
@@ -31,6 +32,7 @@ export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSu
       if ([401, 403, 404, 409].includes(response.status)) { onChanged(); onClose(); return; }
       if (!response.ok) throw new Error();
       const state = await response.json() as Access;
+      if (!validRecoveryEpoch(state.recoveryEpoch)) throw new Error();
       if (!lifetime.current.signal.aborted && current === loadSequence.current) { setAccess(state); setLoadError(''); onChanged(state); }
     } catch { if (!lifetime.current.signal.aborted) setLoadError("We couldn't load access. Try again."); }
   };
@@ -84,17 +86,20 @@ export function ShareBoardDialog({ board, onClose, onChanged }: { board: BoardSu
     try {
       let operation = operations.current.get(key); let completed: Access | undefined;
       if (operation) completed = await reconcile(operation);
-      else { operation = { id: crypto.randomUUID(), method, path: target, body, recipient: access?.grants.find(row => row.id === key)?.email }; operations.current.set(key, operation); }
+      else { if (!access) throw new Error('Reload access before making a change.'); operation = { id: crypto.randomUUID(), method, path: target, body, epoch: access.recoveryEpoch, recipient: access.grants.find(row => row.id === key)?.email }; operations.current.set(key, operation); }
       if (!completed) {
         const timeout = new AbortController(); const abort = () => timeout.abort();
         const timer = window.setTimeout(abort, 10000); controller.signal.addEventListener('abort', abort, { once: true });
         try {
-          const response = await fetch(operation.path, { method: operation.method, headers, signal: timeout.signal, body: JSON.stringify({ ...operation.body, operationId: operation.id }) });
+          const response = await fetch(operation.path, { method: operation.method, headers: { ...headers, 'X-Dali-Recovery-Epoch': operation.epoch }, signal: timeout.signal, body: JSON.stringify({ ...operation.body, operationId: operation.id }) });
           if ([401, 403, 404].includes(response.status)) { operations.current.delete(key); onChanged(); onClose(); return; }
           if (response.status === 409 || response.status === 400) {
+            const reason = await response.clone().json() as { code?: string };
+            if (reason.code === 'RECOVERY_EPOCH_REQUIRED' || reason.code === 'RECOVERY_EPOCH_MISMATCH') { operations.current.delete(key); throw new Error('The server was restored. Reopen this board before changing access.'); }
             operations.current.delete(key); await load(); throw new Error(response.status === 409 ? 'Access changed. Review current access and try again.' : 'Choose an eligible internal recipient and try again.');
           }
           if (!response.ok) throw new Error("We couldn't update access. Try again.");
+          if (response.headers.get('X-Dali-Recovery-Epoch') !== operation.epoch) throw new Error('The server recovery state changed. Check this operation before retrying.');
           completed = await response.json() as Access;
         } catch (cause) {
           if (controller.signal.aborted) return;

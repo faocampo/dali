@@ -1,6 +1,13 @@
 import { test as base, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
-import type { Page } from '@playwright/test';
+import type { Page, APIRequestContext } from '@playwright/test';
+
+/** Explicit metadata capture for synthetic direct-API setup operations. */
+export async function fixtureRecoveryEpoch(request: APIRequestContext, accountId: string, origin = ''): Promise<string> {
+  const response = await request.get(origin + '/api/recovery-state', { headers: { 'X-Dali-Account': accountId } });
+  expect(response.status()).toBe(200);
+  const state = await response.json(); expect(state.epoch).toMatch(/^[0-9a-f-]{36}$/); return state.epoch;
+}
 
 /** Complete synthetic library setup before a test replaces its document. */
 export async function waitForAuthenticatedLibrary(page: Page) {
@@ -70,7 +77,7 @@ export const test = base.extend<{
           await waitForAuthenticatedLibrary(page);
           const session = await context.request.get('/api/session'); expect(session.status()).toBe(200);
           const member = await session.json();
-          const response = await context.request.post('/api/boards', { headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1' }, data: { operationId: randomUUID(), title: 'Untitled board' } });
+          const response = await context.request.post('/api/boards', { headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(context.request, member.accountId) }, data: { operationId: randomUUID(), title: 'Untitled board' } });
           expect(response.status()).toBe(201); boardId = (await response.json()).summary.id as string;
         }
         return original('/?board=' + encodeURIComponent(boardId), options);

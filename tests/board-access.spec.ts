@@ -1,3 +1,4 @@
+import { fixtureRecoveryEpoch } from './fixtures';
 import { fileAction } from './app-menu';
 import { randomUUID } from 'node:crypto';
 import { test, expect, waitForAuthenticatedLibrary } from './fixtures';
@@ -27,7 +28,7 @@ test('@03-06-02 two New commands create distinct private tabs and preserve the s
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
-  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
+  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(page.request, member.accountId), 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Preserved source title' } })).json();
   await page.goto('/?board=' + board.summary.id); await expect(page.locator('editor-host')).toBeVisible();
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.press('Escape');
@@ -59,7 +60,7 @@ test('@03-06-02 blocked popup retry reconciles one committed destination without
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
-  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
+  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(page.request, member.accountId), 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Popup source canary' } })).json();
   await page.goto('/?board=' + board.summary.id); await expect(page.locator('editor-host')).toBeVisible();
   const before = await (await context.request.get('/api/boards', { headers })).json();
@@ -98,7 +99,7 @@ test('@03-06-01 authorized deep link mounts native editing and cold reopen retai
   await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
-  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
+  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(page.request, member.accountId), 'X-Dali-Request': '1', Origin: baseURL! };
   const created = await context.request.post('/api/boards', { headers, data: { title: 'Native shell canary', operationId: randomUUID() } });
   expect(created.status()).toBe(201);
   const board = await created.json();
@@ -125,7 +126,7 @@ test('@03-06-01 loading blank board gates mutations and native history publishes
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
-  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
+  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(page.request, member.accountId), 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID() } })).json();
   let release!: () => void;
   const hold = new Promise<void>(resolve => { release = resolve; });
@@ -176,7 +177,7 @@ test('@03-06-01 image loading missing retry and lost authorization clear protect
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
-  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
+  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(page.request, member.accountId), 'X-Dali-Request': '1', Origin: baseURL! };
   const board = await (await context.request.post('/api/boards', { headers, data: { operationId: randomUUID(), title: 'Image access canary' } })).json();
   await page.goto('/?board=' + board.summary.id);
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic-canary.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes });
@@ -218,7 +219,7 @@ test('@03-03-01 private creates have independent IDs and idempotent operation re
   await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await waitForAuthenticatedLibrary(page);
   const member = await (await context.request.get('/api/session')).json();
-  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
+  const headers = { 'X-Dali-Account': member.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(page.request, member.accountId), 'X-Dali-Request': '1', Origin: baseURL! };
   const operationId = randomUUID();
   const create = (operation = operationId) => context.request.post('/api/boards', { headers, data: { title: 'Independent synthetic boards', operationId: operation, ownerId: 'forged-owner', grants: [{ memberId: 'forged-member', role: 'editor' }] } });
   const first = await create();
@@ -260,7 +261,7 @@ test('@03-03-01 BOARD-01 empty creates server-confirmed default and named cards 
   await fileAction(page, 'All boards');
   await expect(page.getByRole('link', { name: 'Open Named synthetic board', exact: true })).toBeVisible();
   const member = await (await context.request.get(service.origin + '/api/session')).json();
-  const headers = { 'X-Dali-Account': member.accountId, Origin: service.origin, 'X-Dali-Request': '1' };
+  const headers = { 'X-Dali-Account': member.accountId, Origin: service.origin, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(page.request, member.accountId, service.origin), 'X-Dali-Request': '1' };
   const before = await (await context.request.get(service.origin + '/api/boards', { headers })).json();
   await page.evaluate(() => localStorage.setItem('djai-design.active-board', 'remembered-foreign-target'));
   for (const target of ['missing-target', '']) {
@@ -274,7 +275,7 @@ test('@03-03-01 BOARD-01 empty creates server-confirmed default and named cards 
 test('@03-03-01 @03-06-01 D-05 D-13 foreign target and library conceal canary and preserve owner descriptor', async ({ page, context, browser, baseURL }) => {
   await page.goto('/'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   const owner = await (await context.request.get('/api/session')).json();
-  const headers = { 'X-Dali-Account': owner.accountId, 'X-Dali-Request': '1', Origin: baseURL! };
+  const headers = { 'X-Dali-Account': owner.accountId, 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(page.request, owner.accountId), 'X-Dali-Request': '1', Origin: baseURL! };
   const canary = 'foreign-secret-' + randomUUID();
   const created = await context.request.post('/api/boards', { headers, data: { title: canary, operationId: randomUUID() } });
   expect(created.status()).toBe(201); const descriptor = await created.json();
