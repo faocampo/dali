@@ -4,16 +4,16 @@ current_phase: 04
 current_phase_name: Durable Boards and Recovery
 current_plan: 4
 status: executing
-stopped_at: Completed 04-03-PLAN.md; Phase 04 remains executing
-last_updated: "2026-09-25T22:17:37.118Z"
+stopped_at: Completed 04-10-PLAN.md in wave 3; Phase 04 remains executing
+last_updated: "2026-09-25T22:36:39.107Z"
 last_activity: 2026-09-25
-last_activity_desc: Completed 04-03 reconstructable local capture
-state_head: b5e119ae87eb176a899a15dffc22dad674e229dd
+last_activity_desc: Completed 04-10 verified backup publication in wave 3
+state_head: f32b528c71432937c199c93647f810a0b397c2b7
 progress:
   total_phases: 13
   completed_phases: 3
   total_plans: 42
-  completed_plans: 29
+  completed_plans: 30
   percent: 23
 ---
 
@@ -35,15 +35,15 @@ Current Plan: 4
 Total Plans in Phase: 16
 Status: Ready to execute
 Next action: $gsd-execute-phase 4
-Last activity: 2026-09-25 — Completed 04-03 reconstructable local capture; continue dependency-ordered Phase 4 execution
+Last activity: 2026-09-25 — Completed 04-10 verified backup publication after 04-03 in wave 3; next dependency-ordered plan is 04-04
 
-Progress: [██░░░░░░░░] 23% (3/13 phases complete; 29/42 currently planned plans complete; later phases remain unplanned)
+Progress: [██░░░░░░░░] 23% (3/13 phases complete; 30/42 currently planned plans complete; later phases remain unplanned)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 29
+- Total plans completed: 30
 - Average duration: —
 - Total execution time: not consistently recorded across sessions.
 
@@ -58,8 +58,8 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 29/42 curr
 
 **Recent Trend:**
 
-- Last 5 plans: 03-11, 03-12, 04-01, 04-02, 04-03
-- Trend: Phase 3 accepted; Phase 4 plans 04-01 through 04-03 verify restart durability, epoch fencing and reconstructable local capture; remaining Phase 4 plans are executing sequentially.
+- Last 5 plans: 03-12, 04-01, 04-02, 04-03, 04-10
+- Trend: Phase 3 accepted; Phase 4 has verified restart durability, epoch fencing, reconstructable local capture and backup publication; remaining plans execute sequentially in dependency order.
 
 **Per-Plan Metrics:**
 
@@ -90,6 +90,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 29/42 curr
 | Phase 04 P01 | 14min | 2 tasks | 6 files |
 | Phase 04 P02 | 25min | 3 tasks | 42 files |
 | Phase 04 P03 | 30min | 2 tasks | 11 files |
+| Phase 04 P10 | 17min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 - [Phase 04]: Retain legacy journal rows without epochs and reject replay pending plan 04-03 versioned capture.
 - [Phase 04]: Keep legacy recovery rows unchanged in the version-2 namespace; exact-ID acknowledgments atomically advance reconstruction checkpoints.
 - [Phase 04]: Compute submission coverage from confirmed Yjs clocks and deletions; cache available images without blocking visible loading and retry.
+- [Phase 04]: Publish online backups through the live connection; normalize the completed copy to DELETE journal mode and select only fully verified complete sets.
+- [Phase 04]: Independent backup storage remains an external operator assertion; publication retains all prior complete sets until the dedicated retention scheduler.
 
 ### Pending Todos
 
@@ -126,8 +129,8 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-09-25T22:17:37.058Z
-Stopped at: Completed 04-03-PLAN.md; Phase 04 remains executing
+Last session: 2026-09-25T22:36:39.030Z
+Stopped at: Completed 04-10-PLAN.md in wave 3; Phase 04 remains executing
 Resume file: None
 Next action: `$gsd-execute-phase 4`
 
