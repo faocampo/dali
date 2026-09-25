@@ -7,6 +7,12 @@ const epoch = '11111111-1111-4111-8111-111111111111';
 const options = () => ({ boardId: 'board', rootDocId: 'root', contentDocId: 'content', accountId: 'member', generation: 1, isCurrent: () => true, getRecoveryEpoch: () => epoch });
 const image = () => new Blob(['synthetic-raster'], { type: 'image/png' });
 describe('BoardBlobSource', () => {
+  it('@04-03-02 failed local admission retains the latest image bytes in memory', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ code: 'IMAGE_UNAVAILABLE' }, { status: 404 }));
+    const source = new BoardBlobSource({ ...options(), fetch: fetcher, durableLocalBlobs: true, onPendingBlob: () => { throw new DOMException('Synthetic quota', 'QuotaExceededError'); } });
+    const blob = image(); await expect(source.set(key, blob)).rejects.toThrow('quota');
+    expect(await source.get(key)).toBe(blob); expect(fetcher).not.toHaveBeenCalled();
+  });
   it.each(['other-key', 'missing-epoch', 'other-epoch', 'late-epoch'])('@04-02-02 %s image response cannot clear pending records', async fault => {
     let currentEpoch = epoch; const ack = vi.fn();
     const source = new BoardBlobSource({ ...options(), getRecoveryEpoch: () => currentEpoch, onAcknowledged: ack, fetch: vi.fn<typeof fetch>(async (_input, init) => {

@@ -90,6 +90,20 @@ async function storagePage(page: Page) {
   await page.route('**/recovery-fixture', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Synthetic recovery fixture</title>' }));
   await page.goto('/recovery-fixture'); await page.addScriptTag({ content: harness });
 }
+test('@04-03-02 acknowledged image bytes remain available to pending reconstruction', async ({ page }) => {
+  await storagePage(page);
+  const result = await page.evaluate(async scope => {
+    const R = window.RecoveryHarness; const journal = new R.AccountJournal(scope, () => {});
+    const bytes = new Uint8Array([1, 2, 255]); const key = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))).replace(/\+/g, '-').replace(/\//g, '_');
+    await journal.checkpoint({ root: { docId: 'root', data: new Uint8Array([0, 0]) }, content: { docId: 'content', data: new Uint8Array([0, 0]) }, title: 'Synthetic images', assets: { [key]: {} } });
+    const image = await journal.capture('blob', key, new Blob([bytes], { type: 'image/png' }));
+    await journal.captureUpdate('content', new Uint8Array([0, 0]));
+    await R.acknowledgeRecord(image);
+    const checkpoint = await R.readCheckpoint(scope, journal.tabId);
+    return { bytes: checkpoint?.assets[key]?.data ? [...checkpoint.assets[key].data!] : null, pending: (await R.pendingRecords(scope.accountId, scope.boardId)).length };
+  }, scope);
+  expect(result.bytes).toEqual([1, 2, 255]); expect(result.pending).toBe(1);
+});
 test('@04-03-01 native upgrade retains legacy bytes without adopting an epoch', async ({ page }) => {
   await storagePage(page);
   const result = await page.evaluate(async scope => {
