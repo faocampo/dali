@@ -9,6 +9,7 @@ export { localReturnIntent } from './auth/oidc.js';
 export type { SessionDescriptor } from './auth/session-store.js';
 import { openDatabase, runMigrations, type AccountDatabase } from './storage/database.js';
 import { registerBoardRoutes } from './boards/routes.js';
+import { startProductionLifecycle, drainProductionApp } from './storage/lifecycle.js';
 import { BackupScheduler, readStorageConfig, setBackupHealthPolicy, getBackupHealth, unavailableBackupHealth, type StoragePolicy } from './storage/backup-scheduler.js';
 
 export type AuthConfig = {
@@ -51,7 +52,17 @@ export function readConfig(env: Record<string, string | undefined>): AuthConfig 
 export async function buildApp(options: { config: Record<string, string | undefined>; database?: AccountDatabase; now?: () => number; beforeCommit?: () => Promise<void>; storagePolicy?: StoragePolicy }) {
   if (Object.keys({ ...process.env, ...options.config }).some(key => /(?:TEST.*AUTH|AUTH.*TEST|AUTH.*BYPASS)/i.test(key))) throw new Error('Test authentication is forbidden');
   // Pending grant identifiers encode issuer + email and can exceed the router's 100-byte default.
-  const app = Fastify({ logger: false, bodyLimit: 16384, routerOptions: { maxParamLength: 8192 } });
+  const proxy = options.config.DALI_TRUST_PROXY;
+  if (proxy !== undefined && proxy !== 'loopback') throw new Error('Proxy configuration unavailable');
+  const app = Fastify({ logger: false, bodyLimit: 16384, routerOptions: { maxParamLength: 8192 },
+    forceCloseConnections: 'idle', return503OnClosing: true,
+    trustProxy: proxy === 'loopback' ? (address, hop) => hop === 0 && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address) : false });
+  let initialized = false;
+  let localDatabase: AccountDatabase | undefined;
+  startProductionLifecycle(app, {
+    ready: () => initialized && !!localDatabase?.open && !!localDatabase.prepare('SELECT 1').get(),
+    onDrain: () => { if (localDatabase) setBackupHealthPolicy(localDatabase, unavailableBackupHealth); },
+  });
   app.addHook('onRequest', async (_request, reply) => { reply.header('Cache-Control', 'private, no-store'); });
   app.setErrorHandler((error, _request, reply) => {
     const validation = error instanceof Error && 'validation' in error;
@@ -64,6 +75,7 @@ export async function buildApp(options: { config: Record<string, string | undefi
     app.get('/auth/callback', async (_request, reply) => reply.redirect('/?authError=configuration')); return app;
   }
   const database = options.database ?? openDatabase(config.databasePath); runMigrations(database);
+  localDatabase = database;
   const now = options.now ?? Date.now; await app.register(cookie);
   await app.register(session, { secret: config.secret, cookieName: SESSION_COOKIE,
     cookie: { path: '/', httpOnly: true, sameSite: 'lax', secure: config.secure },
@@ -75,6 +87,7 @@ export async function buildApp(options: { config: Record<string, string | undefi
   if (options.storagePolicy) {
     const policy = options.storagePolicy;
     setBackupHealthPolicy(database, 'health' in policy ? policy.health : () => ({ state: 'healthy', reason: 'fresh', recoverableAgeMs: 0, recoveryPointAt: now(), failure: null }));
+    initialized = true;
   } else {
     try {
       const storage = readStorageConfig(options.config);
@@ -82,16 +95,20 @@ export async function buildApp(options: { config: Record<string, string | undefi
         if (health.state !== 'healthy') app.log.warn({ backup: health }, 'Backup coverage requires attention');
       } });
       await scheduler.start();
+      initialized = true;
     } catch { /* Configuration failure leaves durable writes fenced; authentication and repair remain available. */ }
   }
   app.get('/api/storage-health', async (request, reply) => {
     const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
     return { backup: getBackupHealth(database) };
   });
-  app.addHook('onClose', async () => { await scheduler?.close(); if (!options.database) database.close(); });
+  app.addHook('onClose', async () => { initialized = false; await scheduler?.close(); if (!options.database) database.close(); });
   return app;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   readConfig(process.env); readStorageConfig(process.env); const app = await buildApp({ config: process.env });
   await app.listen({ host: '127.0.0.1', port: Number(process.env.PORT ?? 3000) });
+  const shutdown = () => { void drainProductionApp(app).catch(() => { process.exit(1); }); };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 }

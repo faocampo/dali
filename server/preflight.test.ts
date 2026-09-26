@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from './app.js';
+import Fastify from 'fastify';
+import { startProductionLifecycle } from './storage/lifecycle.js';
 
 const runtimeConfig = {
   DALI_ORIGIN: 'https://canvas.example.org', DALI_DATABASE_PATH: ':memory:',
@@ -12,6 +14,33 @@ const runtimeConfig = {
 };
 
 describe('@04-13-02 production runtime boundary', () => {
+  it('fences mutations before waiting for admitted work and closes once', async () => {
+    const app = Fastify({ forceCloseConnections: 'idle' });
+    let release!: () => void; let entered!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    let fenced = false; let closed = 0;
+    const lifecycle = startProductionLifecycle(app, { ready: () => true, onDrain: () => { fenced = true; } });
+    app.get('/work', async () => { entered(); await barrier; return { acknowledged: true }; });
+    app.addHook('onClose', async () => { closed++; });
+    const origin = await app.listen({ host: '127.0.0.1', port: 0 });
+    const request = fetch(origin + '/work'); await started;
+    const drain = lifecycle.drain();
+    expect(lifecycle.draining).toBe(true); expect(fenced).toBe(true); expect(closed).toBe(0);
+    expect(lifecycle.drain()).toBe(drain);
+    release(); expect(await (await request).json()).toEqual({ acknowledged: true });
+    await drain; expect(closed).toBe(1);
+  });
+
+  it('bounds a stuck close hook with the shutdown deadline', async () => {
+    const app = Fastify(); let release!: () => void;
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    app.addHook('onClose', async () => { await barrier; });
+    const lifecycle = startProductionLifecycle(app, { ready: () => true, onDrain: () => {}, timeoutMs: 20 });
+    await app.ready();
+    try { await expect(lifecycle.drain()).rejects.toThrow('Shutdown deadline exceeded'); }
+    finally { release(); }
+  });
   it('keeps liveness independent while configuration gates readiness', async () => {
     const app = await buildApp({ config: {} });
     try {
