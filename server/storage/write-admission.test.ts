@@ -109,3 +109,13 @@ it.each(['no-baseline', 'clock-invalid'] as const)('@04-11-02 %s fences while au
   const pull = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/docs/${board.contentDocId}/pull`, headers: { ...headers(), 'content-type': 'application/octet-stream' }, payload: Buffer.from([0]) }); expect(pull.statusCode).toBe(200);
   expect(snapshot()).toEqual(before);
 });
+it('@04-11-03 pending grant activation defers while fenced and authentication succeeds', async () => {
+  const response = await send({ method: 'POST', url: `/api/boards/${board.summary.id}/grants`, payload: { operationId: randomUUID(), revision: 1, email: 'editor@example.org', role: 'editor' } });
+  expect(response.statusCode).toBe(200); expect(response.json().grants[0].status).toBe('pending');
+  const before = snapshot(); health = { ...health, state: 'fenced', reason: 'stale', recoverableAgeMs: 3_600_000 };
+  const editor = await signIn('editor'); expect(editor.accountId).toBeTruthy(); expect(snapshot()).toEqual(before);
+  health = { ...health, state: 'healthy', reason: 'fresh', recoverableAgeMs: 0 };
+  await signIn('editor');
+  expect(database.prepare('SELECT * FROM pending_grants').all()).toHaveLength(0);
+  expect(database.prepare('SELECT member_id FROM board_grants').all()).toEqual([{ member_id: editor.accountId }]);
+});
