@@ -5,10 +5,104 @@ import type * as Capture from '../src/canvas/account/local-capture';
 import * as Y from 'yjs';
 import { fixtureRecoveryEpoch } from './fixtures';
 import { randomUUID } from 'node:crypto';
+import { recoveryBoardFixture, failRecoveryStorage, restoreRecoveryStorage, nativeRecoveryModel, journalRows } from './recovery-fixtures';
+import type { EditorHost } from '@blocksuite/affine/std';
+import { syntheticCanaries } from './access-fixtures';
 
 declare global { interface Window { RecoveryHarness: typeof Recovery & typeof Capture & { Y: typeof Y }; recoveryJournal?: Recovery.AccountJournal; recoveryBlocker?: IDBDatabase; recoverySignals?: unknown[] } }
 let harness: string;
 const scope = { accountId: 'synthetic-member', boardId: 'synthetic-board', generation: 1, recoveryEpoch: '11111111-1111-4111-8111-111111111111' };
+
+for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses native mutations while retaining inspection, recovery and responsive controls`, async ({ page, baseURL }) => {
+  await recoveryBoardFixture(page, baseURL!, 'S'.repeat(200));
+  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type('Retained recovery canary'); await page.keyboard.press('Escape');
+  await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'I'.repeat(120) + '.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes });
+  await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await failRecoveryStorage(page, mode);
+  await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type(' Preserved in memory');
+  await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toBeVisible();
+  const before = await nativeRecoveryModel(page);
+  await expect(page.locator('editor-host')).toBeVisible();
+  await page.keyboard.type('DENIED'); await page.keyboard.press('Backspace'); await page.keyboard.press('ControlOrMeta+z'); await page.keyboard.press('ControlOrMeta+Shift+z');
+  await page.locator('editor-host').evaluate(el => {
+    const host = el as EditorHost; const data = new DataTransfer(); data.setData('text/plain', 'DENIED'); data.files;
+    data.items.add(new File([new Uint8Array([1, 2, 3])], 'denied.png', { type: 'image/png' }));
+    host.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true, composed: true }));
+    host.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true, composed: true }));
+    host.store.spaceDoc.getMap('blocks').clear(); host.store.undo(); host.store.redo();
+    window.dispatchEvent(new CustomEvent('dali:board-command', { detail: 'undo' }));
+  });
+  expect(await nativeRecoveryModel(page)).toBe(before);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Add sticky note', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Zoom, current 110%', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Fit to screen', exact: true }).click();
+  await page.locator('affine-edgeless-note').click(); await page.keyboard.press('Delete');
+  await page.mouse.move(700, 500); await page.keyboard.down('Space'); await page.mouse.down(); await page.mouse.move(760, 530); await page.mouse.up(); await page.keyboard.up('Space');
+  expect(await nativeRecoveryModel(page)).toBe(before);
+  await page.getByRole('button', { name: 'Editing paused', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry saving', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download recovery copy', exact: true })).toBeVisible();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const width of [1440, 900, 600, 490, 320]) {
+    await page.setViewportSize({ width, height: 800 });
+    const bounds = await page.getByRole('region', { name: 'Board recovery' }).boundingBox();
+    expect(bounds!.width).toBeLessThanOrEqual(width); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByRole('button', { name: 'Retry saving', exact: true })).toBeInViewport();
+  }
+  await page.getByRole('button', { name: 'Retry saving', exact: true }).focus();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Retry saving', exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Editing paused', exact: true }).click();
+  await restoreRecoveryStorage(page);
+  await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add sticky note', exact: true })).toBeEnabled();
+});
+for (const kind of ['corrupt', 'restore'] as const) test(`@04-04-03 ${kind} retains isolated journal and distinct recovery actions`, async ({ page, baseURL }) => {
+  await recoveryBoardFixture(page, baseURL!);
+  await expect(page.locator('affine-edgeless-note')).toHaveCount(0);
+  await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
+  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await expect.poll(async () => (await journalRows(page)).length).toBeGreaterThan(0);
+  await page.evaluate(kind => new Promise<void>((resolve, reject) => {
+    const request = indexedDB.open('dali-account-recovery-v1', 2); request.onerror = () => reject(request.error);
+    request.onsuccess = () => { const db = request.result; const tx = db.transaction('journal', 'readwrite'); const store = tx.objectStore('journal'); const get = store.getAll(); get.onsuccess = () => get.result.forEach(row => store.put(kind === 'corrupt' ? { ...row, schemaVersion: 999 } : { ...row, epoch: '22222222-2222-4222-8222-222222222222', recoveryEpoch: '22222222-2222-4222-8222-222222222222' })); tx.oncomplete = () => { db.close(); resolve(); }; };
+  }), kind);
+  const before = await journalRows(page);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Recovery needs attention', exact: true })).toBeVisible();
+  await expect(page.locator('editor-host')).toHaveCount(0); expect(await journalRows(page)).toEqual(before);
+  if (kind === 'corrupt') {
+    await expect(page.getByText("These pending changes could not be opened safely. Keep this browser's data and contact your operator for recovery help.", { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open restored board', exact: true })).toHaveCount(0);
+  } else {
+    await page.unroute('**/docs/*/push');
+    await page.getByRole('button', { name: 'Open restored board', exact: true }).click();
+    await expect(page.locator('editor-host')).toBeVisible();
+    await expect(page.locator('affine-edgeless-note')).toHaveCount(0);
+    expect(await journalRows(page)).toEqual(expect.arrayContaining(before));
+  }
+});
+test('@04-04-03 loading respects intervening user focus and opens a valid empty board', async ({ page, baseURL }) => {
+  const { member, descriptor } = await recoveryBoardFixture(page, baseURL!);
+  await page.evaluate(({ accountId, boardId }) => sessionStorage.setItem('dali-recovery-focus', JSON.stringify({ accountId, boardId, label: 'Add sticky note', tag: 'button', elements: [], editing: false })), { accountId: member.accountId, boardId: descriptor.summary.id });
+  let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/docs/*/pull', async route => { await barrier; await route.continue(); });
+  await page.reload(); await expect(page.getByText('Opening board…', { exact: true })).toBeVisible();
+  await page.evaluate(() => { const button = document.createElement('button'); button.id = 'synthetic-focus-target'; button.textContent = 'Synthetic focus target'; document.body.append(button); });
+  await page.getByRole('button', { name: 'Synthetic focus target', exact: true }).click();
+  release(); await expect(page.locator('editor-host')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Synthetic focus target', exact: true })).toBeFocused();
+  await expect(page.locator('affine-edgeless-note')).toHaveCount(0);
+  expect(await page.evaluate(() => sessionStorage.getItem('dali-recovery-focus'))).toBeNull();
+});
 test.beforeAll(async () => {
   const result = await build({ stdin: { contents: "export * from './src/canvas/account/outbox'; export * from './src/canvas/account/local-capture'; export * as Y from 'yjs';", resolveDir: process.cwd() }, bundle: true, write: false, format: 'iife', globalName: 'RecoveryHarness', platform: 'browser' });
   harness = result.outputFiles[0]!.text;
