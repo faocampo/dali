@@ -157,6 +157,16 @@ for (const access of ['viewer', 'revoked'] as const) test(`@03-10-02 ${access} r
   const pending = await records(page); const serverBefore = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
   let writes = 0; page.on('request', request => { if (request.url().includes('/push') || request.method() === 'PUT') writes++; });
   await page.clock.setFixedTime(new Date()); await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
+  if (access === 'viewer') {
+    await expect(page.locator('editor-host')).toBeVisible();
+    await page.getByRole('button', { name: 'Your access has changed', exact: true }).click();
+    await expect(page.getByText('Your access has changed. Pending changes have not been applied. Contact the board owner to restore editing access.', { exact: true })).toBeVisible();
+    expect(writes).toBe(0); expect(await records(page)).toEqual(pending);
+    expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(serverBefore);
+    expect(await model(page)).not.toContain('Quarantined grant canary');
+    await expect(page.getByRole('button', { name: 'Add mind map', exact: true })).toHaveCount(0);
+    await owner.close(); return;
+  }
   await expect(page.getByText('Your access has changed. Pending changes have not been applied. Return to your boards or contact the board owner.', { exact: true })).toBeVisible();
   expect(writes).toBe(0); expect(await records(page)).toEqual(pending); expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(serverBefore);
   await page.getByRole('button', { name: 'Discard pending changes', exact: true }).click();
@@ -278,9 +288,10 @@ test('@03-10-03 failed replay stays pending without resume and retries committed
   const descriptor = await board(page); await text(page, 'Replay retry canary'); await expire(page);
   await page.clock.setFixedTime(new Date()); await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_UNAVAILABLE' } }));
   await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible(); await expect(page.getByText('Editing resumed.', { exact: true })).toHaveCount(0); await expect(page.locator('editor-host')).toHaveCount(0);
-  expect((await records(page)).length).toBeGreaterThan(0); await page.unrouteAll({ behavior: 'ignoreErrors' }); await page.getByRole('button', { name: 'Try again', exact: true }).click();
-  await expect(page.getByText('Editing resumed.', { exact: true })).toBeVisible(); expect(await model(page)).toContain('Replay retry canary');
+  await expect(page.getByRole('button', { name: 'Changes waiting to save', exact: true })).toBeVisible(); await expect(page.getByText('Editing resumed.', { exact: true })).toHaveCount(0); await expect(page.locator('editor-host')).toBeVisible();
+  expect((await records(page)).length).toBeGreaterThan(0); await page.unrouteAll({ behavior: 'ignoreErrors' });
+  await page.getByRole('button', { name: 'Changes waiting to save', exact: true }).click(); await page.getByRole('button', { name: 'Retry now', exact: true }).click();
+  await expect.poll(async () => (await records(page)).length).toBe(0); expect(await model(page)).toContain('Replay retry canary');
   const independent = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } }); expect(independent.status()).toBe(200);
 });
 for (const scenario of [

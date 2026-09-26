@@ -31,7 +31,7 @@ export function restoreRecoveryFocus() {
   const userMoved = (event: Event) => { if (event.isTrusted) relinquish(); };
   const attempt = async () => {
     const scope = getActiveAccessScope();
-    if (stopped || restoring || scope?.phase !== 'active' || !scope.canWrite || scope.accountId !== captured.accountId || scope.boardId !== captured.boardId) return;
+    if (stopped || restoring || scope?.phase !== 'active' || !scope.canWrite || (scope.recoveryState && scope.recoveryState !== 'saved') || scope.accountId !== captured.accountId || scope.boardId !== captured.boardId) return;
     const host = document.querySelector<EditorHost>('editor-host');
     const root = host?.querySelector<BlockComponent & { gfx: GfxController }>('affine-edgeless-root');
     const mountPoint = root?.querySelector('.edgeless-mount-point');

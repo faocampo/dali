@@ -106,6 +106,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   journal = scopedJournal;
   const isCurrent = () => scope?.generation === initial.generation && scope.phase === 'active';
   let baseline: AccountWorkspaceOptions['recoveryBaseline'];
+  let initializing = true;
   let authorizedDescriptor = options.descriptor;
   const coordinator = recovery = new RecoveryCoordinator({
     current: isCurrent,
@@ -128,7 +129,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (!isCurrent()) throw new Error('Stale recovery');
       if (rows.some(row => row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
       if (rows.some(row => !validRecord(row))) throw new RecoveryStorageError('CORRUPT');
-      if (rows.length && !current) {
+      if (rows.length && initializing) {
         const checkpoints = await Promise.all([...new Set([scopedJournal.tabId, ...rows.map(row => row.tabId!)])].map(tab => readCheckpoint(scopedJournal.scope, tab)));
         if (!isCurrent()) throw new Error('Stale recovery');
         const checkpoint = checkpoints.find(Boolean);
@@ -144,7 +145,11 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       return rows.length > 0;
     },
     preserve: () => scopedJournal.preserve(),
-    drain: async (authority, signal) => { await replayJournal(authority.descriptor, initial.accountId, signal, false, options.openRestored); },
+    drain: async (authority, signal) => {
+      await replayJournal(authority.descriptor, initial.accountId, signal, false, options.openRestored);
+      const remaining = await pendingRecords(initial.accountId, initial.boardId);
+      if (remaining.some(row => !options.openRestored || row.epoch === authority.descriptor.recoveryEpoch)) throw new Error('New changes are waiting to save');
+    },
     changed: (recoveryState, stalled) => {
       if (!isCurrent()) return;
       if (recoveryState === 'storage-paused') { pauseRecoveryStorage(); return; }
@@ -161,7 +166,12 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   requestAbort.signal.addEventListener('abort', () => coordinator.dispose(), { once: true });
   const promise = coordinator.open().then(authority => {
     if (!authority) { if (scope?.recoveryState === 'denied') throw new SourceAccessError(404); throw new Error('Board unavailable'); }
+    if (scope?.recoveryState === 'denied' && authority.descriptor.summary.role !== 'viewer') throw new SourceAccessError(403);
     if (['corrupt', 'epoch-mismatch'].includes(scope?.recoveryState ?? '')) throw Object.assign(new Error('Recovery needs attention'), { recoveryState: scope!.recoveryState });
+    // Once replay is acknowledged, ordinary server hydration owns freshness and
+    // image loading/error feedback. Local hydration is reserved for pending work.
+    if (scope?.recoveryState === 'saved') baseline = undefined;
+    initializing = false;
     authorizedDescriptor = authority.descriptor;
     publish({ ...scope!, role: authority.descriptor.summary.role, canWrite: !storagePaused && authority.descriptor.summary.role !== 'viewer' });
     return import('./account/board-workspace');
@@ -176,7 +186,14 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     },
     onPendingDocument: (id, data) => scopedJournal.captureSubmission(id, data),
     onPendingBlob: (key, value) => scopedJournal.capture('blob', key, value),
-    onFetchedBlob: initial.canWrite ? (key, value) => scopedJournal.cacheAsset(key, value) : undefined,
+    onFetchedBlob: authorizedDescriptor.summary.role !== 'viewer' ? async (key, value) => {
+      try { await scopedJournal.cacheAsset(key, value); }
+      catch (error) {
+        // Admission failure already retains bytes and pauses edits. Reading an
+        // authorized image must still work for inspection and recovery export.
+        if (error instanceof RecoveryStorageError && error.code === 'CORRUPT') throw error;
+      }
+    } : undefined,
     onAcknowledged: token => {
       if (typeof token === 'string') return scopedJournal.acknowledge([token]);
       const receipt = token as Awaited<ReturnType<AccountJournal['captureSubmission']>>;

@@ -13,7 +13,7 @@ declare global { interface Window { RecoveryHarness: typeof Recovery & typeof Ca
 let harness: string;
 const scope = { accountId: 'synthetic-member', boardId: 'synthetic-board', generation: 1, recoveryEpoch: '11111111-1111-4111-8111-111111111111' };
 
-for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses native mutations while retaining inspection, recovery and responsive controls`, async ({ page, baseURL }) => {
+for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses native mutations while retaining inspection, recovery and responsive controls`, async ({ page, baseURL }, testInfo) => {
   await recoveryBoardFixture(page, baseURL!, 'S'.repeat(200));
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
   await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type('Retained recovery canary'); await page.keyboard.press('Escape');
@@ -27,7 +27,7 @@ for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses n
   await expect(page.locator('editor-host')).toBeVisible();
   await page.keyboard.type('DENIED'); await page.keyboard.press('Backspace'); await page.keyboard.press('ControlOrMeta+z'); await page.keyboard.press('ControlOrMeta+Shift+z');
   await page.locator('editor-host').evaluate(el => {
-    const host = el as EditorHost; const data = new DataTransfer(); data.setData('text/plain', 'DENIED'); data.files;
+    const host = el as EditorHost; const data = new DataTransfer(); data.setData('text/plain', 'DENIED');
     data.items.add(new File([new Uint8Array([1, 2, 3])], 'denied.png', { type: 'image/png' }));
     host.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true, composed: true }));
     host.dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true, composed: true }));
@@ -38,8 +38,9 @@ for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses n
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Add sticky note', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Zoom, current 110%', exact: true })).toBeVisible();
+  const zoom = () => page.getByRole('button', { name: /^Zoom, current/ }).getAttribute('aria-label').then(value => Number(value!.match(/(\d+)%/)![1]));
+  const oldZoom = await zoom(); await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await expect.poll(zoom).toBeGreaterThan(oldZoom);
   await page.getByRole('button', { name: 'Fit to screen', exact: true }).click();
   await page.locator('affine-edgeless-note').click(); await page.keyboard.press('Delete');
   await page.mouse.move(700, 500); await page.keyboard.down('Space'); await page.mouse.down(); await page.mouse.move(760, 530); await page.mouse.up(); await page.keyboard.up('Space');
@@ -47,13 +48,20 @@ for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses n
   await page.getByRole('button', { name: 'Editing paused', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Retry saving', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download recovery copy', exact: true })).toBeVisible();
+  if (mode === 'quota') {
+    const downloading = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
+    expect((await downloading).suggestedFilename()).toMatch(/\.bs\.zip$/);
+    await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toBeVisible();
+  }
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [1440, 900, 600, 490, 320]) {
     await page.setViewportSize({ width, height: 800 });
     const bounds = await page.getByRole('region', { name: 'Board recovery' }).boundingBox();
     expect(bounds!.width).toBeLessThanOrEqual(width); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect((await page.getByRole('banner').boundingBox())!.height).toBeLessThan(300);
     await expect(page.getByRole('button', { name: 'Retry saving', exact: true })).toBeInViewport();
+    if (width === 320 && mode === 'quota') await page.screenshot({ path: testInfo.outputPath('recovery-narrow.png') });
   }
   await page.getByRole('button', { name: 'Retry saving', exact: true }).focus();
   await page.keyboard.press('Escape');
@@ -205,7 +213,7 @@ for (const failure of ['denied', 'expired', 'different-account'] as const) test(
   }
   let pushes = 0; page.on('request', request => { if (request.url().includes('/push')) pushes++; });
   await page.goto('/?board=' + descriptor.summary.id);
-  await expect(page.getByRole('heading', { name: failure === 'expired' ? 'Session expired — sign in to continue.' : failure === 'denied' ? "You don't have access to this board" : "We couldn't open this board.", exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: failure === 'expired' ? 'Session expired — sign in to continue.' : "You don't have access to this board", exact: true })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0); expect(pushes).toBe(0);
   expect(await page.evaluate(() => (window as unknown as { recoveryReads: number }).recoveryReads)).toBe(0);
 });

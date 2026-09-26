@@ -93,7 +93,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   if (state === 'denied') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>You don't have access to this board</h1><p>Ask the board owner to grant access to your internal account.</p><a href="/">Back to your boards</a></section>;
   if (state === 'error') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>We couldn't open this board.</h1><p role="alert">We couldn't open this board. Try again.</p><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/">Back to your boards</a></section>;
   return <div className="djai-app" data-board-id={board!.summary.id}>
-    <Header boardTitle={board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={activeScope?.canWrite ? renameBoard : undefined} />
+    <Header boardTitle={board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={activeScope?.canWrite ? renameBoard : undefined} onOpenRestored={() => { setRestored(true); setRetry(value => value + 1); }} />
     <main className="djai-canvas-area"><BlockSuiteCanvas runtime={runtime!} /></main>
   </div>;
 }

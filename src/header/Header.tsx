@@ -22,12 +22,13 @@ import { AccountMenu } from './AccountMenu';
 export function Header({
   boardTitle = 'Untitled board',
   onOpenBoards,
-  onRenameBoard,
+  onRenameBoard, onOpenRestored,
   board, member, signOut, onBoardChanged,
 }: {
   boardTitle?: string;
   onOpenBoards?: () => void;
   onRenameBoard?: (title: string) => Promise<void>;
+  onOpenRestored?: () => void;
   board?: BoardDescriptor; member?: SessionDescriptor; signOut?: () => Promise<void>; onBoardChanged?: (board: BoardDescriptor) => void;
 }) {
   const [exportOpen, setExportOpen] = useState(false);
@@ -109,7 +110,7 @@ export function Header({
       {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
-        {recovering && <RecoveryStateView state={scope.recoveryState!} compact retry={retryRecovery} download={scope.role !== 'viewer' ? () => exportBoardFile() : undefined} />}
+        {recovering && <RecoveryStateView state={scope.recoveryState!} compact retry={retryRecovery} openRestored={onOpenRestored} download={scope.role !== 'viewer' ? () => exportBoardFile() : undefined} />}
         <div className="djai-save" hidden={!!recovering}>
           <button
             type="button"

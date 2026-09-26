@@ -183,6 +183,7 @@ test('@03-06-01 image loading missing retry and lost authorization clear protect
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic-canary.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes });
   await expect(page.locator('affine-edgeless-image img')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expectAcknowledgedJournal(page);
   let release!: () => void; const hold = new Promise<void>(resolve => { release = resolve; });
   let phase: 'missing' | 'ready' | 'denied' = 'missing'; let reads = 0;
   await page.route('**/api/boards/*/blobs/*', async route => {
