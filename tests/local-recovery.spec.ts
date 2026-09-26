@@ -57,7 +57,7 @@ test('@04-03-01 corrupt and unknown records remain intact and never reach replay
   expect(result.records[0]).toMatchObject({ schemaVersion: 999, data: [255] }); expect(result.scopes[0]).toMatchObject({ corrupt: true });
 });
 
-test('@04-03-01 independent capture reconstructs the second edit after native sync failure and reload', async ({ page, baseURL }) => {
+test('@04-03-01 @04-04-01 independent capture reconstructs the second edit after native sync failure and reload', async ({ page, baseURL }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('/auth/start'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
@@ -86,6 +86,8 @@ test('@04-03-01 independent capture reconstructs the second edit after native sy
   await expect.poll(text).toContain('Second local canary');
   expect((await stored()).checkpoints).toHaveLength(1);
   await page.reload(); await expect.poll(text).toContain('First local canary'); expect(await text()).toContain('Second local canary'); expect(errors).toEqual([]);
+  await expect(page.locator('editor-host')).toBeVisible();
+  await expect(page.locator('affine-edgeless-note')).toContainText('Second local canary');
 });
 async function storagePage(page: Page) {
   await page.route('**/recovery-fixture', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Synthetic recovery fixture</title>' }));
