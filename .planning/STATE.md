@@ -4,10 +4,11 @@ current_phase: 04
 current_phase_name: Durable Boards and Recovery
 current_plan: 8
 status: blocked
-stopped_at: "Blocked at 04-13-01 prerequisite: ready container daemon required; see 04-13-CHECKPOINT.md"
+last_gate_trip: 04-13/04-13-02
+stopped_at: "04-13-02 TDD gate: feat_before_test; task 1 image packaging committed, runtime task not started"
 last_updated: "2026-09-26T04:33:19.262Z"
 last_activity: 2026-09-26
-last_activity_desc: Plan 04-13 prerequisite blocked by unavailable container daemon; pinned package provenance verified
+last_activity_desc: Plan 04-13 task 1 complete; task 2 stopped at TDD commit-order gate
 state_head: 85226fd90198865f6ae99ac986538a33b14aea63
 progress:
   total_phases: 13
@@ -30,12 +31,12 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
-Phase: 04 (Durable Boards and Recovery) — BLOCKED AT 04-13 PREREQUISITE
+Phase: 04 (Durable Boards and Recovery) — BLOCKED 04-13
 Current Plan: 8
 Total Plans in Phase: 16
-Status: Awaiting ready operator container runtime
+Status: Task 1 complete; task 2 blocked by TDD commit-order gate
 Next action: $gsd-execute-phase 4
-Last activity: 2026-09-26 — Plan 04-13 task 1 stopped before implementation: actual container daemon unavailable after elevated read-only check; pinned package source/version/integrity verified. See [checkpoint](phases/04-durable-boards-and-recovery/04-13-CHECKPOINT.md) (prerequisite evidence and resume condition).
+Last activity: 2026-09-26 — Plan 04-13 task 1 committed as f600476 after both image builds, native SQLite proof and both typechecks. Task 2 stopped before implementation because the runtime TDD gate matches the earlier task 1 feat commit. See [checkpoint](phases/04-durable-boards-and-recovery/04-13-CHECKPOINT.md) (gate evidence and continuation point).
 
 Progress: [██░░░░░░░░] 23% (3/13 phases complete; 34/42 currently planned plans complete; later phases remain unplanned)
 
@@ -130,7 +131,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 - No remaining Phase 3 blocker within approved scope. Real-provider and spoken assistive-technology acceptance have explicit backlog follow-ups.
 - Cross-browser/service-restart durability, deployment and backup/restore require Phase 4 evidence. Simultaneous collaboration and reconnect convergence require Phase 5 evidence.
-- Plan 04-13 task 1 precondition: Docker daemon remains unreachable after elevated read-only check. Pinned better-sqlite3 13.0.3 registry version, official source and lockfile integrity verified. Operator must provide a ready intended container runtime before packaging execution.
+- Resolved 04-13 prerequisite: operator reported ready; elevated rechecks confirmed Docker server 29.6.2 and pinned package provenance. Production packaging execution resumed.
 
 ## Deferred Items
 

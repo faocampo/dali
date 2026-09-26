@@ -1,5 +1,15 @@
 # Plan 04-13 prerequisite checkpoint
 
+## Current continuation gate
+
+Task 04-13-01 completed in `f600476` with both actual image builds, native Linux SQLite WAL/FULL proof, nonroot read-only runtime proof and both typechecks. Task 04-13-02 has no tests or implementation changes yet.
+
+The required runtime TDD gate reports `feat_before_test`: its plan-level check rejects any `feat(04-13)` commit before the failing-test commit. It therefore matches the completed configuration-only task 1 commit, although task 1 carries no TDD attribute. Execution stopped before task 2 implementation and recorded `last_gate_trip: 04-13/04-13-02` in state. Resolve the gate's scope for a mixed configuration/TDD plan or explicitly authorize the documented gate override; retain the task 1 commit and require genuine RED evidence before task 2 implementation. No complete summary or image-smoke acceptance is claimed.
+
+**Current progress:** 1/2 tasks complete. **Current task:** 04-13-02. **Gate reason:** `feat_before_test`.
+
+**Resolved on 2026-09-26:** The operator reported the runtime ready. Elevated read-only rechecks returned Docker server 29.6.2 and matching registry version/source/lockfile integrity. Execution resumed at task 04-13-01; the original checkpoint evidence below remains retained.
+
 **Date:** 2026-09-26
 **Type:** human-verify
 **Gate:** blocking-human
