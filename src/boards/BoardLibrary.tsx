@@ -8,6 +8,7 @@ import { AccountMenu } from '../header/AccountMenu';
 import { Dropdown } from '../header/Dropdown';
 import logo from '../../imgs/svg/dali-logo-light.svg';
 import { authenticatedRecoveryEpoch, validRecoveryEpoch } from '../canvas/account/doc-source';
+import { inspectAuthorizedPendingBoards, subscribePendingBoardInvalidation, type PendingBoardStatus } from './pending-recovery';
 
 export type BoardSummary = { id: string; title: string; updatedAt: number; role: 'owner' | 'editor' | 'viewer'; access: 'private' | 'shared'; pendingCount: number; accountId: string; thumbnailUrl?: string };
 export type BoardDescriptor = { summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number; recoveryEpoch: string };
@@ -44,6 +45,9 @@ function ProtectedPreview({ board }: { board: BoardSummary }) {
   return <span className="board-card__preview">{url ? <img src={url} alt="" onError={() => setUrl(undefined)} /> : 'Preview unavailable'}</span>;
 }
 export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; signOut: () => Promise<void> }) {
+  return <AccountBoardLibrary key={member.accountId} member={member} signOut={signOut} />;
+}
+function AccountBoardLibrary({ member, signOut }: { member: SessionDescriptor; signOut: () => Promise<void> }) {
   const [importOpen, setImportOpen] = useState(false);
   const [action, setAction] = useState<{ board: BoardSummary; kind: 'rename' | 'duplicate' | 'delete' }>();
   const [notice, setNotice] = useState('');
@@ -52,6 +56,7 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
+  const [recovery, setRecovery] = useState<{ boards: BoardSummary[]; status: 'checking' | 'ready' | 'error'; pending: Map<string, PendingBoardStatus> }>();
   const [filter, setFilter] = useState<'all' | 'mine' | 'shared'>('all');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -89,6 +94,20 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [member.accountId, refresh, filter]);
+  useEffect(() => subscribePendingBoardInvalidation(() => setRefresh(value => value + 1)), []);
+  useEffect(() => {
+    if (loading || error) return;
+    const controller = new AbortController();
+    setRecovery({ boards, status: 'checking', pending: new Map() });
+    void inspectAuthorizedPendingBoards(member.accountId, boards, controller.signal).then(pending => {
+      if (!controller.signal.aborted) setRecovery({ boards, status: 'ready', pending });
+    }).catch(() => {
+      if (!controller.signal.aborted) setRecovery({ boards, status: 'error', pending: new Map() });
+    });
+    return () => controller.abort();
+  }, [member.accountId, boards, loading, error]);
+  const currentRecovery = recovery?.boards === boards ? recovery : undefined;
+  const hasPending = (id: string) => currentRecovery?.pending.get(id)?.hasPendingChanges === true;
   const create = async () => {
     if (busy) return;
     const controller = lifetime.current!; setBusy(true); setCreateError('');
@@ -150,9 +169,10 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
       {(['all', 'mine', 'shared'] as const).map(value => <button key={value} aria-pressed={filter === value} onClick={event => { event.currentTarget.focus(); setFilter(value); }}>{value === 'all' ? 'All' : value === 'mine' ? 'Mine' : 'Shared with me'}</button>)}
       <button aria-label="Refresh boards" title="Refresh boards" onClick={event => { event.currentTarget.focus(); setRefresh(value => value + 1); }}><MenuIcon name="refresh" /><span>Refresh boards</span></button>
     </div>
+    {!loading && !error && <p className="board-library__recovery-status" role="status">{!currentRecovery || currentRecovery.status === 'checking' ? 'Checking recovery status…' : currentRecovery.status === 'error' ? 'Recovery status unavailable. Refresh boards to try again.' : ''}</p>}
     {loading ? <><p role="status">Loading your boards…</p><div className="board-grid" aria-hidden="true">{[0, 1, 2].map(key => <div className="board-card board-card--skeleton" key={key} />)}</div></> : error ? <section><p role="alert">We couldn't load your boards. Try again.</p><button onClick={() => setRefresh(value => value + 1)}>Try again</button></section> : boards.length === 0 ? <section className="board-library__empty"><h2>{member.systemRole === 'viewer' || filter === 'shared' ? 'No shared boards yet' : 'Create your first board'}</h2><p>{member.systemRole === 'viewer' || filter === 'shared' ? 'Boards shared with you will appear here. Choose All to see your boards.' : 'Start a private board. You can share it with internal members afterward.'}</p>{filter === 'shared' && <button onClick={() => setFilter('all')}>View all boards</button>}</section> : <div className="board-grid">
       {boards.map(board => <article className="board-card" key={board.id} data-board-id={board.id}>
-        <a className="board-card__open" href={'/?board=' + encodeURIComponent(board.id)} aria-label={'Open ' + board.title}>
+        <a className="board-card__open" href={'/?board=' + encodeURIComponent(board.id)} aria-label={'Open ' + board.title} aria-describedby={hasPending(board.id) ? 'pending-' + board.id : undefined}>
           <ProtectedPreview board={board} /><strong className="board-card__title" title={board.title}>{board.title}</strong>
           <small>Edited {new Date(board.updatedAt).toLocaleString()}</small>
         </a><div className="board-card__footer"><div className="board-card__metadata"><span>{board.access === 'private' ? 'Private' : 'Shared'}</span><span>{board.role[0]!.toUpperCase() + board.role.slice(1)}</span>{board.pendingCount > 0 && <span>Pending member sign-in</span>}</div>
@@ -167,6 +187,7 @@ export function BoardLibrary({ member, signOut }: { member: SessionDescriptor; s
             </>}
           </Dropdown>}
         </div>
+        {hasPending(board.id) && <div className="board-card__pending" id={'pending-' + board.id}><span aria-hidden="true">◷</span><div><span>Changes waiting to save</span><p>Open this board in this browser to recover changes that have not reached the server.</p></div></div>}
       </article>)}
     </div>}
     {importOpen && <BoardImportDialog key={member.accountId} member={member} onClose={() => setImportOpen(false)} onImported={() => { setFilter('all'); setRefresh(value => value + 1); }} />}
