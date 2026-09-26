@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Durable Boards and Recovery
-current_plan: 13
+current_plan: 14
 status: executing
-stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-09-26T20:10:07.587Z"
+stopped_at: Completed 04-08-PLAN.md
+last_updated: "2026-09-26T20:39:14.182Z"
 last_activity: 2026-09-26
-last_activity_desc: Plan 04-07 save details complete; continue 04-08 with phase acceptance pending
-state_head: d547c2ae8da1acbecd93211f3021f74bd96fc40f
+last_activity_desc: Plan 04-08 title intent and navigation complete; continue 04-15 subject to operational prerequisites
+state_head: 85d6ef6ebf9bbbb3bedec3c93e0fb4c10aa6f1f2
 progress:
   total_phases: 13
   completed_phases: 3
   total_plans: 42
-  completed_plans: 39
+  completed_plans: 40
   percent: 23
 ---
 
@@ -30,20 +30,20 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
-Phase: 04 (Durable Boards and Recovery) — Wave 7 complete; Wave 8 next
-Current Plan: 13
+Phase: 04 (Durable Boards and Recovery) — Wave 8 complete; operational verification next
+Current Plan: 14
 Total Plans in Phase: 16
-Status: 13/16 plans complete; continue dependency-approved Wave 8 with 04-08
-Next action: $gsd-execute-phase 4 — plan 04-08
-Last activity: 2026-09-26 — Plan 04-07 save details complete: scoped image actions, real recovery downloads, Viewer presentation and viewport containment. Both typechecks, 182 unit tests, nine exact new native cases and integrated recovery cases passed across documented runs. See [summary](phases/04-durable-boards-and-recovery/04-07-SUMMARY.md) (evidence and native browser UI zoom limit).
+Status: 14/16 plans complete; continue 04-15 only when its explicit operational prerequisites are satisfied
+Next action: $gsd-execute-phase 4 — plan 04-15 preconditions, then 04-16 final verification
+Last activity: 2026-09-26 — Plan 04-08 complete: durable title intent, exact receipt/revision fencing, cold reopen and informed navigation. Both typechecks, 191 unit tests, six exact new native cases and nine scoped existing browser regressions passed. See [summary](phases/04-durable-boards-and-recovery/04-08-SUMMARY.md) (evidence, integration corrections and browser warning limits). Phase acceptance remains pending.
 
-Progress: [██░░░░░░░░] 23% (3/13 phases complete; 39/42 currently planned plans complete; later phases remain unplanned)
+Progress: [██░░░░░░░░] 23% (3/13 phases complete; 40/42 currently planned plans complete; later phases remain unplanned)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 39
+- Total plans completed: 40
 - Average duration: —
 - Total execution time: not consistently recorded across sessions.
 
@@ -58,7 +58,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 39/42 curr
 
 **Recent Trend:**
 
-- Last 5 plans: 04-13, 04-06, 04-09, 04-14, 04-07
+- Last 5 plans: 04-06, 04-09, 04-14, 04-07, 04-08
 - Trend: Phase 3 accepted; Phase 4 has verified restart durability, epoch fencing, reconstructable local capture, backup publication, authorized recovery, scheduled retention, freshness admission, current save coverage and selected fresh-target restore with native cold access; remaining plans execute sequentially in dependency order.
 
 **Per-Plan Metrics:**
@@ -100,6 +100,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 39/42 curr
 | Phase 04 P09 | 12min | 2 tasks | 8 files |
 | Phase 04 P14 | 15min | 2 tasks | 9 files |
 | Phase 04 P07 | 30min | 2 tasks | 35 files |
+| Phase 04 P08 | 22min | 2 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,8 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 - [Phase 04]: Reauthorize library cards on journal invalidation; expose only pending booleans for current account and authorized board indexes while retaining unresolved old epochs.
 - [Phase 04]: Use restricted Recreate/RWOP Kubernetes manifests with explicit operator storage ownership and network bindings; runtime smoke requires a fresh selected disposable namespace.
 - [Phase 04]: Present active authorized Viewers as Read only while preserving coordinator write isolation; scope Save details and local previews to the current account, board and generation.
+- [Phase 04]: Title intent uses scoped journal metadata and exact operation receipts; title replay failures retain visible intent independently of document hydration.
+- [Phase 04]: Failed or stalled in-app leaving requires Stay or explicit Leave; browser-controlled warnings are conditional and recovery data remains preserved where possible.
 
 ### Pending Todos
 
@@ -155,8 +158,8 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-09-26T20:10:07.521Z
-Stopped at: Completed 04-07-PLAN.md
+Last session: 2026-09-26T20:39:04.494Z
+Stopped at: Completed 04-08-PLAN.md
 Resume file: None
 Next action: `$gsd-execute-phase 4`
 
