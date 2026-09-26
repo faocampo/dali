@@ -2,19 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Durable Boards and Recovery
-current_plan: 8
-status: blocked
-last_gate_trip: 04-13/04-13-02
-stopped_at: "04-13-02 TDD gate: feat_before_test; task 1 image packaging committed, runtime task not started"
-last_updated: "2026-09-26T04:33:19.262Z"
+current_plan: 9
+status: executing
+stopped_at: Completed 04-13-PLAN.md
+last_updated: "2026-09-26T18:25:50.758Z"
 last_activity: 2026-09-26
-last_activity_desc: Plan 04-13 task 1 complete; task 2 stopped at TDD commit-order gate
-state_head: 85226fd90198865f6ae99ac986538a33b14aea63
+last_activity_desc: Plan 04-13 complete with pinned production images, secure TLS/OIDC smoke and durable restart proof
+state_head: 4e7c171a0cb3869793c4c7947a7a159c8a859f7d
 progress:
   total_phases: 13
   completed_phases: 3
   total_plans: 42
-  completed_plans: 34
+  completed_plans: 35
   percent: 23
 ---
 
@@ -31,20 +30,20 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
-Phase: 04 (Durable Boards and Recovery) — BLOCKED 04-13
-Current Plan: 8
+Phase: 04 (Durable Boards and Recovery) — Wave 5 complete
+Current Plan: 9
 Total Plans in Phase: 16
-Status: Task 1 complete; task 2 blocked by TDD commit-order gate
+Status: 9/16 plans complete; ready for dependency-approved Wave 6 execution
 Next action: $gsd-execute-phase 4
-Last activity: 2026-09-26 — Plan 04-13 task 1 committed as f600476 after both image builds, native SQLite proof and both typechecks. Task 2 stopped before implementation because the runtime TDD gate matches the earlier task 1 feat commit. See [checkpoint](phases/04-durable-boards-and-recovery/04-13-CHECKPOINT.md) (gate evidence and continuation point).
+Last activity: 2026-09-26 — Plan 04-13 complete: both actual production images built, native SQLite WAL/FULL proven, 9 preflight tests and 307 server regressions passed, both typechecks passed, and actual secure image smoke returned IMAGE_SMOKE_PASS through SIGTERM/restart. See [summary](phases/04-durable-boards-and-recovery/04-13-SUMMARY.md) (execution evidence and external acceptance boundaries).
 
-Progress: [██░░░░░░░░] 23% (3/13 phases complete; 34/42 currently planned plans complete; later phases remain unplanned)
+Progress: [██░░░░░░░░] 23% (3/13 phases complete; 35/42 currently planned plans complete; later phases remain unplanned)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 34
+- Total plans completed: 35
 - Average duration: —
 - Total execution time: not consistently recorded across sessions.
 
@@ -96,6 +95,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 34/42 curr
 | Phase 04 P11 | 16min | 3 tasks | 29 files |
 | Phase 04 P05 | 24min | 2 tasks | 10 files |
 | Phase 04 P12 | 15min | 2 tasks | 7 files |
+| Phase 04 P13 | 15min commit interval; build time unmeasured | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -122,6 +122,9 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 - [Phase 04]: Saved requires current confirmed Yjs content and all required image acknowledgments; prior server-save age remains during pending work and keyed errors persist through coalesced retries.
 - [Phase 04]: Require explicitly selected backup digest and external fencing evidence; restore fresh storage and keep ingress closed through access verification.
 - [Phase 04]: Reconcile post-point access changes before startup and require renewed current-epoch backup coverage before durable writes.
+- [Phase 04]: 04-13: Pin official Node 24/nginx image digests, verify native SQLite in Linux, and keep test fixtures outside production images.
+- [Phase 04]: 04-13: Trust only the first loopback proxy hop; retain operator TLS/private ingress and single-writer storage acceptance gates.
+- [Phase 04]: 04-13: Keep liveness independent of provider/backup outages; fence mutations before a 45-second graceful shutdown with 60-second platform grace.
 
 ### Pending Todos
 
@@ -142,9 +145,9 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-09-26T04:33:19.200Z
-Stopped at: Blocked at 04-13-01 prerequisite: ready container daemon required; see 04-13-CHECKPOINT.md
-Resume file: .planning/phases/04-durable-boards-and-recovery/04-13-CHECKPOINT.md
+Last session: 2026-09-26T18:25:04.961Z
+Stopped at: Completed 04-13-PLAN.md
+Resume file: None
 Next action: `$gsd-execute-phase 4`
 
 ## Phase 1 verification outcome

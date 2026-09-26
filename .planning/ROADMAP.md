@@ -195,7 +195,7 @@ Plans:
   3. An operator can follow the documented configuration and startup procedure to deploy Dali and its required services on operator-managed infrastructure, then open an authenticated board. (OPS-01)
   4. An operator can back up and restore board documents and images, and an authorized member can reopen the restored boards with their content and images intact. (OPS-02)
 
-**Plans**: 8/16 plans executed
+**Plans**: 9/16 plans executed
 
 Plans:
 **Wave 1**
@@ -220,7 +220,7 @@ Plans:
 
 - [x] 04-05-PLAN.md — Make save state follow current document and image acknowledgments
 - [x] 04-12-PLAN.md — Restore an operator-selected backup into a fenced fresh target
-- [ ] 04-13-PLAN.md — Build and run a production-only container boundary
+- [x] 04-13-PLAN.md — Build and run a production-only container boundary
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -421,7 +421,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
 | 3. Okta and Board Access | 12/12 | Complete    | 2026-09-25 |
-| 4. Durable Boards and Recovery | 8/16 | In Progress|  |
+| 4. Durable Boards and Recovery | 9/16 | In Progress|  |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
 | 6. Follow Me | 0/TBD | Not started | - |
 | 7. Entity Comments | 0/TBD | Not started | - |

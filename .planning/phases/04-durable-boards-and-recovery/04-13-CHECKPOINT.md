@@ -1,6 +1,10 @@
 # Plan 04-13 prerequisite checkpoint
 
+**Execution completed:** Both tasks now completed with actual native image, TLS/OIDC, SIGTERM/restart and static/regression evidence. See `04-13-SUMMARY.md` for current results. The records below preserve historical checkpoints and their resolutions; neither remains active.
+
 ## Current continuation gate
+
+**Resolved:** Fresh `config-get workflow.tdd_mode --raw` returned `false`; no `--tdd` invocation enabled the runtime gate. The runtime reference's “When this gate fires” section explicitly makes that gate inactive when this condition is false. The prior `feat_before_test` report was therefore a false positive. Task 2 resumes with its ordinary required RED→GREEN cycle; no override or history rewrite applies.
 
 Task 04-13-01 completed in `f600476` with both actual image builds, native Linux SQLite WAL/FULL proof, nonroot read-only runtime proof and both typechecks. Task 04-13-02 has no tests or implementation changes yet.
 
