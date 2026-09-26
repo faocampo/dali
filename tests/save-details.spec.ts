@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { saveDetailsBoard, openSaveDetails, saveTrigger, addDetailImages } from './save-details-fixtures';
+import { saveDetailsBoard, openSaveDetails, saveTrigger, addDetailImages, saveDetailsFixtures } from './save-details-fixtures';
 import { documentResponseBarrier } from './save-status-fixtures';
 import { recoveryAuthorizationBarrier } from './recovery-archive-fixtures';
 import { journalRows, nativeRecoveryModel } from './recovery-fixtures';
@@ -16,6 +16,55 @@ test('@04-07-01 saved empty board opens named details with keyboard focus and ac
   await expect(dialog.getByRole('list')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Retry now' })).toHaveCount(0);
   await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(saveTrigger(page)).toBeFocused();
+});
+
+test('@04-07-02 fifty failed images and long labels fit every narrow and short viewport', async ({ page, baseURL }, testInfo) => {
+  await saveDetailsBoard(page, baseURL!, saveDetailsFixtures.title); await addDetailImages(page, 50, saveDetailsFixtures.name);
+  await expect(saveTrigger(page)).toContainText('Saved', { timeout: 30000 });
+  await page.route('**/blobs/*', route => route.request().method() === 'GET' ? route.fulfill({ status: 503, json: { code: 'SYNTHETIC_IMAGE_FAILURE' } }) : route.continue());
+  await page.reload(); await expect(saveTrigger(page)).toContainText('Image not saved');
+  await page.setViewportSize({ width: 320, height: 600 }); await page.emulateMedia({ reducedMotion: 'reduce' });
+  const dialog = await openSaveDetails(page); await expect(dialog.getByRole('listitem')).toHaveCount(50);
+  for (const width of [320, 490, 600, 900, 1440]) {
+    await page.setViewportSize({ width, height: width === 320 ? 480 : 800 });
+    await expect.poll(async () => dialog.evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 15 && r.right <= innerWidth - 15 && r.bottom <= innerHeight - 15; })).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    const header = await page.locator('.djai-header').boundingBox(); const box = await dialog.boundingBox(); expect(box!.y).toBeGreaterThanOrEqual(header!.y + header!.height - 1);
+    const last = dialog.getByRole('button', { name: `Select image: ${saveDetailsFixtures.name}`, exact: true }).last();
+    await last.scrollIntoViewIfNeeded(); await expect(last).toBeInViewport(); expect((await last.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await dialog.getByRole('button', { name: 'Download recovery copy' }).scrollIntoViewIfNeeded(); await expect(dialog.getByRole('button', { name: 'Download recovery copy' })).toBeInViewport();
+  }
+  await page.setViewportSize({ width: 320, height: 480 }); await dialog.evaluate(el => { el.scrollTop = 0; });
+  await page.screenshot({ path: testInfo.outputPath('save-details-50-images-narrow.png') });
+  await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(saveTrigger(page)).toBeFocused();
+});
+
+test('@04-07-02 rendered contrast typography and native visual viewport zoom preserve reachable controls', async ({ page, baseURL }, testInfo) => {
+  await saveDetailsBoard(page, baseURL!); await addDetailImages(page, 1, '<Synthetic> & image');
+  await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
+  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect(saveTrigger(page)).toContainText('Save failed');
+  const dialog = await openSaveDetails(page); await expect(dialog.locator('img')).toHaveCount(1);
+  await expect(dialog.locator('img')).toHaveJSProperty('naturalWidth', 8);
+  await expect(dialog.getByRole('button', { name: 'Select image: <Synthetic> & image', exact: true })).toBeVisible();
+  const contrast = await dialog.evaluate(el => {
+    const rgb = (s: string) => (s.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+    const luminance = (s: string) => rgb(s).map(n => n / 255).map(n => n <= .04045 ? n / 12.92 : ((n + .055) / 1.055) ** 2.4).reduce((sum, n, i) => sum + n * [.2126, .7152, .0722][i]!, 0);
+    const ratio = (a: string, b: string) => { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+    const background = getComputedStyle(el).backgroundColor;
+    return [...el.querySelectorAll('h2,h3,p,strong,button')].map(node => {
+      const style = getComputedStyle(node); const bg = style.backgroundColor === 'rgba(0, 0, 0, 0)' ? background : style.backgroundColor;
+      return { text: node.textContent, textRatio: ratio(style.color, bg), borderRatio: node.tagName === 'BUTTON' ? ratio(style.borderTopColor, background) : 3, size: style.fontSize, weight: style.fontWeight };
+    });
+  });
+  for (const item of contrast) { expect(item.textRatio, item.text ?? '').toBeGreaterThanOrEqual(4.5); expect(item.borderRatio).toBeGreaterThanOrEqual(3); expect(['12px', '13px', '14px', '20px']).toContain(item.size); expect(['400', '600']).toContain(item.weight); }
+  const cdp = await page.context().newCDPSession(page); await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
+  await expect.poll(() => page.evaluate(() => visualViewport!.scale)).toBe(2);
+  await expect.poll(() => dialog.evaluate(el => { const r = el.getBoundingClientRect(), v = visualViewport!; return r.left >= v.offsetLeft && r.right <= v.offsetLeft + v.width && r.bottom <= v.offsetTop + v.height; })).toBe(true);
+  const download = dialog.getByRole('button', { name: 'Download recovery copy' }); await download.scrollIntoViewIfNeeded(); await expect(download).toBeInViewport();
+  await page.screenshot({ path: testInfo.outputPath('save-details-200-percent.png') });
+  await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 }); await cdp.detach();
+  await dialog.getByRole('button', { name: 'Close save details' }).click(); await expect(saveTrigger(page)).toBeFocused();
 });
 
 test('@04-07-01 pending details preserve age and focus through acknowledgement and light dismissal', async ({ page, baseURL }) => {
