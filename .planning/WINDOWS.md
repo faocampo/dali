@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 8
 waived_count: 1
-fixed_count: 7
-total_count: 16
-last_updated: 2026-09-26T04:09:03.108Z
+fixed_count: 8
+total_count: 17
+last_updated: 2026-09-26T04:29:31.962Z
 ---
 
 # Broken Windows Ledger
@@ -31,6 +31,7 @@ last_updated: 2026-09-26T04:09:03.108Z
 | 14 | 04 | deviation | server/storage/backup.ts |  | Plan 04-10 used the existing bundler for crash children, normalized snapshot journal mode and preserved legitimate duplicate/deletion receipts; all 22 backup tests pass. | fixed |  | 2026-09-25T22:36:39.393Z | 2026-09-25T22:36:44.145Z |
 | 15 | 04 | deviation | server/app.ts |  | Bounded router parameter length expanded to support required pending-grant admission routes; all 95 route/time cases pass. | fixed |  | 2026-09-26T03:38:38.344Z | 2026-09-26T03:41:00.992Z |
 | 16 | 04 | deviation | src/canvas/account/outbox.ts |  | Plan 04-05 connected journal acknowledgments and Header status to exact save coverage, and verified image-only retry through real server reads; 20 reducer and nine browser cases pass. | fixed |  | 2026-09-26T04:07:37.553Z | 2026-09-26T04:09:03.108Z |
+| 17 | 04 | deviation | server/storage/restore.ts |  | Fixed future-dated selected backup publishing an unverifiable restore; final restore suite passes. | fixed |  | 2026-09-26T04:27:37.952Z | 2026-09-26T04:29:31.962Z |
 
 ````json
 [
@@ -230,6 +231,19 @@ last_updated: 2026-09-26T04:09:03.108Z
     "reason": "",
     "recorded_at": "2026-09-26T04:07:37.553Z",
     "resolved_at": "2026-09-26T04:09:03.108Z",
+    "milestone": null
+  },
+  {
+    "id": 17,
+    "kind": "deviation",
+    "phase": "04",
+    "file": "server/storage/restore.ts",
+    "line": null,
+    "description": "Fixed future-dated selected backup publishing an unverifiable restore; final restore suite passes.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-26T04:27:37.952Z",
+    "resolved_at": "2026-09-26T04:29:31.962Z",
     "milestone": null
   }
 ]
