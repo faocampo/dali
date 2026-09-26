@@ -354,7 +354,8 @@ export class AccountJournal {
   }
 }
 /** Fresh descriptor and expected identity precede every replay; Yjs/hash keys are idempotent. */
-export async function replayJournal(descriptor: BoardDescriptor, accountId: string, signal: AbortSignal, blobsOnly = false, currentEpochOnly = false): Promise<boolean> {
+export type ReplayObserver = (record: JournalRecord, outcome: 'sending' | 'acknowledged' | 'failed', attempt: string) => void;
+export async function replayJournal(descriptor: BoardDescriptor, accountId: string, signal: AbortSignal, blobsOnly = false, currentEpochOnly = false, observer?: ReplayObserver): Promise<boolean> {
   if (descriptor.summary.accountId !== accountId) throw new SourceAccessError(409);
   const records = (await pendingRecords(accountId, descriptor.summary.id)).filter(record => (!blobsOnly || record.kind === 'blob') && (!currentEpochOnly || record.epoch === descriptor.recoveryEpoch));
   if (!records.length) return false;
@@ -364,6 +365,9 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
   if (records.some(record => !validRecord(record))) throw new RecoveryStorageError('CORRUPT');
   const ordered = [...records.filter(r => r.kind === 'blob'), ...records.filter(r => r.kind === 'document')];
   for (const record of ordered) {
+    const attempt = crypto.randomUUID();
+    observer?.(record, 'sending', attempt);
+    try {
     if (signal.aborted) throw new Error('Recovery interrupted');
     if (record.kind === 'document' && ![descriptor.rootDocId, descriptor.contentDocId].includes(record.resource)) throw new Error('Recovery document unavailable');
     const base = `/api/boards/${encodeURIComponent(descriptor.summary.id)}`;
@@ -383,6 +387,8 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
     if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true ||
       (record.kind === 'blob' && (!('key' in result) || result.key !== record.resource))) throw new Error('Recovery commit unconfirmed');
     await acknowledgeRecords({ accountId, boardId: descriptor.summary.id, recoveryEpoch: epoch, generation: record.generation }, [record.id]);
+    observer?.(record, 'acknowledged', attempt);
+    } catch (error) { observer?.(record, 'failed', attempt); throw error; }
   }
   return true;
 }

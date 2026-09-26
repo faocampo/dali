@@ -1,6 +1,5 @@
 import type { BlobSource } from '@blocksuite/affine/sync';
 import { SourceAccessError, RecoveryEpochError, sourceRecoveryEpoch, confirmRecoveryEpoch, type SourceOptions } from './doc-source';
-import { beginBlobWrite, finishBlobWrite } from '../save-status';
 
 export type BlobSourceOptions = Omit<SourceOptions, 'onPendingDocument'> & {
   onPendingBlob?: (key: string, value: Blob) => unknown | Promise<unknown>;
@@ -45,10 +44,13 @@ export class BoardBlobSource implements BlobSource {
   async get(key: string): Promise<Blob | null> {
     this.assertCurrent();
     if (this.pending.has(key)) return this.pending.get(key)!;
-    const response = await this.request('GET', key); if (!response) return null;
+    const attempt = crypto.randomUUID(); this.options.onImageOutcome?.(key, 'sending', attempt);
+    try {
+    const response = await this.request('GET', key); if (!response) { this.options.onImageOutcome?.(key, 'failed', attempt); return null; }
     if (!['image/png', 'image/jpeg'].includes(response.headers.get('content-type')?.split(';')[0] ?? '')) throw new Error('Invalid image response');
     const blob = await response.blob(); this.assertCurrent();
-    await this.options.onFetchedBlob?.(key, blob); this.assertCurrent(); return blob;
+    await this.options.onFetchedBlob?.(key, blob); this.assertCurrent(); this.options.onImageOutcome?.(key, 'loaded', attempt); return blob;
+    } catch (error) { this.options.onImageOutcome?.(key, 'failed', attempt); throw error; }
   }
   async set(key: string, value: Blob): Promise<string> {
     this.assertCurrent(true);
@@ -56,16 +58,20 @@ export class BoardBlobSource implements BlobSource {
     const epoch = sourceRecoveryEpoch(this.options);
     this.pending.set(key, value);
     const token = await this.options.onPendingBlob?.(key, value);
+    const attempt = crypto.randomUUID(); this.options.onImageOutcome?.(key, 'sending', attempt);
     const upload = async () => {
+      try {
       confirmRecoveryEpoch(this.options, epoch);
       const response = await this.request('PUT', key, value, epoch); const result: unknown = await response!.json(); this.assertCurrent(true);
       if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true || !('key' in result) || result.key !== key) throw new Error('Image commit unconfirmed');
       confirmRecoveryEpoch(this.options, epoch, response!);
       await this.options.onAcknowledged?.(token); if (this.pending.get(key) === value) this.pending.delete(key);
+      this.assertCurrent(true); this.options.onImageOutcome?.(key, 'acknowledged', attempt);
+      } catch (error) { this.options.onImageOutcome?.(key, 'failed', attempt); throw error; }
     };
     if (this.options.durableLocalBlobs && token) {
-      this.assertCurrent(true); this.pending.set(key, value); beginBlobWrite();
-      void upload().then(() => finishBlobWrite(), error => finishBlobWrite(error));
+      this.assertCurrent(true); this.pending.set(key, value);
+      void upload().catch(() => undefined);
     } else await upload();
     return key;
   }

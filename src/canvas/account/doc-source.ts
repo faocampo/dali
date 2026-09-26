@@ -9,6 +9,8 @@ export type SourceOptions = {
   durableLocalBlobs?: boolean;
   beforeDocumentWrite?: () => Promise<void>;
   getRecoveryEpoch?: () => string;
+  onDocumentOutcome?: (docId: string, data: Uint8Array, outcome: 'loaded' | 'sending' | 'acknowledged' | 'failed', attempt: string) => void;
+  onImageOutcome?: (key: string, outcome: 'loaded' | 'sending' | 'acknowledged' | 'failed', attempt: string) => void;
 };
 export class RecoveryEpochError extends Error {
   constructor(readonly code: 'RECOVERY_EPOCH_REQUIRED' | 'RECOVERY_EPOCH_MISMATCH') { super('Server recovery state changed'); this.name = 'RecoveryEpochError'; }
@@ -58,12 +60,17 @@ export class BoardDocSource implements DocSource {
   }
   async pull(docId: string, state: Uint8Array) {
     const response = await this.request(docId, 'pull', state);
-    const data = new Uint8Array(await response.arrayBuffer()); this.assertCurrent(docId); return { data };
+    const data = new Uint8Array(await response.arrayBuffer()); this.assertCurrent(docId);
+    this.options.onDocumentOutcome?.(docId, data, 'loaded', crypto.randomUUID()); return { data };
   }
   async push(docId: string, data: Uint8Array) {
     this.assertCurrent(docId, true);
+    const attempt = crypto.randomUUID();
+    const copy = new Uint8Array(data);
+    this.options.onDocumentOutcome?.(docId, copy, 'sending', attempt);
+    try {
     const epoch = sourceRecoveryEpoch(this.options);
-    const copy = new Uint8Array(data); const token = await this.options.onPendingDocument?.(docId, copy);
+    const token = await this.options.onPendingDocument?.(docId, copy);
     try { await this.options.beforeDocumentWrite?.(); }
     catch (error) { if (error instanceof SourceAccessError) this.options.onAuthorizationLost?.(error); throw error; }
     confirmRecoveryEpoch(this.options, epoch);
@@ -72,6 +79,8 @@ export class BoardDocSource implements DocSource {
     if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true) throw new Error('Document commit unconfirmed');
     confirmRecoveryEpoch(this.options, epoch, response);
     await this.options.onAcknowledged?.(token);
+    this.assertCurrent(docId, true); this.options.onDocumentOutcome?.(docId, copy, 'acknowledged', attempt);
+    } catch (error) { this.options.onDocumentOutcome?.(docId, copy, 'failed', attempt); throw error; }
   }
   subscribe(_callback: (docId: string, data: Uint8Array) => void, disconnect: (reason: string) => void) {
     const abort = () => disconnect('account-source-disposed');

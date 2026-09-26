@@ -1,9 +1,9 @@
 import type { Store, Workspace } from '@blocksuite/affine/store';
 import { validDescriptor, type BoardDescriptor, type BoardSummary } from '../boards/BoardLibrary';
 import type { AccountWorkspaceOptions, BoardWorkspace } from './account/board-workspace';
-import { reportDocEngineStatus, resetSaveStatus } from './save-status';
+import { resetSaveStatus, dispatchSaveEvent, reportSaveCoverage, reportImageOutcome } from './save-status';
 import * as Y from 'yjs';
-import { AccountJournal, replayJournal, requestRecoveryStorage, pendingRecords, readCheckpoint, validRecord, RecoveryStorageError } from './account/outbox';
+import { AccountJournal, replayJournal, requestRecoveryStorage, pendingRecords, readCheckpoint, validRecord, RecoveryStorageError, type ReplayObserver } from './account/outbox';
 import { RecoveryCoordinator, type RecoveryOutcome } from './account/recovery';
 import { RecoveryEpochError, SourceAccessError } from './account/doc-source';
 import { interruptSession, revalidateSession } from '../auth/session';
@@ -21,12 +21,15 @@ let abort: AbortController | undefined;
 let capture: Promise<unknown>[] = [];
 let recovery: RecoveryCoordinator | undefined;
 let storagePaused = false;
+let saveScope: string | undefined;
+let replayObserver: ReplayObserver | undefined;
 export const retryRecovery = () => recovery?.retryRecovery();
 export function pauseRecoveryStorage() {
   if (!scope || scope.phase !== 'active') return;
   storagePaused = true;
   if (current) { current.store.readonly = true; current.workspace.docSync.forceStop(); }
   publish({ ...scope, canWrite: false, recoveryState: 'storage-paused' });
+  if (saveScope) dispatchSaveEvent({ type: 'recovery', scope: saveScope, state: 'storage-paused' });
 }
 const listeners = new Set<() => void>();
 export const getActiveAccessScope = (): AccessScope | null => scope;
@@ -44,6 +47,7 @@ export function suspendAccessScope(_reason: string): void {
     current.workspace.docSync.forceStop(); current.workspace.blobSync.stop();
   }
   publish({ ...scope, phase: 'paused', canWrite: false });
+  if (saveScope) dispatchSaveEvent({ type: 'recovery', scope: saveScope, state: 'denied' });
   abort?.abort();
 }
 export async function preserveCanvasRuntime() { await Promise.all(capture); await journal?.preserve(); }
@@ -67,7 +71,7 @@ export async function synchronizeActiveBoard(accountId: string, boardId: string)
           await localJournal.capture('document', runtime.descriptor.rootDocId, root);
           await localJournal.capture('document', runtime.descriptor.contentDocId, content);
           await localJournal.preserve(); assertCurrent();
-          await replayJournal(runtime.descriptor, accountId, controller.signal); assertCurrent();
+          await replayJournal(runtime.descriptor, accountId, controller.signal, false, false, replayObserver); assertCurrent();
           if (same(root, Y.encodeStateAsUpdate(runtime.workspace.doc)) && same(content, Y.encodeStateAsUpdate(runtime.store.spaceDoc))) return;
         }
         throw new Error('The board is still changing');
@@ -83,6 +87,7 @@ export function disposeCanvasRuntime(expectedGeneration = scope?.generation): vo
   if (!scope || scope.generation !== expectedGeneration) return;
   const old = current; current = null; pending = null;
   recovery?.dispose(); recovery = undefined;
+  if (saveScope) dispatchSaveEvent({ type: 'recovery', scope: saveScope, state: 'disposed' });
   publish({ ...scope, phase: 'disposed', canWrite: false });
   old?.dispose();
 }
@@ -97,7 +102,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   disposeCanvasRuntime();
   const initial: AccessScope = { accountId: options.accountId, boardId: options.descriptor.summary.id, generation: options.generation,
     role: options.descriptor.summary.role, canWrite: options.descriptor.summary.role !== 'viewer', phase: 'active' };
-  publish(initial); resetSaveStatus();
+  publish(initial); const statusScope = JSON.stringify([key, options.descriptor.recoveryEpoch]); saveScope = statusScope; resetSaveStatus(statusScope);
   abort = new AbortController(); const requestAbort = abort;
   options.signal?.addEventListener('abort', () => requestAbort.abort(), { once: true });
   capture = [];
@@ -108,6 +113,45 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   let baseline: AccountWorkspaceOptions['recoveryBaseline'];
   let initializing = true;
   let authorizedDescriptor = options.descriptor;
+  const confirmed = new Map<string, Y.Doc>();
+  const live = new Map<string, Y.Doc>();
+  const revisions = new Map<string, number>();
+  const imageLabels = new Map<string, string>();
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  const covered = (id: string) => {
+    const known = confirmed.get(id); const doc = live.get(id);
+    return !!known && !!doc && !known.store.pendingStructs && !known.store.pendingDs && Y.snapshotContainsUpdate(Y.snapshot(known), Y.encodeStateAsUpdate(doc));
+  };
+  const coverage = () => {
+    if (!isCurrent() || live.size !== 2) return;
+    const images: { id: string; label: string }[] = [];
+    live.get(options.descriptor.contentDocId)!.getMap<Y.Map<unknown>>('blocks').forEach(block => {
+      const id = block.get('prop:sourceId'); if (block.get('sys:flavour') !== 'affine:image' || typeof id !== 'string') return;
+      if (!imageLabels.has(id)) imageLabels.set(id, `Image ${imageLabels.size + 1}`);
+      if (!images.some(image => image.id === id)) images.push({ id, label: imageLabels.get(id)! });
+    });
+    reportSaveCoverage({ type: 'coverage', scope: statusScope, documents: Object.fromEntries([...live.keys()].map(id => [id, { revision: revisions.get(id) ?? 0, acknowledged: covered(id) }])), images, at: Date.now() });
+  };
+  const documentOutcome: NonNullable<AccountWorkspaceOptions['onDocumentOutcome']> = (id, data, outcome, attempt) => {
+    if (!isCurrent()) return;
+    if (outcome === 'sending') timers.set(attempt, setTimeout(() => { if (isCurrent() && !covered(id)) dispatchSaveEvent({ type: 'document-failure', scope: statusScope, docId: id }); }, 15000));
+    else { clearTimeout(timers.get(attempt)); timers.delete(attempt); }
+    if (outcome === 'loaded' || outcome === 'acknowledged') {
+      const doc = confirmed.get(id) ?? new Y.Doc({ guid: id }); confirmed.set(id, doc); Y.applyUpdate(doc, new Uint8Array(data)); coverage();
+    } else if (outcome === 'failed' && !covered(id)) dispatchSaveEvent({ type: 'document-failure', scope: statusScope, docId: id });
+  };
+  const imageOutcome: NonNullable<AccountWorkspaceOptions['onImageOutcome']> = (id, outcome, attempt) => {
+    if (!isCurrent()) return;
+    if (outcome === 'sending') timers.set(attempt, setTimeout(() => { if (isCurrent()) reportImageOutcome({ type: 'image', scope: statusScope, id, outcome: 'failed', attempt, at: Date.now() }); }, 15000));
+    else { clearTimeout(timers.get(attempt)); timers.delete(attempt); }
+    if (outcome === 'loaded' && baseline?.assets.has(id)) return;
+    reportImageOutcome({ type: 'image', scope: statusScope, id, outcome: outcome === 'loaded' ? 'acknowledged' : outcome, attempt, at: Date.now() });
+  };
+  const observeReplay: ReplayObserver = (record, outcome, attempt) => {
+    if (record.kind === 'blob') imageOutcome(record.resource, outcome, attempt);
+    else documentOutcome(record.resource, record.data as Uint8Array, outcome, attempt);
+  };
+  replayObserver = observeReplay;
   const coordinator = recovery = new RecoveryCoordinator({
     current: isCurrent,
     authorize: async signal => {
@@ -146,12 +190,13 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     },
     preserve: () => scopedJournal.preserve(),
     drain: async (authority, signal) => {
-      await replayJournal(authority.descriptor, initial.accountId, signal, false, options.openRestored);
+      await replayJournal(authority.descriptor, initial.accountId, signal, false, options.openRestored, observeReplay);
       const remaining = await pendingRecords(initial.accountId, initial.boardId);
       if (remaining.some(row => !options.openRestored || row.epoch === authority.descriptor.recoveryEpoch)) throw new Error('New changes are waiting to save');
     },
     changed: (recoveryState, stalled) => {
       if (!isCurrent()) return;
+      dispatchSaveEvent({ type: 'recovery', scope: statusScope, state: recoveryState, stalled });
       if (recoveryState === 'storage-paused') { pauseRecoveryStorage(); return; }
       if (recoveryState === 'saved' && storagePaused) {
         storagePaused = false;
@@ -178,6 +223,8 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   }).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, descriptor: authorizedDescriptor, isCurrent, recoveryBaseline: baseline,
     // Workspace lifetime is distinct from request cancellation while preservation is pending.
     durableLocalBlobs: true,
+    onDocumentOutcome: documentOutcome,
+    onImageOutcome: imageOutcome,
     fetch: (input, init) => {
       const url = new URL(String(input), location.href); const key = decodeURIComponent(url.pathname.split('/blobs/')[1] ?? '');
       const local = baseline?.assets.get(key);
@@ -221,13 +268,20 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (!isCurrent()) throw new Error('Board access changed');
     }
     catch (error) { local?.dispose(); workspace.dispose(); throw error; }
-    reportDocEngineStatus(workspace.docSync.status);
-    const subscription = workspace.docSync.onStatusChange.subscribe(reportDocEngineStatus);
+    live.set(workspace.doc.guid, workspace.doc); live.set(store.spaceDoc.guid, store.spaceDoc);
+    const changed = (_data: Uint8Array, _origin: unknown, doc: Y.Doc) => {
+      if (!isCurrent()) return;
+      revisions.set(doc.guid, (revisions.get(doc.guid) ?? 0) + 1); coverage();
+      const version = JSON.stringify([...revisions]);
+      void scopedJournal.preserve().then(() => { if (isCurrent() && JSON.stringify([...revisions]) === version) dispatchSaveEvent({ type: 'preserved', scope: statusScope }); }).catch(() => undefined);
+    };
+    workspace.doc.on('update', changed); store.spaceDoc.on('update', changed); coverage();
+    const stopStatus = () => { workspace.doc.off('update', changed); store.spaceDoc.off('update', changed); for (const timer of timers.values()) clearTimeout(timer); timers.clear(); for (const doc of confirmed.values()) doc.destroy(); confirmed.clear(); };
     const value: CanvasRuntime = { workspace, store, descriptor: structuredClone(authorizedDescriptor), scope: scope!,
-      stopSaveStatus: () => subscription.unsubscribe(), dispose: () => { local?.dispose(); subscription.unsubscribe(); workspace.dispose(); } };
+      stopSaveStatus: stopStatus, dispose: () => { local?.dispose(); stopStatus(); workspace.dispose(); } };
     current = value;
     if (storagePaused) { store.readonly = true; workspace.docSync.forceStop(); }
     return value;
-  }).catch(error => { if (pending?.key === key) pending = null; throw error; });
+  }).catch(error => { for (const timer of timers.values()) clearTimeout(timer); for (const doc of confirmed.values()) doc.destroy(); if (pending?.key === key) pending = null; throw error; });
   pending = { key, promise }; return promise;
 }

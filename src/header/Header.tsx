@@ -6,7 +6,7 @@ import { DaliMenu } from './DaliMenu';
 import { BoardTitleMenu } from './BoardTitleMenu';
 import logo from '../../imgs/svg/dali-symbol-color.svg';
 import { exportBoardFile } from '../canvas/export-board';
-import { getActiveAccessScope, getCanvasRuntime, subscribeAccessScope, retryRecovery } from '../canvas/runtime';
+import { getActiveAccessScope, subscribeAccessScope, retryRecovery } from '../canvas/runtime';
 import { RecoveryStateView } from '../canvas/RecoveryStateView';
 import { createAccountBoard } from '../boards/operations';
 import { accountBoardUrl } from '../boards/preferences';
@@ -40,7 +40,7 @@ export function Header({
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 10000); return () => clearInterval(timer); }, []);
   const saveStatus = useSyncExternalStore(subscribeSaveStatus, getSaveStatus);
   const scope = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
-  const recovering = scope?.recoveryState && scope.recoveryState !== 'saved';
+  const recovering = scope?.recoveryState && ['storage-paused', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(scope.recoveryState);
   type Creation = { id: string; accountId: string; generation: number; tab: Window | null; state: 'pending' | 'error' | 'ready'; href?: string };
   const [creations, setCreations] = useState<Creation[]>([]);
   const lifetime = useRef(new AbortController());
@@ -126,7 +126,7 @@ export function Header({
           >
             <span aria-hidden="true" />
             {saveStatus.state === 'saved' ? 'Saved' : saveStatus.label}
-            {saveStatus.state === 'saved' && saveStatus.savedAt && <small className="save-age" aria-hidden="true">{formatSaveAge(saveStatus.savedAt, now)}</small>}
+            {saveStatus.savedAt && <small className="save-age" aria-hidden="true">{formatSaveAge(saveStatus.savedAt, now)}</small>}
           </button>
           {saveStatus.state === 'failed' && saveHelpOpen && (
             <div className="djai-save__recovery" role="dialog" aria-label="Local save recovery">
@@ -138,9 +138,7 @@ export function Header({
                   className="djai-ghost"
                   onClick={() => {
                     setRetryError(null);
-                    void getCanvasRuntime()
-                      .then(({ workspace }) => { workspace.docSync.forceStop(); workspace.docSync.start(); })
-                      .then(() => setSaveHelpOpen(false))
+                    void Promise.resolve(retryRecovery())
                       .catch((cause: unknown) =>
                         setRetryError(cause instanceof Error ? cause.message : String(cause))
                       );
