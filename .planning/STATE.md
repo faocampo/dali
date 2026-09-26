@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Durable Boards and Recovery
-current_plan: 10
+current_plan: 11
 status: executing
-stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-09-26T19:05:22.105Z"
+stopped_at: Completed 04-09-PLAN.md
+last_updated: "2026-09-26T19:18:24.074Z"
 last_activity: 2026-09-26
-last_activity_desc: Plan 04-06 complete with authorized immutable recovery archives and native fidelity proof
-state_head: 0c8fe3a5a46800a5011fa9ba180ba744ca77b234
+last_activity_desc: Plan 04-09 complete with authorized browser-local pending markers and native lifecycle proof
+state_head: ccdeec9eb18b12aae2cad72cf137021b9cbc4cdb
 progress:
   total_phases: 13
   completed_phases: 3
   total_plans: 42
-  completed_plans: 36
+  completed_plans: 37
   percent: 23
 ---
 
@@ -31,19 +31,19 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
 Phase: 04 (Durable Boards and Recovery) — Wave 6 in progress
-Current Plan: 10
+Current Plan: 11
 Total Plans in Phase: 16
-Status: 10/16 plans complete; continue dependency-approved Wave 6 with 04-09
-Next action: $gsd-execute-phase 4 — plan 04-09, then 04-14
-Last activity: 2026-09-26 — Plan 04-06 complete: authorized immutable recovery archives, persistent preparation and retry, native private Import fidelity, 174 frontend unit tests, 307 server tests, both typechecks and 12 final native recovery regressions passed. See [summary](phases/04-durable-boards-and-recovery/04-06-SUMMARY.md) (execution evidence and acceptance boundaries).
+Status: 11/16 plans complete; continue dependency-approved Wave 6 with 04-14
+Next action: $gsd-execute-phase 4 — plan 04-14
+Last activity: 2026-09-26 — Plan 04-09 complete: authorized browser-local pending markers, independent inspection and account-race protection, 182 frontend unit tests, both typechecks and 20 final native library regressions passed. See [summary](phases/04-durable-boards-and-recovery/04-09-SUMMARY.md) (execution evidence and final human-matrix obligations).
 
-Progress: [██░░░░░░░░] 23% (3/13 phases complete; 36/42 currently planned plans complete; later phases remain unplanned)
+Progress: [██░░░░░░░░] 23% (3/13 phases complete; 37/42 currently planned plans complete; later phases remain unplanned)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 36
+- Total plans completed: 37
 - Average duration: —
 - Total execution time: not consistently recorded across sessions.
 
@@ -58,7 +58,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 36/42 curr
 
 **Recent Trend:**
 
-- Last 5 plans: 04-11, 04-05, 04-12, 04-13, 04-06
+- Last 5 plans: 04-05, 04-12, 04-13, 04-06, 04-09
 - Trend: Phase 3 accepted; Phase 4 has verified restart durability, epoch fencing, reconstructable local capture, backup publication, authorized recovery, scheduled retention, freshness admission, current save coverage and selected fresh-target restore with native cold access; remaining plans execute sequentially in dependency order.
 
 **Per-Plan Metrics:**
@@ -97,6 +97,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 36/42 curr
 | Phase 04 P12 | 15min | 2 tasks | 7 files |
 | Phase 04 P13 | 15min commit interval; build time unmeasured | 2 tasks | 10 files |
 | Phase 04 P06 | 35min | 2 tasks | 11 files |
+| Phase 04 P09 | 12min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 - [Phase 04]: 04-13: Keep liveness independent of provider/backup outages; fence mutations before a 45-second graceful shutdown with 60-second platform grace.
 - [Phase 04]: Capture recovery content before asynchronous work, verify every original and processed image, and recheck current authority at the sole handoff.
 - [Phase 04]: Keep recovery preparation and browser handoff independent from save acknowledgments; retain pending IDs through failure, retry and success.
+- [Phase 04]: Reauthorize library cards on journal invalidation; expose only pending booleans for current account and authorized board indexes while retaining unresolved old epochs.
 
 ### Pending Todos
 
@@ -148,8 +150,8 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-09-26T19:05:22.042Z
-Stopped at: Completed 04-06-PLAN.md
+Last session: 2026-09-26T19:18:24.012Z
+Stopped at: Completed 04-09-PLAN.md
 Resume file: None
 Next action: `$gsd-execute-phase 4`
 
