@@ -33,7 +33,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
       DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]',
       DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]', DALI_EMAIL_CASE_FOLD: 'false' };
     database = openDatabase(env.DALI_DATABASE_PATH!);
-    app = await buildApp({ config: env, database, now: () => clock });
+    app = await buildApp({ storagePolicy: { kind: 'fixture' }, config: env, database, now: () => clock });
   });
   afterEach(async () => { vi.restoreAllMocks(); vi.unstubAllEnvs(); await app?.close(); database?.close(); await provider?.close(); await rm(directory, { recursive: true, force: true }); });
   const begin = async (returnTo = '/', identity = 'owner') => {
@@ -57,7 +57,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     const created = await app.inject({ method: 'POST', url: '/api/boards', headers, payload: { title: 'Previously owned', operationId: '11111111-1111-4111-8111-111111111111' } });
     expect(created.statusCode).toBe(201); const board = created.json();
     await app.close();
-    app = await buildApp({ config: { ...env, DALI_ROLE_CLAIM: 'app_role', DALI_EDITOR_VALUES_JSON: '["editor"]' }, database, now: () => clock });
+    app = await buildApp({ storagePolicy: { kind: 'fixture' }, config: { ...env, DALI_ROLE_CLAIM: 'app_role', DALI_EDITOR_VALUES_JSON: '["editor"]' }, database, now: () => clock });
     const restricted = await finish(await begin('/', 'viewer'));
     expect((await session(cookieOf(restricted))).json().systemRole).toBe('viewer');
     expect((await session(oldCookie)).json().systemRole).toBe('viewer');
@@ -151,7 +151,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   it('production rejects ambient test-auth enablement', async () => {
     vi.stubEnv('DALI_TEST_AUTH', 'true');
     let rejected = false;
-    try { const invalid = await buildApp({ config: { ...env, NODE_ENV: 'production' }, database }); await invalid.close(); }
+    try { const invalid = await buildApp({ storagePolicy: { kind: 'fixture' }, config: { ...env, NODE_ENV: 'production' }, database }); await invalid.close(); }
     catch (error) { rejected = error instanceof Error && error.message === 'Test authentication is forbidden'; }
     expect(rejected, 'production startup rejects ambient authentication switches').toBe(true);
   });
@@ -219,7 +219,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
   it('persistent SQL session survives a new app instance without rolling expiry', async () => {
     const flow = await signIn(); const before = (await session(flow.authenticated)).json();
     await app.close(); database.close(); database = openDatabase(env.DALI_DATABASE_PATH!);
-    clock += 1000; app = await buildApp({ config: env, database, now: () => clock });
+    clock += 1000; app = await buildApp({ storagePolicy: { kind: 'fixture' }, config: env, database, now: () => clock });
     const restored = await session(flow.authenticated); expect(restored.json()).toEqual(before); expect(restored.headers['set-cookie']).toBeUndefined();
   });
   it.each(['0', '-1', 'NaN', 'Infinity', '1.5', '9007199254740992', '2678400001'])('AUTH-01 precision rejects invalid lifetime %s', async value => {
@@ -230,13 +230,13 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     expect(expiresAt(clock, 1)).toBe(clock + 1);
   });
   it.each(['DALI_OIDC_ISSUER', 'DALI_INTERNAL_CLAIM', 'DALI_INTERNAL_VALUES_JSON', 'DALI_INTERNAL_EMAIL_DOMAINS_JSON', 'DALI_SESSION_SECRET'])('AUTH-01 empty incomplete %s gives a recoverable secret-free error', async key => {
-    const invalid = await buildApp({ config: { ...env, [key]: '' } });
+    const invalid = await buildApp({ storagePolicy: { kind: 'fixture' }, config: { ...env, [key]: '' } });
     try { const response = await invalid.inject('/api/session'); expect(response.statusCode).toBe(503); expect(response.json()).toEqual({ code: 'AUTH_CONFIGURATION' });
       expect((await invalid.inject('/auth/start')).headers.location).toBe('/?authError=configuration'); }
     finally { await invalid.close(); }
   });
   it('missing configuration fails closed and can recover on valid startup', async () => {
-    const invalid = await buildApp({ config: {} });
+    const invalid = await buildApp({ storagePolicy: { kind: 'fixture' }, config: {} });
     try { expect((await invalid.inject('/api/session')).statusCode).toBe(503); } finally { await invalid.close(); }
     expect((await session((await signIn()).authenticated)).statusCode).toBe(200);
   });
@@ -267,8 +267,8 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     expect(() => readConfig({ ...env, DALI_INTERNAL_VALUES_JSON: '[]' })).toThrow();
     expect(() => readConfig({ ...env, DALI_OIDC_CALLBACK_URL: 'https://foreign.example.org/auth/callback' })).toThrow();
     for (const path of ['/auth/test', '/api/test/login', '/auth/fixture']) expect((await app.inject(path)).statusCode).toBe(404);
-    await expect(buildApp({ config: { ...env, DALI_TEST_AUTH: 'true' }, database })).rejects.toThrow();
-    const production = await buildApp({ config: { ...env, NODE_ENV: 'production',
+    await expect(buildApp({ storagePolicy: { kind: 'fixture' }, config: { ...env, DALI_TEST_AUTH: 'true' }, database })).rejects.toThrow();
+    const production = await buildApp({ storagePolicy: { kind: 'fixture' }, config: { ...env, NODE_ENV: 'production',
       DALI_ORIGIN: 'https://app.example.org', DALI_OIDC_CALLBACK_URL: 'https://app.example.org/auth/callback', DALI_OIDC_ISSUER: 'https://identity.example.org' }, database });
     try {
       for (const path of ['/auth/test', '/api/test/login', '/auth/fixture']) expect((await production.inject(path)).statusCode).toBe(404);
@@ -276,7 +276,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     } finally { await production.close(); }
   });
   it('HTTPS origin issues Secure host-only persistent cookies', async () => {
-    const secure = await buildApp({ config: { ...env, DALI_ORIGIN: 'https://app.example.org',
+    const secure = await buildApp({ storagePolicy: { kind: 'fixture' }, config: { ...env, DALI_ORIGIN: 'https://app.example.org',
       DALI_OIDC_CALLBACK_URL: 'https://app.example.org/auth/callback' }, database });
     try {
       const response = await secure.inject('/auth/start'); expect(response.statusCode).toBe(302);
@@ -288,7 +288,7 @@ describe('@03-02-02 trusted callbacks and absolute sessions', () => {
     const first = (await session((await signIn()).authenticated)).json(); expect(first.accountId).toEqual(expect.any(String));
     const second = await createOidcProvider({ clients: [{ clientId: env.DALI_OIDC_CLIENT_ID!, clientSecret: env.DALI_OIDC_CLIENT_SECRET!, redirectUri: env.DALI_OIDC_CALLBACK_URL! }] });
     try {
-      await app.close(); app = await buildApp({ config: { ...env, DALI_OIDC_ISSUER: second.issuer }, database, now: () => clock });
+      await app.close(); app = await buildApp({ storagePolicy: { kind: 'fixture' }, config: { ...env, DALI_OIDC_ISSUER: second.issuer }, database, now: () => clock });
       const other = (await session((await signIn()).authenticated)).json(); expect(other.accountId).not.toBe(first.accountId);
       expect(other.email).toBe(first.email); expect(members()).toHaveLength(2);
     } finally { await second.close(); }

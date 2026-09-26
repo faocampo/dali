@@ -259,11 +259,11 @@ export async function startAccessHarness() {
     // Lazy URL import intentionally allows the protocol self-test before plan 02 creates the application.
     const appModuleUrl = new URL('../server/app.js', import.meta.url).href;
     const { buildApp } = await import(appModuleUrl) as {
-      buildApp(options: { config: Record<string, string>; now: () => number }): Promise<FastifyInstance>;
+      buildApp(options: { storagePolicy: { kind: 'fixture' }; config: Record<string, string>; now: () => number }): Promise<FastifyInstance>;
     };
     for (const [index, registration] of registrations.entries()) {
       const origin = new URL(registration.redirectUri).origin;
-      const app = await buildApp({ now, config: {
+      const app = await buildApp({ storagePolicy: { kind: 'fixture' }, now, config: {
         DALI_ORIGIN: origin, DALI_DATABASE_PATH: join(directory, `app-${index}.sqlite`),
         DALI_SESSION_SECRET: opaque(), DALI_SESSION_TTL_MS: '86400000',
         DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId,

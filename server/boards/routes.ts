@@ -8,7 +8,8 @@ import { registerDocumentRoutes, type BeforeCommit } from './documents.js';
 import { registerBlobRoutes, validateImageBytes } from './blobs.js';
 import { registerGrantRoutes, grantState } from './grants.js';
 import { registerActionRoutes } from './actions.js';
-import { initializeRecoveryState, readRecoveryEpoch, requireRecoveryEpoch } from '../storage/recovery-state.js';
+import { initializeRecoveryState, readRecoveryEpoch } from '../storage/recovery-state.js';
+import { requireDurableWriteAdmission } from '../storage/write-admission.js';
 
 export type BoardRole = 'owner' | 'editor' | 'viewer';
 export type BoardCapability = 'read' | 'image' | 'presentation-export' | 'write' | 'rename' | 'editable-export' | 'duplicate' | 'grants' | 'delete';
@@ -31,7 +32,7 @@ export function requireBoardCapability(database: AccountDatabase, request: Fasti
   if (member!.systemRole === 'viewer' && board.role !== 'owner') board.role = 'viewer';
   if (!canBoard(board.role, capability)) { reply.code(403).send({ code: 'CAPABILITY_REQUIRED' }); return; }
   if (database.inTransaction && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method) &&
-      ['write', 'rename', 'duplicate', 'grants', 'delete'].includes(capability) && !requireRecoveryEpoch(database, request, reply)) return;
+      ['write', 'rename', 'duplicate', 'grants', 'delete'].includes(capability) && !requireDurableWriteAdmission(database, request, reply)) return;
   return board;
 }
 function summary(database: AccountDatabase, board: BoardRow, accountId: string): BoardSummary {
@@ -175,9 +176,11 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
     if (!requireMutation(request, reply, config)) return;
     const title = request.body.title?.trim() || 'Untitled board';
     if ([...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length > 200) return reply.code(400).send({ code: 'TITLE_TOO_LONG' });
+    const authorized = currentSession(database, request, now); if (!requireExpectedMember(request, reply, authorized) || !requireSystemWriter(reply, authorized)) return;
+    await beforeCommit?.();
     return database.transaction(() => {
       const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member) || !requireSystemWriter(reply, member)) return;
-      if (!requireRecoveryEpoch(database, request, reply)) return;
+      if (!requireDurableWriteAdmission(database, request, reply)) return;
       const previous = database.prepare('SELECT kind,result FROM operations WHERE member_id=? AND operation_id=?')
         .get(member!.accountId, request.body.operationId) as { kind: string; result: string } | undefined;
       if (previous) {

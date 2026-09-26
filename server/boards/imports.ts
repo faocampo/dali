@@ -8,6 +8,7 @@ import { requireBoardCapability, operationReceipt, type BoardRow } from './route
 import { referencedImageKeys, validateDocument, DOCUMENT_LIMITS, type BeforeCommit } from './documents.js';
 import { BlobRepository, imageHash, validateImageBytes, IMAGE_LIMITS } from './blobs.js';
 import { readRecoveryEpoch, requireRecoveryEpoch } from '../storage/recovery-state.js';
+import { requireDurableWriteAdmission } from '../storage/write-admission.js';
 
 type Stage = { member_id: string; operation_id: string; source_id: string; source_revision: number; descriptor: string; manifest: string; root: Buffer | null; content: Buffer | null };
 const operationSchema = { type: 'string', minLength: 1, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' };
@@ -30,9 +31,11 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
     } } },
   }, async (request, reply) => {
     if (!requireMutation(request, reply, config)) return;
+    const authorized = currentSession(database, request, now); if (!requireExpectedMember(request, reply, authorized) || !requireSystemWriter(reply, authorized)) return;
+    await beforeCommit?.();
     return database.transaction(() => {
       const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member) || !requireSystemWriter(reply, member)) return;
-      if (!requireRecoveryEpoch(database, request, reply)) return;
+      if (!requireDurableWriteAdmission(database, request, reply)) return;
       const { operationId, title, manifest } = request.body;
       if (![...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length || [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length > 200) return reply.code(400).send({ code: 'INVALID_TITLE' });
       const old = previous(member!.accountId, operationId);
@@ -50,6 +53,7 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
     if (!(stage.source_id ? !!requireBoardCapability(database, request, reply, stage.source_id, 'duplicate', now) : requireSystemWriter(reply, member))) return false;
     const epoch = requireRecoveryEpoch(database, request, reply); if (!epoch) return false;
     if (JSON.parse(stage.descriptor).recoveryEpoch !== epoch) { reply.code(409).send({ code: 'RECOVERY_EPOCH_MISMATCH' }); return false; }
+    if (database.inTransaction && !requireDurableWriteAdmission(database, request, reply)) return false;
     return true;
   };
   app.get<{ Params: { operationId: string } }>('/api/imports/:operationId', async (request, reply) => {

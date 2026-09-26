@@ -29,7 +29,7 @@ process.once('message', async (input: { config: Record<string, string>; assets: 
       return result;
     }, run);
   }) as typeof database.transaction;
-  const app = await buildApp({ config: input.config, database, beforeCommit: async () => {
+  const app = await buildApp({ storagePolicy: { kind: 'fixture' }, config: input.config, database, beforeCommit: async () => {
     if (mode === 'readonly') database.pragma('query_only = ON');
     if (mode === 'full') database.pragma(`max_page_count = ${database.pragma('page_count', { simple: true })}`);
   } });

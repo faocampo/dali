@@ -43,7 +43,7 @@ beforeEach(async () => {
   config = { DALI_ORIGIN: origin, DALI_DATABASE_PATH: database.name, DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000',
     DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret,
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]' };
-  app = await buildApp({ database, config }); actors = {};
+  app = await buildApp({ storagePolicy: { kind: 'fixture' }, database, config }); actors = {};
   for (const identity of ['owner', 'editor', 'viewer', 'nonMember']) actors[identity] = await signIn(app, identity);
   board = undefined as unknown as typeof board;
   const created = await app.inject({ method: 'POST', url: '/api/boards', headers: headers(), payload: { operationId: randomUUID(), title: 'Synthetic backup' } });
@@ -75,7 +75,7 @@ it('@04-10-01 online backup during writes publishes a complete independently reo
   expect((await stat(target)).mode & 0o777).toBe(0o700); expect((await stat(join(target, 'database.sqlite'))).mode & 0o777).toBe(0o600);
   expect(validateBackupDatabase(join(target, 'database.sqlite')).counts).toEqual(result.manifest.counts);
   const restore = join(directory, 'fresh.sqlite'); await copyFile(join(target, 'database.sqlite'), restore);
-  const freshDb = openDatabase(restore); const fresh = await buildApp({ database: freshDb, config });
+  const freshDb = openDatabase(restore); const fresh = await buildApp({ storagePolicy: { kind: 'fixture' }, database: freshDb, config });
   try {
     for (const identity of ['owner', 'editor', 'viewer', 'nonMember']) {
       const actor = await signIn(fresh, identity); const access = { cookie: actor.cookie, 'x-dali-account': actor.accountId };

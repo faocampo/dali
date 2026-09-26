@@ -27,7 +27,7 @@ beforeEach(async () => {
   barrier = async () => {};
   const registration = { clientId: 'synthetic-recovery', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
   provider = await createOidcProvider({ port: 0, clients: [registration] }); database = openDatabase(':memory:');
-  app = await buildApp({ database, beforeCommit: () => barrier(), config: {
+  app = await buildApp({ storagePolicy: { kind: 'fixture' }, database, beforeCommit: () => barrier(), config: {
     DALI_ORIGIN: origin, DALI_DATABASE_PATH: ':memory:', DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000',
     DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret,
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',

@@ -61,6 +61,8 @@ export function registerActionRoutes(app: FastifyInstance, config: AuthConfig, d
   })());
   app.post<{ Params: { boardId: string }; Body: Mutation }>('/api/boards/:boardId/duplicate', { schema: mutationSchema }, async (request, reply) => {
     if (!requireMutation(request, reply, config)) return;
+    if (!requireBoardCapability(database, request, reply, request.params.boardId, 'duplicate', now)) return;
+    await beforeCommit?.();
     return database.transaction(() => {
       const board = requireBoardCapability(database, request, reply, request.params.boardId, 'duplicate', now); if (!board) return;
       const member = currentSession(database, request, now)!; const old = previous(member.accountId, request.body.operationId);
