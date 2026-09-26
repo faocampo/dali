@@ -1,14 +1,16 @@
 import type { Store, Workspace } from '@blocksuite/affine/store';
-import type { BoardDescriptor, BoardSummary } from '../boards/BoardLibrary';
+import { validDescriptor, type BoardDescriptor, type BoardSummary } from '../boards/BoardLibrary';
 import type { AccountWorkspaceOptions, BoardWorkspace } from './account/board-workspace';
 import { reportDocEngineStatus, resetSaveStatus } from './save-status';
 import * as Y from 'yjs';
-import { AccountJournal, replayJournal, requestRecoveryStorage } from './account/outbox';
+import { AccountJournal, replayJournal, requestRecoveryStorage, pendingRecords, readCheckpoint, validRecord, RecoveryStorageError } from './account/outbox';
+import { RecoveryCoordinator, type RecoveryOutcome } from './account/recovery';
+import { RecoveryEpochError, SourceAccessError } from './account/doc-source';
 import { interruptSession, revalidateSession } from '../auth/session';
 import { attachLocalCapture } from './account/local-capture';
 
 export type BoardRole = BoardSummary['role'];
-export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed' }>;
+export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; stalled?: boolean }>;
 export type CanvasRuntime = { workspace: Workspace & Pick<BoardWorkspace, 'docSync' | 'waitForSynced'>; store: Store; descriptor: BoardDescriptor; scope: AccessScope; stopSaveStatus: () => void; dispose: () => void };
 let scope: AccessScope | null = null;
 let current: CanvasRuntime | null = null;
@@ -17,6 +19,8 @@ let generation = 0;
 let journal: AccountJournal | undefined;
 let abort: AbortController | undefined;
 let capture: Promise<unknown>[] = [];
+let recovery: RecoveryCoordinator | undefined;
+export const retryRecovery = () => recovery?.retryRecovery();
 const listeners = new Set<() => void>();
 export const getActiveAccessScope = (): AccessScope | null => scope;
 export const getRecoveryBoard = () => current ? { accountId: current.scope.accountId, boardId: current.descriptor.summary.id, title: current.descriptor.summary.title } : null;
@@ -71,6 +75,7 @@ export async function synchronizeActiveBoard(accountId: string, boardId: string)
 export function disposeCanvasRuntime(expectedGeneration = scope?.generation): void {
   if (!scope || scope.generation !== expectedGeneration) return;
   const old = current; current = null; pending = null;
+  recovery?.dispose(); recovery = undefined;
   publish({ ...scope, phase: 'disposed', canWrite: false });
   old?.dispose();
 }
@@ -92,10 +97,67 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   const scopedJournal = new AccountJournal({ ...initial, recoveryEpoch: options.descriptor.recoveryEpoch }, () => { queueMicrotask(() => { suspendAccessScope('storage'); }); });
   journal = scopedJournal;
   const isCurrent = () => scope?.generation === initial.generation && scope.phase === 'active';
-  const promise = replayJournal(options.descriptor, options.accountId, requestAbort.signal).then(() => import('./account/board-workspace')).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, isCurrent,
+  let baseline: AccountWorkspaceOptions['recoveryBaseline'];
+  let authorizedDescriptor = options.descriptor;
+  const coordinator = recovery = new RecoveryCoordinator({
+    current: isCurrent,
+    authorize: async signal => {
+      const session = await fetch('/api/session', { cache: 'no-store', signal, headers: { 'X-Dali-Account': options.accountId } });
+      if (!session.ok) throw [401, 403, 404, 409].includes(session.status) ? new SourceAccessError(session.status) : new Error('Session unavailable');
+      const member = await session.json() as { accountId: string; expiresAt: number };
+      if (!isCurrent() || member.accountId !== options.accountId) throw new SourceAccessError(409);
+      if (!Number.isSafeInteger(member.expiresAt) || member.expiresAt <= Date.now()) throw new SourceAccessError(401);
+      const response = await fetch(`/api/boards/${encodeURIComponent(initial.boardId)}`, { cache: 'no-store', signal, headers: { 'X-Dali-Account': options.accountId } });
+      if (!response.ok) throw [401, 403, 404, 409].includes(response.status) ? new SourceAccessError(response.status) : new Error('Board unavailable');
+      const descriptor = await response.json() as BoardDescriptor;
+      if (!isCurrent() || !validDescriptor(descriptor, options.accountId) || descriptor.summary.id !== initial.boardId) throw new SourceAccessError(409);
+      if (descriptor.recoveryEpoch !== options.descriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+      return { ...member, descriptor };
+    },
+    inspect: async authority => {
+      const rows = await pendingRecords(initial.accountId, initial.boardId);
+      if (!isCurrent()) throw new Error('Stale recovery');
+      if (rows.some(row => row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+      if (rows.some(row => !validRecord(row))) throw new RecoveryStorageError('CORRUPT');
+      if (rows.length && !current) {
+        const checkpoints = await Promise.all([...new Set([scopedJournal.tabId, ...rows.map(row => row.tabId!)])].map(tab => readCheckpoint(scopedJournal.scope, tab)));
+        if (!isCurrent()) throw new Error('Stale recovery');
+        const checkpoint = checkpoints.find(Boolean);
+        if (checkpoint) {
+          if (checkpoint.root.docId !== options.descriptor.rootDocId || checkpoint.content.docId !== options.descriptor.contentDocId || rows.some(row => row.kind === 'document' && ![checkpoint.root.docId, checkpoint.content.docId].includes(row.resource))) throw new RecoveryStorageError('CORRUPT');
+          const merged = (id: string, data: Uint8Array) => Y.mergeUpdates([data, ...rows.filter(row => row.kind === 'document' && row.resource === id).map(row => row.data as Uint8Array)]);
+          const assets = new Map<string, Blob>();
+          for (const [key, asset] of Object.entries(checkpoint.assets)) if (asset.data) assets.set(key, new Blob([new Uint8Array(asset.data)], { type: asset.mime }));
+          for (const row of rows) if (row.kind === 'blob') assets.set(row.resource, row.data instanceof Blob ? row.data : new Blob([new Uint8Array(row.data)], { type: row.mime }));
+          baseline = { root: merged(checkpoint.root.docId, checkpoint.root.data), content: merged(checkpoint.content.docId, checkpoint.content.data), assets };
+        }
+      }
+      return rows.length > 0;
+    },
+    preserve: () => scopedJournal.preserve(),
+    drain: async (authority, signal) => { await replayJournal(authority.descriptor, initial.accountId, signal); },
+    changed: (recoveryState, stalled) => {
+      if (!isCurrent()) return;
+      publish({ ...scope!, recoveryState, stalled });
+      if (recoveryState === 'expired') void interruptSession();
+    },
+  });
+  requestAbort.signal.addEventListener('abort', () => coordinator.dispose(), { once: true });
+  const promise = coordinator.open().then(authority => {
+    if (!authority) throw new Error('Board unavailable');
+    if (['corrupt', 'epoch-mismatch'].includes(scope?.recoveryState ?? '')) throw Object.assign(new Error('Recovery needs attention'), { recoveryState: scope!.recoveryState });
+    authorizedDescriptor = authority.descriptor;
+    publish({ ...scope!, role: authority.descriptor.summary.role, canWrite: authority.descriptor.summary.role !== 'viewer' });
+    return import('./account/board-workspace');
+  }).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, descriptor: authorizedDescriptor, isCurrent, recoveryBaseline: baseline,
     // Workspace lifetime is distinct from request cancellation while preservation is pending.
     durableLocalBlobs: true,
-    fetch: (input, init) => (options.fetch ?? fetch)(input, { ...init, signal: requestAbort.signal }),
+    fetch: (input, init) => {
+      const url = new URL(String(input), location.href); const key = decodeURIComponent(url.pathname.split('/blobs/')[1] ?? '');
+      const local = baseline?.assets.get(key);
+      if (isCurrent() && init?.method === 'GET' && local) return Promise.resolve(new Response(local, { headers: { 'Content-Type': local.type } }));
+      return (options.fetch ?? fetch)(input, { ...init, signal: requestAbort.signal });
+    },
     onPendingDocument: (id, data) => scopedJournal.captureSubmission(id, data),
     onPendingBlob: (key, value) => scopedJournal.capture('blob', key, value),
     onFetchedBlob: initial.canWrite ? (key, value) => scopedJournal.cacheAsset(key, value) : undefined,
@@ -105,7 +167,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (receipt?.scope !== scopedJournal.scope || !Array.isArray(receipt.ids)) return Promise.reject(new Error('Recovery acknowledgment scope changed'));
       return scopedJournal.acknowledge(receipt.ids);
     },
-    beforeDocumentWrite: () => replayJournal(options.descriptor, options.accountId, requestAbort.signal, true).then(() => undefined),
+    beforeDocumentWrite: async () => { await coordinator.retryRecovery(); if (!isCurrent() || scope?.recoveryState !== 'saved') throw new Error('Recovery is pending'); },
     onAuthorizationLost: error => {
       if (isCurrent()) { suspendAccessScope('authorization'); if (error.status === 401) void interruptSession(); else if (error.status === 409) void revalidateSession(); }
       if (![401, 409].includes(error.status)) options.onAuthorizationLost?.(error);
@@ -128,7 +190,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     catch (error) { local?.dispose(); workspace.dispose(); throw error; }
     reportDocEngineStatus(workspace.docSync.status);
     const subscription = workspace.docSync.onStatusChange.subscribe(reportDocEngineStatus);
-    const value: CanvasRuntime = { workspace, store, descriptor: structuredClone(options.descriptor), scope: scope!,
+    const value: CanvasRuntime = { workspace, store, descriptor: structuredClone(authorizedDescriptor), scope: scope!,
       stopSaveStatus: () => subscription.unsubscribe(), dispose: () => { local?.dispose(); subscription.unsubscribe(); workspace.dispose(); } };
     current = value; return value;
   }).catch(error => { if (pending?.key === key) pending = null; throw error; });

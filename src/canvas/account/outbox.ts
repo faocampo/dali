@@ -46,7 +46,7 @@ const checkpointId = (scope: JournalScope, tab: string = tabId) => JSON.stringif
 function assertScope(scope: JournalScope) {
   if (!bounded(scope.accountId) || !bounded(scope.boardId) || !validRecoveryEpoch(scope.recoveryEpoch) || !Number.isSafeInteger(scope.generation) || scope.generation < 0) throw new RecoveryStorageError('CORRUPT');
 }
-function validRecord(record: JournalRecord): boolean {
+export function validRecord(record: JournalRecord): boolean {
   if (record.schemaVersion !== 2 || !validRecoveryEpoch(record.epoch) || record.epoch !== record.recoveryEpoch || !bounded(record.id) || !bounded(record.tabId) || !bounded(record.accountId) || !bounded(record.boardId) || !bounded(record.resource) || !Number.isSafeInteger(record.sequence) || record.sequence < 1 || !Array.isArray(record.coveredIds) || record.coveredIds.length > 10000 || !record.coveredIds.every(bounded)) return false;
   if (!(record.data instanceof Uint8Array || record.data instanceof Blob)) return false;
   const size = record.data instanceof Blob ? record.data.size : record.data.byteLength;

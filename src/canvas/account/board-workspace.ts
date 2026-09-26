@@ -18,6 +18,7 @@ import { BoardMeta } from './board-meta';
 export type AccountWorkspaceOptions = Omit<SourceOptions, 'boardId' | 'rootDocId' | 'contentDocId' | 'readonly'> & Pick<BlobSourceOptions, 'onPendingBlob' | 'onFetchedBlob'> & {
   descriptor: BoardDescriptor;
   onReadonlyMutation?: (error: Error) => void;
+  recoveryBaseline?: { root: Uint8Array; content: Uint8Array; assets: Map<string, Blob> };
 };
 
 /** One authorized root/content pair, with no cross-board caches or network awareness. */
@@ -108,11 +109,12 @@ export class BoardWorkspace implements Workspace {
     this.hydrated = true;
     const timeout = setTimeout(this.dispose, 20_000);
     try {
-      Y.applyUpdate(this.doc, (await this.source.pull(this.id, new Uint8Array([0]))).data, 'load');
+      const baseline = this.options.recoveryBaseline;
+      Y.applyUpdate(this.doc, baseline?.root ?? (await this.source.pull(this.id, new Uint8Array([0]))).data, 'load');
       this.assertCurrent();
       const content = this.validateRoot();
       this.content = content;
-      Y.applyUpdate(content, (await this.source.pull(content.guid, new Uint8Array([0]))).data, 'load');
+      Y.applyUpdate(content, baseline?.content ?? (await this.source.pull(content.guid, new Uint8Array([0]))).data, 'load');
       this.assertCurrent();
       if (content.getSubdocs().size || content.getMap('blocks').size === 0) throw new Error('Invalid board content');
       const doc = new BoardDoc(this, content, this.awarenessStore);
@@ -127,7 +129,7 @@ export class BoardWorkspace implements Workspace {
       const store = doc.getStore();
       store.load(); store.resetHistory();
       if (!store.root || store.getBlocksByFlavour('affine:surface').length !== 1) throw new Error('Invalid board content');
-      if (!this.readonly) { this.docSync.start(); await this.waitForSynced(); }
+      if (!this.readonly) { this.docSync.start(); if (!baseline) await this.waitForSynced(); }
       this.assertCurrent();
       return this;
     } catch (error) { this.dispose(); throw error; } finally { clearTimeout(timeout); }

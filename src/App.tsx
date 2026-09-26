@@ -6,7 +6,7 @@ import { Header } from './header/Header';
 import { disposeCanvasRuntime, getCanvasRuntime, nextAccessGeneration, suspendAccessScope, type CanvasRuntime } from './canvas/runtime';
 import { accountBoardUrl, accountIntent } from './boards/preferences';
 import { createAccountBoard, AccountBoardAction, BoardActionError } from './boards/operations';
-import { discardRecords, pendingRecords } from './canvas/account/outbox';
+import { discardRecords } from './canvas/account/outbox';
 import { getSessionState, interruptSession, preserveBeforeNavigation, recoveryBoard, subscribeSession } from './auth/session';
 
 function RecoveryDenied({ accountId, boardId }: { accountId: string; boardId: string }) {
@@ -45,7 +45,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   const [board, setBoard] = useState<BoardDescriptor>();
   const [runtime, setRuntime] = useState<CanvasRuntime>();
   const [retry, setRetry] = useState(0);
-  const [hasRecovery, setHasRecovery] = useState(false);
+  const hasRecovery = recoveryBoard(member.accountId)?.boardId === target;
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (['expired', 'denied', 'error'].includes(state)) heading.current?.focus(); }, [state, target]);
   const rename = useRef<AccountBoardAction>();
@@ -63,7 +63,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
     const controller = new AbortController(); const generation = nextAccessGeneration();
     setState('loading'); setBoard(undefined); setRuntime(undefined);
     if (!target) { setState('denied'); return () => controller.abort(); }
-    void pendingRecords(member.accountId, target).then(records => { if (controller.signal.aborted) throw new Error('Stale board'); setHasRecovery(records.length > 0); return fetch(`/api/boards/${encodeURIComponent(target)}`, { headers: { 'X-Dali-Account': member.accountId }, cache: 'no-store', signal: controller.signal }); })
+    void fetch(`/api/boards/${encodeURIComponent(target)}`, { headers: { 'X-Dali-Account': member.accountId }, cache: 'no-store', signal: controller.signal })
       .then(async response => {
         if (controller.signal.aborted) return;
         if (response.status === 401) { void interruptSession(); return; }
@@ -74,7 +74,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
         if (!controller.signal.aborted) {
           const loaded = await getCanvasRuntime({ descriptor, accountId: member.accountId, generation, signal: controller.signal,
             onAuthorizationLost: error => { if (!controller.signal.aborted) { setRuntime(undefined); setBoard(undefined); setState(error.status === 401 ? 'expired' : 'denied'); } } });
-          if (!controller.signal.aborted) { setRuntime(loaded); setBoard(descriptor); setState('ready'); }
+          if (!controller.signal.aborted) { setRuntime(loaded); setBoard(loaded.descriptor); setState('ready'); }
         }
       }).catch((cause: unknown) => { if (!controller.signal.aborted) setState(cause instanceof Error && 'status' in cause ? (cause.status === 401 ? 'expired' : 'denied') : 'error'); });
     return () => { suspendAccessScope('navigation'); queueMicrotask(() => { controller.abort(); disposeCanvasRuntime(generation); }); };

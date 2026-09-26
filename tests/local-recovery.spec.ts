@@ -93,6 +93,28 @@ async function storagePage(page: Page) {
   await page.route('**/recovery-fixture', route => route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Synthetic recovery fixture</title>' }));
   await page.goto('/recovery-fixture'); await page.addScriptTag({ content: harness });
 }
+
+for (const failure of ['denied', 'expired', 'different-account'] as const) test(`@04-04-01 ${failure} fresh authority never opens local recovery storage`, async ({ page, baseURL }) => {
+  await page.goto('/auth/start'); await page.getByRole('link', { name: 'Synthetic Owner', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  const member = await (await page.request.get('/api/session')).json(); const epoch = await fixtureRecoveryEpoch(page.request, member.accountId);
+  const created = await page.request.post('/api/boards', { headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': epoch }, data: { operationId: randomUUID(), title: 'Synthetic guarded reopen' } });
+  const descriptor = await created.json();
+  await page.addInitScript(() => { const open = indexedDB.open.bind(indexedDB); Object.assign(window, { recoveryReads: 0 }); indexedDB.open = (...args) => { if (args[0].startsWith('dali-account-recovery')) (window as unknown as { recoveryReads: number }).recoveryReads++; return open(...args); }; });
+  if (failure === 'denied') await page.route('**/api/boards/' + descriptor.summary.id, route => route.fulfill({ status: 404, json: { code: 'BOARD_UNAVAILABLE' } }));
+  else {
+    let sessions = 0;
+    await page.route('**/api/session', route => {
+      if (++sessions === 1) return route.continue();
+      return failure === 'expired' ? route.fulfill({ status: 401, json: { code: 'SESSION_EXPIRED' } }) : route.fulfill({ status: 200, json: { ...member, accountId: 'synthetic-other-account' } });
+    });
+  }
+  let pushes = 0; page.on('request', request => { if (request.url().includes('/push')) pushes++; });
+  await page.goto('/?board=' + descriptor.summary.id);
+  await expect(page.getByRole('heading', { name: failure === 'expired' ? 'Session expired — sign in to continue.' : failure === 'denied' ? "You don't have access to this board" : "We couldn't open this board.", exact: true })).toBeVisible();
+  await expect(page.locator('editor-host')).toHaveCount(0); expect(pushes).toBe(0);
+  expect(await page.evaluate(() => (window as unknown as { recoveryReads: number }).recoveryReads)).toBe(0);
+});
 test('@04-03-02 acknowledged image bytes remain available to pending reconstruction', async ({ page }) => {
   await storagePage(page);
   const result = await page.evaluate(async scope => {
