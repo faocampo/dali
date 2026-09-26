@@ -137,3 +137,23 @@ The synthetic server tests exercise real online SQLite backup during writes, cor
 References: better-sqlite3 backup API ([https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md](https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md)); SQLite Online Backup API ([https://www.sqlite.org/backup.html](https://www.sqlite.org/backup.html)); Node.js filesystem API ([https://nodejs.org/api/fs.html](https://nodejs.org/api/fs.html)).
 
 Scheduling references: Node.js timers ([https://nodejs.org/api/timers.html](https://nodejs.org/api/timers.html)); Node.js monotonic performance clock ([https://nodejs.org/api/perf_hooks.html#performancenow](https://nodejs.org/api/perf_hooks.html#performancenow)). Timers can run late; transaction-time admission enforces the bound independently of timer delivery.
+
+## Representative local recovery envelope
+
+Run the owned synthetic dataset and local I/O gate with:
+
+```sh
+npm run test:server -- server/storage/operations-drill.test.ts -t @04-15-01
+npm exec playwright test -- tests/restored-board.spec.ts --project=prod --grep @04-15-01
+npm run test:server -- server/storage/backup-scheduler.test.ts server/boards/access.test.ts
+```
+
+The seed-415 generator creates 50 boards owned across three synthetic identities. Each ordinary board has 100 editable objects; the large board has 1,000 ordinary objects plus 100 mind-map nodes. Native structures include a frame, bound connector endpoints, styled topics, a collapsed branch and image edit metadata referencing both original and processed assets. Private and shared boards exercise Owner, Editor, Viewer and denied access. The zero/one/many-image distribution references 50 distinct PNGs with real seeded RGB scanlines, more than 128 MiB total and an exact 8 MiB largest file. The manifest records schema, seed, dimensions, individual bytes and SHA-256 hashes.
+
+The HTTP fixture signs in through synthetic OIDC, writes images/documents through authorized APIs, and records timestamped rename acknowledgments at a target 100 ms cadence while a real online backup runs. Timer delays are reflected in the actual recorded acknowledgment times. After explicitly selecting the resulting manifest digest, it stops the owned writer, deletes only its synthetic live files and restores into a fresh restricted directory. It compares every document and image digest and the board/grant graph, verifies the included canary sequence, signs in afresh for all three identities and reads every authorized document/image while checking private denials. The browser gate additionally hydrates the representative native canvas and decodes its images from fresh browser profiles.
+
+Generated `.gsd/representative-recovery.json` contains the measured local report, dataset manifest and content digests. It remains ignored runtime output. The report records actual backup/restore durations, byte counts, acknowledged loss window, recovery-point age and capacity at a 15-minute cadence. Capacity uses `(30 × 24 × 4 + 1) × measured backup bytes × 1.25`, including the retention-boundary set and 25% headroom. Existing clock-based tests independently exercise retention policy and payload limits.
+
+This gate establishes the measured local filesystem envelope. Its live/backup directories share one host. Production acceptance still requires the explicit disposable Kubernetes context, surviving independent storage, synthetic TLS/OIDC, image availability, writer fencing and complete timed deployment/disaster/maintenance gates. Preserve those prerequisites and the separate 1-hour RPO / 24-hour RTO / 24-hour maintenance bounds when recording acceptance.
+
+Fixture encoding reference: Yjs document update API ([https://docs.yjs.dev/api/document-updates](https://docs.yjs.dev/api/document-updates)); native object representation follows the installed BlockSuite 0.22.4 schemas used by board creation.

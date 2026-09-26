@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { randomUUID, createHash } from 'node:crypto';
-import { createRestoreService } from './durability-fixtures';
+import { createRestoreService, createRepresentativeRecoveryService } from './durability-fixtures';
 import { syntheticCanaries, accessIdentityLabels, type AccessIdentity } from './access-fixtures';
 
 async function signIn(context: BrowserContext, identity: AccessIdentity) {
@@ -29,6 +29,47 @@ async function journal(page: Page) {
       request.onsuccess = () => { db.close(); resolve(request.result.map(row => ({ id: row.id, epoch: row.epoch }))); }; request.onerror = () => reject(request.error); };
   }));
 }
+
+test('@04-15-01 representative restored canvas hydrates native shapes hierarchy frame connector and original images in cold browsers', async ({ browser, baseURL }, testInfo) => {
+  test.setTimeout(300_000);
+  const { service, manifest, boards, graph } = await createRepresentativeRecoveryService(baseURL!);
+  const contexts: BrowserContext[] = [];
+  try {
+    const before = graph(); const selected = await service.backup(); const start = performance.now();
+    await service.restore(selected, undefined, true); expect(graph()).toEqual(before);
+    for (const identity of ['owner', 'editor', 'viewer'] as const) {
+      const cold = await browser.newContext({ baseURL: service.origin, extraHTTPHeaders: service.operatorHeaders }); contexts.push(cold);
+      expect((await cold.storageState()).origins).toEqual([]);
+      const { page } = await signIn(cold, identity); const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+      await page.goto('/?board=' + boards[0]!.summary.id); await expect(page.locator('editor-host')).toBeVisible();
+      const content = await page.locator('affine-edgeless-root').evaluate(async el => {
+        const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
+        const map = gfx.surface!.getElementById('synthetic-415-0-mindmap') as unknown as { children: Map<string, { collapsed?: boolean }>; style: number };
+        const images = await Promise.all(gfx.doc.getBlocksByFlavour('affine:image').map(async ({ model }) => {
+          const source = (model as typeof model & { props: { sourceId: string } }).props.sourceId; const blob = await gfx.doc.blobSync.get(source);
+          if (!blob) throw new Error('Restored image absent'); const bitmap = await createImageBitmap(blob);
+          const result = { source, width: bitmap.width, height: bitmap.height, sha256: Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())), n => n.toString(16).padStart(2, '0')).join('') };
+          bitmap.close(); return result;
+        }));
+        return { elements: gfx.surface!.elementModels.length, frames: gfx.doc.getBlocksByFlavour('affine:frame').length,
+          nodes: map.children.size, collapsed: map.children.get('synthetic-415-0-topic-1')?.collapsed, style: map.style, images };
+      });
+      expect(content).toMatchObject({ elements: 1100, frames: 1, nodes: 100, collapsed: true, style: 1 });
+      expect(content.images).toHaveLength(2);
+      for (const image of content.images) { const expected = manifest.imageSpecs.find(spec => spec.key === image.source)!;
+        expect(image).toEqual({ source: expected.key, width: expected.width, height: expected.height, sha256: expected.sha256 }); }
+      expect(errors).toEqual([]);
+      await cold.close();
+    }
+    const denied = await browser.newContext({ baseURL: service.origin, extraHTTPHeaders: service.operatorHeaders }); contexts.push(denied);
+    const actor = await signIn(denied, 'nonMember');
+    expect((await denied.request.get('/api/boards/' + boards[0]!.summary.id, { headers: { 'X-Dali-Account': actor.member.accountId } })).status()).toBe(404);
+    expect((await denied.request.get(`/api/boards/${boards[0]!.summary.id}/blobs/${manifest.imageSpecs[0]!.key}`, { headers: { 'X-Dali-Account': actor.member.accountId } })).status()).toBe(404);
+    service.openIngress();
+    await testInfo.attach('representative-local-cold-restore', { body: JSON.stringify({ seed: manifest.seed, boards: manifest.boards, images: manifest.images, imageBytes: manifest.imageBytes,
+      coldRestoreMs: performance.now() - start, failureDomain: 'local-owned-directories' }), contentType: 'application/json' });
+  } finally { for (const context of contexts) await context.close(); await service.close(); }
+});
 
 test('@04-12-02 selected native restore reopens cold authorized content and quarantines old browser work', async ({ browser, baseURL }, testInfo) => {
   test.setTimeout(180_000);
