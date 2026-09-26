@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 10
+open_count: 12
 waived_count: 1
 fixed_count: 8
-total_count: 19
-last_updated: 2026-09-26T20:09:43.019Z
+total_count: 21
+last_updated: 2026-09-26T20:58:18.675Z
 ---
 
 # Broken Windows Ledger
@@ -34,6 +34,8 @@ last_updated: 2026-09-26T20:09:43.019Z
 | 17 | 04 | deviation | server/storage/restore.ts |  | Fixed future-dated selected backup publishing an unverifiable restore; final restore suite passes. | fixed |  | 2026-09-26T04:27:37.952Z | 2026-09-26T04:29:31.962Z |
 | 18 | 04 | unmet-truth | scripts/deployment-smoke.mjs |  | Actual Kubernetes deployment smoke remains pending: no explicitly selected disposable context or verified independent storage fixture is configured. | open |  | 2026-09-26T19:33:30.654Z |  |
 | 19 | 04 | unrun-verify | tests/save-details.spec.ts |  | Native browser UI 200% zoom remains a final phase acceptance check; 04-07 automated Chromium evidence uses CDP visual viewport scale 2 and narrow viewport reflow. | open |  | 2026-09-26T20:09:43.019Z |  |
+| 20 | 04 | unrun-verify | scripts/recovery-drill.mjs |  | 04-15-02 production recovery gate remains unrun: explicit disposable context absent and Kubernetes context inventory empty. | open |  | 2026-09-26T20:58:18.534Z |  |
+| 21 | 04 | unrun-verify | tests/backup-fence.spec.ts |  | 04-15-03 browser backup-fence gate remains unexecuted after the preceding task 2 blocking prerequisite. | open |  | 2026-09-26T20:58:18.675Z |  |
 
 ````json
 [
@@ -271,6 +273,32 @@ last_updated: 2026-09-26T20:09:43.019Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-26T20:09:43.019Z",
+    "resolved_at": null,
+    "milestone": null
+  },
+  {
+    "id": 20,
+    "kind": "unrun-verify",
+    "phase": "04",
+    "file": "scripts/recovery-drill.mjs",
+    "line": null,
+    "description": "04-15-02 production recovery gate remains unrun: explicit disposable context absent and Kubernetes context inventory empty.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-26T20:58:18.534Z",
+    "resolved_at": null,
+    "milestone": null
+  },
+  {
+    "id": 21,
+    "kind": "unrun-verify",
+    "phase": "04",
+    "file": "tests/backup-fence.spec.ts",
+    "line": null,
+    "description": "04-15-03 browser backup-fence gate remains unexecuted after the preceding task 2 blocking prerequisite.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-26T20:58:18.675Z",
     "resolved_at": null,
     "milestone": null
   }

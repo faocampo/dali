@@ -236,9 +236,11 @@ Plans:
 
 - [x] 04-08-PLAN.md — Preserve title intent and warn before leaving unresolved saving
 
-**Wave 9** *(blocked on Wave 8 completion)*
+**Wave 9** *(task 04-15-01 complete; task 04-15-02 blocked on disposable cluster prerequisite)*
 
 - [ ] 04-15-PLAN.md — Measure independent storage-loss recovery, operational targets and browser recovery after backup fencing
+
+Task 1 local representative restore passed: 50 boards, 50 valid PNGs, exact hashes and cold native role access. Task 2's explicit acceptance context remains absent; task 3 remains unexecuted in sequence. See [04-15-CHECKPOINT.md](phases/04-durable-boards-and-recovery/04-15-CHECKPOINT.md) (required environment and resume point). Plan remains incomplete.
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
