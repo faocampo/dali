@@ -88,7 +88,30 @@ For an unavailable destination, repair the mount, permissions or capacity while 
 
 Programmatic tests can explicitly inject `storagePolicy: {kind: 'fixture'}` or a deterministic health provider. The production entrypoint accepts neither through environment configuration. Such tests establish route behavior only; they do not demonstrate real independent-storage recovery guarantees.
 
-Restore into fresh empty storage through the later restore procedure, preserve the failed original for operator handling, clear restored authentication state and rotate the recovery epoch before reopening writes. Keep verified published backup files immutable; copy a selected set into restore staging before opening it as a writable application database.
+Restore into fresh empty storage through the procedure below. Keep verified published backup files immutable.
+
+## Operator-selected offline restore
+
+Use the compiled `server/operator.js` from the compatible release. The commands below use synthetic paths; supply private values in operator infrastructure. `inspect` verifies one explicitly selected set and returns its manifest digest. Record that digest with the operator's selection, then pass it to `restore`.
+
+```sh
+node server/operator.js inspect --backup /mnt/dali-backups/backup-EXPLICIT-SELECTION
+node server/operator.js restore \
+  --backup /mnt/dali-backups/backup-EXPLICIT-SELECTION \
+  --expected-manifest-digest SELECTED_MANIFEST_SHA256 \
+  --destination /mnt/dali-fresh \
+  --source-database /mnt/dali-old/database.sqlite \
+  --maintenance-confirmed \
+  --writer-fenced writer-stopped \
+  --fence-evidence 'Operator record confirming old writer termination'
+node server/operator.js verify --destination /mnt/dali-fresh
+```
+
+The operator provisions a distinct empty mode-0700 destination and controls its parent directory and all ancestor mounts against replacement. The old source parent remains available for canonical-path comparison even when its database has been lost. `--writer-fenced` accepts `writer-stopped` or `storage-fenced`; its evidence is a required operator attestation backed by infrastructure observations. The command cannot prove remote process termination or storage detachment. Confirm termination/fencing externally before invoking it. An empty flag or merely inaccessible endpoint is insufficient evidence.
+
+Restore validates completion, manifest digest, database size/digest, supported schema, Yjs decoding, images and relationships before changing the destination. It copies into private sibling staging, verifies the copied bytes again, applies compatible additive migrations, clears login transactions then sessions, rotates a random recovery epoch and clears stale backup coverage. It preserves members, owners, grants and operation receipts. After offline integrity verification and flushing, it replaces only the empty target directory with the prepared directory. Nonempty targets, symlinks, unexpected WAL/SHM companions, absent fencing confirmation and invalid sets fail with nonzero status. Failed staging cleanup touches only that invocation's private directory. A failure after publication can leave a complete fresh target for explicit verification; ingress stays closed.
+
+The sanitized `RestoreReport` includes selected backup ID/digest, conservative recovery point, restore time, old/new epochs and aggregate integrity counters. `verify` runs offline before startup and requires cleared sessions and no WAL/SHM companions. It does not reopen ingress or certify subsequent access reconciliation. Once the application starts, use the signed access/content checks below instead of rerunning offline verification on a live WAL database.
 
 ## Evidence and acceptance boundary
 

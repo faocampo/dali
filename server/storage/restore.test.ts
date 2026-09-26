@@ -9,6 +9,7 @@ import { buildApp } from '../app.js';
 import { openDatabase, type AccountDatabase } from './database.js';
 import { publishBackup, backupDigest } from './backup.js';
 import { restoreBackup, verifyRestore } from './restore.js';
+import { runOperator } from '../operator.js';
 import { readRecoveryEpoch } from './recovery-state.js';
 import { createOidcProvider, IDENTITY_COOKIE } from '../../tests/oidc-provider.js';
 import { syntheticCanaries } from '../../tests/access-fixtures.js';
@@ -97,4 +98,18 @@ for (const defect of ['digest', 'corrupt', 'incomplete', 'maintenance', 'fencing
   const before = await readdir(input.destination);
   await expect(restoreBackup(input)).rejects.toThrow();
   expect(await readdir(input.destination)).toEqual(before); expect(await readFile(input.sourceDatabase)).toEqual(oldBytes);
+});
+it('@04-12-01 CLI explicitly inspects selects restores and verifies with sanitized failures', async () => {
+  const input = await selected(); const output: string[] = []; const log = (value: string) => output.push(value);
+  expect(await runOperator(['inspect', '--backup', input.backup], log)).toBe(0);
+  expect(JSON.parse(output.pop()!).manifestDigest).toBe(input.expectedManifestDigest);
+  expect(await runOperator(['restore', '--backup', input.backup], log)).toBe(1);
+  expect(output.pop()).toBe('{"error":"OPERATOR_VERIFICATION_FAILED","ingress":"closed"}');
+  expect(await readdir(input.destination)).toEqual([]);
+  expect(await runOperator(['restore', '--backup', input.backup, '--destination', input.destination, '--source-database', input.sourceDatabase,
+    '--expected-manifest-digest', input.expectedManifestDigest, '--maintenance-confirmed', '--writer-fenced', 'writer-stopped', '--fence-evidence', 'Synthetic writer exited'], log)).toBe(0);
+  expect(await runOperator(['verify', '--destination', input.destination], log)).toBe(0);
+  expect(output.join('')).not.toContain(directory); expect(output.join('')).not.toContain('example.org');
+  await writeFile(join(input.destination, 'database.sqlite-wal'), 'Unexpected old WAL');
+  expect(await runOperator(['verify', '--destination', input.destination], log)).toBe(1);
 });

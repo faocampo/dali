@@ -23,6 +23,16 @@ export function initializeBackupSchedule(database: AccountDatabase) {
 export function readBackupSchedule(database: AccountDatabase): BackupScheduleState {
   return database.prepare('SELECT backup_point,backup_completed,backup_checked FROM recovery_state WHERE singleton=1').get() as BackupScheduleState;
 }
+/** Only the offline fresh-target restore calls this, before service startup. */
+export function resetRestoredRecoveryState(database: AccountDatabase): string {
+  return database.transaction(() => {
+    database.prepare('DELETE FROM login_transactions').run();
+    database.prepare('DELETE FROM sessions').run();
+    const epoch = randomUUID();
+    database.prepare('UPDATE recovery_state SET epoch=?,backup_point=NULL,backup_completed=NULL,backup_checked=NULL WHERE singleton=1').run(epoch);
+    return readRecoveryEpoch(database);
+  })();
+}
 /** Call only after current authorization, and again inside the write transaction. */
 export function requireRecoveryEpoch(database: AccountDatabase, request: FastifyRequest, reply: FastifyReply): string | undefined {
   const supplied = request.headers['x-dali-recovery-epoch'];
