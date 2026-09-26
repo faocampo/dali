@@ -105,7 +105,7 @@ Plans:
 
 - [x] 02-05-PLAN.md — Automatic anchored layout, persistent formatting and accessible controls.
 
-**Wave 6** *(blocked on Wave 5 completion)*
+**Wave 6** *(in progress; next 04-09, then 04-14)*
 
 - [x] 02-06-PLAN.md — Visible and selected-map PNG exports with the complete canvas regression gate.
 
@@ -195,7 +195,7 @@ Plans:
   3. An operator can follow the documented configuration and startup procedure to deploy Dali and its required services on operator-managed infrastructure, then open an authenticated board. (OPS-01)
   4. An operator can back up and restore board documents and images, and an authorized member can reopen the restored boards with their content and images intact. (OPS-02)
 
-**Plans**: 9/16 plans executed
+**Plans**: 10/16 plans executed
 
 Plans:
 **Wave 1**
@@ -224,7 +224,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 04-06-PLAN.md — Download a complete authorized archive of pending recovery work
+- [x] 04-06-PLAN.md — Download a complete authorized archive of pending recovery work
 - [ ] 04-09-PLAN.md — Show account-isolated pending work on authorized library cards
 - [ ] 04-14-PLAN.md — Deploy one durable writer with generic Kubernetes configuration
 
@@ -421,7 +421,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
 | 3. Okta and Board Access | 12/12 | Complete    | 2026-09-25 |
-| 4. Durable Boards and Recovery | 9/16 | In Progress|  |
+| 4. Durable Boards and Recovery | 10/16 | In Progress|  |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
 | 6. Follow Me | 0/TBD | Not started | - |
 | 7. Entity Comments | 0/TBD | Not started | - |
