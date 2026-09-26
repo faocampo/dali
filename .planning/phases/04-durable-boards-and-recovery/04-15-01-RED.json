@@ -1,0 +1,9 @@
+{
+  "command": "npm run test:server -- server/storage/operations-drill.test.ts -t @04-15-01 --reporter=tap",
+  "exitCode": 1,
+  "targetFile": "server/storage/operations-drill.test.ts",
+  "targetTest": "@04-15-01 seeded recovery envelope contains fifty boards and at least 128 MiB of real images",
+  "expected": "50 boards",
+  "actual": "0 boards",
+  "output": "TAP version 13\n1..1\nnot ok 1 - @04-15-01 seeded recovery envelope contains fifty boards and at least 128 MiB of real images\n  ---\n  name: AssertionError\n  message: expected +0 to be 50\n  actual: 0\n  expected: 50\n  ...\n# tests 1\n# pass 0\n# fail 1\n# skipped 0\n"
+}
