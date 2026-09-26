@@ -6,7 +6,18 @@ import {
   reportDocEngineStatus,
   reportDocWriteFailure,
   resetSaveStatus,
+  createSaveSnapshot,
+  reduceSaveStatus,
 } from './save-status';
+
+it('@04-05-01 current document coverage establishes server saved time and retains it while newer work waits', () => {
+  const fresh = createSaveSnapshot('synthetic-board-generation-1');
+  const saved = reduceSaveStatus(fresh, { type: 'coverage', scope: fresh.scope, documents: { root: { revision: 0, acknowledged: true }, content: { revision: 0, acknowledged: true } }, images: [], at: 1000 });
+  expect(saved).toMatchObject({ state: 'saved', label: 'Saved', savedAt: 1000 });
+  const newer = reduceSaveStatus(saved, { type: 'coverage', scope: fresh.scope, documents: { root: { revision: 0, acknowledged: true }, content: { revision: 1, acknowledged: false } }, images: [], at: 2000 });
+  expect(newer).toMatchObject({ state: 'saving', savedAt: 1000 });
+  expect(reduceSaveStatus(newer, { type: 'coverage', scope: fresh.scope, documents: { root: { revision: 0, acknowledged: true }, content: { revision: 0, acknowledged: true } }, images: [], at: 3000 })).toBe(newer);
+});
 
 const engineStatus = (step: number, retrying = false) =>
   ({ step, retrying, main: null, shadows: [] }) as Parameters<

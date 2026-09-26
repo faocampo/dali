@@ -1,5 +1,10 @@
 import type { DocEngineStatus } from '@blocksuite/affine/sync';
 
+export type SaveSnapshot = { scope: string; state: 'saving' | 'saved' | 'failed'; label: string; savedAt?: number };
+export type SaveEvent = { type: 'coverage'; scope: string; documents: Record<string, { revision: number; acknowledged: boolean }>; images: { id: string; label: string }[]; at: number };
+export function createSaveSnapshot(scope: string): SaveSnapshot { return { scope, state: 'saving', label: 'Saving…' }; }
+export function reduceSaveStatus(state: SaveSnapshot, _event: SaveEvent): SaveSnapshot { return state; }
+
 export type LocalSaveState = 'saving' | 'saved' | 'failed';
 
 export type LocalSaveStatus = {
