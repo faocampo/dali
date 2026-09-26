@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Durable Boards and Recovery
-current_plan: 6
+current_plan: 7
 status: executing
-stopped_at: Completed 04-11-PLAN.md in wave 4; next dependency-ordered plan is 04-05
-last_updated: "2026-09-26T03:41:31.659Z"
+stopped_at: Completed 04-05-PLAN.md in wave 5; next dependency-ordered plan is 04-12
+last_updated: "2026-09-26T04:09:36.108Z"
 last_activity: 2026-09-26
-last_activity_desc: Completed 04-11 scheduled backups and freshness admission in wave 4
-state_head: 2d82234228a4b44764a622a71bfe3982d8349325
+last_activity_desc: Completed 04-05 current save coverage and response-backed status in wave 5
+state_head: 9806448ae4d9072767fe7b8bf43e6d3809f82a52
 progress:
   total_phases: 13
   completed_phases: 3
   total_plans: 42
-  completed_plans: 32
+  completed_plans: 33
   percent: 23
 ---
 
@@ -31,19 +31,19 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
 Phase: 04 (Durable Boards and Recovery) — EXECUTING
-Current Plan: 6
+Current Plan: 7
 Total Plans in Phase: 16
 Status: Ready to execute
 Next action: $gsd-execute-phase 4
-Last activity: 2026-09-26 — Completed 04-11 scheduled backups and freshness admission in wave 4; next dependency-ordered plan is 04-05
+Last activity: 2026-09-26 — Completed 04-05 current save coverage and response-backed status in wave 5; next dependency-ordered plan is 04-12
 
-Progress: [██░░░░░░░░] 23% (3/13 phases complete; 32/42 currently planned plans complete; later phases remain unplanned)
+Progress: [██░░░░░░░░] 23% (3/13 phases complete; 33/42 currently planned plans complete; later phases remain unplanned)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 32
+- Total plans completed: 33
 - Average duration: —
 - Total execution time: not consistently recorded across sessions.
 
@@ -58,8 +58,8 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 32/42 curr
 
 **Recent Trend:**
 
-- Last 5 plans: 04-02, 04-03, 04-10, 04-04, 04-11
-- Trend: Phase 3 accepted; Phase 4 has verified restart durability, epoch fencing, reconstructable local capture, backup publication, authorized recovery, scheduled retention and freshness admission; remaining plans execute sequentially in dependency order.
+- Last 5 plans: 04-03, 04-10, 04-04, 04-11, 04-05
+- Trend: Phase 3 accepted; Phase 4 has verified restart durability, epoch fencing, reconstructable local capture, backup publication, authorized recovery, scheduled retention, freshness admission and current save coverage; remaining plans execute sequentially in dependency order.
 
 **Per-Plan Metrics:**
 
@@ -93,6 +93,7 @@ Progress: [██░░░░░░░░] 23% (3/13 phases complete; 32/42 curr
 | Phase 04 P10 | 17min | 2 tasks | 8 files |
 | Phase 04 P04 | 32min | 3 tasks | 17 files |
 | Phase 04 P11 | 16min | 3 tasks | 29 files |
+| Phase 04 P05 | 24min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 - [Phase 04]: Storage pause retains active read authority and memory; explicit restored entry retains old epochs separately without rewriting or discarding records.
 - [Phase 04]: Bind verified backup coverage to the current epoch and conservative wall/monotonic age; uncertain clocks require correction and restart.
 - [Phase 04]: Defer pending-grant activation while freshness is fenced, preserve sign-in, and retry activation on a later validated sign-in.
+- [Phase 04]: Saved requires current confirmed Yjs content and all required image acknowledgments; prior server-save age remains during pending work and keyed errors persist through coalesced retries.
 
 ### Pending Todos
 
@@ -135,8 +137,8 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-09-26T03:41:31.597Z
-Stopped at: Completed 04-11-PLAN.md in wave 4; next dependency-ordered plan is 04-05
+Last session: 2026-09-26T04:09:36.048Z
+Stopped at: Completed 04-05-PLAN.md in wave 5; next dependency-ordered plan is 04-12
 Resume file: None
 Next action: `$gsd-execute-phase 4`
 
