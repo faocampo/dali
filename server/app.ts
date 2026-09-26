@@ -9,7 +9,7 @@ export { localReturnIntent } from './auth/oidc.js';
 export type { SessionDescriptor } from './auth/session-store.js';
 import { openDatabase, runMigrations, type AccountDatabase } from './storage/database.js';
 import { registerBoardRoutes } from './boards/routes.js';
-import { BackupScheduler, readStorageConfig, setBackupHealthPolicy, getBackupHealth, type StoragePolicy } from './storage/backup-scheduler.js';
+import { BackupScheduler, readStorageConfig, setBackupHealthPolicy, getBackupHealth, unavailableBackupHealth, type StoragePolicy } from './storage/backup-scheduler.js';
 
 export type AuthConfig = {
   origin: string; databasePath: string; secret: string; ttl: number; issuer: string;
@@ -50,7 +50,8 @@ export function readConfig(env: Record<string, string | undefined>): AuthConfig 
 }
 export async function buildApp(options: { config: Record<string, string | undefined>; database?: AccountDatabase; now?: () => number; beforeCommit?: () => Promise<void>; storagePolicy?: StoragePolicy }) {
   if (Object.keys({ ...process.env, ...options.config }).some(key => /(?:TEST.*AUTH|AUTH.*TEST|AUTH.*BYPASS)/i.test(key))) throw new Error('Test authentication is forbidden');
-  const app = Fastify({ logger: false, bodyLimit: 16384 });
+  // Pending grant identifiers encode issuer + email and can exceed the router's 100-byte default.
+  const app = Fastify({ logger: false, bodyLimit: 16384, routerOptions: { maxParamLength: 8192 } });
   app.addHook('onRequest', async (_request, reply) => { reply.header('Cache-Control', 'private, no-store'); });
   app.setErrorHandler((error, _request, reply) => {
     const validation = error instanceof Error && 'validation' in error;
@@ -70,6 +71,7 @@ export async function buildApp(options: { config: Record<string, string | undefi
   await registerOidcRoutes(app, config, database, now);
   registerBoardRoutes(app, config, database, now, options.beforeCommit);
   let scheduler: BackupScheduler | undefined;
+  setBackupHealthPolicy(database, unavailableBackupHealth);
   if (options.storagePolicy) {
     const policy = options.storagePolicy;
     setBackupHealthPolicy(database, 'health' in policy ? policy.health : () => ({ state: 'healthy', reason: 'fresh', recoverableAgeMs: 0, recoveryPointAt: now(), failure: null }));

@@ -5,13 +5,18 @@ import { buildApp } from '../app.js';
 import { openDatabase, type AccountDatabase } from './database.js';
 import { readRecoveryEpoch } from './recovery-state.js';
 import { createOidcProvider, IDENTITY_COOKIE } from '../../tests/oidc-provider.js';
-import type { BackupHealth } from './backup-scheduler.js';
+import { BackupScheduler, type BackupHealth } from './backup-scheduler.js';
+import { inspectBackupSet } from './backup.js';
+import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import * as Y from 'yjs';
 import { syntheticCanaries } from '../../tests/access-fixtures.js';
 import { imageHash } from '../boards/blobs.js';
 
 let app: FastifyInstance; let database: AccountDatabase; let provider: Awaited<ReturnType<typeof createOidcProvider>>;
 let health: BackupHealth; let barrier: () => Promise<void>;
+let scheduler: BackupScheduler | undefined; let directory: string | undefined;
 const origin = 'http://127.0.0.1:5499';
 let actor: { cookie: string; accountId: string };
 let board: { summary: { id: string }; rootDocId: string; contentDocId: string; revision: number; recoveryEpoch: string };
@@ -62,6 +67,7 @@ async function signIn(identity = 'owner') {
   return { cookie, accountId: session.json().accountId as string };
 }
 beforeEach(async () => {
+  scheduler = undefined; directory = undefined;
   barrier = async () => {}; health = { state: 'healthy', reason: 'fresh', recoveryPointAt: Date.now(), recoverableAgeMs: 0, failure: null };
   const registration = { clientId: 'synthetic-admission', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
   provider = await createOidcProvider({ port: 0, clients: [registration] }); database = openDatabase(':memory:');
@@ -74,7 +80,7 @@ beforeEach(async () => {
   const created = await app.inject({ method: 'POST', url: '/api/boards', headers: headers(), payload: { title: 'Synthetic admission board', operationId: randomUUID() } });
   expect(created.statusCode).toBe(201); board = created.json();
 });
-afterEach(async () => { await app?.close(); database?.close(); await provider?.close(); });
+afterEach(async () => { await scheduler?.close(); await app?.close(); database?.close(); await provider?.close(); if (directory) await rm(directory, { recursive: true, force: true }); });
 it('@04-11-02 stale backup fences create without changing durable storage', async () => {
   health = { ...health, state: 'fenced', reason: 'stale', recoverableAgeMs: 3_600_000 };
   const before = snapshot();
@@ -118,4 +124,51 @@ it('@04-11-03 pending grant activation defers while fenced and authentication su
   await signIn('editor');
   expect(database.prepare('SELECT * FROM pending_grants').all()).toHaveLength(0);
   expect(database.prepare('SELECT member_id FROM board_grants').all()).toEqual([{ member_id: editor.accountId }]);
+});
+
+const grantRoutes = ['active-create', 'active-patch', 'active-revoke', 'pending-create', 'pending-patch', 'pending-revoke'] as const;
+async function prepareGrant(route: typeof grantRoutes[number]): Promise<MutationRequest> {
+  const base = `/api/boards/${board.summary.id}/grants`;
+  const recipient = route.startsWith('active') ? { memberId: (await signIn('editor')).accountId } : { email: 'synthetic-pending@example.org' };
+  if (route.endsWith('create')) return { method: 'POST', url: base, payload: { operationId: randomUUID(), revision: 1, ...recipient, role: 'viewer' } };
+  const created = await send({ method: 'POST', url: base, payload: { operationId: randomUUID(), revision: 1, ...recipient, role: 'viewer' } });
+  expect(created.statusCode).toBe(200); const grant = created.json().grants[0];
+  return { method: route.endsWith('patch') ? 'PATCH' : 'DELETE', url: base + '/' + grant.id, payload: { operationId: randomUUID(), revision: grant.revision, ...(route.endsWith('patch') ? { role: 'editor' } : {}) } };
+}
+const allRoutes = [...mutationRoutes, ...grantRoutes];
+const boundaries = ['fresh', '59:59', '60:00', 'crossing', 'renewed'] as const;
+const routeMatrix = allRoutes.flatMap(route => boundaries.map(boundary => ({ route, boundary })));
+it('@04-11-03 required route matrix enumerates all 19 durable cases and five time states', () => {
+  expect(allRoutes).toHaveLength(19); expect(new Set(allRoutes).size).toBe(19); expect(routeMatrix).toHaveLength(95);
+});
+it.each(routeMatrix)('@04-11-03 $route at $boundary uses verified recovery age at transaction commit', async ({ route, boundary }) => {
+  const request = mutationRoutes.includes(route as typeof mutationRoutes[number]) ? await prepareMutation(route as typeof mutationRoutes[number]) : await prepareGrant(route as typeof grantRoutes[number]);
+  directory = await mkdtemp(join(tmpdir(), 'dali-admission-')); const destination = { directory: join(directory, 'backups'), independentStorage: true as const }; await mkdir(destination.directory, { mode: 0o700 });
+  let wall = Date.now(); let mono = 0;
+  const advance = (ms: number) => { wall += ms; mono += ms; };
+  scheduler = new BackupScheduler({ database, destination, applicationVersion: '0.1.0', wall: () => wall, monotonic: () => mono, schedule: () => () => {} });
+  await scheduler.start(); expect(await inspectBackupSet(destination)).toHaveLength(1);
+  expect(scheduler.health()).toMatchObject({ state: 'healthy', reason: 'fresh', recoverableAgeMs: 0 });
+  const before = snapshot();
+  if (boundary !== 'fresh') {
+    advance(2_700_000); expect(scheduler.health()).toMatchObject({ state: 'alert', reason: 'aging' });
+    advance(899_000); expect(scheduler.health()).toMatchObject({ state: 'alert', recoverableAgeMs: 3_599_000 });
+  }
+  let crossed = false;
+  if (boundary === 'crossing') barrier = async () => { crossed = true; advance(1000); };
+  if (boundary === '60:00' || boundary === 'renewed') advance(1000);
+  if (boundary === 'renewed') {
+    const denied = await send(request); expect(denied.statusCode).toBe(503); expect(snapshot()).toEqual(before);
+    await scheduler.check(); expect(await inspectBackupSet(destination)).toHaveLength(2);
+    expect(scheduler.health()).toMatchObject({ state: 'healthy', recoverableAgeMs: 0 });
+  }
+  const response = await send(request);
+  if (boundary === '60:00' || boundary === 'crossing') {
+    expect(response.statusCode, `${route}: ${response.body}`).toBe(503); expect(response.json()).toEqual({ code: 'BACKUP_FRESHNESS_REQUIRED' });
+    expect(snapshot()).toEqual(before); expect(scheduler.health()).toMatchObject({ state: 'fenced', reason: 'stale', recoverableAgeMs: 3_600_000 });
+    if (boundary === 'crossing') expect(crossed).toBe(true);
+    expect((await app.inject({ url: '/api/session', headers: headers() })).statusCode).toBe(200);
+  } else {
+    expect(response.statusCode, `${route}: ${response.body}`).toBe(route === 'create' ? 201 : 200); expect(snapshot()).not.toEqual(before);
+  }
 });

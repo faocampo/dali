@@ -2,11 +2,11 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { mkdtemp, mkdir, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { buildApp } from '../app.js';
 import { openDatabase, type AccountDatabase } from './database.js';
 import { inspectBackupSet, publishBackup } from './backup.js';
-import { BackupScheduler, BACKUP_DEFAULTS, readStorageConfig, type SchedulerOptions } from './backup-scheduler.js';
+import { BackupScheduler, BACKUP_DEFAULTS, readStorageConfig, getBackupHealth, type SchedulerOptions } from './backup-scheduler.js';
 import type { FastifyInstance } from 'fastify';
 import { readBackupSchedule } from './recovery-state.js';
 
@@ -116,4 +116,16 @@ it('@04-11-01 application startup and real timer automatically publish and close
   expect((await app.inject('/api/storage-health')).statusCode).toBe(401);
   await app.close(); const count = (await inspectBackupSet(destination)).length;
   await new Promise(resolve => setTimeout(resolve, 1100)); expect(await inspectBackupSet(destination)).toHaveLength(count);
+});
+it('@04-11-03 rotating the live epoch invalidates old coverage until a verified current-epoch backup', async () => {
+  const scheduler = make(); await scheduler.start(); database.prepare('UPDATE recovery_state SET epoch=?').run(randomUUID());
+  expect(scheduler.health()).toMatchObject({ state: 'fenced', reason: 'no-baseline', recoveryPointAt: null });
+  advance(1); await scheduler.check(); expect(scheduler.health()).toMatchObject({ state: 'healthy', recoverableAgeMs: 0 });
+  expect(await inspectBackupSet(destination)).toHaveLength(2);
+});
+it('@04-11-03 reused injected connections cannot retain a prior fixture admission policy', async () => {
+  await app.close(); app = await buildApp({ database, config, storagePolicy: { kind: 'fixture' } });
+  expect(getBackupHealth(database).state).toBe('healthy');
+  await app.close(); app = await buildApp({ database, config });
+  expect(getBackupHealth(database).state).toBe('fenced');
 });

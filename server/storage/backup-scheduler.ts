@@ -32,7 +32,7 @@ export type SchedulerOptions = { database: AccountDatabase; destination: BackupD
 export class BackupScheduler {
   private readonly wall; private readonly monotonic; private readonly policy;
   private wallAnchor: number; private monoAnchor: number; private clockInvalid = false;
-  private point: number | null = null; private pointMono = 0; private pointAge = 0;
+  private point: number | null = null; private pointEpoch: string | null = null; private pointMono = 0; private pointAge = 0;
   private failure: BackupHealth['failure'] = null;
   private running?: Promise<void>; private startup?: Promise<void>; private cancel?: () => void; private closed = false;
   constructor(readonly options: SchedulerOptions) {
@@ -50,10 +50,11 @@ export class BackupScheduler {
   }
   health(): BackupHealth {
     const { wall, mono } = this.sample();
-    const age = this.point === null ? null : Math.max(0, wall - this.point, this.pointAge + mono - this.pointMono);
+    const point = this.pointEpoch === readRecoveryEpoch(this.options.database) ? this.point : null;
+    const age = point === null ? null : Math.max(0, wall - point, this.pointAge + mono - this.pointMono);
     const reason = this.clockInvalid ? 'clock-invalid' : age === null ? 'no-baseline' : age >= this.policy.maxAgeMs ? 'stale' : age >= this.policy.alertAgeMs ? 'aging' : 'fresh';
     return { state: ['clock-invalid', 'no-baseline', 'stale'].includes(reason) ? 'fenced' : reason === 'aging' || this.failure ? 'alert' : 'healthy',
-      recoverableAgeMs: age, recoveryPointAt: this.point, reason, failure: this.failure };
+      recoverableAgeMs: age, recoveryPointAt: point, reason, failure: this.failure };
   }
   start(): Promise<void> {
     if (!this.startup) this.startup = this.check().finally(() => this.arm());
@@ -75,10 +76,10 @@ export class BackupScheduler {
       const epoch = readRecoveryEpoch(this.options.database);
       let sets = await (this.options.inspect ?? inspectBackupSet)(this.options.destination);
       const baseline = sets.find(set => set.manifest.epoch === epoch);
-      if (!baseline) this.point = null;
+      if (!baseline) { this.point = null; this.pointEpoch = null; }
       else if (baseline.manifest.recoveryPointAt > wall || baseline.manifest.completedAt > wall) this.clockInvalid = true;
-      else if (this.point !== baseline.manifest.recoveryPointAt) {
-        this.point = baseline.manifest.recoveryPointAt; this.pointAge = wall - this.point; this.pointMono = mono;
+      else if (this.point !== baseline.manifest.recoveryPointAt || this.pointEpoch !== epoch) {
+        this.point = baseline.manifest.recoveryPointAt; this.pointEpoch = epoch; this.pointAge = wall - this.point; this.pointMono = mono;
       }
       // Persist only valid observations; an invalid clock requires operator correction/restart.
       if (this.clockInvalid) { this.options.onHealth?.(this.health()); return; }
@@ -87,8 +88,8 @@ export class BackupScheduler {
         const result = await (this.options.publish ?? publishBackup)({ database: this.options.database, destination: this.options.destination, applicationVersion: this.options.applicationVersion, now: this.wall });
         sets = await (this.options.inspect ?? inspectBackupSet)(this.options.destination);
         const verified = sets.find(set => set.id === result.id && set.manifest.epoch === epoch);
-        if (!verified || this.sample().wall < verified.manifest.completedAt || this.clockInvalid) throw new Error('Unverified publication');
-        this.point = verified.manifest.recoveryPointAt; this.pointAge = Math.max(this.wall() - this.point, this.monotonic() - mono); this.pointMono = this.monotonic();
+        if (!verified || readRecoveryEpoch(this.options.database) !== epoch || this.sample().wall < verified.manifest.completedAt || this.clockInvalid) throw new Error('Unverified publication');
+        this.point = verified.manifest.recoveryPointAt; this.pointEpoch = epoch; this.pointAge = Math.max(this.wall() - this.point, this.monotonic() - mono); this.pointMono = this.monotonic();
         this.options.database.prepare('UPDATE recovery_state SET backup_point=?,backup_completed=?,backup_checked=? WHERE singleton=1').run(this.point, verified.manifest.completedAt, this.wall());
         this.failure = null;
         try {

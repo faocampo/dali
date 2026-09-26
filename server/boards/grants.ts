@@ -6,6 +6,7 @@ import { currentSession, requireMutation } from '../auth/session-store.js';
 import { requireBoardCapability } from './routes.js';
 import type { BeforeCommit } from './documents.js';
 import { readRecoveryEpoch } from '../storage/recovery-state.js';
+import { durableWritesAvailable } from '../storage/write-admission.js';
 
 export function canonicalInternalEmail(config: Pick<AuthConfig, 'domains' | 'emailCaseFold'>, email: unknown): string | undefined {
   if (typeof email !== 'string' || email.length > 254) return;
@@ -20,6 +21,9 @@ type Grant = { id: string; memberId?: string; issuer?: string; email: string; di
 const grantId = (kind: string, key: string) => Buffer.from(JSON.stringify([kind, key])).toString('base64url');
 /** Called only inside the validated identity/profile transaction. History is ambiguity evidence. */
 export function activatePendingGrants(database: AccountDatabase, identity: { issuer: string; canonicalEmail: string }, memberId: string) {
+  if (!database.inTransaction) throw new Error('Grant activation requires a transaction');
+  // Sign-in remains available. A later validated sign-in retries deferred activation.
+  if (!durableWritesAvailable(database)) return;
   const collisions = database.prepare(`SELECT id FROM members WHERE issuer=? AND id<>? AND
     (canonical_email=? OR EXISTS(SELECT 1 FROM json_each(email_history) WHERE value=?))`).all(identity.issuer, memberId, identity.canonicalEmail, identity.canonicalEmail);
   if (collisions.length) return;
