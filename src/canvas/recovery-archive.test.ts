@@ -77,3 +77,7 @@ test('verified image and its original adjustment pixels are complete native arch
   const result = await buildSnapshotArchive(fixture.snapshot, new Map([[id, blob]]), [{ id, label: 'Image 1' }]);
   expect(result.size).toBeGreaterThan(0); expect(JSON.parse(fixture.written)).toEqual(fixture.snapshot);
 });
+test('duplicate activation shares one snapshot and one recovery handoff', async () => {
+  await Promise.all([downloadRecoveryCopy(), downloadRecoveryCopy()]);
+  expect(fixture.handed).toHaveBeenCalledTimes(1);
+});

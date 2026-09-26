@@ -5,6 +5,7 @@ import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { MindmapElementModel, ShapeElementModel } from '@blocksuite/affine/model';
 import { unzipSync } from 'fflate';
 import { createHash } from 'node:crypto';
+import { recoveryArchiveFixtures, recoveryAuthorizationBarrier } from './recovery-archive-fixtures';
 
 async function startRecovery(page: Page) {
   const paused = page.getByRole('button', { name: 'Editing paused', exact: true });
@@ -112,4 +113,23 @@ test('@04-06-01 access loss during delayed authorization prevents all downloads'
   await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Account changed', exact: true })).toBeVisible(); release();
   await expect(page.locator('editor-host')).toHaveCount(0); expect(downloads).toEqual([]); await other.close();
+});
+
+test('@04-06-02 preparing state survives details reopening and coalesces duplicate activation while later edits stay pending', async ({ page, baseURL }) => {
+  await recoveryBoardFixture(page, baseURL!, recoveryArchiveFixtures.longText.title); await pending(page); await startRecovery(page);
+  const beforeIds = (await journalRows(page)).map(row => row.id); const barrier = await recoveryAuthorizationBarrier(page);
+  const downloads: import('@playwright/test').Download[] = []; page.on('download', download => downloads.push(download));
+  await page.getByRole('button', { name: 'Download recovery copy', exact: true }).evaluate(button => { (button as HTMLButtonElement).click(); (button as HTMLButtonElement).click(); });
+  await expect.poll(barrier.held).toBe(1);
+  await expect(page.getByText(recoveryArchiveFixtures.loading.label, { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download recovery copy', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Save failed', exact: true }).click(); await page.getByRole('button', { name: 'Save failed', exact: true }).click();
+  await expect(page.getByText(recoveryArchiveFixtures.loading.label, { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await expect(page.locator('affine-edgeless-note')).toHaveCount(2); barrier.release();
+  await expect.poll(() => downloads.length).toBe(1); await expect(page.getByText(recoveryArchiveFixtures.populated.label, { exact: true })).toBeVisible();
+  const entries = unzipSync(await readDownload(downloads[0]!)); const text = Buffer.from(Object.entries(entries).find(([key]) => key.endsWith('.snapshot.json'))![1]).toString();
+  expect((text.match(/"flavour":"affine:note"/g) ?? []).length).toBe(1);
+  const afterIds = (await journalRows(page)).map(row => row.id); expect(beforeIds.every(id => afterIds.includes(id))).toBe(true);
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toHaveCount(0);
 });
