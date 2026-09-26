@@ -3,7 +3,9 @@ import { AuthBoundary, type SessionDescriptor } from './auth/AuthBoundary';
 import { BoardLibrary, validDescriptor, type BoardDescriptor } from './boards/BoardLibrary';
 import BlockSuiteCanvas from './canvas/BlockSuiteCanvas';
 import { Header } from './header/Header';
-import { disposeCanvasRuntime, getCanvasRuntime, nextAccessGeneration, suspendAccessScope, type CanvasRuntime } from './canvas/runtime';
+import { disposeCanvasRuntime, getCanvasRuntime, getActiveAccessScope, subscribeAccessScope, nextAccessGeneration, suspendAccessScope, type CanvasRuntime } from './canvas/runtime';
+import { RecoveryStateView } from './canvas/RecoveryStateView';
+import { canMutateCurrentScope } from './canvas/account/mutation-guard';
 import { accountBoardUrl, accountIntent } from './boards/preferences';
 import { createAccountBoard, AccountBoardAction, BoardActionError } from './boards/operations';
 import { discardRecords } from './canvas/account/outbox';
@@ -41,7 +43,9 @@ function NewBoardTarget({ member, operationId }: { member: SessionDescriptor; op
 }
 
 function BoardTarget({ member, target, onOpenBoards, signOut }: { member: SessionDescriptor; target: string; onOpenBoards: () => void; signOut: () => Promise<void> }) {
-  const [state, setState] = useState<'loading' | 'denied' | 'expired' | 'error' | 'ready'>('loading');
+  const [state, setState] = useState<'loading' | 'denied' | 'expired' | 'error' | 'ready' | 'corrupt' | 'epoch-mismatch'>('loading');
+  const activeScope = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
+  const [restored, setRestored] = useState(false);
   const [board, setBoard] = useState<BoardDescriptor>();
   const [runtime, setRuntime] = useState<CanvasRuntime>();
   const [retry, setRetry] = useState(0);
@@ -50,6 +54,8 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   useEffect(() => { if (['expired', 'denied', 'error'].includes(state)) heading.current?.focus(); }, [state, target]);
   const rename = useRef<AccountBoardAction>();
   const renameBoard = async (title: string) => {
+    const expected = getActiveAccessScope();
+    if (!expected || !canMutateCurrentScope(expected)) throw new BoardActionError('Editing is paused. Retry saving before renaming.');
     if (rename.current) {
       const known = await rename.current.check();
       if (known.status === 'completed') { setBoard(known.result!); rename.current = undefined; return; }
@@ -72,20 +78,22 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
         const descriptor = await response.json() as BoardDescriptor;
         if (!validDescriptor(descriptor, member.accountId) || descriptor.summary.id !== target) throw new Error('Invalid descriptor');
         if (!controller.signal.aborted) {
-          const loaded = await getCanvasRuntime({ descriptor, accountId: member.accountId, generation, signal: controller.signal,
+          const loaded = await getCanvasRuntime({ descriptor, accountId: member.accountId, generation, signal: controller.signal, openRestored: restored,
             onAuthorizationLost: error => { if (!controller.signal.aborted) { setRuntime(undefined); setBoard(undefined); setState(error.status === 401 ? 'expired' : 'denied'); } } });
           if (!controller.signal.aborted) { setRuntime(loaded); setBoard(loaded.descriptor); setState('ready'); }
         }
-      }).catch((cause: unknown) => { if (!controller.signal.aborted) setState(cause instanceof Error && 'status' in cause ? (cause.status === 401 ? 'expired' : 'denied') : 'error'); });
+      }).catch((cause: unknown) => { if (!controller.signal.aborted) setState(cause instanceof Error && 'recoveryState' in cause ? cause.recoveryState as 'corrupt' | 'epoch-mismatch' : cause instanceof Error && 'status' in cause ? (cause.status === 401 ? 'expired' : 'denied') : 'error'); });
     return () => { suspendAccessScope('navigation'); queueMicrotask(() => { controller.abort(); disposeCanvasRuntime(generation); }); };
-  }, [member.accountId, target, retry]);
-  if (state === 'loading') return <p role="status">Opening board…</p>;
+  }, [member.accountId, target, retry, restored]);
+  if (state === 'corrupt' || state === 'epoch-mismatch') return <RecoveryStateView state={state} openRestored={() => setRestored(true)} />;
+  if (state === 'ready' && activeScope?.recoveryState === 'denied' && board?.summary.role !== 'viewer') return <RecoveryDenied accountId={member.accountId} boardId={target} />;
+  if (state === 'loading') return <p role="status">{activeScope?.recoveryState === 'recovering' ? 'Recovering changes…' : 'Opening board…'}</p>;
   if (state === 'expired') return <section><h1 ref={heading} tabIndex={-1}>Session expired — sign in to continue.</h1><a href={'/auth/start?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search)}>Sign in to continue</a></section>;
   if (state === 'denied' && hasRecovery) return <RecoveryDenied accountId={member.accountId} boardId={target} />;
   if (state === 'denied') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>You don't have access to this board</h1><p>Ask the board owner to grant access to your internal account.</p><a href="/">Back to your boards</a></section>;
   if (state === 'error') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>We couldn't open this board.</h1><p role="alert">We couldn't open this board. Try again.</p><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/">Back to your boards</a></section>;
   return <div className="djai-app" data-board-id={board!.summary.id}>
-    <Header boardTitle={board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={board!.summary.role === 'viewer' ? undefined : renameBoard} />
+    <Header boardTitle={board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={activeScope?.canWrite ? renameBoard : undefined} />
     <main className="djai-canvas-area"><BlockSuiteCanvas runtime={runtime!} /></main>
   </div>;
 }

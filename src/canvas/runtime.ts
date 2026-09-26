@@ -20,7 +20,14 @@ let journal: AccountJournal | undefined;
 let abort: AbortController | undefined;
 let capture: Promise<unknown>[] = [];
 let recovery: RecoveryCoordinator | undefined;
+let storagePaused = false;
 export const retryRecovery = () => recovery?.retryRecovery();
+export function pauseRecoveryStorage() {
+  if (!scope || scope.phase !== 'active') return;
+  storagePaused = true;
+  if (current) { current.store.readonly = true; current.workspace.docSync.forceStop(); }
+  publish({ ...scope, canWrite: false, recoveryState: 'storage-paused' });
+}
 const listeners = new Set<() => void>();
 export const getActiveAccessScope = (): AccessScope | null => scope;
 export const getRecoveryBoard = () => current ? { accountId: current.scope.accountId, boardId: current.descriptor.summary.id, title: current.descriptor.summary.title } : null;
@@ -94,7 +101,8 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   abort = new AbortController(); const requestAbort = abort;
   options.signal?.addEventListener('abort', () => requestAbort.abort(), { once: true });
   capture = [];
-  const scopedJournal = new AccountJournal({ ...initial, recoveryEpoch: options.descriptor.recoveryEpoch }, () => { queueMicrotask(() => { suspendAccessScope('storage'); }); });
+  storagePaused = false;
+  const scopedJournal = new AccountJournal({ ...initial, recoveryEpoch: options.descriptor.recoveryEpoch }, () => { if (scope?.generation === initial.generation) pauseRecoveryStorage(); });
   journal = scopedJournal;
   const isCurrent = () => scope?.generation === initial.generation && scope.phase === 'active';
   let baseline: AccountWorkspaceOptions['recoveryBaseline'];
@@ -115,7 +123,8 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       return { ...member, descriptor };
     },
     inspect: async authority => {
-      const rows = await pendingRecords(initial.accountId, initial.boardId);
+      const allRows = await pendingRecords(initial.accountId, initial.boardId);
+      const rows = options.openRestored ? allRows.filter(row => row.epoch === authority.descriptor.recoveryEpoch) : allRows;
       if (!isCurrent()) throw new Error('Stale recovery');
       if (rows.some(row => row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
       if (rows.some(row => !validRecord(row))) throw new RecoveryStorageError('CORRUPT');
@@ -135,19 +144,26 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       return rows.length > 0;
     },
     preserve: () => scopedJournal.preserve(),
-    drain: async (authority, signal) => { await replayJournal(authority.descriptor, initial.accountId, signal); },
+    drain: async (authority, signal) => { await replayJournal(authority.descriptor, initial.accountId, signal, false, options.openRestored); },
     changed: (recoveryState, stalled) => {
       if (!isCurrent()) return;
-      publish({ ...scope!, recoveryState, stalled });
+      if (recoveryState === 'storage-paused') { pauseRecoveryStorage(); return; }
+      if (recoveryState === 'saved' && storagePaused) {
+        storagePaused = false;
+        if (current) { current.store.readonly = false; current.workspace.docSync.start(); }
+      }
+      const blocked = storagePaused || ['corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(recoveryState);
+      if (current && blocked) current.store.readonly = true;
+      publish({ ...scope!, canWrite: !blocked && initial.role !== 'viewer', recoveryState: storagePaused ? 'storage-paused' : recoveryState, stalled });
       if (recoveryState === 'expired') void interruptSession();
     },
   });
   requestAbort.signal.addEventListener('abort', () => coordinator.dispose(), { once: true });
   const promise = coordinator.open().then(authority => {
-    if (!authority) throw new Error('Board unavailable');
+    if (!authority) { if (scope?.recoveryState === 'denied') throw new SourceAccessError(404); throw new Error('Board unavailable'); }
     if (['corrupt', 'epoch-mismatch'].includes(scope?.recoveryState ?? '')) throw Object.assign(new Error('Recovery needs attention'), { recoveryState: scope!.recoveryState });
     authorizedDescriptor = authority.descriptor;
-    publish({ ...scope!, role: authority.descriptor.summary.role, canWrite: authority.descriptor.summary.role !== 'viewer' });
+    publish({ ...scope!, role: authority.descriptor.summary.role, canWrite: !storagePaused && authority.descriptor.summary.role !== 'viewer' });
     return import('./account/board-workspace');
   }).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, descriptor: authorizedDescriptor, isCurrent, recoveryBaseline: baseline,
     // Workspace lifetime is distinct from request cancellation while preservation is pending.
@@ -175,9 +191,9 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   })).then(async workspace => {
     if (!isCurrent()) { workspace.dispose(); throw new Error('Board access changed'); }
     const store = workspace.getDoc(options.descriptor.contentDocId)!.getStore();
-    const local = initial.canWrite ? attachLocalCapture({ journal: scopedJournal, root: workspace.doc, content: store.spaceDoc, title: options.descriptor.summary.title, isCurrent }) : undefined;
+    const local = authorizedDescriptor.summary.role !== 'viewer' ? attachLocalCapture({ journal: scopedJournal, root: workspace.doc, content: store.spaceDoc, title: options.descriptor.summary.title, isCurrent }) : undefined;
     try {
-      await local?.ready;
+      try { await local?.ready; } catch { pauseRecoveryStorage(); }
       if (local) {
         void requestRecoveryStorage();
         const keys = new Set<string>();
@@ -192,7 +208,9 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     const subscription = workspace.docSync.onStatusChange.subscribe(reportDocEngineStatus);
     const value: CanvasRuntime = { workspace, store, descriptor: structuredClone(authorizedDescriptor), scope: scope!,
       stopSaveStatus: () => subscription.unsubscribe(), dispose: () => { local?.dispose(); subscription.unsubscribe(); workspace.dispose(); } };
-    current = value; return value;
+    current = value;
+    if (storagePaused) { store.readonly = true; workspace.docSync.forceStop(); }
+    return value;
   }).catch(error => { if (pending?.key === key) pending = null; throw error; });
   pending = { key, promise }; return promise;
 }

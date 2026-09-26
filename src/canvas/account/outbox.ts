@@ -354,9 +354,9 @@ export class AccountJournal {
   }
 }
 /** Fresh descriptor and expected identity precede every replay; Yjs/hash keys are idempotent. */
-export async function replayJournal(descriptor: BoardDescriptor, accountId: string, signal: AbortSignal, blobsOnly = false): Promise<boolean> {
+export async function replayJournal(descriptor: BoardDescriptor, accountId: string, signal: AbortSignal, blobsOnly = false, currentEpochOnly = false): Promise<boolean> {
   if (descriptor.summary.accountId !== accountId) throw new SourceAccessError(409);
-  const records = (await pendingRecords(accountId, descriptor.summary.id)).filter(record => !blobsOnly || record.kind === 'blob');
+  const records = (await pendingRecords(accountId, descriptor.summary.id)).filter(record => (!blobsOnly || record.kind === 'blob') && (!currentEpochOnly || record.epoch === descriptor.recoveryEpoch));
   if (!records.length) return false;
   if (descriptor.summary.role === 'viewer' || !descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
   const epoch = descriptor.recoveryEpoch;

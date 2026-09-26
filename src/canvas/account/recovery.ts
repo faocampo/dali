@@ -36,11 +36,12 @@ export class RecoveryCoordinator {
           if (this.authority && authority.descriptor.recoveryEpoch !== this.authority.descriptor.recoveryEpoch) throw Object.assign(new Error('Restored board'), { code: 'RECOVERY_EPOCH_MISMATCH' });
           this.authority = authority;
           if (authority.descriptor.summary.role === 'viewer' || !authority.descriptor.capabilities.includes('write')) { this.emit('denied'); return authority; }
+          try { await d.preserve(); } catch (error) { throw Object.assign(new Error('Local preservation failed'), { code: 'STORAGE_PAUSED', cause: error }); }
+          this.assertCurrent(signal);
           const pending = await d.inspect(authority); this.assertCurrent(signal);
           if (pending) {
             this.emit('recovering');
-            try { await d.preserve(); } catch (error) { throw Object.assign(new Error('Local preservation failed'), { code: 'STORAGE_PAUSED', cause: error }); }
-            this.assertCurrent(signal); await d.drain(authority, signal); this.assertCurrent(signal);
+            await d.drain(authority, signal); this.assertCurrent(signal);
           }
           this.attempt = 0; this.emit('saved'); return authority;
         })(),

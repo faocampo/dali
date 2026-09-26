@@ -6,7 +6,8 @@ import { DaliMenu } from './DaliMenu';
 import { BoardTitleMenu } from './BoardTitleMenu';
 import logo from '../../imgs/svg/dali-symbol-color.svg';
 import { exportBoardFile } from '../canvas/export-board';
-import { getActiveAccessScope, getCanvasRuntime } from '../canvas/runtime';
+import { getActiveAccessScope, getCanvasRuntime, subscribeAccessScope, retryRecovery } from '../canvas/runtime';
+import { RecoveryStateView } from '../canvas/RecoveryStateView';
 import { createAccountBoard } from '../boards/operations';
 import { accountBoardUrl } from '../boards/preferences';
 import { getSaveStatus, subscribeSaveStatus } from '../canvas/save-status';
@@ -37,6 +38,8 @@ export function Header({
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 10000); return () => clearInterval(timer); }, []);
   const saveStatus = useSyncExternalStore(subscribeSaveStatus, getSaveStatus);
+  const scope = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
+  const recovering = scope?.recoveryState && scope.recoveryState !== 'saved';
   type Creation = { id: string; accountId: string; generation: number; tab: Window | null; state: 'pending' | 'error' | 'ready'; href?: string };
   const [creations, setCreations] = useState<Creation[]>([]);
   const lifetime = useRef(new AbortController());
@@ -101,12 +104,13 @@ export function Header({
         <img src={logo} alt="Dalí" height={34} />
       </a>
 
-      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} canCreate={member?.systemRole !== 'viewer'} role={board?.summary.role} onBoardAction={board ? setAction : undefined} />
+      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} canCreate={member?.systemRole !== 'viewer' && !!scope?.canWrite} role={scope?.canWrite ? board?.summary.role : 'viewer'} onBoardAction={board && scope?.canWrite ? setAction : undefined} />
       <div className="board-document-heading">
       {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
-        <div className="djai-save">
+        {recovering && <RecoveryStateView state={scope.recoveryState!} compact retry={retryRecovery} download={scope.role !== 'viewer' ? () => exportBoardFile() : undefined} />}
+        <div className="djai-save" hidden={!!recovering}>
           <button
             type="button"
             className={`djai-save__status djai-save__status--${saveStatus.state}`}

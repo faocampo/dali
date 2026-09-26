@@ -2,13 +2,16 @@ import * as Y from 'yjs';
 import type { Store } from '@blocksuite/affine/store';
 import { getActiveAccessScope, subscribeAccessScope, type AccessScope } from '../runtime';
 const guards = new WeakMap<Store, { references: number; release: () => void }>();
+export const recoveryBlocksMutation = (scope: AccessScope) => ['storage-paused', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(scope.recoveryState ?? '');
+export function canMutateCurrentScope(expected: AccessScope) { return accessScopeCurrent(expected, true); }
+export function canExportRecoveryScope(expected: AccessScope) { const current = getActiveAccessScope(); return accessScopeCurrent(expected) && current?.role !== 'viewer' && !['expired', 'denied', 'corrupt'].includes(current?.recoveryState ?? ''); }
 
 /** Captured authority never follows a new account, board, or runtime. */
 export function accessScopeCurrent(expected: AccessScope, write = false): boolean {
   const current = getActiveAccessScope();
   return current?.phase === 'active' && current.accountId === expected.accountId &&
     current.boardId === expected.boardId && current.generation === expected.generation &&
-    (!write || (current.canWrite && current.role !== 'viewer'));
+    (!write || (current.canWrite && current.role !== 'viewer' && !recoveryBlocksMutation(current)));
 }
 
 /**

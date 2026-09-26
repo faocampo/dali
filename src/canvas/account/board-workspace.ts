@@ -19,6 +19,7 @@ export type AccountWorkspaceOptions = Omit<SourceOptions, 'boardId' | 'rootDocId
   descriptor: BoardDescriptor;
   onReadonlyMutation?: (error: Error) => void;
   recoveryBaseline?: { root: Uint8Array; content: Uint8Array; assets: Map<string, Blob> };
+  openRestored?: boolean;
 };
 
 /** One authorized root/content pair, with no cross-board caches or network awareness. */

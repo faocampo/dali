@@ -27,6 +27,8 @@ export function restoreRecoveryFocus() {
   try { token = JSON.parse(sessionStorage.getItem('dali-recovery-focus') ?? 'null'); } catch { return () => {}; }
   if (!token || token.accountId !== state.member?.accountId) return () => {};
   const captured = token; let stopped = false; let frame = 0; let restoring = false;
+  const relinquish = () => { stopped = true; observer.disconnect(); cancelAnimationFrame(frame); sessionStorage.removeItem('dali-recovery-focus'); };
+  const userMoved = (event: Event) => { if (event.isTrusted) relinquish(); };
   const attempt = async () => {
     const scope = getActiveAccessScope();
     if (stopped || restoring || scope?.phase !== 'active' || !scope.canWrite || scope.accountId !== captured.accountId || scope.boardId !== captured.boardId) return;
@@ -75,7 +77,8 @@ export function restoreRecoveryFocus() {
   };
   const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => { void attempt(); }); };
   const observer = new MutationObserver(schedule); observer.observe(document.documentElement, { childList: true, subtree: true }); schedule();
-  return () => { stopped = true; observer.disconnect(); cancelAnimationFrame(frame); };
+  document.addEventListener('pointerdown', userMoved, true); document.addEventListener('keydown', userMoved, true);
+  return () => { stopped = true; observer.disconnect(); cancelAnimationFrame(frame); document.removeEventListener('pointerdown', userMoved, true); document.removeEventListener('keydown', userMoved, true); };
 }
 export const getSessionState = () => state;
 export const subscribeSession = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };

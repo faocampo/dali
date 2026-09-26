@@ -6,7 +6,7 @@
  */
 import { createAssetsArchive } from '@blocksuite/affine/widgets/linked-doc';
 import { getCanvasRuntime } from './runtime';
-import { accessScopeCurrent } from './account/mutation-guard';
+import { accessScopeCurrent, canExportRecoveryScope } from './account/mutation-guard';
 import type { ExportPlan, ExportScale } from './export-plan';
 import {
   renderBoardPresentation,
@@ -143,7 +143,7 @@ export async function exportBoardFile(
 ): Promise<PresentationExportResult | void> {
   const { store, scope } = await getCanvasRuntime();
   const assertCurrent = () => {
-    if (!accessScopeCurrent(scope, format === 'board')) throw new Error(format === 'board' ? 'Editable download requires current Owner or Editor access.' : 'Board access changed. Reopen the board before exporting.');
+    if (!(format === 'board' ? canExportRecoveryScope(scope) : accessScopeCurrent(scope))) throw new Error(format === 'board' ? 'Editable download requires current Owner or Editor access.' : 'Board access changed. Reopen the board before exporting.');
   };
   const authorize = async () => {
     assertCurrent();
