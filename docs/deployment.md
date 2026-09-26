@@ -24,7 +24,66 @@ node scripts/production-smoke.mjs --app-image dali-app:release --web-image dali-
 
 The smoke command requires a ready Docker daemon and OpenSSL. It creates uniquely named, owned containers, volumes and a temporary TLS certificate. It exercises static HTTP, signed OIDC with PKCE, secure cookies, forwarding-header spoofing, board/document/image acknowledgments, provider outage, SIGTERM and restart through the actual images. It prints `IMAGE_SMOKE_PASS` only after every check passes, and removes its own fixtures. This synthetic proof does not establish operator storage independence, Kubernetes scheduling or recovery objectives.
 
-## Runtime topology
+## TLS overlay and network bindings
+
+Render `kubectl kustomize deploy/kubernetes/overlays/example`. Its synthetic host is `canvas.example.org`; images, CSI classes, ingress class, TLS Secret and resources must be replaced in operator-controlled infrastructure. The example annotations target an nginx-compatible ingress controller and force HTTPS. For another controller, supply and verify its equivalent HTTPS-only policy before exposure. Configure the controller to reject unknown hosts and prevent direct public Service/pod access. No ingress controller is installed by these manifests.
+
+The base NetworkPolicy admits TCP 8080 only from the conjunction of a labeled ingress namespace and ingress pods. Egress allows TCP/UDP 53 to the selected cluster DNS pods and TCP 443 to selected OIDC pods. These are deliberately explicit example bindings: a private overlay must select the actual DNS and ingress identities and the issuer's discovery/JWKS/token/userinfo destinations. For external OIDC, use narrow verified IP CIDRs or the platform's maintained egress gateway/FQDN policy; account for address changes. Kubernetes core NetworkPolicy has no hostname selector. Confirm enforcement with the selected CNI; controller/node traffic and DNS address translation need platform-specific verification. Keep default-deny boundaries while adapting bindings.
+
+## Deployment smoke gates
+
+Run the configuration-only checks locally:
+
+```sh
+node --test-reporter=tap scripts/deployment-smoke.mjs --self-test
+node scripts/deployment-smoke.mjs --check-manifests
+```
+
+`MANIFEST_CHECK_PASS` means both base and example render and satisfy the local structural assertions. The self-tests mutate writer count, exposure, mounts, probes, TLS, privileges and egress and verify rejection. They also exercise missing/default-context and nonsynthetic-fixture rejection. Actual API admission, CNI enforcement, ingress behavior and volume persistence require the real gate below.
+
+Provision an explicitly selected disposable Kubernetes context with an enforcing CNI, supported ReadWriteOncePod CSI storage, a working nginx-compatible HTTPS ingress and a synthetic signed OIDC issuer. Provisioner-created volume roots must already satisfy UID/GID 1000:1000 and mode 0700. Confirm reliable SQLite locking/flush and independently surviving backup storage before declaring either verified. The host running the smoke must resolve and trust the synthetic issuer/application DNS names. The issuer must immediately authorize a synthetic internal member through the normal authorization-code/PKCE flow, and permit repeated fresh logins; no test auth bypass enters the app. Its client registration must use the selected application HTTPS callback.
+
+Keep a private JSON fixture outside the repository with these fields:
+
+| Field | Contract |
+|---|---|
+| `synthetic`, `disposable` | Explicit boolean `true` assertions for this fixture and environment |
+| `storageSemanticsVerified` | Boolean `true` after CSI locking/flush, ownership, permissions and fencing review |
+| `independentBackupVerified` | Boolean `true` after validating the backup failure domain |
+| `liveStorageClass`, `backupStorageClass` | Selected CSI classes that meet those contracts |
+| `ingressClass` | Installed nginx-compatible HTTPS ingress class |
+| `config` | String-valued nonsecret DALI settings from the External configuration table, including independent-storage assertion; paths/proxy/production mode are fixed by the manifest |
+| `auth` | String-valued `DALI_SESSION_SECRET` and `DALI_OIDC_CLIENT_SECRET`, generated for synthetic use |
+| `tls` | Base64 `tls.crt` and `tls.key` for the application host, passed as a Kubernetes TLS Secret |
+| `caFile` | Private local PEM trust bundle for the application and issuer; also mounted read-only in the app |
+| `networkPolicy` | Complete NetworkPolicy `spec`, with `app: dali` pod selection, ingress and DNS/OIDC bindings satisfying the boundary above |
+
+Use an absent namespace beginning with `dali-smoke-`; the harness atomically creates it and refuses to adopt existing resources. Use images built and tested by the production smoke, available to the selected cluster; prefer immutable registry digests. Example invocation uses generic values:
+
+```sh
+node scripts/deployment-smoke.mjs \
+  --context disposable-validation \
+  --namespace dali-smoke-validation \
+  --app-image registry.example.org/dali-app:release \
+  --web-image registry.example.org/dali-web:release \
+  --fixture "$DALI_SYNTHETIC_FIXTURE"
+```
+
+The command supplies the explicit context on every cluster operation. It creates only its fresh namespaced resources, waits for real startup/readiness, completes signed synthetic authentication, waits for healthy backup admission, creates a board, uploads a validated PNG and commits a Yjs update. It retains expected bytes in the host process, scales to zero, waits for the old pod to disappear, starts one replacement and verifies changed pod UID with unchanged PVC/PV identities. A new login then cold-fetches board, document and image bytes through verified HTTPS. Only this entire sequence emits `DEPLOYMENT_SMOKE_PASS`. Failed environment/runtime gates exit nonzero and retain owned resources for inspection. No fallback to static success is permitted. The harness retains the namespace and PVCs on success too; cleanup is a separately selected operator action.
+
+Plan 04-15 must consume the actual runtime gate result and perform the representative recovery drill. A successful pod replacement proves that restart path only; independently verified storage-loss survival, capacity, authorization roles and measured RPO/RTO remain distinct obligations. Do not commit private fixtures, kubeconfig, resource dumps or operator evidence.
+
+## Compatible release maintenance
+
+1. Record maintenance start and deadline (within 24 hours), proposed image digests, schema compatibility, expected capacity and rollback binary. Inspect a current complete backup through the existing operator command and retain its explicitly selected manifest digest and independent-storage evidence privately. A timer or attempted snapshot establishes no verified backup.
+2. Close external ingress and prevent new sessions/writes. Drain existing requests using the lifecycle contract. Scale the writer to zero, wait for termination, and verify storage fencing; an unreachable node requires externally confirmed fencing before another writer starts.
+3. Review migrations against both proposed and rollback binaries. Apply compatible changes with only one writer and the same intact SQLite companions. A destructive schema change, storage replacement/deletion or changed recovery point is an explicit operator decision checkpoint with affected resources, data-loss consequences and a recovery path. Preserve old storage until approved disposal.
+4. Start the chosen release against the approved storage and wait for real probes. Verify current complete backup coverage, cold content/image reads and current Owner/Editor/Viewer/denied access through fresh sessions while ingress remains restricted to validation. Reconcile post-point access if restoring. Reopen general ingress only after those checks pass.
+5. For compatible binary rollback, drain/fence again and select the previous tested binary supporting the existing schema. A database restore is separately selected fresh-target recovery using the runbook in `docs/operations.md`; it rotates the epoch and invalidates sessions. Measure maintenance completion against its own 24-hour budget independently of recovery RTO.
+
+Kubernetes references: NetworkPolicy semantics ([https://kubernetes.io/docs/concepts/services-networking/network-policies/](https://kubernetes.io/docs/concepts/services-networking/network-policies/)); Ingress TLS ([https://kubernetes.io/docs/concepts/services-networking/ingress/#tls](https://kubernetes.io/docs/concepts/services-networking/ingress/#tls)); Kustomize configuration ([https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/)).
+
+## Container networking
 
 Run one app container and one web container in the same pod/network namespace. The app binds `127.0.0.1:3000`. The nonroot nginx container receives port `8080` from an operator-controlled HTTPS ingress and serves the SPA; `/api`, `/auth` and `/health` proxy to the loopback app. Route all paths on the same HTTPS origin. The ingress must validate the configured public host, terminate TLS and prevent clients reaching port 8080 directly. Keep the service private to ingress and do not publish backend port 3000.
 

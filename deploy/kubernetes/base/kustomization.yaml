@@ -4,6 +4,7 @@
   "resources": [
     "deployment.yaml",
     "service.yaml",
-    "storage.yaml"
+    "storage.yaml",
+    "network-policy.yaml"
   ]
 }
