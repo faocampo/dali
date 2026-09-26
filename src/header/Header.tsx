@@ -16,7 +16,7 @@ import type { BoardDescriptor } from '../boards/BoardLibrary';
 import type { SessionDescriptor } from '../auth/AuthBoundary';
 import { ShareBoardDialog } from '../boards/ShareBoardDialog';
 import { BoardActionDialog } from '../boards/BoardActionDialog';
-import { preserveBeforeNavigation } from '../auth/session';
+import { requestBoardNavigation } from '../canvas/leave-policy';
 import { AccountMenu } from './AccountMenu';
 
 export function Header({
@@ -110,7 +110,7 @@ export function Header({
         <img src={logo} alt="Dalí" height={34} />
       </a>
 
-      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} canCreate={member?.systemRole !== 'viewer' && !!scope?.canWrite} role={scope?.canWrite ? board?.summary.role : 'viewer'} onBoardAction={board && scope?.canWrite ? setAction : undefined} />
+      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} canCreate={member?.systemRole !== 'viewer' && !!scope?.canWrite} role={scope?.canWrite ? board?.summary.role : 'viewer'} onBoardAction={board && scope?.canWrite ? kind => { if (kind === 'rename' && onRenameBoard) document.querySelector<HTMLButtonElement>('.board-title-label')?.click(); else setAction(kind); } : undefined} />
       <div className="board-document-heading">
       {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu paused={!scope?.canWrite} title={boardTitle} onRename={onRenameBoard} />}
@@ -143,7 +143,7 @@ export function Header({
       {action && board && <BoardActionDialog board={board.summary} kind={action} onClose={() => setAction(undefined)} onComplete={result => {
         setAction(undefined);
         if (result.deleted) onOpenBoards?.();
-        else if (action === 'duplicate') void preserveBeforeNavigation().then(preserved => { if (preserved) window.location.assign('/?focusBoard=' + encodeURIComponent(result.summary.id)); });
+        else if (action === 'duplicate') requestBoardNavigation(() => window.location.assign('/?focusBoard=' + encodeURIComponent(result.summary.id)));
         else onBoardChanged?.(result);
       }} />}
       {creations.map(creation => <div key={creation.id} role={creation.state === 'error' ? 'alert' : 'status'}>

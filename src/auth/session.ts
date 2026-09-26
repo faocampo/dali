@@ -194,9 +194,10 @@ export function watchSession() {
   window.addEventListener('storage', storage); window.addEventListener('pageshow', pageshow); document.addEventListener('click', navigate);
   return () => { channel?.close(); channel = undefined; window.removeEventListener('storage', storage); window.removeEventListener('pageshow', pageshow); document.removeEventListener('click', navigate); if (window.fetch === guardedFetch) window.fetch = originalFetch; };
 }
-export async function preserveBeforeNavigation() {
+export async function preserveBeforeNavigation(allowLoss = false) {
+  try { rememberRecovery(); } catch { /* The journal remains the durable source. */ }
   suspendAccessScope('navigation');
-  try { await preserveCanvasRuntime(); return true; } catch { await interruptSession(); return false; }
+  try { await preserveCanvasRuntime(); return true; } catch { if (allowLoss) return true; await interruptSession(); return false; }
 }
 export function startSignIn() {
   if (['preserving', 'preservation-failed'].includes(state.phase)) return;

@@ -36,7 +36,7 @@ export function BoardTitleMenu({ title, onRename, paused = false }: {
       .finally(() => { saving.current = false; setBusy(false); });
   };
   return <div className="board-title-control board-title-inline">
-    {editing ? <input ref={input} aria-label="Board name" aria-describedby={error ? 'board-title-error' : undefined} title={title} value={draft} readOnly={paused} disabled={busy || uncertain}
+    {editing ? <input ref={input} aria-label="Board name" aria-describedby={error ? 'board-title-error' : undefined} title={title} value={draft} readOnly={paused || busy || uncertain}
       style={{ width: `${Math.max(8, Math.min(28, draft.length + 2))}ch` }}
       onChange={event => setDraft(event.target.value)} onBlur={() => {
         // Firefox can deliver disabled-input blur after save completion, before

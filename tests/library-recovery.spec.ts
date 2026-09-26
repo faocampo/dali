@@ -208,6 +208,7 @@ test('@04-09-02 download then leave and explicit restored entry preserve unresol
   expect(await journalRows(page)).toEqual(expect.arrayContaining(before));
   page.on('dialog', dialog => dialog.accept());
   await page.getByRole('link', { name: 'Dalí', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Leave with changes waiting to save?' }).getByRole('button', { name: 'Leave board', exact: true }).click();
   await expect(page.locator('.board-card__pending')).toHaveCount(1);
   service.database.prepare('UPDATE recovery_state SET epoch=? WHERE singleton=1').run('22222222-2222-4222-8222-222222222222');
   await page.unroute('**/docs/*/push');

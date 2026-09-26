@@ -10,6 +10,10 @@ import { createAccountBoard, renameOpenAccountBoard } from './boards/operations'
 import { discardRecords } from './canvas/account/outbox';
 import { getSessionState, interruptSession, preserveBeforeNavigation, recoveryBoard, subscribeSession } from './auth/session';
 
+import { getAccountSaveSnapshot, subscribeSaveStatus } from './canvas/save-status';
+import { installBoardNavigationGuard, requestBoardNavigation, shouldWarnOnLeave } from './canvas/leave-policy';
+import { LeaveRecoveryDialog } from './header/LeaveRecoveryDialog';
+
 function RecoveryDenied({ accountId, boardId }: { accountId: string; boardId: string }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, [accountId, boardId]);
@@ -87,7 +91,57 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
 export default function App() {
   const session = useSyncExternalStore(subscribeSession, getSessionState);
   const [intent, setIntent] = useState(() => accountIntent());
-  useEffect(() => { const changed = () => { void preserveBeforeNavigation().then(ok => { if (ok) setIntent(accountIntent()); }); }; window.addEventListener('popstate', changed); return () => window.removeEventListener('popstate', changed); }, []);
-  const openBoards = () => { void preserveBeforeNavigation().then(ok => { if (ok) { window.history.pushState(null, '', '/'); setIntent({ kind: 'home' }); } }); };
-  return <AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId + session.revision} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId + session.revision} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} signOut={signOut} /> : <BoardLibrary key={member.accountId + session.revision} member={member} signOut={signOut} />}</AuthBoundary>;
+  const snapshot = useSyncExternalStore(subscribeSaveStatus, getAccountSaveSnapshot);
+  const access = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
+  const [destination, setDestination] = useState<{ run: () => void | Promise<void>; origin: HTMLElement | null }>();
+  const pendingDestination = useRef(false); const navigating = useRef(false);
+  const nativeNavigationApproved = useRef(false);
+  const [leaving, setLeaving] = useState(false);
+  const currentUrl = useRef(window.location.href);
+  useEffect(() => { nativeNavigationApproved.current = false; }, [intent]);
+  const finish = async (run: () => void | Promise<void>, confirmed: boolean) => {
+    if (navigating.current) return;
+    navigating.current = true; nativeNavigationApproved.current = true; setLeaving(true);
+    try {
+      if (await preserveBeforeNavigation(confirmed)) { await run(); currentUrl.current = window.location.href; }
+      else nativeNavigationApproved.current = false;
+    } finally { navigating.current = false; pendingDestination.current = false; setLeaving(false); setDestination(undefined); }
+  };
+  useEffect(() => installBoardNavigationGuard(run => {
+    if (pendingDestination.current || navigating.current) return;
+    const scope = getActiveAccessScope();
+    if (scope?.phase === 'active' && scope.role !== 'viewer' && shouldWarnOnLeave(getAccountSaveSnapshot(), scope.stalled)) {
+      pendingDestination.current = true; setDestination({ run, origin: document.activeElement instanceof HTMLElement ? document.activeElement : null });
+    } else void finish(run, false);
+  }), []);
+  useEffect(() => {
+    if (intent.kind !== 'board' || !access || access.role === 'viewer' || !shouldWarnOnLeave(snapshot, access.stalled)) return;
+    const warn = (event: BeforeUnloadEvent) => { if (!nativeNavigationApproved.current) { event.preventDefault(); event.returnValue = true; } };
+    window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
+  }, [snapshot, access, intent.kind]);
+  useEffect(() => {
+    const go = (href: string, replace = false) => {
+      const url = new URL(href);
+      if (url.pathname !== '/') { window.location.assign(href); return; }
+      if (replace) window.history.replaceState(null, '', href); else window.history.pushState(null, '', href);
+      setIntent(accountIntent());
+    };
+    const changed = () => {
+      const href = window.location.href;
+      window.history.replaceState(null, '', currentUrl.current);
+      requestBoardNavigation(() => go(href, true));
+    };
+    const clicked = (event: MouseEvent) => {
+      const link = event.composedPath().find(node => node instanceof HTMLAnchorElement) as HTMLAnchorElement | undefined;
+      if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target === '_blank' || link.hasAttribute('download') || getActiveAccessScope()?.phase !== 'active' || new URL(link.href).origin !== location.origin) return;
+      event.preventDefault(); event.stopPropagation(); const href = link.href;
+      requestBoardNavigation(() => go(href));
+    };
+    window.addEventListener('popstate', changed); document.addEventListener('click', clicked, true);
+    return () => { window.removeEventListener('popstate', changed); document.removeEventListener('click', clicked, true); };
+  }, []);
+  const openBoards = () => requestBoardNavigation(() => { window.history.pushState(null, '', '/'); setIntent({ kind: 'home' }); });
+  return <><AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId + session.revision} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId + session.revision} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} signOut={async () => { requestBoardNavigation(signOut); }} /> : <BoardLibrary key={member.accountId + session.revision} member={member} signOut={signOut} />}</AuthBoundary>
+    {destination && <LeaveRecoveryDialog preserved={!!snapshot?.preserved} busy={leaving} onStay={() => { const origin = destination.origin; pendingDestination.current = false; setDestination(undefined); requestAnimationFrame(() => { if (origin?.isConnected) origin.focus(); }); }} onLeave={() => { void finish(destination.run, true); }} />}
+  </>;
 }

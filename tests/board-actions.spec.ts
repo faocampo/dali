@@ -312,13 +312,13 @@ test('@03-08-02 inline loading guards repeated commits and uncertain failure ret
   const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id); const input = await editBoardTitle(page); await expect(input).toBeVisible();
   let release!: () => void; const wait = new Promise<void>(resolve => { release = resolve; }); let writes = 0;
   await page.route('**/api/boards/' + board.summary.id, async route => { if (route.request().method() !== 'PATCH') return route.continue(); writes++; await wait; await route.continue(); });
-  await input.fill('Pending name'); await input.press('Enter'); await expect(page.getByRole('status', { name: '' }).filter({ hasText: 'Saving name' })).toBeVisible(); await expect(input).toBeDisabled();
+  await input.fill('Pending name'); await input.press('Enter'); await expect(page.getByRole('status', { name: '' }).filter({ hasText: 'Saving name' })).toBeVisible(); await expect(input).toHaveAttribute('readonly', '');
   expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Synthetic actions' }); release(); await expect(page.locator('.board-title-label')).toHaveText('Pending name'); await editBoardTitle(page); expect(writes).toBe(1);
   await page.unroute('**/api/boards/' + board.summary.id);
   await input.fill('Failed draft'); await page.route('**/api/boards/' + board.summary.id, route => route.request().method() === 'PATCH' ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }) : route.continue());
-  await input.press('Enter'); await expect(page.getByRole('button', { name: 'Check again' })).toBeVisible(); await expect(input).toHaveValue('Failed draft');
-  expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Pending name' }); await page.getByRole('button', { name: 'Check again' }).click(); await expect(input).toBeEnabled();
-  await page.unroute('**/api/boards/' + board.summary.id); await input.fill('Corrected draft'); await input.press('Tab');
+  await input.press('Enter'); await expect(page.getByRole('button', { name: 'Save failed, Open save details', exact: true })).toBeVisible(); await expect(page.locator('.board-title-label')).toHaveText('Failed draft');
+  expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Pending name' });
+  await page.unroute('**/api/boards/' + board.summary.id); await editBoardTitle(page); await input.fill('Corrected draft'); await input.press('Tab');
   await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Corrected draft' });
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');

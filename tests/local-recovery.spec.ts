@@ -84,6 +84,7 @@ for (const kind of ['corrupt', 'restore'] as const) test(`@04-04-03 ${kind} reta
     request.onsuccess = () => { const db = request.result; const tx = db.transaction('journal', 'readwrite'); const store = tx.objectStore('journal'); const get = store.getAll(); get.onsuccess = () => get.result.forEach(row => store.put(kind === 'corrupt' ? { ...row, schemaVersion: 999 } : { ...row, epoch: '22222222-2222-4222-8222-222222222222', recoveryEpoch: '22222222-2222-4222-8222-222222222222' })); tx.oncomplete = () => { db.close(); resolve(); }; };
   }), kind);
   const before = await journalRows(page);
+  page.once('dialog', dialog => dialog.accept());
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Recovery needs attention', exact: true })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0); expect(await journalRows(page)).toEqual(before);
@@ -187,6 +188,7 @@ test('@04-03-01 @04-04-01 independent capture reconstructs the second edit after
   const text = async () => { const value = await reconstruct(); const doc = new Y.Doc(); try { Y.applyUpdate(doc, new Uint8Array(value.content)); value.updates.forEach(update => Y.applyUpdate(doc, new Uint8Array(update))); return JSON.stringify(doc.getMap('blocks').toJSON()); } finally { doc.destroy(); } };
   await expect.poll(text).toContain('Second local canary');
   expect((await stored()).checkpoints).toHaveLength(1);
+  page.once('dialog', dialog => dialog.accept());
   await page.reload(); await expect.poll(text).toContain('First local canary'); expect(await text()).toContain('Second local canary'); expect(errors).toEqual([]);
   await expect(page.locator('editor-host')).toBeVisible();
   await expect(page.locator('affine-edgeless-note')).toContainText('Second local canary');

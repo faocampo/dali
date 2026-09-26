@@ -147,6 +147,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   } };
   preserveTitle = async () => { if (unpreservedTitle) await titles.write(unpreservedTitle); };
   let titleQueue = Promise.resolve();
+  let attemptedTitle: string | undefined;
   captureTitle = title => {
     const work = titleQueue.then(async () => {
       if (!isCurrent() || !scope?.canWrite || storagePaused) throw new Error('Editing is paused. Retry saving before renaming.');
@@ -156,7 +157,9 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (!isCurrent()) return;
       dispatchSaveEvent({ type: 'title', scope: statusScope, id: intent.operationId, outcome: 'pending', at: Date.now() });
       dispatchSaveEvent({ type: 'preserved', scope: statusScope });
-      void coordinator.retryRecovery();
+      await coordinator.retryRecovery();
+      // A recovery already in flight may have inspected before this capture.
+      if (isCurrent() && attemptedTitle !== intent.operationId) await coordinator.retryRecovery();
     });
     titleQueue = work.catch(() => {}); capture.push(work.catch(() => {})); return work;
   };
@@ -206,6 +209,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       const titleScopes = await inspectPendingScopes(initial.accountId);
       if (!options.openRestored && titleScopes.some(row => row.boardId === initial.boardId && row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
       const intent = await titles.read(); if (!intent) { authorizedDescriptor = authority.descriptor; return; }
+      attemptedTitle = intent.operationId;
       if (!isCurrent()) throw new Error('Stale title recovery');
       publish({ ...scope!, title: intent.title });
       dispatchSaveEvent({ type: 'title', scope: statusScope, id: intent.operationId, outcome: 'pending', at: Date.now() });
@@ -222,9 +226,20 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
         if (!isCurrent()) return;
         if (result) { authorizedDescriptor = result; authority.descriptor = result; if (current) current.descriptor = result; }
         dispatchSaveEvent({ type: 'title', scope: statusScope, id: intent.operationId, outcome: 'acknowledged', at: Date.now() });
+        const newer = await titles.read();
+        if (isCurrent() && newer && newer.operationId !== intent.operationId) {
+          publish({ ...scope!, title: newer.title });
+          dispatchSaveEvent({ type: 'title', scope: statusScope, id: newer.operationId, outcome: 'pending', at: Date.now() });
+          clearTimeout(timers.get('title-retry'));
+          timers.set('title-retry', setTimeout(() => { timers.delete('title-retry'); if (isCurrent()) coordinator.retryIfIdle(); }, 0));
+        }
       } catch (error) {
-        if (isCurrent()) dispatchSaveEvent({ type: 'title', scope: statusScope, id: intent.operationId, outcome: 'failed', at: Date.now() });
-        throw error;
+        if (isCurrent()) dispatchSaveEvent({ type: 'title', scope: statusScope, id: intent.operationId, outcome: 'failed', at: Date.now(), message: error instanceof Error ? error.message : 'Your pending name could not be saved.' });
+        // A rejected title remains pending independently of document hydration.
+        // Authority/epoch/storage failures still fence the entire recovery scope.
+        if (error instanceof SourceAccessError || error instanceof RecoveryEpochError || error instanceof RecoveryStorageError) throw error;
+        clearTimeout(timers.get('title-retry'));
+        timers.set('title-retry', setTimeout(() => { timers.delete('title-retry'); if (isCurrent()) coordinator.retryIfIdle(); }, 5000));
       }
     },
     authorize: async signal => {

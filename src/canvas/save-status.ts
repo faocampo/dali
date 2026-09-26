@@ -16,9 +16,9 @@ export function reportRecoveryDownloadState(next: RecoveryDownloadState) {
 export type ImageSaveRow = Readonly<{ id: string; label: string; state: 'waiting' | 'uploading' | 'failed' | 'saved'; attempt?: string; required: boolean; wasRequired?: boolean }>;
 type DocumentSaveRow = Readonly<{ revision: number; acknowledged: boolean; failure?: string }>;
 export type SaveSnapshot = Readonly<{ scope: string; state: 'saving' | 'saved' | 'failed'; label: string; message?: string; savedAt?: number;
-  documents: Readonly<Record<string, DocumentSaveRow>>; images: Readonly<Record<string, ImageSaveRow>>; preserved: boolean; retrying: boolean; recovery?: string; lastCoverage?: string; title?: { id: string; acknowledged: boolean; failed: boolean } }>;
+  documents: Readonly<Record<string, DocumentSaveRow>>; images: Readonly<Record<string, ImageSaveRow>>; preserved: boolean; retrying: boolean; recovery?: string; lastCoverage?: string; title?: { id: string; acknowledged: boolean; failed: boolean; message?: string } }>;
 export type SaveEvent =
-  | { type: 'title'; scope: string; id: string; outcome: 'pending' | 'acknowledged' | 'failed'; at: number }
+  | { type: 'title'; scope: string; id: string; outcome: 'pending' | 'acknowledged' | 'failed'; at: number; message?: string }
   | { type: 'coverage'; scope: string; documents: Record<string, { revision: number; acknowledged: boolean }>; images: { id: string; label: string }[]; at: number }
   | { type: 'image'; scope: string; id: string; label?: string; outcome: 'sending' | 'acknowledged' | 'failed'; attempt: string; at: number }
   | { type: 'document-failure'; scope: string; docId: string }
@@ -32,7 +32,7 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
   let time: number | undefined;
   if (event.type === 'title') {
     if (event.outcome !== 'pending' && state.title?.id !== event.id) return state;
-    next.title = { id: event.id, acknowledged: event.outcome === 'acknowledged', failed: event.outcome === 'failed' };
+    next.title = { id: event.id, acknowledged: event.outcome === 'acknowledged', failed: event.outcome === 'failed', message: event.message };
     if (event.outcome === 'pending') next.preserved = false;
     time = event.at;
   } else if (event.type === 'coverage') {
@@ -81,6 +81,7 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
     const coverage = JSON.stringify([Object.entries(next.documents).map(([id, row]) => [id, row.revision]), images.filter(row => row.required).map(row => row.id).sort(), next.title?.id]);
     if (time !== undefined && coverage !== next.lastCoverage) { next.savedAt = time; next.lastCoverage = coverage; }
   }
+  if (next.title?.failed && !unsafe && !failed.length) next.message = next.title.message ?? 'The board name has not reached the server. Your pending name is preserved; retry saving or download a recovery copy.';
   return freeze(next);
 }
 
