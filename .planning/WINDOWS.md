@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 8
 waived_count: 1
-fixed_count: 6
-total_count: 15
-last_updated: 2026-09-26T03:41:00.992Z
+fixed_count: 7
+total_count: 16
+last_updated: 2026-09-26T04:09:03.108Z
 ---
 
 # Broken Windows Ledger
@@ -30,6 +30,7 @@ last_updated: 2026-09-26T03:41:00.992Z
 | 13 | 04 | deviation | src/canvas/account/outbox.ts |  | Plan 04-03 integrated runtime callbacks and fixture schema checks; corrected Yjs semantic coverage and preserved image loading feedback; final 44 browser cases pass. | fixed |  | 2026-09-25T22:17:37.399Z | 2026-09-25T22:17:42.532Z |
 | 14 | 04 | deviation | server/storage/backup.ts |  | Plan 04-10 used the existing bundler for crash children, normalized snapshot journal mode and preserved legitimate duplicate/deletion receipts; all 22 backup tests pass. | fixed |  | 2026-09-25T22:36:39.393Z | 2026-09-25T22:36:44.145Z |
 | 15 | 04 | deviation | server/app.ts |  | Bounded router parameter length expanded to support required pending-grant admission routes; all 95 route/time cases pass. | fixed |  | 2026-09-26T03:38:38.344Z | 2026-09-26T03:41:00.992Z |
+| 16 | 04 | deviation | src/canvas/account/outbox.ts |  | Plan 04-05 connected journal acknowledgments and Header status to exact save coverage, and verified image-only retry through real server reads; 20 reducer and nine browser cases pass. | fixed |  | 2026-09-26T04:07:37.553Z | 2026-09-26T04:09:03.108Z |
 
 ````json
 [
@@ -216,6 +217,19 @@ last_updated: 2026-09-26T03:41:00.992Z
     "reason": "",
     "recorded_at": "2026-09-26T03:38:38.344Z",
     "resolved_at": "2026-09-26T03:41:00.992Z",
+    "milestone": null
+  },
+  {
+    "id": 16,
+    "kind": "deviation",
+    "phase": "04",
+    "file": "src/canvas/account/outbox.ts",
+    "line": null,
+    "description": "Plan 04-05 connected journal acknowledgments and Header status to exact save coverage, and verified image-only retry through real server reads; 20 reducer and nine browser cases pass.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-26T04:07:37.553Z",
+    "resolved_at": "2026-09-26T04:09:03.108Z",
     "milestone": null
   }
 ]
