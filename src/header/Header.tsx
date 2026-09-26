@@ -113,7 +113,7 @@ export function Header({
       <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} canCreate={member?.systemRole !== 'viewer' && !!scope?.canWrite} role={scope?.canWrite ? board?.summary.role : 'viewer'} onBoardAction={board && scope?.canWrite ? setAction : undefined} />
       <div className="board-document-heading">
       {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
-      {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
+      {onOpenBoards && onRenameBoard && <BoardTitleMenu paused={!scope?.canWrite} title={boardTitle} onRename={onRenameBoard} />}
 
         <div className="djai-save">
           <button ref={saveTrigger} type="button" className={`djai-save__status djai-save__status--${scope?.role === 'viewer' ? 'saved' : saveStatus.state}`}

@@ -33,7 +33,7 @@ export function captureRecoverySnapshot(): { captured: RecoverySnapshot; readAss
       return Object.freeze({ id, label: caption || `Image ${index + 1}` });
     });
     if (images.some(image => !ids.includes((image.model.props as { sourceId: string }).sourceId))) throw new Error('An image reference could not be captured. Keep this tab open and retry.');
-    snapshot.meta.title = runtime.descriptor.summary.title;
+    snapshot.meta.title = scope.title ?? runtime.descriptor.summary.title;
     const captured = Object.freeze({ scope: Object.freeze({ ...scope }), capturedAt: Date.now(), title: snapshot.meta.title, snapshot: freezeSnapshot(structuredClone(snapshot)), references: Object.freeze(references) });
     return { captured, readAsset: async id => { assertAuthority(scope); const value = await readLocalAsset(id); assertAuthority(scope); return value; } };
   } finally { transformer[Symbol.dispose](); }

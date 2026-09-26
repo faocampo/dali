@@ -16,8 +16,9 @@ export function reportRecoveryDownloadState(next: RecoveryDownloadState) {
 export type ImageSaveRow = Readonly<{ id: string; label: string; state: 'waiting' | 'uploading' | 'failed' | 'saved'; attempt?: string; required: boolean; wasRequired?: boolean }>;
 type DocumentSaveRow = Readonly<{ revision: number; acknowledged: boolean; failure?: string }>;
 export type SaveSnapshot = Readonly<{ scope: string; state: 'saving' | 'saved' | 'failed'; label: string; message?: string; savedAt?: number;
-  documents: Readonly<Record<string, DocumentSaveRow>>; images: Readonly<Record<string, ImageSaveRow>>; preserved: boolean; retrying: boolean; recovery?: string; lastCoverage?: string }>;
+  documents: Readonly<Record<string, DocumentSaveRow>>; images: Readonly<Record<string, ImageSaveRow>>; preserved: boolean; retrying: boolean; recovery?: string; lastCoverage?: string; title?: { id: string; acknowledged: boolean; failed: boolean } }>;
 export type SaveEvent =
+  | { type: 'title'; scope: string; id: string; outcome: 'pending' | 'acknowledged' | 'failed'; at: number }
   | { type: 'coverage'; scope: string; documents: Record<string, { revision: number; acknowledged: boolean }>; images: { id: string; label: string }[]; at: number }
   | { type: 'image'; scope: string; id: string; label?: string; outcome: 'sending' | 'acknowledged' | 'failed'; attempt: string; at: number }
   | { type: 'document-failure'; scope: string; docId: string }
@@ -29,7 +30,12 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
   if (event.scope !== state.scope || ['dispatched', 'local-complete', 'exported'].includes(event.type)) return state;
   let next = { ...state, documents: { ...state.documents }, images: { ...state.images } };
   let time: number | undefined;
-  if (event.type === 'coverage') {
+  if (event.type === 'title') {
+    if (event.outcome !== 'pending' && state.title?.id !== event.id) return state;
+    next.title = { id: event.id, acknowledged: event.outcome === 'acknowledged', failed: event.outcome === 'failed' };
+    if (event.outcome === 'pending') next.preserved = false;
+    time = event.at;
+  } else if (event.type === 'coverage') {
     if (Object.entries(event.documents).some(([id, row]) => row.revision < (state.documents[id]?.revision ?? 0))) return state;
     const changed = Object.entries(event.documents).some(([id, row]) => row.revision !== state.documents[id]?.revision);
     for (const [id, row] of Object.entries(event.documents)) next.documents[id] = { ...row, ...(row.acknowledged ? {} : { failure: state.documents[id]?.failure }) };
@@ -49,6 +55,7 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
     const doc = next.documents[event.docId];
     next.documents[event.docId] = { revision: 0, acknowledged: false, ...doc, failure: 'Board changes have not reached the server.' };
   } else if (event.type === 'recovery') {
+    if ((event.state === 'pending' || event.stalled) && next.title && !next.title.acknowledged) next.title = { ...next.title, failed: true };
     next.recovery = event.state; next.retrying = event.state === 'retrying' || event.state === 'recovering';
     if (event.stalled) for (const [id, row] of Object.entries(next.documents)) if (!row.acknowledged) next.documents[id] = { ...row, failure: 'Saving is taking longer than expected.' };
   } else if (event.type === 'preserved') next.preserved = true;
@@ -58,9 +65,9 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
   // Removing a reference locally does not erase its failure until the removal itself is acknowledged.
   if (covered && event.type === 'coverage') for (const [id, row] of Object.entries(next.images)) if (!row.required && row.wasRequired) delete next.images[id];
   const images = Object.values(next.images); const failed = images.filter(row => row.state === 'failed' && (row.required || row.wasRequired));
-  const contentFailed = documents.some(row => row.failure && !row.acknowledged);
+  const contentFailed = documents.some(row => row.failure && !row.acknowledged) || !!next.title?.failed;
   const unsafe = ['expired', 'denied', 'storage-paused', 'corrupt', 'epoch-mismatch', 'disposed'].includes(next.recovery ?? '');
-  const allSaved = covered && images.filter(row => row.required).every(row => row.state === 'saved') && !failed.length;
+  const allSaved = covered && (!next.title || next.title.acknowledged) && images.filter(row => row.required).every(row => row.state === 'saved') && !failed.length;
   if (unsafe) {
     next.state = 'failed'; next.label = next.recovery === 'expired' ? 'Sign in to continue' : next.recovery === 'denied' ? 'Access changed' : next.recovery === 'storage-paused' ? 'Editing paused' : 'Recovery needs attention';
     next.message = 'Keep this tab open. Your pending work needs attention.';
@@ -71,7 +78,7 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
   else if (!allSaved) { next.state = 'saving'; next.label = next.preserved ? 'Changes pending' : 'Saving…'; next.message = next.preserved ? 'Changes are preserved in this browser and waiting to reach the server.' : 'Sending your latest changes and images to the server.'; }
   else {
     next.state = 'saved'; next.label = 'Saved'; next.message = 'All changes and images are saved to the server.'; next.retrying = false;
-    const coverage = JSON.stringify([Object.entries(next.documents).map(([id, row]) => [id, row.revision]), images.filter(row => row.required).map(row => row.id).sort()]);
+    const coverage = JSON.stringify([Object.entries(next.documents).map(([id, row]) => [id, row.revision]), images.filter(row => row.required).map(row => row.id).sort(), next.title?.id]);
     if (time !== undefined && coverage !== next.lastCoverage) { next.savedAt = time; next.lastCoverage = coverage; }
   }
   return freeze(next);

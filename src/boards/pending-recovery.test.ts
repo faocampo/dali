@@ -1,8 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { pendingRecords, subscribeJournalInvalidation, type JournalRecord } from '../canvas/account/outbox';
+import { pendingRecords, pendingTitleIntents, subscribeJournalInvalidation, type JournalRecord } from '../canvas/account/outbox';
 import { inspectAuthorizedPendingBoards, subscribePendingBoardInvalidation } from './pending-recovery';
-vi.mock('../canvas/account/outbox', () => ({ pendingRecords: vi.fn(), subscribeJournalInvalidation: vi.fn() }));
-afterEach(() => vi.resetAllMocks());
+vi.mock('../canvas/account/outbox', () => ({ pendingRecords: vi.fn(), pendingTitleIntents: vi.fn(async () => []), subscribeJournalInvalidation: vi.fn() }));
+afterEach(() => { vi.resetAllMocks(); vi.mocked(pendingTitleIntents).mockResolvedValue([]); });
 const card = (id: string, accountId = 'member') => ({ id, accountId });
 const record = (id: string, boardId: string, accountId = 'member') => ({ id, boardId, accountId, epoch: 'old-epoch' } as JournalRecord);
 it('reads only unique currently authorized account and board indexes', async () => {

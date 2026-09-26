@@ -1,7 +1,7 @@
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
 export type RecoveryOutcome = 'checking-access' | 'recovering' | 'pending' | 'retrying' | 'saved' | 'expired' | 'denied' | 'storage-paused' | 'corrupt' | 'epoch-mismatch';
 export type RecoveryAuthority = { accountId: string; expiresAt: number; descriptor: BoardDescriptor };
-export type RecoveryDependencies = { authorize: (signal: AbortSignal) => Promise<RecoveryAuthority>; inspect: (authority: RecoveryAuthority) => Promise<boolean>; drain: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; verify?: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; preserve: () => Promise<void>; current: () => boolean; changed: (state: RecoveryOutcome, stalled: boolean) => void; now?: () => number; random?: () => number };
+export type RecoveryDependencies = { authorize: (signal: AbortSignal) => Promise<RecoveryAuthority>; title?: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; inspect: (authority: RecoveryAuthority) => Promise<boolean>; drain: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; verify?: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; preserve: () => Promise<void>; current: () => boolean; changed: (state: RecoveryOutcome, stalled: boolean) => void; now?: () => number; random?: () => number };
 export class RecoveryCoordinator {
   private flight?: Promise<RecoveryAuthority | undefined>;
   private controller?: AbortController;
@@ -39,6 +39,7 @@ export class RecoveryCoordinator {
           if (authority.descriptor.summary.role === 'viewer' || !authority.descriptor.capabilities.includes('write')) { this.emit('denied'); return authority; }
           try { await d.preserve(); } catch (error) { throw Object.assign(new Error('Local preservation failed'), { code: 'STORAGE_PAUSED', cause: error }); }
           this.assertCurrent(signal);
+          await d.title?.(authority, signal); this.assertCurrent(signal);
           const pending = await d.inspect(authority); this.assertCurrent(signal);
           if (pending) {
             this.emit('recovering');

@@ -19,7 +19,7 @@ import {
 import { validDescriptor, type BoardDescriptor } from './BoardLibrary';
 import * as Y from 'yjs';
 import { createAccountWorkspace, createStagingWorkspace } from '../canvas/account/board-workspace';
-import { synchronizeActiveBoard } from '../canvas/runtime';
+import { renameActiveBoard, synchronizeActiveBoard } from '../canvas/runtime';
 import { authenticatedRecoveryEpoch, RecoveryEpochError, validRecoveryEpoch } from '../canvas/account/doc-source';
 
 export function validateBoardTitle(draft: string, acknowledged: string): string {
@@ -27,6 +27,8 @@ export function validateBoardTitle(draft: string, acknowledged: string): string 
   if ([...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length > 200) throw new Error('Use a board name of 200 characters or fewer.');
   return title;
 }
+/** Open-board renames participate in durable recovery; library actions remain online. */
+export const renameOpenAccountBoard = renameActiveBoard;
 export class BoardActionError extends Error {
   constructor(message: string, readonly uncertain = false) { super(message); }
 }

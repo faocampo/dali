@@ -5,9 +5,8 @@ import BlockSuiteCanvas from './canvas/BlockSuiteCanvas';
 import { Header } from './header/Header';
 import { disposeCanvasRuntime, getCanvasRuntime, getActiveAccessScope, subscribeAccessScope, nextAccessGeneration, suspendAccessScope, type CanvasRuntime } from './canvas/runtime';
 import { RecoveryStateView } from './canvas/RecoveryStateView';
-import { canMutateCurrentScope } from './canvas/account/mutation-guard';
 import { accountBoardUrl, accountIntent } from './boards/preferences';
-import { createAccountBoard, AccountBoardAction, BoardActionError } from './boards/operations';
+import { createAccountBoard, renameOpenAccountBoard } from './boards/operations';
 import { discardRecords } from './canvas/account/outbox';
 import { getSessionState, interruptSession, preserveBeforeNavigation, recoveryBoard, subscribeSession } from './auth/session';
 
@@ -52,19 +51,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   const hasRecovery = recoveryBoard(member.accountId)?.boardId === target;
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (['expired', 'denied', 'error'].includes(state)) heading.current?.focus(); }, [state, target]);
-  const rename = useRef<AccountBoardAction>();
-  const renameBoard = async (title: string) => {
-    const expected = getActiveAccessScope();
-    if (!expected || !canMutateCurrentScope(expected)) throw new BoardActionError('Editing is paused. Retry saving before renaming.');
-    if (rename.current) {
-      const known = await rename.current.check();
-      if (known.status === 'completed') { setBoard(known.result!); rename.current = undefined; return; }
-      rename.current = undefined; throw new BoardActionError('No completed change was found. You can retry the name.');
-    }
-    rename.current = new AccountBoardAction(member.accountId, target, 'rename');
-    try { setBoard(await rename.current.run(title)); rename.current = undefined; }
-    catch (cause) { if (!(cause instanceof BoardActionError && cause.uncertain)) rename.current = undefined; throw cause; }
-  };
+  const renameBoard = renameOpenAccountBoard;
   useEffect(() => {
     const controller = new AbortController(); const generation = nextAccessGeneration();
     setState('loading'); setBoard(undefined); setRuntime(undefined);
@@ -93,7 +80,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   if (state === 'denied') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>You don't have access to this board</h1><p>Ask the board owner to grant access to your internal account.</p><a href="/">Back to your boards</a></section>;
   if (state === 'error') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>We couldn't open this board.</h1><p role="alert">We couldn't open this board. Try again.</p><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/">Back to your boards</a></section>;
   return <div className="djai-app" data-board-id={board!.summary.id}>
-    <Header boardTitle={board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={activeScope?.canWrite ? renameBoard : undefined} onOpenRestored={() => { setRestored(true); setRetry(value => value + 1); }} />
+    <Header boardTitle={activeScope?.title ?? board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={board?.summary.role !== 'viewer' ? renameBoard : undefined} onOpenRestored={() => { setRestored(true); setRetry(value => value + 1); }} />
     <main className="djai-canvas-area"><BlockSuiteCanvas runtime={runtime!} /></main>
   </div>;
 }

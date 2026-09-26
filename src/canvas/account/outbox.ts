@@ -1,6 +1,7 @@
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
 import { SourceAccessError, RecoveryEpochError, validRecoveryEpoch } from './doc-source';
 import * as Y from 'yjs';
+import { validTitleIntent, type TitleIntent, type TitleStore } from './title-intent';
 
 export type JournalScope = { accountId: string; boardId: string; generation: number; recoveryEpoch?: string };
 export type JournalRecord = JournalScope & { id: string; sequence: number; kind: 'document' | 'blob'; resource: string; data: Uint8Array | Blob; mime?: string;
@@ -121,7 +122,39 @@ export async function inspectPendingScopes(accountId: string) {
     const scope = scopes.get(key) ?? { accountId, boardId: record.boardId, epoch: record.epoch, count: 0, legacy: false, corrupt: false };
     scope.count++; scope.legacy ||= record.schemaVersion === undefined; scope.corrupt ||= record.schemaVersion !== undefined && !validRecord(record); scopes.set(key, scope);
   }
+  const titles = await transaction<(TitleIntent & { id: string })[]>(['sequences'], 'readonly', (tx, done) => { const request = tx.objectStore('sequences').getAll(); request.onsuccess = () => done(request.result); });
+  for (const title of titles.filter(row => row.id.startsWith('title:') && row.accountId === accountId)) {
+    const key = JSON.stringify([title.boardId, title.epoch]);
+    const scope = scopes.get(key) ?? { accountId, boardId: title.boardId, epoch: title.epoch, count: 0, legacy: false, corrupt: false };
+    scope.count++; scope.corrupt ||= !validTitleIntent(title); scopes.set(key, scope);
+  }
   return [...scopes.values()];
+}
+/** Metadata shares the existing strict journal database and transactional ID acknowledgment. */
+export function titleIntentStore(scope: JournalScope): TitleStore {
+  assertScope(scope); const id = 'title:' + scopeKey(scope);
+  return {
+    read: () => transaction(['sequences'], 'readonly', (tx, done) => {
+      const request = tx.objectStore('sequences').get(id);
+      request.onsuccess = () => { const row = request.result; if (row && (!validTitleIntent(row) || row.accountId !== scope.accountId || row.boardId !== scope.boardId || row.epoch !== scope.recoveryEpoch)) { tx.abort(); return; } done(row); };
+    }),
+    write: value => transaction(['sequences'], 'readwrite', (tx, done) => {
+      if (!validTitleIntent(value) || value.accountId !== scope.accountId || value.boardId !== scope.boardId || value.epoch !== scope.recoveryEpoch) throw new RecoveryStorageError('CORRUPT');
+      tx.objectStore('sequences').put({ ...value, id }); done(undefined);
+    }),
+    acknowledge: operationId => transaction(['sequences'], 'readwrite', (tx, done) => {
+      const store = tx.objectStore('sequences'); const request = store.get(id);
+      request.onsuccess = () => { if (request.result?.operationId === operationId) store.delete(id); done(undefined); };
+    }),
+  };
+}
+export async function pendingTitleIntents(accountId: string, boardId: string): Promise<TitleIntent[]> {
+  if (!bounded(accountId) || !bounded(boardId)) throw new RecoveryStorageError('CORRUPT');
+  const prefix = 'title:' + JSON.stringify([accountId, boardId]).slice(0, -1) + ',';
+  return transaction(['sequences'], 'readonly', (tx, done) => {
+    const request = tx.objectStore('sequences').getAll(IDBKeyRange.bound(prefix, prefix + '\uffff'));
+    request.onsuccess = () => done(request.result);
+  });
 }
 export async function readCheckpoint(scope: JournalScope, tab: string): Promise<RecoveryCheckpoint | undefined> {
   assertScope(scope);
@@ -183,8 +216,13 @@ export async function acknowledgeRecords(scope: JournalScope, ids: readonly stri
 export async function acknowledgeRecord(id: string, scope: JournalScope) { await acknowledgeRecords(scope, [id]); }
 export async function discardRecords(accountId: string, boardId: string) {
   const ids = (await pendingRecords(accountId, boardId)).map(record => record.id);
+  const titles = await pendingTitleIntents(accountId, boardId);
   // Explicit authorized discard also covers quarantined rows, without trusting epochs.
-  await transaction(['journal'], 'readwrite', (tx, done) => {
+  await transaction(['journal', 'sequences'], 'readwrite', (tx, done) => {
+    for (const title of titles) {
+      const store = tx.objectStore('sequences'); const id = 'title:' + JSON.stringify([accountId, boardId, title.epoch]);
+      const request = store.get(id); request.onsuccess = () => { if (request.result?.operationId === title.operationId) store.delete(id); };
+    }
     for (const id of ids) {
       const store = tx.objectStore('journal'); const request = store.get(id);
       request.onsuccess = () => { if (request.result?.accountId === accountId && request.result?.boardId === boardId) store.delete(id); };
