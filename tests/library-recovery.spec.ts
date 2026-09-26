@@ -105,7 +105,8 @@ test('@04-09-02 fifty long marked cards preserve ordering roles dates and respon
   }
 });
 
-test('@04-09-02 delayed inspection cannot reveal the prior account after account switch', async ({ page, context }) => {
+test('@04-09-02 delayed inspection cannot reveal the prior account after account switch', async ({ page, context, expectErrors }) => {
+  expectErrors.push('Failed to load resource: the server responded with a status of 409 (Conflict)');
   const account = await libraryRecoveryMember(page, service.origin);
   const board = await libraryRecoveryBoard(page, service.origin, account, 'Private previous-account canary');
   await seedLibraryPending(page, account, [board.summary.id]);
@@ -168,7 +169,9 @@ test('@04-09-02 actual acknowledgment clears one board while another pending mar
   const account = await libraryRecoveryMember(page, service.origin);
   const board = await libraryRecoveryBoard(page, service.origin, account);
   const other = await libraryRecoveryBoard(page, service.origin, account, 'Other unresolved board');
-  await seedLibraryPending(page, account, [other.summary.id]);
+  const unresolved = [other.summary.id];
+  for (let index = 0; index < 48; index++) unresolved.push((await libraryRecoveryBoard(page, service.origin, account, 'Unresolved board ' + index)).summary.id);
+  await seedLibraryPending(page, account, unresolved);
   await page.goto(service.origin + '/?board=' + board.summary.id);
   await expect(page.locator('editor-host')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
@@ -178,13 +181,14 @@ test('@04-09-02 actual acknowledgment clears one board while another pending mar
   const library = await context.newPage();
   try {
     await library.goto(service.origin + '/');
-    await expect(library.locator('.board-card__pending')).toHaveCount(2);
+    await expect(library.locator('.board-card__pending')).toHaveCount(50);
     await page.unroute('**/docs/*/push');
     await page.getByRole('button', { name: 'Save failed', exact: true }).click();
-    await page.getByRole('button', { name: 'Retry now', exact: true }).click();
+    await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
     await expect(library.locator('[data-board-id="' + board.summary.id + '"] .board-card__pending')).toHaveCount(0);
     await expect(library.locator('[data-board-id="' + other.summary.id + '"] .board-card__pending')).toHaveCount(1);
+    await expect(library.locator('.board-card__pending')).toHaveCount(49);
   } finally { await library.close(); }
 });
 
@@ -203,7 +207,7 @@ test('@04-09-02 download then leave and explicit restored entry preserve unresol
   expect((await downloaded).suggestedFilename()).toContain('-recovery-');
   expect(await journalRows(page)).toEqual(expect.arrayContaining(before));
   page.on('dialog', dialog => dialog.accept());
-  await page.goto(service.origin + '/');
+  await page.getByRole('link', { name: 'Dalí', exact: true }).click();
   await expect(page.locator('.board-card__pending')).toHaveCount(1);
   service.database.prepare('UPDATE recovery_state SET epoch=? WHERE singleton=1').run('22222222-2222-4222-8222-222222222222');
   await page.unroute('**/docs/*/push');
@@ -212,6 +216,6 @@ test('@04-09-02 download then leave and explicit restored entry preserve unresol
   await page.getByRole('button', { name: 'Open restored board', exact: true }).click();
   await expect(page.locator('editor-host')).toBeVisible();
   expect(await journalRows(page)).toEqual(expect.arrayContaining(before));
-  await page.goto(service.origin + '/');
+  await page.getByRole('link', { name: 'Dalí', exact: true }).click();
   await expect(page.locator('.board-card__pending')).toHaveCount(1);
 });

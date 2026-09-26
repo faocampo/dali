@@ -9,6 +9,7 @@ import { Dropdown } from '../header/Dropdown';
 import logo from '../../imgs/svg/dali-logo-light.svg';
 import { authenticatedRecoveryEpoch, validRecoveryEpoch } from '../canvas/account/doc-source';
 import { inspectAuthorizedPendingBoards, subscribePendingBoardInvalidation, type PendingBoardStatus } from './pending-recovery';
+import './pending-recovery.css';
 
 export type BoardSummary = { id: string; title: string; updatedAt: number; role: 'owner' | 'editor' | 'viewer'; access: 'private' | 'shared'; pendingCount: number; accountId: string; thumbnailUrl?: string };
 export type BoardDescriptor = { summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number; recoveryEpoch: string };
