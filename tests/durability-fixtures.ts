@@ -1,12 +1,55 @@
 import { fork, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
 import { createOidcProvider } from './oidc-provider.js';
 import { IDENTITY_COOKIE } from './oidc-provider.js';
+import { buildApp } from '../server/app.js';
+import { openDatabase } from '../server/storage/database.js';
+import { publishBackup, backupDigest, inspectBackupSet } from '../server/storage/backup.js';
+import type { RestoreReport } from '../server/storage/restore.js';
+import { readRecoveryEpoch } from '../server/storage/recovery-state.js';
+
+/** Owned synthetic restore drill with real SQLite and a private operator ingress header. */
+export async function createRestoreService(assets: string) {
+  const directory = await mkdtemp(join(tmpdir(), 'dali-restore-drill-'));
+  const old = join(directory, 'old'); const fresh = join(directory, 'fresh'); const backups = join(directory, 'backups');
+  for (const path of [old, fresh, backups]) await mkdir(path, { mode: 0o700 });
+  const reservation = createServer(); reservation.listen(0, '127.0.0.1'); await once(reservation, 'listening');
+  const port = (reservation.address() as { port: number }).port;
+  await new Promise<void>(resolve => reservation.close(() => resolve()));
+  const origin = `http://127.0.0.1:${port}`;
+  const operatorToken = randomBytes(32).toString('hex'); const operatorHeaders = { 'x-synthetic-operator': operatorToken };
+  const registration = { clientId: 'synthetic-restore', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
+  const provider = await createOidcProvider({ port: 0, clients: [registration] });
+  const sourceDatabase = join(old, 'database.sqlite'); let database = openDatabase(sourceDatabase);
+  const config = { DALI_ORIGIN: origin, DALI_DATABASE_PATH: sourceDatabase, DALI_SESSION_SECRET: randomBytes(32).toString('hex'), DALI_SESSION_TTL_MS: '86400000',
+    DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret,
+    DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',
+    DALI_BACKUP_DIRECTORY: backups, DALI_BACKUP_INDEPENDENT_STORAGE: 'true', DALI_BACKUP_INTERVAL_MS: '1000' };
+  let ingress = true; let app: Awaited<ReturnType<typeof buildApp>>;
+  async function start() {
+    app = await buildApp({ config, database });
+    app.addHook('onRequest', async (request, reply) => { if (!ingress && request.headers['x-synthetic-operator'] !== operatorToken) return reply.code(503).send({ code: 'SYNTHETIC_MAINTENANCE' }); });
+    app.get('/*', async (request, reply) => { const response = await fetch(assets + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
+    await app.listen({ host: '127.0.0.1', port });
+  }
+  await start();
+  return { origin, operatorHeaders, get database() { return database; },
+    async backup() { const selected = await publishBackup({ database, destination: { directory: backups, independentStorage: true }, applicationVersion: '0.1.0' });
+      const backup = join(backups, selected.id); return { ...selected, backup, manifestDigest: await backupDigest(join(backup, 'manifest.json')) }; },
+    async restore(_selected: { backup: string; manifestDigest: string }, _revoke: { boardId: string; memberId: string }): Promise<RestoreReport> {
+      throw new Error('Restore drill unavailable');
+    },
+    async completeSets() { return inspectBackupSet({ directory: backups, independentStorage: true }); },
+    currentEpoch() { return readRecoveryEpoch(database); },
+    openIngress() { ingress = true; },
+    async close() { await app?.close(); if (database.open) database.close(); await provider.close(); await rm(directory, { recursive: true, force: true }); },
+  };
+}
 
 /** Signed OIDC authorization-code flow for HTTP-only crash tests. */
 export async function durabilityActor(origin: string, identity = 'owner') {
