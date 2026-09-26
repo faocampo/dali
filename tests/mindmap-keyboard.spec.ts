@@ -117,7 +117,7 @@ test('@02-03-01 Shift+Enter retains multiline text and reload installs one handl
   await page.keyboard.press('Shift+Enter'); await page.keyboard.insertText('Second line');
   await page.keyboard.press('Escape');
   expect((await nodes(page))[0]!.text).toBe('First line\nSecond line');
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   await page.reload();
   await expect(page.getByRole('button', { name: 'Add mind map', exact: true })).toBeVisible();
   await page.locator('affine-edgeless-root').evaluate(el => {

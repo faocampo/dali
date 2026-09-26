@@ -132,7 +132,7 @@ test('@03-10-02 different identity receives no previous content or replay even w
   expect((await records(page)).every(record => record.accountId === originalAccount && record.boardId === descriptor.summary.id)).toBe(true);
 });
 test('@03-10-02 persisted pageshow pauses until fresh session and descriptor authorize', async ({ page }) => {
-  const descriptor = await board(page); await text(page, 'BFCache canary'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  const descriptor = await board(page); await text(page, 'BFCache canary'); await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let checks = 0;
   await page.route('**/api/session', async route => { checks++; await barrier; await route.continue(); });
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
@@ -189,7 +189,7 @@ for (const fallback of [false, true]) test(`@03-10-02 cross-tab logout preserves
 });
 test('@03-10-02 explicit logout quota failure retains tab and only sends logout after retry', async ({ page }) => {
   await board(page); await text(page, 'Logout pending canary');
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.evaluate(() => { const put = IDBObjectStore.prototype.put; Object.assign(window, { restoreJournal: () => { IDBObjectStore.prototype.put = put; } }); IDBObjectStore.prototype.put = function (...args) { if (this.transaction.db.name.startsWith('dali-account-recovery')) throw new DOMException('Synthetic quota', 'QuotaExceededError'); return put.apply(this, args); }; });
   let logout = 0; page.on('request', request => { if (request.url().endsWith('/api/logout')) logout++; });
   await page.locator('.board-account summary').click(); await page.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
@@ -213,7 +213,7 @@ for (const resource of ['document', 'image', 'thumbnail'] as const) test.describ
   });
   const descriptor = await board(page); await text(page, 'Delayed identity canary');
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'canary.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes }); await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   if (resource === 'thumbnail') {
     const thumbnail = await page.request.put(origin + '/api/boards/' + descriptor.summary.id + '/thumbnail', { headers: { Origin: origin, 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(database), 'X-Dali-Request': '1', 'Content-Type': 'image/png' }, data: syntheticCanaries().imageBytes }); expect(thumbnail.status()).toBe(200);
   }

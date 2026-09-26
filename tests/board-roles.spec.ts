@@ -56,7 +56,7 @@ async function ownerRead(id: string) {
 }
 test('@CR-07 Viewer import is disabled with an accessible reason and keyboard navigation preserves source', async ({ page }) => {
   const board = await create(page, 'Viewer import canary'); await page.goto(origin + '/?board=' + board.summary.id);
-  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Protected import source'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Protected import source'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await role(page, board.summary.id, 'viewer'); const before = await localState(page); const server = await ownerRead(board.summary.id);
   let choosers = 0; let imports = 0; page.on('filechooser', () => { choosers++; }); page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/imports')) imports++; });
   await page.getByRole('button', { name: 'Main Menu', exact: true }).focus(); await page.keyboard.press('Enter');
@@ -75,8 +75,8 @@ test('@CR-07 Viewer import is disabled with an accessible reason and keyboard na
 });
 test('@CR-06 immediate rename updates all download names and decoded archive metadata', async ({ page }) => {
   const board = await create(page, 'Synthetic old'); await page.goto(origin + '/?board=' + board.summary.id);
-  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Rename export canary'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
-  const name = await editBoardTitle(page); await name.fill('Synthetic new'); await page.getByRole('button', { name: 'Saved', exact: true }).click();
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Rename export canary'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+  const name = await editBoardTitle(page); await name.fill('Synthetic new'); await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).click();
   await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Synthetic new' });
   for (const format of ['board', 'png', 'pdf']) {
     await fileAction(page, 'Export board'); const dialog = page.getByRole('dialog', { name: 'Export board', exact: true });
@@ -89,7 +89,7 @@ test('@CR-06 immediate rename updates all download names and decoded archive met
 });
 test('@CR-04 Viewer menu zoom and fit navigate without native or server mutations', async ({ page }) => {
   const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id);
-  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Viewer fit canary'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Viewer fit canary'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await role(page, board.summary.id, 'viewer'); const before = await localState(page); const server = await ownerRead(board.summary.id);
   const viewport = () => page.locator('affine-edgeless-root').evaluate(el => { const v = (el as HTMLElement & { gfx: GfxController }).gfx.viewport; return { zoom: v.zoom, center: { ...v.center } }; });
   await page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.viewport.setZoom(0.5));
@@ -106,7 +106,7 @@ test('@03-09-01 Viewer native keyboard clipboard drop and history preserve model
   const board = await create(page); await page.goto(origin + '/?board=' + board.summary.id);
   await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Role map canary'); await page.keyboard.press('Enter');
   await page.keyboard.press('Tab'); await page.keyboard.type('Child canary'); await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await role(page, board.summary.id, 'viewer');
   await expect(page.getByRole('button', { name: 'Add sticky note', exact: true })).toHaveCount(0);
   const before = await localState(page); const server = sourceState(board.summary.id); const owner = await ownerRead(board.summary.id);
@@ -181,7 +181,7 @@ for (const access of ['owner', 'editor'] as const) test(`@03-09-01 ${access} nat
     const inputs = await page.evaluate(() => { const probe = (window as unknown as { rolePasteProbe: { inputs: string[]; restore(): void } }).rolePasteProbe; probe.restore(); return probe.inputs; });
     expect(inputs).toEqual(['Writable native clipboard']);
   }
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const saved = await localState(page); await page.reload(); await expect(page.locator('affine-edgeless-root')).toHaveCount(1); await expect(page.locator('affine-edgeless-root')).toBeVisible(); expect((await localState(page)).model).toBe(saved.model);
   if (browserName === 'firefox') { expect(parserErrors).toHaveLength(1); expect(parserErrors[0]!.pasting).toBe(true); }
 });
@@ -195,7 +195,7 @@ test('@03-09-01 Viewer native shape drawing image properties groups connectors a
     const a = surface.addElement({ type: 'shape', xywh: '[0,500,100,100]' }); const b = surface.addElement({ type: 'shape', xywh: '[200,500,100,100]' });
     surface.addElement({ type: 'connector', source: { id: a }, target: { id: b } }); surface.addElement({ type: 'group', children: { [a]: true, [b]: true }, title: 'Group canary' });
   });
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible(); await role(page, board.summary.id, 'viewer');
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible(); await role(page, board.summary.id, 'viewer');
   const before = await localState(page); const server = sourceState(board.summary.id); const owner = await ownerRead(board.summary.id);
   const actions = ['image', 'connector', 'group', 'create', 'delete', 'map-child'] as const;
   for (const action of actions) {
@@ -231,7 +231,7 @@ async function exportSeed(page: Page) {
     surface.addElement({ type: 'shape', shapeType: 'rect', shapeStyle: 'General', filled: true, fillColor: '#ff0000', strokeWidth: 0, xywh: `[${root.x + root.w + 350},${root.y},100,100]` });
     return { frame, image: image.id, map: map.id };
   });
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible(); return { board, ids };
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible(); return { board, ids };
 }
 async function downloadBytes(page: Page) {
   const downloading = page.waitForEvent('download'); await page.getByRole('dialog').getByRole('button', { name: 'Download', exact: true }).click();
@@ -311,7 +311,7 @@ test('system Viewer creator retains Owner controls and owns an independent copy'
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
   await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.insertText('Owned content'); await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Main Menu', exact: true }).click();
   await page.getByRole('menuitem', { name: 'File', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Duplicate board', exact: true }).click();

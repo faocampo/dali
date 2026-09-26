@@ -52,7 +52,7 @@ test('@04-12-02 selected native restore reopens cold authorized content and quar
     await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type('Restored synthetic canary'); await page.keyboard.press('Escape');
     const png = syntheticCanaries().imageBytes;
     await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: png });
-    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     const before = await snapshot(page); expect(before.images).toHaveLength(1); expect(before.images[0]!.hash).toBe(createHash('sha256').update(png).digest('hex'));
     const maintenanceStarted = Date.now(); await service.plannedRestart();
     const maintenanceBrowser = await browser.newContext({ baseURL: service.origin, extraHTTPHeaders: service.operatorHeaders }); contexts.push(maintenanceBrowser);

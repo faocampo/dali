@@ -9,8 +9,8 @@ import { createHash } from 'node:crypto';
 import { recoveryArchiveFixtures, recoveryAuthorizationBarrier } from './recovery-archive-fixtures';
 
 async function startRecovery(page: Page) {
-  const paused = page.getByRole('button', { name: 'Editing paused', exact: true });
-  await (await paused.count() ? paused : page.getByRole('button', { name: 'Save failed', exact: true })).click();
+  const paused = page.getByRole('button', { name: 'Editing paused, Open save details', exact: true });
+  await (await paused.count() ? paused : page.getByRole('button', { name: 'Save failed, Open save details', exact: true })).click();
 }
 async function pending(page: Page) {
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
@@ -43,7 +43,7 @@ test('@04-06-01 zero-image pending board downloads a timestamped editable recove
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
   await expect.poll(async () => (await journalRows(page)).length).toBeGreaterThan(0);
-  await page.getByRole('button', { name: 'Save failed', exact: true }).click();
+  await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
   expect((await download).suggestedFilename()).toMatch(/-recovery-\d{4}-.*\.bs\.zip$/);
@@ -64,13 +64,13 @@ test('@04-06-01 native pending map geometry connectors adjusted images round tri
   });
   const raster = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = 200; canvas.height = 100; const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#80a040'; ctx.fillRect(0, 0, 200, 100); return canvas.toDataURL().split(',')[1]!; });
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'Synthetic adjustable.png', mimeType: 'image/png', buffer: Buffer.from(raster, 'base64') });
-  await expect(page.locator('affine-edgeless-image')).toHaveCount(1); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.locator('affine-edgeless-image')).toHaveCount(1); await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Fit to screen', exact: true }).click(); await page.locator('affine-edgeless-image').click();
   await page.locator('.selection-inspector').getByRole('button', { name: 'Crop', exact: true }).click();
   await page.getByRole('button', { name: 'Crop left', exact: true }).press('Shift+ArrowRight'); await page.getByRole('button', { name: 'Apply crop', exact: true }).click();
   await page.locator('.image-slider').filter({ hasText: 'Brightness' }).locator('input').fill('20');
   await expect.poll(async () => (await semantic(page)).edits.some(e => (e as Record<string, unknown>).brightness === 20)).toBe(true);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await pending(page); const before = await semantic(page); await startRecovery(page);
   const downloadPromise = page.waitForEvent('download', { timeout: 20000 }); await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
   const archive = await readDownload(await downloadPromise); const entries = unzipSync(archive);
@@ -95,13 +95,13 @@ test('@04-06-01 native pending map geometry connectors adjusted images round tri
 test('@04-06-01 paused memory remains downloadable offline with retained image bytes', async ({ page, baseURL }) => {
   await recoveryBoardFixture(page, baseURL!); await addSavedImage(page); await failRecoveryStorage(page, 'quota');
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toBeVisible();
   await page.route('**/api/**', route => route.abort('internetdisconnected'));
   await startRecovery(page); const download = page.waitForEvent('download', { timeout: 20000 });
   await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
   const entries = unzipSync(await readDownload(await download)); expect(Object.keys(entries).some(path => path.startsWith('assets/'))).toBe(true);
   expect(Buffer.from(Object.entries(entries).find(([key]) => key.endsWith('.snapshot.json'))![1]).toString()).toContain('affine:note');
-  await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toBeVisible();
 });
 
 test('@04-06-01 access loss during delayed authorization prevents all downloads', async ({ page, context, baseURL }) => {
@@ -124,7 +124,7 @@ test('@04-06-02 preparing state survives details reopening and coalesces duplica
   await expect.poll(barrier.held).toBe(1);
   await expect(page.getByText(recoveryArchiveFixtures.loading.label, { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download recovery copy', exact: true })).toBeDisabled();
-  await page.getByRole('button', { name: 'Save failed', exact: true }).click(); await page.getByRole('button', { name: 'Save failed', exact: true }).click();
+  await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click(); await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
   await expect(page.getByText(recoveryArchiveFixtures.loading.label, { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
   await expect(page.locator('affine-edgeless-note')).toHaveCount(2); barrier.release();
@@ -132,7 +132,7 @@ test('@04-06-02 preparing state survives details reopening and coalesces duplica
   const entries = unzipSync(await readDownload(downloads[0]!)); const text = Buffer.from(Object.entries(entries).find(([key]) => key.endsWith('.snapshot.json'))![1]).toString();
   expect((text.match(/"flavour":"affine:note"/g) ?? []).length).toBe(1);
   const afterIds = (await journalRows(page)).map(row => row.id); expect(beforeIds.every(id => afterIds.includes(id))).toBe(true);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toHaveCount(0);
 });
 
 test('@04-06-02 missing required bytes expose a named retryable error and preserve pending IDs at narrow widths', async ({ page, baseURL }, testInfo) => {
@@ -158,7 +158,7 @@ test('@04-06-02 missing required bytes expose a named retryable error and preser
   available = true; await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
   await expect.poll(() => downloads.length).toBe(1); await expect(page.getByText(recoveryArchiveFixtures.populated.label, { exact: true })).toBeVisible();
   const after = (await journalRows(page)).map(row => row.id); expect(before.every(id => after.includes(id))).toBe(true);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toHaveCount(0);
 });
 
 test('@04-06-02 missing visual preview still exports retained complete image bytes', async ({ page, baseURL }) => {

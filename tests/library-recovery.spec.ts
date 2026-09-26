@@ -174,18 +174,18 @@ test('@04-09-02 actual acknowledgment clears one board while another pending mar
   await seedLibraryPending(page, account, unresolved);
   await page.goto(service.origin + '/?board=' + board.summary.id);
   await expect(page.locator('editor-host')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Save failed', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Save failed, Open save details', exact: true })).toBeVisible();
   const library = await context.newPage();
   try {
     await library.goto(service.origin + '/');
     await expect(library.locator('.board-card__pending')).toHaveCount(50);
     await page.unroute('**/docs/*/push');
-    await page.getByRole('button', { name: 'Save failed', exact: true }).click();
+    await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
     await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     await expect(library.locator('[data-board-id="' + board.summary.id + '"] .board-card__pending')).toHaveCount(0);
     await expect(library.locator('[data-board-id="' + other.summary.id + '"] .board-card__pending')).toHaveCount(1);
     await expect(library.locator('.board-card__pending')).toHaveCount(49);
@@ -197,10 +197,10 @@ test('@04-09-02 download then leave and explicit restored entry preserve unresol
   const board = await libraryRecoveryBoard(page, service.origin, account);
   await page.goto(service.origin + '/?board=' + board.summary.id);
   await expect(page.locator('editor-host')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
-  await page.getByRole('button', { name: 'Save failed', exact: true }).click();
+  await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
   const before = await journalRows(page);
   const downloaded = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
@@ -212,7 +212,7 @@ test('@04-09-02 download then leave and explicit restored entry preserve unresol
   service.database.prepare('UPDATE recovery_state SET epoch=? WHERE singleton=1').run('22222222-2222-4222-8222-222222222222');
   await page.unroute('**/docs/*/push');
   await page.getByRole('link', { name: 'Open Synthetic pending board', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Recovery needs attention', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recovery needs attention, Open save details', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Open restored board', exact: true }).click();
   await expect(page.locator('editor-host')).toBeVisible();
   expect(await journalRows(page)).toEqual(expect.arrayContaining(before));

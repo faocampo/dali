@@ -65,7 +65,7 @@ for (const route of ['native', 'custom', 'shortcut'] as const) test(`topic ${rou
       map.toggleCollapse(map.getNode(id)!, { layout: true });
     }, branch.id);
     expect((await state(page)).maps[0]!.nodes.filter(n => before.maps[0]!.nodes.some(old => old.id === n.id))).toEqual(before.maps[0]!.nodes);
-    await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
     const saved = await state(page); await page.reload();
     await expect.poll(() => state(page)).toEqual(saved);
   }

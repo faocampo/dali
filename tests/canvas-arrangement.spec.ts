@@ -182,7 +182,7 @@ test('native contextual style controls persist the selected shape color', async 
   await page.getByRole('button', { name: 'Color', exact: true }).click();
   await page.getByRole('listbox', { name: 'Fill color', exact: true }).locator('edgeless-color-button').nth(3).click();
   await expect.poll(async () => (await state(page))[0]?.color).not.toBe(original.color);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const colored = await state(page);
   await page.reload();
   await expect(page.getByTestId('board-action-menu')).toBeVisible();

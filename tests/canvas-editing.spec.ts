@@ -55,7 +55,7 @@ test('native drawing tools create editable shapes, frames, arrows and freehand',
   const fittedCenter=await currentShapePoint();
   await page.mouse.click(fittedCenter.x, fittedCenter.y);
   await expect(page.getByRole('button', { name: 'Switch shape type', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const before = await models(page);
   await page.reload();
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
@@ -87,7 +87,7 @@ for (const size of [{ width: 1280, height: 800 }, { width: 900, height: 700 }]) 
     await expect(page.locator('edgeless-text-editor [contenteditable="true"]')).toBeFocused();
     await page.keyboard.insertText('Editable text');
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     const before = await read();
     await page.reload();
     await expect(page.getByTestId('board-action-menu')).toBeVisible();

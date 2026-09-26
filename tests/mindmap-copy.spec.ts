@@ -95,7 +95,7 @@ for (const route of ['duplicate', 'clipboard'] as const) test(`@02-02-01 ${route
     map.layout(); gfx.doc.captureSync();
   }, copy.id);
   expect((await state(page)).maps.find(m => m.id === ids.map)).toEqual(source);
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   const beforeReload = await state(page);
   await page.reload();
   await expect.poll(() => state(page)).toEqual(beforeReload);
@@ -120,7 +120,7 @@ test('@02-02-01 board copy regenerates identities and retains independent typogr
     const labels = new Map(map.nodes.map(node => [node.id, node.text]));
     return map.nodes.map(({ id: _id, parent, ...node }) => ({ ...node, parent: parent ? labels.get(parent) : undefined }));
   });
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   await fileAction(page, 'All boards');
   await boardAction(page.locator(`.board-card[data-board-id="${new URL(sourceUrl).searchParams.get('board')}"]`), 'Duplicate board');
   const dialog = page.getByRole('dialog', { name: 'Duplicate board', exact: true }); const title = 'Synthetic typography copy ' + crypto.randomUUID();
@@ -138,13 +138,13 @@ test('@02-02-01 board copy regenerates identities and retains independent typogr
     gfx.surface!.updateElement(map.tree.id, { fontSize: 40, fontWeight: '400', color: '#991122' });
     map.layout(); gfx.doc.captureSync();
   });
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   const changed = await state(page);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect.poll(async () => (await state(page)).maps[0]!.nodes.find(n => !n.parent)!.fontSize).toBe(29);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect.poll(() => state(page)).toEqual(changed);
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   await page.reload(); await expect.poll(() => state(page)).toEqual(changed);
   await fileAction(page, 'All boards');
   await page.locator(`a[href="/${new URL(sourceUrl).search}"]`).click();

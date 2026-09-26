@@ -54,7 +54,7 @@ test('@02-03-02 nested collapse has direct-child accessible count and exact undo
   }, ids);
   expect(state.nested).toBe(true); expect(state.hidden).toBe(true); expect(state.selected).toEqual([ids.a]);
   expect(state.texts).toHaveLength(7);
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   const expanded = await snapshot(page);
   await page.reload(); await expect.poll(() => snapshot(page)).toEqual(expanded);
 });

@@ -52,7 +52,7 @@ test('@04-01-01 acknowledged native sticky and PNG survive SIGKILL and cold sign
     const uploaded = page.waitForResponse(r => r.url().includes('/blobs/') && r.request().method() === 'PUT' && r.ok());
     await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: png });
     expect(await (await uploaded).json()).toMatchObject({ acknowledged: true });
-    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     const before = await snapshot(page); expect(before.images).toHaveLength(1);
     expect(before.images[0]!.hash).toBe(createHash('sha256').update(png).digest('hex'));
     await first.close(); await service.killAndRestart();

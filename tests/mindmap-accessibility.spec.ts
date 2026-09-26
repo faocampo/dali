@@ -82,7 +82,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await expect(panel).toHaveCount(0);
     await expect(page.locator('editor-host')).toBeFocused();
     expect(await page.locator('.djai-header').boundingBox()).toEqual(headerBefore);
-    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     expect(await page.locator('affine-edgeless-root').evaluate(el => ((el as HTMLElement & { gfx: GfxController }).gfx.selection.selectedElements[0] as unknown as { fontSize: number }).fontSize)).toBe(changed ? 24 : 20);
     await page.keyboard.press('Escape'); await page.keyboard.press('Tab');
     expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
@@ -123,7 +123,7 @@ test('@02-05-03 empty loading populated partial and long-text states retain usab
   await openMindmapProperties(page);
   await expect(page.getByRole('status').filter({ hasText: 'Level 1. Parent: Empty topic.' })).toBeVisible();
   await expect(page.getByText('Start a mind map', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
 });
 
 test('@02-05-03 live counts readonly controls error retry and zoomed-out canvas', async ({ page }) => {

@@ -19,10 +19,10 @@ for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses n
   await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type('Retained recovery canary'); await page.keyboard.press('Escape');
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'I'.repeat(120) + '.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes });
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await failRecoveryStorage(page, mode);
   await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type(' Preserved in memory');
-  await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toBeVisible();
   const before = await nativeRecoveryModel(page);
   await expect(page.locator('editor-host')).toBeVisible();
   await page.keyboard.type('DENIED'); await page.keyboard.press('Backspace'); await page.keyboard.press('ControlOrMeta+z'); await page.keyboard.press('ControlOrMeta+Shift+z');
@@ -45,13 +45,13 @@ for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses n
   await page.locator('affine-edgeless-note').click(); await page.keyboard.press('Delete');
   await page.mouse.move(700, 500); await page.keyboard.down('Space'); await page.mouse.down(); await page.mouse.move(760, 530); await page.mouse.up(); await page.keyboard.up('Space');
   expect(await nativeRecoveryModel(page)).toBe(before);
-  await page.getByRole('button', { name: 'Editing paused', exact: true }).click();
+  await page.getByRole('button', { name: 'Editing paused, Open save details', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Retry saving', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download recovery copy', exact: true })).toBeVisible();
   if (mode === 'quota') {
     const downloading = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
     expect((await downloading).suggestedFilename()).toMatch(/\.bs\.zip$/);
-    await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toBeVisible();
   }
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [1440, 900, 600, 490, 320]) {
@@ -66,11 +66,11 @@ for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses n
   await page.getByRole('button', { name: 'Retry saving', exact: true }).focus();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Retry saving', exact: true })).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toBeFocused();
-  await page.getByRole('button', { name: 'Editing paused', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: 'Editing paused, Open save details', exact: true }).click();
   await restoreRecoveryStorage(page);
   await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Editing paused', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Add sticky note', exact: true })).toBeEnabled();
 });
 for (const kind of ['corrupt', 'restore'] as const) test(`@04-04-03 ${kind} retains isolated journal and distinct recovery actions`, async ({ page, baseURL }) => {
@@ -85,7 +85,7 @@ for (const kind of ['corrupt', 'restore'] as const) test(`@04-04-03 ${kind} reta
   }), kind);
   const before = await journalRows(page);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Recovery needs attention', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recovery needs attention, Open save details', exact: true })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0); expect(await journalRows(page)).toEqual(before);
   if (kind === 'corrupt') {
     await expect(page.getByText("These pending changes could not be opened safely. Keep this browser's data and contact your operator for recovery help.", { exact: true })).toBeVisible();

@@ -37,7 +37,7 @@ for (const [name, mode] of [['straight', 0], ['angled', 1], ['curved', 2]] as co
     await expect.poll(async () => (await labels(page))[0]?.bounds?.[3]).toBeGreaterThan(40);
     await page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.doc.redo());
     await expect.poll(async () => (await labels(page))[0]?.bounds?.[3]).toBeLessThan(30);
-    await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
     await page.reload();
     await expect.poll(async () => (await labels(page))[0]?.bounds).toEqual(long.bounds);
   });
@@ -89,7 +89,7 @@ for (const timeout of [false, true]) test(`slow bundled fonts preserve connector
     gfx.surface!.addElement({ type: 'connector', source: { position: [250, 250] }, target: { position: [1000, 350] }, mode: 0, text: 'Release\nplan', labelXYWH: [0, 0, 16, 16] });
   });
   await expect.poll(async () => (await labels(page))[0]?.bounds?.[3]).toBeGreaterThan(30);
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   const before = (await labels(page))[0]!;
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });

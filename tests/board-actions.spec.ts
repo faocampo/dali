@@ -58,7 +58,7 @@ for (const sourceRole of ['owner', 'editor']) test(`@CR-02 @CR-07 ${sourceRole} 
     const response = await page.request.get(`${origin}/api/boards/${board.summary.id}/editable-export`, { headers: { 'X-Dali-Account': accountId } });
     return response.ok() ? (await response.json()).manifest.length : 0;
   }).toBe(1);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   if (sourceRole === 'editor') {
     await page.context().clearCookies(); await page.goto(origin + '/auth/start'); await page.getByRole('link', { name: 'Synthetic Editor', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
@@ -105,7 +105,7 @@ for (const sourceRole of ['owner', 'editor']) test(`@CR-02 @CR-07 ${sourceRole} 
 });
 for (const failure of ['failed', 'held']) test(`@CR-03 active duplicate preserves visible pending edits with ${failure} pushes`, async ({ page }) => {
   const board = await create(page, 'Pending source'); await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
-  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Acknowledged A'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add mind map', exact: true }).click(); await page.keyboard.type('Acknowledged A'); await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const acknowledged = sourceState(board.summary.id); let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; }); let pushes = 0;
   const pattern = '**/api/boards/' + board.summary.id + '/docs/*/push';
   await page.route(pattern, async route => { pushes++; if (failure === 'held') { await gate; return route.continue(); } return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }); });
@@ -243,7 +243,7 @@ test('@03-08-01 native map image duplicate has fresh identities private ownershi
   const image = syntheticCanaries().imageBytes;
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic-canary.png', mimeType: 'image/png', buffer: image });
   await expect.poll(() => database.prepare('SELECT count(*) AS n FROM board_blobs WHERE board_id=?').get(board.summary.id)).toEqual({ n: 1 });
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const native = () => page.locator('editor-host').evaluate(el => {
     const host = el as EditorHost; const root = host.querySelector('affine-edgeless-root') as HTMLElement & { gfx: GfxController }; const surface = root.gfx.surface!;
     const map = surface.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel;
@@ -320,7 +320,7 @@ test('@03-08-02 inline loading guards repeated commits and uncertain failure ret
   expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Pending name' }); await page.getByRole('button', { name: 'Check again' }).click(); await expect(input).toBeEnabled();
   await page.unroute('**/api/boards/' + board.summary.id); await input.fill('Corrected draft'); await input.press('Tab');
   await expect.poll(() => database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Corrected draft' });
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Share board', exact: true })).toBeFocused();
   await editBoardTitle(page); await input.fill('界'.repeat(201)); await input.press('Enter'); await expect(input).toHaveValue('界'.repeat(201)); await expect(page.getByRole('alert')).toContainText('200');

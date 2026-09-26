@@ -46,7 +46,7 @@ test('creates, edits and reopens exactly one locally stored sticky note', async 
   await page.keyboard.type('Synthetic local canvas idea');
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await notes(page)).notes.map(n => n.text)).toEqual(['Synthetic local canvas idea']);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const stored = await notes(page);
   await page.reload();
   await expect(page.locator('affine-edgeless-root')).toHaveCount(1);
@@ -58,7 +58,7 @@ test('creates, edits and reopens exactly one locally stored sticky note', async 
 test('repeated editor reopen preserves IDs without duplicate objects or handlers', async ({ page }) => {
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect(page.locator('affine-edgeless-note')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const stored = await notes(page);
   const originalUrl = page.url();
   for (let repeat = 0; repeat < 3; repeat += 1) {
@@ -90,7 +90,7 @@ test('cancelled editor setup never attaches a second host', async ({ page }) => 
 
 test('interrupted mounting and rapid board switching keep the final board isolated', async ({ page }) => {
   await page.getByRole('button', { name: 'Add sticky note' }).click();
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const first = await notes(page);
   const firstUrl = page.url();
   await fileAction(page, 'All boards');
@@ -122,7 +122,7 @@ test('interrupted mounting and rapid board switching keep the final board isolat
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
   await page.getByRole('button', { name: 'Add sticky note' }).click();
   await expect.poll(async () => (await notes(page)).notes.length).toBe(1);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await fileAction(page, 'All boards');
   await page.locator(`a[href="/${new URL(firstUrl).search}"]`).click();
   await expect.poll(() => notes(page)).toEqual(first);
@@ -131,7 +131,7 @@ test('interrupted mounting and rapid board switching keep the final board isolat
 test.describe('account recovery write failures', () => {
   test.use({ expectErrors: ['Synthetic storage quota'] });
   test('a failed IndexedDB write is reported without a saved acknowledgement', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     const session = await (await page.request.get('/api/session')).json();
     const boardId = new URL(page.url()).searchParams.get('board');
     const read = async () => { const response = await page.request.get(`/api/boards/${boardId}/editable-export`, { headers: { 'X-Dali-Account': session.accountId } }); expect(response.status()).toBe(200); return response.json(); };
@@ -150,7 +150,7 @@ test.describe('account recovery write failures', () => {
     await page.getByRole('button', { name: 'Add sticky note' }).click();
     await expect(page.getByRole('button', { name: 'Retry preservation', exact: true })).toBeVisible();
     expect(await page.evaluate(() => (window as unknown as { quotaProbe: { failures: number } }).quotaProbe.failures)).toBeGreaterThan(0);
-    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toHaveCount(0);
     const pending = await notes(page); expect(pending.notes).toHaveLength(1);
     expect(await read()).toEqual(before);
     await expect(page.getByText('Pending changes could not be secured for sign-in. Keep this tab open and retry preservation.', { exact: true })).toBeVisible();
@@ -161,7 +161,7 @@ test.describe('account recovery write failures', () => {
     await expect(page.getByTestId('board-action-menu')).toBeVisible();
     await expect(page.locator('editor-host')).toHaveCount(1);
     await expect.poll(() => notes(page)).toEqual(pending);
-    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     await page.reload(); await expect(page.locator('editor-host')).toHaveCount(1); await expect.poll(() => notes(page)).toEqual(pending);
   });
 });

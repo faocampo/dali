@@ -28,7 +28,7 @@ test('shape typography preserves geometry, accepts small fonts and persists', as
   expect((await shapeState(page)).xywh).toBe(original.xywh);
   await page.getByRole('combobox', { name: 'Font', exact: true }).selectOption({ label: 'Kalam' });
   await expect.poll(async () => (await shapeState(page)).family).toContain('Kalam');
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.reload(); await expect(page.locator('affine-edgeless-root')).toBeVisible();
   await expect.poll(async () => (await shapeState(page)).fontSize).toBe(10);
   expect((await shapeState(page)).xywh).toBe(original.xywh);
@@ -82,9 +82,9 @@ test('font options, thickness, connector endpoint position and eraser are usable
 
 for (const width of [1400, 390]) test(`compact header and image recovery at ${width}`, async ({ page }, info) => {
   await page.setViewportSize({ width, height: 850 }); await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await expect(page.locator('.board-document-heading .save-age')).toHaveText('just now');
-  const titleBox = (await page.locator('.board-title-control').boundingBox())!; const savedBox = (await page.getByRole('button', { name: 'Saved', exact: true }).boundingBox())!;
+  const titleBox = (await page.locator('.board-title-control').boundingBox())!; const savedBox = (await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).boundingBox())!;
   if (width > 900) expect(savedBox.x - (titleBox.x + titleBox.width)).toBeLessThan(24);
   await expect(page.locator('.djai-header-actions > .board-role')).toHaveCount(0);
   await page.getByLabel('Account for Synthetic Owner').click(); await expect(page.locator('.board-account .board-role')).toHaveText('Owner');

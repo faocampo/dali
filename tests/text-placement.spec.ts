@@ -49,7 +49,7 @@ test('draws before creation, focuses a visible caret, wraps, reopens and persist
   await page.keyboard.press('ControlOrMeta+End'); await page.keyboard.type(' Reopened.');
   await page.mouse.click(850, 650);
   await expect.poll(async () => (await texts(page))[0]?.text).toContain('Reopened.');
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const saved = await texts(page); await page.reload();
   await expect.poll(async () => (await texts(page)).map(t => [t.id, t.text, t.w])).toEqual(saved.map(t => [t.id, t.text, t.w]));
 });

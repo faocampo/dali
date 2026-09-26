@@ -49,7 +49,7 @@ async function seedLocal(page: Page, titles = ['Legacy map canary', 'Unselected 
   });
   const image = syntheticCanaries().imageBytes;
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'canary.png', mimeType: 'image/png', buffer: image });
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await expect.poll(() => database.prepare('SELECT count(*) AS n FROM board_blobs WHERE board_id=?').get(board.summary.id)).toEqual({ n: 1 });
   const semantic = await nativeSemantic(page);
   await fileAction(page, 'Export board'); const pending = page.waitForEvent('download');

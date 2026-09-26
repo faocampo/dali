@@ -6,7 +6,7 @@ export async function addSavedImage(page: Page, name = 'Synthetic image.png') {
   const bytes = syntheticCanaries().imageBytes;
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name, mimeType: 'image/png', buffer: bytes });
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   return bytes;
 }
 

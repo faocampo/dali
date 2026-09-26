@@ -54,7 +54,7 @@ test('@02-01-02 explicit native typography survives layout and preset fitting', 
   });
   expect(result).toEqual(Array.from({ length: 7 }, () => [31, '700', '#123456']));
   await expect(page.locator('img[src="x"]')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   const before = await snapshot(page);
   await page.reload();
   await expect.poll(() => snapshot(page)).toEqual(before);
@@ -175,7 +175,7 @@ test('@02-01-02 board transformer copy keeps document-scoped hierarchy independe
     const labels = new Map(nodes.map(node => [node.id, node.text]));
     return nodes.map(({ id: _id, parent, ...node }) => ({ ...node, parent: parent ? labels.get(parent) : undefined }));
   };
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   await fileAction(page, 'All boards');
   const original = page.locator(`.board-card[data-board-id="${new URL(sourceUrl).searchParams.get('board')}"]`);
   await boardAction(original, 'Duplicate board');
@@ -193,7 +193,7 @@ test('@02-01-02 board transformer copy keeps document-scoped hierarchy independe
     map.layout();
     gfx.doc.captureSync();
   });
-  await page.getByRole('button', { name: 'Saved', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
   await fileAction(page, 'All boards');
   await page.locator(`a[href="/${new URL(sourceUrl).search}"]`).click();
   await expect.poll(() => snapshot(page)).toEqual(before);

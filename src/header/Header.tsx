@@ -5,12 +5,12 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { DaliMenu } from './DaliMenu';
 import { BoardTitleMenu } from './BoardTitleMenu';
 import logo from '../../imgs/svg/dali-symbol-color.svg';
-import { downloadRecoveryCopy, recoveryDownloadScope } from '../canvas/recovery-archive';
-import { getActiveAccessScope, subscribeAccessScope, retryRecovery } from '../canvas/runtime';
-import { RecoveryStateView } from '../canvas/RecoveryStateView';
+import { recoveryDownloadScope } from '../canvas/recovery-archive';
+import { getActiveAccessScope, subscribeAccessScope } from '../canvas/runtime';
+import { SaveDetails, saveDetailsCopy } from './SaveDetails';
 import { createAccountBoard } from '../boards/operations';
 import { accountBoardUrl } from '../boards/preferences';
-import { getSaveStatus, subscribeSaveStatus, getRecoveryDownloadState, subscribeRecoveryDownloadState } from '../canvas/save-status';
+import { getSaveStatus, getAccountSaveSnapshot, subscribeSaveStatus, getRecoveryDownloadState, subscribeRecoveryDownloadState } from '../canvas/save-status';
 import { ExportDialog } from './ExportDialog';
 import type { BoardDescriptor } from '../boards/BoardLibrary';
 import type { SessionDescriptor } from '../auth/AuthBoundary';
@@ -35,14 +35,17 @@ export function Header({
   const [sharing, setSharing] = useState(false);
   const [action, setAction] = useState<'rename' | 'duplicate' | 'delete'>();
   const [saveHelpOpen, setSaveHelpOpen] = useState(false);
-  const [retryError, setRetryError] = useState<string | null>(null);
+  const saveTrigger = useRef<HTMLButtonElement>(null);
+  const closeSaveDetails = useCallback((restore = false) => { setSaveHelpOpen(false); if (restore) saveTrigger.current?.focus(); }, []);
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 10000); return () => clearInterval(timer); }, []);
   const saveStatus = useSyncExternalStore(subscribeSaveStatus, getSaveStatus);
   const scope = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
   const downloadState = useSyncExternalStore(subscribeRecoveryDownloadState, getRecoveryDownloadState);
   const downloadStatus = scope && downloadState.scope === recoveryDownloadScope(scope) ? downloadState : undefined;
-  const recovering = scope?.recoveryState && ['storage-paused', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(scope.recoveryState);
+  const accountSave = getAccountSaveSnapshot();
+  const saveCopy = saveDetailsCopy(saveStatus, accountSave, scope);
+  useEffect(() => setSaveHelpOpen(false), [scope?.accountId, scope?.boardId, scope?.generation]);
   type Creation = { id: string; accountId: string; generation: number; tab: Window | null; state: 'pending' | 'error' | 'ready'; href?: string };
   const [creations, setCreations] = useState<Creation[]>([]);
   const lifetime = useRef(new AbortController());
@@ -112,54 +115,18 @@ export function Header({
       {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
-        {recovering && <RecoveryStateView state={scope.recoveryState!} compact retry={retryRecovery} openRestored={onOpenRestored} download={scope.role !== 'viewer' ? downloadRecoveryCopy : undefined} downloadStatus={downloadStatus} />}
-        <div className="djai-save" hidden={!!recovering}>
-          <button
-            type="button"
-            className={`djai-save__status djai-save__status--${saveStatus.state}`}
-            aria-haspopup={saveStatus.state === 'failed' ? 'dialog' : undefined}
-            aria-expanded={saveStatus.state === 'failed' ? saveHelpOpen : undefined}
-            aria-label={saveStatus.state === 'saved' ? 'Saved' : saveStatus.label}
-            title={saveStatus.savedAt ? `Last saved ${new Date(saveStatus.savedAt).toLocaleTimeString()}` : undefined}
-            aria-live="polite"
-            onClick={() => {
-              if (saveStatus.state === 'failed') setSaveHelpOpen((open) => !open);
-            }}
-          >
-            <span aria-hidden="true" />
-            {saveStatus.state === 'saved' ? 'Saved' : saveStatus.label}
-            {saveStatus.savedAt && <small className="save-age" aria-hidden="true">{formatSaveAge(saveStatus.savedAt, now)}</small>}
+        <div className="djai-save">
+          <button ref={saveTrigger} type="button" className={`djai-save__status djai-save__status--${scope?.role === 'viewer' ? 'saved' : saveStatus.state}`}
+            aria-haspopup="dialog" aria-expanded={saveHelpOpen} aria-controls="save-details"
+            aria-label={`${saveCopy.label}, Open save details`}
+            aria-describedby={saveStatus.savedAt && scope?.role !== 'viewer' ? 'save-age' : undefined}
+            title={saveStatus.savedAt && scope?.role !== 'viewer' ? `Last saved ${new Date(saveStatus.savedAt).toLocaleTimeString()}` : undefined}
+            onClick={() => setSaveHelpOpen(open => !open)}>
+            <span aria-hidden="true" />{saveCopy.label}
+            {saveStatus.savedAt && scope?.role !== 'viewer' && <small id="save-age" className="save-age">{formatSaveAge(saveStatus.savedAt, now)}</small>}
           </button>
-          {saveStatus.state === 'failed' && saveHelpOpen && (
-            <div className="djai-save__recovery" role="dialog" aria-label="Local save recovery" style={{ zIndex: 40, maxHeight: 'calc(100dvh - 112px)', overflowY: 'auto' }}>
-              <strong>Your board is still open</strong>
-              <p>{retryError ?? saveStatus.message}</p>
-              {downloadStatus && <p role={downloadStatus.phase === 'error' ? 'alert' : 'status'} style={{ overflowWrap: 'anywhere' }}>{downloadStatus.label}{downloadStatus.message && ` ${downloadStatus.message}`}</p>}
-              <div style={{ flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className="djai-ghost"
-                  onClick={() => {
-                    setRetryError(null);
-                    void Promise.resolve(retryRecovery())
-                      .catch((cause: unknown) =>
-                        setRetryError(cause instanceof Error ? cause.message : String(cause))
-                      );
-                  }}
-                >
-                  Retry saving
-                </button>
-                {board?.summary.role !== 'viewer' && <button
-                  type="button"
-                  className="djai-primary"
-                  disabled={downloadStatus?.phase === 'preparing'}
-                  onClick={() => { setRetryError(null); void downloadRecoveryCopy().catch(() => undefined); }}
-                >
-                  Download recovery copy
-                </button>}
-              </div>
-            </div>
-          )}
+          <span className="save-announcement" role={saveStatus.state === 'failed' && scope?.role !== 'viewer' ? 'alert' : 'status'}>{saveCopy.label}{downloadStatus && scope?.role !== 'viewer' && downloadStatus.phase !== 'error' && ` ${downloadStatus.label}`}</span>
+          {saveHelpOpen && <SaveDetails key={`${scope?.accountId}:${scope?.boardId}:${scope?.generation}`} status={saveStatus} snapshot={accountSave} scope={scope} downloadStatus={downloadStatus} trigger={saveTrigger} onClose={closeSaveDetails} onOpenRestored={onOpenRestored} />}
         </div>
       </div>
 
