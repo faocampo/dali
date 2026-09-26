@@ -65,6 +65,7 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
 }
 
 let accountSnapshot: SaveSnapshot | undefined;
+export const getAccountSaveSnapshot = () => accountSnapshot;
 export function dispatchSaveEvent(event: SaveEvent) {
   if (!accountSnapshot) return;
   const next = reduceSaveStatus(accountSnapshot, event); if (next === accountSnapshot) return;

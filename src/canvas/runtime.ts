@@ -1,7 +1,8 @@
 import type { Store, Workspace } from '@blocksuite/affine/store';
 import { validDescriptor, type BoardDescriptor, type BoardSummary } from '../boards/BoardLibrary';
 import type { AccountWorkspaceOptions, BoardWorkspace } from './account/board-workspace';
-import { resetSaveStatus, dispatchSaveEvent, reportSaveCoverage, reportImageOutcome } from './save-status';
+import { resetSaveStatus, dispatchSaveEvent, reportSaveCoverage, reportImageOutcome, getAccountSaveSnapshot } from './save-status';
+import { BoardBlobSource } from './account/blob-source';
 import * as Y from 'yjs';
 import { AccountJournal, replayJournal, requestRecoveryStorage, pendingRecords, readCheckpoint, validRecord, RecoveryStorageError, type ReplayObserver } from './account/outbox';
 import { RecoveryCoordinator, type RecoveryOutcome } from './account/recovery';
@@ -142,10 +143,11 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   };
   const imageOutcome: NonNullable<AccountWorkspaceOptions['onImageOutcome']> = (id, outcome, attempt) => {
     if (!isCurrent()) return;
-    if (outcome === 'sending') timers.set(attempt, setTimeout(() => { if (isCurrent()) reportImageOutcome({ type: 'image', scope: statusScope, id, outcome: 'failed', attempt, at: Date.now() }); }, 15000));
+    if (outcome === 'sending') timers.set(attempt, setTimeout(() => { if (isCurrent()) { reportImageOutcome({ type: 'image', scope: statusScope, id, outcome: 'failed', attempt, at: Date.now() }); coordinator.retryIfIdle(); } }, 15000));
     else { clearTimeout(timers.get(attempt)); timers.delete(attempt); }
     if (outcome === 'loaded' && baseline?.assets.has(id)) return;
     reportImageOutcome({ type: 'image', scope: statusScope, id, outcome: outcome === 'loaded' ? 'acknowledged' : outcome, attempt, at: Date.now() });
+    if (outcome === 'failed') queueMicrotask(() => { if (isCurrent()) coordinator.retryIfIdle(); });
   };
   const observeReplay: ReplayObserver = (record, outcome, attempt) => {
     if (record.kind === 'blob') imageOutcome(record.resource, outcome, attempt);
@@ -189,6 +191,18 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       return rows.length > 0;
     },
     preserve: () => scopedJournal.preserve(),
+    verify: async (authority, signal) => {
+      const snapshot = getAccountSaveSnapshot();
+      if (snapshot?.scope !== statusScope) return;
+      const source = new BoardBlobSource({ ...authority.descriptor, boardId: initial.boardId, accountId: initial.accountId, generation: initial.generation,
+        signal, isCurrent, fetch: options.fetch, onImageOutcome: (id, outcome, attempt) => imageOutcome(id, outcome === 'loaded' ? 'acknowledged' : outcome, attempt),
+        onFetchedBlob: (id, value) => scopedJournal.cacheAsset(id, value) });
+      try {
+        for (const row of Object.values(snapshot.images)) if (row.required && row.state !== 'saved') {
+          if (!await source.get(row.id)) throw new Error('Required image unavailable');
+        }
+      } finally { source.dispose(); }
+    },
     drain: async (authority, signal) => {
       await replayJournal(authority.descriptor, initial.accountId, signal, false, options.openRestored, observeReplay);
       const remaining = await pendingRecords(initial.accountId, initial.boardId);

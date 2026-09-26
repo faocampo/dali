@@ -11,13 +11,14 @@ export async function addSavedImage(page: Page, name = 'Synthetic image.png') {
 }
 
 /** Fetches the actual server response, then holds its delivery to the active browser. */
-export async function documentResponseBarrier(page: Page) {
+export async function documentResponseBarrier(page: Page, boardId?: string) {
   let bypass = false; let requests = 0; const held: { release: () => void; delivered: Promise<void> }[] = [];
   const handler = async (route: Route) => {
-    if (bypass) return route.continue();
+    if (bypass || (boardId && !new URL(route.request().url()).pathname.includes(`/boards/${boardId}/`))) return route.continue();
     requests++;
     const response = await route.fetch();
     expect(response.status()).toBe(200); expect((await response.json()).acknowledged).toBe(true);
+    if (bypass) return route.fulfill({ response });
     let release!: () => void; const ready = new Promise<void>(resolve => { release = resolve; });
     let delivered!: () => void; const done = new Promise<void>(resolve => { delivered = resolve; });
     held.push({ release, delivered: done }); await ready;
@@ -26,6 +27,8 @@ export async function documentResponseBarrier(page: Page) {
   await page.route('**/docs/*/push', handler);
   return { count: () => requests, held: () => held.length,
     async release(index: number) { const item = held[index]!; item.release(); await item.delivered; },
-    async releaseAll() { bypass = true; held.forEach(item => item.release()); await Promise.all(held.map(item => item.delivered)); await page.unroute('**/docs/*/push', handler); },
+    // Keep the bypass installed for this page's lifetime: removing it while a
+    // route.fetch is still in flight races Playwright's automatic continuation.
+    async releaseAll() { bypass = true; held.forEach(item => item.release()); await Promise.all(held.map(item => item.delivered)); },
   };
 }

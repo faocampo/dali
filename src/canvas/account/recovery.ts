@@ -1,7 +1,7 @@
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
 export type RecoveryOutcome = 'checking-access' | 'recovering' | 'pending' | 'retrying' | 'saved' | 'expired' | 'denied' | 'storage-paused' | 'corrupt' | 'epoch-mismatch';
 export type RecoveryAuthority = { accountId: string; expiresAt: number; descriptor: BoardDescriptor };
-export type RecoveryDependencies = { authorize: (signal: AbortSignal) => Promise<RecoveryAuthority>; inspect: (authority: RecoveryAuthority) => Promise<boolean>; drain: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; preserve: () => Promise<void>; current: () => boolean; changed: (state: RecoveryOutcome, stalled: boolean) => void; now?: () => number; random?: () => number };
+export type RecoveryDependencies = { authorize: (signal: AbortSignal) => Promise<RecoveryAuthority>; inspect: (authority: RecoveryAuthority) => Promise<boolean>; drain: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; verify?: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; preserve: () => Promise<void>; current: () => boolean; changed: (state: RecoveryOutcome, stalled: boolean) => void; now?: () => number; random?: () => number };
 export class RecoveryCoordinator {
   private flight?: Promise<RecoveryAuthority | undefined>;
   private controller?: AbortController;
@@ -14,10 +14,11 @@ export class RecoveryCoordinator {
   private assertCurrent(signal: AbortSignal) { if (this.disposed || signal.aborted || !this.dependencies.current()) throw new Error('Recovery interrupted'); }
   open() { return this.run(false); }
   retryRecovery() { return this.run(true); }
+  retryIfIdle() { if (!this.flight && !this.timer && !this.disposed) void this.run(true); }
   dispose() { this.disposed = true; clearTimeout(this.timer); this.controller?.abort(); }
   private run(retry: boolean): Promise<RecoveryAuthority | undefined> {
     if (this.flight) return this.flight;
-    clearTimeout(this.timer);
+    clearTimeout(this.timer); this.timer = undefined;
     const controller = this.controller = new AbortController();
     this.flight = this.execute(controller, retry).finally(() => { this.flight = undefined; });
     return this.flight;
@@ -43,6 +44,7 @@ export class RecoveryCoordinator {
             this.emit('recovering');
             await d.drain(authority, signal); this.assertCurrent(signal);
           }
+          await d.verify?.(authority, signal); this.assertCurrent(signal);
           this.attempt = 0; this.emit('saved'); return authority;
         })(),
         new Promise<never>((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new Error('Recovery timed out')); }, 30000); }),
@@ -59,7 +61,7 @@ export class RecoveryCoordinator {
       else {
         this.emit('pending');
         const delay = Math.min(30000, 1000 * 2 ** Math.min(this.attempt++, 5));
-        this.timer = setTimeout(() => { void this.retryRecovery(); }, Math.min(30000, delay * (0.8 + (d.random?.() ?? Math.random()) * 0.4)));
+        this.timer = setTimeout(() => { this.timer = undefined; void this.retryRecovery(); }, Math.min(30000, delay * (0.8 + (d.random?.() ?? Math.random()) * 0.4)));
       }
       return this.authority;
     } finally { clearTimeout(stalled); clearTimeout(timeout); }
