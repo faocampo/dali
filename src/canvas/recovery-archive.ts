@@ -5,6 +5,7 @@ import { getRecoveryRuntime, suspendAccessScope, type AccessScope } from './runt
 import { canExportRecoveryScope } from './account/mutation-guard';
 import { buildSnapshotArchive, downloadBlob, safeFilename } from './export-board';
 import { validateMindmapDocument } from './mindmap-compatibility';
+import { reportRecoveryDownloadState } from './save-status';
 
 export type RecoverySnapshot = Readonly<{ scope: AccessScope; capturedAt: number; title: string; snapshot: DocSnapshot; references: readonly Readonly<{ id: string; label: string }>[] }>;
 function freezeSnapshot<T>(value: T): T {
@@ -55,8 +56,7 @@ async function confirmAuthority(scope: AccessScope): Promise<boolean> {
   return true;
 }
 
-export async function downloadRecoveryCopy(): Promise<void> {
-  const { captured, readAsset } = captureRecoverySnapshot();
+async function prepareRecoveryCopy({ captured, readAsset }: ReturnType<typeof captureRecoverySnapshot>): Promise<void> {
   await confirmAuthority(captured.scope);
   const assets = new Map<string, Blob>();
   for (const reference of captured.references) {
@@ -74,4 +74,34 @@ export async function downloadRecoveryCopy(): Promise<void> {
   const blob = await buildSnapshotArchive(captured.snapshot, assets, captured.references);
   await confirmAuthority(captured.scope); assertAuthority(captured.scope);
   downloadBlob(blob, `${safeFilename(captured.title)}-recovery-${new Date(captured.capturedAt).toISOString().replace(/:/g, '-')}.bs.zip`);
+}
+
+export const recoveryDownloadScope = (scope: Pick<AccessScope, 'accountId' | 'boardId' | 'generation'>) => JSON.stringify([scope.accountId, scope.boardId, scope.generation]);
+let flight: { scope: string; promise: Promise<void> } | undefined;
+/** One preparation per scope, independent of dialog visibility and save acknowledgment. */
+export function downloadRecoveryCopy(): Promise<void> {
+  let preparingScope: string | undefined;
+  try {
+    const current = getRecoveryRuntime().runtime.scope; assertAuthority(current);
+    const scope = recoveryDownloadScope(current);
+    preparingScope = scope;
+    if (flight?.scope === scope) return flight.promise;
+    const capture = captureRecoverySnapshot();
+    const capturedAt = capture.captured.capturedAt;
+    const promise = Promise.resolve().then(() => prepareRecoveryCopy(capture)).then(() => {
+      reportRecoveryDownloadState({ scope, capturedAt, phase: 'ready', label: "Recovery copy ready. Check your browser's downloads." });
+    }).catch(error => {
+      reportRecoveryDownloadState({ scope, capturedAt, phase: 'error', label: 'Recovery copy could not be prepared', message: error instanceof Error ? error.message : 'Keep this tab open and retry preparing the recovery copy.' });
+      throw error;
+    }).finally(() => { if (flight?.promise === promise) flight = undefined; });
+    flight = { scope, promise };
+    reportRecoveryDownloadState({ scope, capturedAt, phase: 'preparing', label: 'Preparing recovery copy…' });
+    return promise;
+  } catch (error) {
+    if (preparingScope) {
+      reportRecoveryDownloadState({ scope: preparingScope, phase: 'preparing', label: 'Preparing recovery copy…' });
+      reportRecoveryDownloadState({ scope: preparingScope, phase: 'error', label: 'Recovery copy could not be prepared', message: error instanceof Error ? error.message : 'Keep this tab open and retry preparing the recovery copy.' });
+    }
+    return Promise.reject(error);
+  }
 }

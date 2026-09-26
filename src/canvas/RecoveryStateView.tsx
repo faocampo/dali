@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
 import type { RecoveryOutcome } from './account/recovery';
+import type { RecoveryDownloadState } from './save-status';
 
-export function RecoveryStateView({ state, retry, openRestored, download, compact = false }: {
+export function RecoveryStateView({ state, retry, openRestored, download, downloadStatus, compact = false }: {
   state: RecoveryOutcome; retry?: () => void | Promise<unknown>; openRestored?: () => void; download?: () => Promise<unknown>; compact?: boolean;
+  downloadStatus?: RecoveryDownloadState;
 }) {
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [expanded, setExpanded] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -16,9 +18,10 @@ export function RecoveryStateView({ state, retry, openRestored, download, compac
     {compact ? <button ref={trigger} className="djai-ghost" aria-expanded={expanded} aria-controls="board-recovery-details" onClick={() => setExpanded(value => !value)}>{title}</button> : <h1>{title}</h1>}
     <div id="board-recovery-details" hidden={compact && !expanded}>
       <p role="status">{message}</p>{error && <p role="alert">{error}</p>}
+      {downloadStatus && <p role={downloadStatus.phase === 'error' ? 'alert' : 'status'} style={{ overflowWrap: 'anywhere' }}>{downloadStatus.label}{downloadStatus.message && ` ${downloadStatus.message}`}</p>}
       <div className="board-recovery__actions">
         {retry && !['corrupt', 'epoch-mismatch', 'denied'].includes(state) && <button disabled={busy} onClick={() => { void run(retry); }}>{state === 'storage-paused' ? 'Retry saving' : 'Retry now'}</button>}
-        {download && <button disabled={busy} onClick={() => { void run(download); }}>Download recovery copy</button>}
+        {download && <button disabled={downloadStatus?.phase === 'preparing'} onClick={() => { void download().catch(() => undefined); }}>Download recovery copy</button>}
         {state === 'epoch-mismatch' && openRestored && <button disabled={busy} onClick={openRestored}>Open restored board</button>}
         {!compact && <a href="/">Back to your boards</a>}
       </div>

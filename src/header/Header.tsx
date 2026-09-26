@@ -5,12 +5,12 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { DaliMenu } from './DaliMenu';
 import { BoardTitleMenu } from './BoardTitleMenu';
 import logo from '../../imgs/svg/dali-symbol-color.svg';
-import { downloadRecoveryCopy } from '../canvas/recovery-archive';
+import { downloadRecoveryCopy, recoveryDownloadScope } from '../canvas/recovery-archive';
 import { getActiveAccessScope, subscribeAccessScope, retryRecovery } from '../canvas/runtime';
 import { RecoveryStateView } from '../canvas/RecoveryStateView';
 import { createAccountBoard } from '../boards/operations';
 import { accountBoardUrl } from '../boards/preferences';
-import { getSaveStatus, subscribeSaveStatus } from '../canvas/save-status';
+import { getSaveStatus, subscribeSaveStatus, getRecoveryDownloadState, subscribeRecoveryDownloadState } from '../canvas/save-status';
 import { ExportDialog } from './ExportDialog';
 import type { BoardDescriptor } from '../boards/BoardLibrary';
 import type { SessionDescriptor } from '../auth/AuthBoundary';
@@ -40,6 +40,8 @@ export function Header({
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 10000); return () => clearInterval(timer); }, []);
   const saveStatus = useSyncExternalStore(subscribeSaveStatus, getSaveStatus);
   const scope = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
+  const downloadState = useSyncExternalStore(subscribeRecoveryDownloadState, getRecoveryDownloadState);
+  const downloadStatus = scope && downloadState.scope === recoveryDownloadScope(scope) ? downloadState : undefined;
   const recovering = scope?.recoveryState && ['storage-paused', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(scope.recoveryState);
   type Creation = { id: string; accountId: string; generation: number; tab: Window | null; state: 'pending' | 'error' | 'ready'; href?: string };
   const [creations, setCreations] = useState<Creation[]>([]);
@@ -91,7 +93,7 @@ export function Header({
   }, []);
 
   return (
-    <header className="djai-header">
+    <header className="djai-header" style={{ zIndex: saveHelpOpen ? 40 : undefined }}>
       <a
         className="djai-brand"
         href="/"
@@ -110,7 +112,7 @@ export function Header({
       {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
-        {recovering && <RecoveryStateView state={scope.recoveryState!} compact retry={retryRecovery} openRestored={onOpenRestored} download={scope.role !== 'viewer' ? downloadRecoveryCopy : undefined} />}
+        {recovering && <RecoveryStateView state={scope.recoveryState!} compact retry={retryRecovery} openRestored={onOpenRestored} download={scope.role !== 'viewer' ? downloadRecoveryCopy : undefined} downloadStatus={downloadStatus} />}
         <div className="djai-save" hidden={!!recovering}>
           <button
             type="button"
@@ -129,10 +131,11 @@ export function Header({
             {saveStatus.savedAt && <small className="save-age" aria-hidden="true">{formatSaveAge(saveStatus.savedAt, now)}</small>}
           </button>
           {saveStatus.state === 'failed' && saveHelpOpen && (
-            <div className="djai-save__recovery" role="dialog" aria-label="Local save recovery">
+            <div className="djai-save__recovery" role="dialog" aria-label="Local save recovery" style={{ zIndex: 40, maxHeight: 'calc(100dvh - 112px)', overflowY: 'auto' }}>
               <strong>Your board is still open</strong>
               <p>{retryError ?? saveStatus.message}</p>
-              <div>
+              {downloadStatus && <p role={downloadStatus.phase === 'error' ? 'alert' : 'status'} style={{ overflowWrap: 'anywhere' }}>{downloadStatus.label}{downloadStatus.message && ` ${downloadStatus.message}`}</p>}
+              <div style={{ flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   className="djai-ghost"
@@ -149,7 +152,8 @@ export function Header({
                 {board?.summary.role !== 'viewer' && <button
                   type="button"
                   className="djai-primary"
-                  onClick={() => void downloadRecoveryCopy().catch(cause => setRetryError(cause instanceof Error ? cause.message : 'The backup could not be downloaded.'))}
+                  disabled={downloadStatus?.phase === 'preparing'}
+                  onClick={() => { setRetryError(null); void downloadRecoveryCopy().catch(() => undefined); }}
                 >
                   Download recovery copy
                 </button>}

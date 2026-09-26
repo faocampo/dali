@@ -20,8 +20,10 @@ vi.mock('./mindmap-compatibility', () => ({ validateMindmapDocument: () => undef
 vi.mock('./presentation-export', () => ({}));
 import { exportBoardFile, buildSnapshotArchive } from './export-board';
 import { downloadRecoveryCopy, captureRecoverySnapshot } from './recovery-archive';
+import { resetSaveStatus, getAccountSaveSnapshot, getRecoveryDownloadState, dispatchSaveEvent } from './save-status';
 
 beforeEach(() => {
+  resetSaveStatus('synthetic-save');
   fixture.scope = { accountId: 'member', boardId: 'board', generation: 1, role: 'owner', phase: 'active', canWrite: true };
   fixture.expiresAt = Date.now() + 60000; fixture.accountId = 'member'; fixture.references = [];
   fixture.snapshot = { type: 'page', meta: { id: 'board', title: 'Synthetic', createDate: 1, tags: [] }, blocks: { type: 'block', id: 'page', flavour: 'affine:page', props: {}, children: [] } };
@@ -80,4 +82,32 @@ test('verified image and its original adjustment pixels are complete native arch
 test('duplicate activation shares one snapshot and one recovery handoff', async () => {
   await Promise.all([downloadRecoveryCopy(), downloadRecoveryCopy()]);
   expect(fixture.handed).toHaveBeenCalledTimes(1);
+});
+test('preparation failure stays retryable and neither failure nor handoff acknowledges pending saving', async () => {
+  dispatchSaveEvent({ type: 'coverage', scope: 'synthetic-save', documents: { root: { revision: 1, acknowledged: true }, content: { revision: 2, acknowledged: false } }, images: [], at: 1 });
+  const before = getAccountSaveSnapshot();
+  fixture.references = ['A'.repeat(43) + '=']; fixture.readAsset.mockResolvedValue(null);
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })));
+  await expect(downloadRecoveryCopy()).rejects.toThrow(/image bytes/);
+  expect(getRecoveryDownloadState()).toMatchObject({ phase: 'error', message: expect.stringContaining('Synthetic image') });
+  expect(getAccountSaveSnapshot()).toBe(before);
+  fixture.references = []; await downloadRecoveryCopy();
+  expect(getRecoveryDownloadState()).toMatchObject({ phase: 'ready', label: "Recovery copy ready. Check your browser's downloads." });
+  expect(getAccountSaveSnapshot()).toBe(before); expect(fixture.handed).toHaveBeenCalledOnce();
+});
+test('preparation captures synchronously while progress survives a delayed read and later edits', async () => {
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  vi.stubGlobal('fetch', vi.fn(async () => { await gate; return new Response('', { status: 503 }); }));
+  const first = downloadRecoveryCopy(); const duplicate = downloadRecoveryCopy(); expect(duplicate).toBe(first);
+  expect(getRecoveryDownloadState().phase).toBe('preparing'); fixture.snapshot.blocks.props.text = 'Later'; release(); await first;
+  expect(JSON.parse(fixture.written).blocks.props.text).toBeUndefined(); expect(getRecoveryDownloadState().phase).toBe('ready');
+});
+test.each(['account', 'expiry'] as const)('a delayed asset read rechecks %s authority before handoff', async reason => {
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  fixture.references = ['A'.repeat(43) + '='];
+  fixture.readAsset.mockImplementation(async () => { await gate; return fixture.blob; });
+  const pending = downloadRecoveryCopy(); const rejected = expect(pending).rejects.toThrow(/access/);
+  await vi.waitFor(() => expect(fixture.readAsset).toHaveBeenCalledOnce());
+  if (reason === 'account') fixture.accountId = 'other'; else fixture.expiresAt = 0;
+  release(); await rejected; expect(fixture.handed).not.toHaveBeenCalled();
 });

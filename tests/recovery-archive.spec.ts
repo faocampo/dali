@@ -3,6 +3,7 @@ import { recoveryBoardFixture, journalRows, failRecoveryStorage } from './recove
 import { addSavedImage } from './save-status-fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { MindmapElementModel, ShapeElementModel } from '@blocksuite/affine/model';
+import type { EditorHost } from '@blocksuite/affine/std';
 import { unzipSync } from 'fflate';
 import { createHash } from 'node:crypto';
 import { recoveryArchiveFixtures, recoveryAuthorizationBarrier } from './recovery-archive-fixtures';
@@ -132,4 +133,38 @@ test('@04-06-02 preparing state survives details reopening and coalesces duplica
   expect((text.match(/"flavour":"affine:note"/g) ?? []).length).toBe(1);
   const afterIds = (await journalRows(page)).map(row => row.id); expect(beforeIds.every(id => afterIds.includes(id))).toBe(true);
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toHaveCount(0);
+});
+
+test('@04-06-02 missing required bytes expose a named retryable error and preserve pending IDs at narrow widths', async ({ page, baseURL }, testInfo) => {
+  await recoveryBoardFixture(page, baseURL!, recoveryArchiveFixtures.longText.title); await addSavedImage(page); await pending(page);
+  const encoded = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = canvas.height = 16; const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#92ab45'; ctx.fillRect(0, 0, 16, 16); return canvas.toDataURL().split(',')[1]!; });
+  const bytes = Buffer.from(encoded, 'base64'); const key = createHash('sha256').update(bytes).digest('base64url') + '='; let available = false;
+  await page.route('**/blobs/*', route => {
+    if (decodeURIComponent(new URL(route.request().url()).pathname.split('/').at(-1)!) !== key) return route.continue();
+    return available ? route.fulfill({ status: 200, contentType: 'image/png', body: bytes }) : route.fulfill({ status: 503, json: { code: 'SYNTHETIC_IMAGE_UNAVAILABLE' } });
+  });
+  await page.locator('editor-host').evaluate((el, { key, label }) => { const store = (el as EditorHost).store; store.updateBlock(store.getBlocksByFlavour('affine:image')[0]!.model, { sourceId: key, caption: label }); }, { key, label: recoveryArchiveFixtures.longText.imageName });
+  await startRecovery(page); const before = (await journalRows(page)).map(row => row.id);
+  const downloads: import('@playwright/test').Download[] = []; page.on('download', value => downloads.push(value));
+  await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText(recoveryArchiveFixtures.longText.imageName); expect(downloads).toHaveLength(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const width of recoveryArchiveFixtures.overflow.widths) {
+    await page.setViewportSize({ width, height: 800 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await expect(page.getByRole('button', { name: 'Download recovery copy', exact: true })).toBeInViewport();
+  }
+  await page.screenshot({ path: testInfo.outputPath('recovery-missing-narrow.png') });
+  available = true; await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
+  await expect.poll(() => downloads.length).toBe(1); await expect(page.getByText(recoveryArchiveFixtures.populated.label, { exact: true })).toBeVisible();
+  const after = (await journalRows(page)).map(row => row.id); expect(before.every(id => after.includes(id))).toBe(true);
+  await expect(page.getByRole('button', { name: 'Saved', exact: true })).toHaveCount(0);
+});
+
+test('@04-06-02 missing visual preview still exports retained complete image bytes', async ({ page, baseURL }) => {
+  await recoveryBoardFixture(page, baseURL!); await addSavedImage(page); await pending(page);
+  await page.locator('affine-edgeless-image').evaluate(el => el.querySelector('img')?.remove());
+  await startRecovery(page); const download = page.waitForEvent('download', { timeout: 20000 }); await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
+  const files = unzipSync(await readDownload(await download)); expect(Object.keys(files).filter(path => path.startsWith('assets/'))).toHaveLength(1);
+  await expect(page.getByText(recoveryArchiveFixtures.populated.label, { exact: true })).toBeVisible(); expect((await journalRows(page)).length).toBeGreaterThan(0);
 });

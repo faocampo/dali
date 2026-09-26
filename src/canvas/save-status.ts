@@ -1,5 +1,18 @@
 import type { DocEngineStatus } from '@blocksuite/affine/sync';
 
+export type RecoveryDownloadState = Readonly<{ scope: string; phase: 'idle' | 'preparing' | 'ready' | 'error'; label: string; message?: string; capturedAt?: number }>;
+const idleDownload: RecoveryDownloadState = Object.freeze({ scope: '', phase: 'idle', label: '' });
+let recoveryDownload: RecoveryDownloadState = idleDownload;
+const downloadListeners = new Set<() => void>();
+export const getRecoveryDownloadState = () => recoveryDownload;
+export function subscribeRecoveryDownloadState(listener: () => void) { downloadListeners.add(listener); return () => { downloadListeners.delete(listener); }; }
+export function resetRecoveryDownloadState() { recoveryDownload = idleDownload; downloadListeners.forEach(listener => listener()); }
+export function reportRecoveryDownloadState(next: RecoveryDownloadState) {
+  // Completion from an old scope cannot replace a newer preparation or reset.
+  if (next.phase !== 'preparing' && next.scope !== recoveryDownload.scope) return;
+  recoveryDownload = Object.freeze({ ...next }); downloadListeners.forEach(listener => listener());
+}
+
 export type ImageSaveRow = Readonly<{ id: string; label: string; state: 'waiting' | 'uploading' | 'failed' | 'saved'; attempt?: string; required: boolean; wasRequired?: boolean }>;
 type DocumentSaveRow = Readonly<{ revision: number; acknowledged: boolean; failure?: string }>;
 export type SaveSnapshot = Readonly<{ scope: string; state: 'saving' | 'saved' | 'failed'; label: string; message?: string; savedAt?: number;
@@ -68,6 +81,7 @@ let accountSnapshot: SaveSnapshot | undefined;
 export const getAccountSaveSnapshot = () => accountSnapshot;
 export function dispatchSaveEvent(event: SaveEvent) {
   if (!accountSnapshot) return;
+  if (event.scope === accountSnapshot.scope && event.type === 'recovery' && ['expired', 'denied', 'disposed'].includes(event.state)) resetRecoveryDownloadState();
   const next = reduceSaveStatus(accountSnapshot, event); if (next === accountSnapshot) return;
   accountSnapshot = next; snapshot = next; listeners.forEach(listener => listener());
 }
@@ -121,6 +135,7 @@ function publish(): void {
 }
 
 export function resetSaveStatus(scope?: string): void {
+  resetRecoveryDownloadState();
   accountSnapshot = scope ? createSaveSnapshot(scope) : undefined;
   if (accountSnapshot) { snapshot = accountSnapshot; listeners.forEach(listener => listener()); return; }
   docSaving = true;
