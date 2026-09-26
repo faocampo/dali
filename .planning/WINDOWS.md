@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 8
 waived_count: 1
-fixed_count: 5
-total_count: 14
-last_updated: 2026-09-25T22:36:44.145Z
+fixed_count: 6
+total_count: 15
+last_updated: 2026-09-26T03:41:00.992Z
 ---
 
 # Broken Windows Ledger
@@ -29,6 +29,7 @@ last_updated: 2026-09-25T22:36:44.145Z
 | 12 | 04 | deviation | src/canvas/account/outbox.ts |  | Epoch integration required descriptor, journal, thumbnail, duplicate and explicit fixture-header changes; implemented and verified in plan 04-02. | fixed |  | 2026-09-25T21:44:43.562Z | 2026-09-25T21:44:49.417Z |
 | 13 | 04 | deviation | src/canvas/account/outbox.ts |  | Plan 04-03 integrated runtime callbacks and fixture schema checks; corrected Yjs semantic coverage and preserved image loading feedback; final 44 browser cases pass. | fixed |  | 2026-09-25T22:17:37.399Z | 2026-09-25T22:17:42.532Z |
 | 14 | 04 | deviation | server/storage/backup.ts |  | Plan 04-10 used the existing bundler for crash children, normalized snapshot journal mode and preserved legitimate duplicate/deletion receipts; all 22 backup tests pass. | fixed |  | 2026-09-25T22:36:39.393Z | 2026-09-25T22:36:44.145Z |
+| 15 | 04 | deviation | server/app.ts |  | Bounded router parameter length expanded to support required pending-grant admission routes; all 95 route/time cases pass. | fixed |  | 2026-09-26T03:38:38.344Z | 2026-09-26T03:41:00.992Z |
 
 ````json
 [
@@ -202,6 +203,19 @@ last_updated: 2026-09-25T22:36:44.145Z
     "reason": "",
     "recorded_at": "2026-09-25T22:36:39.393Z",
     "resolved_at": "2026-09-25T22:36:44.145Z",
+    "milestone": null
+  },
+  {
+    "id": 15,
+    "kind": "deviation",
+    "phase": "04",
+    "file": "server/app.ts",
+    "line": null,
+    "description": "Bounded router parameter length expanded to support required pending-grant admission routes; all 95 route/time cases pass.",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-26T03:38:38.344Z",
+    "resolved_at": "2026-09-26T03:41:00.992Z",
     "milestone": null
   }
 ]
