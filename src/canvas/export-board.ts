@@ -5,6 +5,7 @@
  * export button run exactly the same code path rather than two copies.
  */
 import { createAssetsArchive } from '@blocksuite/affine/widgets/linked-doc';
+import type { DocSnapshot, BlockSnapshot } from '@blocksuite/store';
 import { getCanvasRuntime } from './runtime';
 import { accessScopeCurrent, canExportRecoveryScope } from './account/mutation-guard';
 import type { ExportPlan, ExportScale } from './export-plan';
@@ -59,14 +60,14 @@ export type PresentationExportResult = {
   estimatedBytes: number;
 };
 
-function safeFilename(value: string): string {
+export function safeFilename(value: string): string {
   return (value.trim() || 'Untitled board')
-    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/[\u0000-\u001f\u007f\\/:*?"<>|]+/g, '-')
     .replace(/\s+/g, ' ')
     .slice(0, 120);
 }
 
-function downloadBlob(blob: Blob, filename: string): void {
+export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -76,6 +77,42 @@ function downloadBlob(blob: Blob, filename: string): void {
   anchor.click();
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** Native editable format, with completeness checked before ZIP creation. */
+export async function buildSnapshotArchive(snapshot: DocSnapshot, assets: ReadonlyMap<string, Blob>, references: readonly { id: string; label: string }[]): Promise<Blob> {
+  let total = 0;
+  const verified = new Map<string, Blob>();
+  for (const { id, label } of references) {
+    if (verified.has(id)) continue;
+    const blob = assets.get(id);
+    if (!blob || !['image/png', 'image/jpeg'].includes(blob.type) || !blob.size || blob.size > 16 * 1024 * 1024) throw new Error(`${label}: image bytes are missing or invalid. Restore the image and retry.`);
+    const bytes = await blob.arrayBuffer();
+    const hash = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))).replace(/\+/g, '-').replace(/\//g, '_');
+    if (hash !== id || (total += bytes.byteLength) > 256 * 1024 * 1024) throw new Error(`${label}: image bytes could not be verified. Restore the image and retry.`);
+    // Native naming uses the content key for Blobs; normalize Files to prevent filename/path ambiguity.
+    verified.set(id, new Blob([bytes], { type: blob.type }));
+  }
+  if (!snapshot || snapshot.type !== 'page' || !snapshot.meta?.id || typeof snapshot.meta.title !== 'string' || !snapshot.blocks || references.length > 10000) throw new Error('The board snapshot is invalid. Keep this tab open and retry.');
+  const referenced = new Set<string>();
+  const inspect = (block: BlockSnapshot, depth = 0) => {
+    if (depth > 128 || block.type !== 'block' || typeof block.id !== 'string' || typeof block.flavour !== 'string' || !block.props || !Array.isArray(block.children)) throw new Error('The board snapshot schema is invalid.');
+    if (['affine:image', 'djai:image-visual-edit'].includes(block.flavour)) {
+      const id = block.props.sourceId;
+      if (typeof id !== 'string' || !verified.has(id)) throw new Error('A required image is missing from the recovery snapshot.');
+      referenced.add(id);
+    }
+    block.children.forEach(child => inspect(child, depth + 1));
+  };
+  inspect(snapshot.blocks);
+  if (references.some(reference => !referenced.has(reference.id))) throw new Error('The recovery image references do not match the captured board.');
+  const json = JSON.stringify(snapshot);
+  if (json.length > 8 * 1024 * 1024) throw new Error('The board exceeds the archive size limit.');
+  const zip = await createAssetsArchive(verified, [...verified.keys()]);
+  await zip.file(`${safeFilename(snapshot.meta.title)}-${safeFilename(snapshot.meta.id)}.snapshot.json`, json);
+  const blob = await zip.generate();
+  if (blob.size > 32 * 1024 * 1024) throw new Error('The recovery copy exceeds the 32 MB Import limit.');
+  return blob;
 }
 
 async function canvasBlob(canvas: HTMLCanvasElement): Promise<Blob> {
@@ -176,9 +213,7 @@ export async function exportBoardFile(
         await job.assetsManager.readFromBlob(id); assertCurrent();
         if (!job.assets.has(id)) throw new Error('An image is missing. Restore the image and retry.');
       }
-      const zip = await createAssetsArchive(job.assets, ids);
-      await zip.file(`${safeFilename(catalog.title)}-${snapshot.meta.id}.snapshot.json`, JSON.stringify(snapshot));
-      const blob = await zip.generate();
+      const blob = await buildSnapshotArchive(snapshot, job.assets, ids.map((id, index) => ({ id, label: `Image ${index + 1}` })));
       await confirm();
       downloadBlob(blob, `${safeFilename(catalog.title)}.bs.zip`);
     } finally { job[Symbol.dispose](); }

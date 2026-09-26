@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import { DaliMenu } from './DaliMenu';
 import { BoardTitleMenu } from './BoardTitleMenu';
 import logo from '../../imgs/svg/dali-symbol-color.svg';
-import { exportBoardFile } from '../canvas/export-board';
+import { downloadRecoveryCopy } from '../canvas/recovery-archive';
 import { getActiveAccessScope, subscribeAccessScope, retryRecovery } from '../canvas/runtime';
 import { RecoveryStateView } from '../canvas/RecoveryStateView';
 import { createAccountBoard } from '../boards/operations';
@@ -110,7 +110,7 @@ export function Header({
       {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu title={boardTitle} onRename={onRenameBoard} />}
 
-        {recovering && <RecoveryStateView state={scope.recoveryState!} compact retry={retryRecovery} openRestored={onOpenRestored} download={scope.role !== 'viewer' ? () => exportBoardFile() : undefined} />}
+        {recovering && <RecoveryStateView state={scope.recoveryState!} compact retry={retryRecovery} openRestored={onOpenRestored} download={scope.role !== 'viewer' ? downloadRecoveryCopy : undefined} />}
         <div className="djai-save" hidden={!!recovering}>
           <button
             type="button"
@@ -149,9 +149,9 @@ export function Header({
                 {board?.summary.role !== 'viewer' && <button
                   type="button"
                   className="djai-primary"
-                  onClick={() => void exportBoardFile().catch(cause => setRetryError(cause instanceof Error ? cause.message : 'The backup could not be downloaded.'))}
+                  onClick={() => void downloadRecoveryCopy().catch(cause => setRetryError(cause instanceof Error ? cause.message : 'The backup could not be downloaded.'))}
                 >
-                  Download backup
+                  Download recovery copy
                 </button>}
               </div>
             </div>

@@ -10,7 +10,7 @@ export type BeforeCommit = () => Promise<void>;
 export function referencedImageKeys(doc: Y.Doc): Set<string> {
   const keys = new Set<string>();
   doc.getMap('blocks').forEach(value => {
-    if (value instanceof Y.Map && value.get('sys:flavour') === 'affine:image' && typeof value.get('prop:sourceId') === 'string') keys.add(value.get('prop:sourceId') as string);
+    if (value instanceof Y.Map && ['affine:image', 'djai:image-visual-edit'].includes(value.get('sys:flavour') as string) && typeof value.get('prop:sourceId') === 'string') keys.add(value.get('prop:sourceId') as string);
   });
   return keys;
 }

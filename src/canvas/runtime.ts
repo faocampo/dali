@@ -24,6 +24,7 @@ let recovery: RecoveryCoordinator | undefined;
 let storagePaused = false;
 let saveScope: string | undefined;
 let replayObserver: ReplayObserver | undefined;
+let recoveryAssets = new Map<string, Blob>();
 export const retryRecovery = () => recovery?.retryRecovery();
 export function pauseRecoveryStorage() {
   if (!scope || scope.phase !== 'active') return;
@@ -35,6 +36,20 @@ export function pauseRecoveryStorage() {
 const listeners = new Set<() => void>();
 export const getActiveAccessScope = (): AccessScope | null => scope;
 export const getRecoveryBoard = () => current ? { accountId: current.scope.accountId, boardId: current.descriptor.summary.id, title: current.descriptor.summary.title } : null;
+/** Synchronous acquisition freezes the visible board before any asynchronous work. */
+export function getRecoveryRuntime() {
+  if (!current || scope?.phase !== 'active' || !journal) throw new Error('Open the authorized board before preparing a recovery copy.');
+  const runtime = current; const capturedJournal = journal; const retained = recoveryAssets;
+  return { runtime, readLocalAsset: async (id: string) => {
+    if (retained.has(id)) return retained.get(id)!;
+    const memory = capturedJournal.pendingMemory().find(row => row.kind === 'blob' && row.resource === id);
+    if (memory?.data instanceof Blob) return memory.data;
+    const checkpoint = await readCheckpoint(capturedJournal.scope, capturedJournal.tabId).catch(() => undefined);
+    const asset = checkpoint?.assets[id];
+    if (asset?.data) return new Blob([new Uint8Array(asset.data)], { type: asset.mime });
+    return null;
+  } };
+}
 export function subscribeAccessScope(listener: () => void): () => void { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function publish(value: AccessScope) { scope = Object.freeze(value); listeners.forEach(listener => listener()); }
 export function nextAccessGeneration() { return ++generation; }
@@ -87,6 +102,7 @@ export async function synchronizeActiveBoard(accountId: string, boardId: string)
 export function disposeCanvasRuntime(expectedGeneration = scope?.generation): void {
   if (!scope || scope.generation !== expectedGeneration) return;
   const old = current; current = null; pending = null;
+  recoveryAssets = new Map();
   recovery?.dispose(); recovery = undefined;
   if (saveScope) dispatchSaveEvent({ type: 'recovery', scope: saveScope, state: 'disposed' });
   publish({ ...scope, phase: 'disposed', canWrite: false });
@@ -108,6 +124,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   options.signal?.addEventListener('abort', () => requestAbort.abort(), { once: true });
   capture = [];
   storagePaused = false;
+  const retainedAssets = recoveryAssets = new Map<string, Blob>();
   const scopedJournal = new AccountJournal({ ...initial, recoveryEpoch: options.descriptor.recoveryEpoch }, () => { if (scope?.generation === initial.generation) pauseRecoveryStorage(); });
   journal = scopedJournal;
   const isCurrent = () => scope?.generation === initial.generation && scope.phase === 'active';
@@ -246,8 +263,9 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       return (options.fetch ?? fetch)(input, { ...init, signal: requestAbort.signal });
     },
     onPendingDocument: (id, data) => scopedJournal.captureSubmission(id, data),
-    onPendingBlob: (key, value) => scopedJournal.capture('blob', key, value),
+    onPendingBlob: (key, value) => { retainedAssets.set(key, value); return scopedJournal.capture('blob', key, value); },
     onFetchedBlob: authorizedDescriptor.summary.role !== 'viewer' ? async (key, value) => {
+      retainedAssets.set(key, value);
       try { await scopedJournal.cacheAsset(key, value); }
       catch (error) {
         // Admission failure already retains bytes and pauses edits. Reading an
