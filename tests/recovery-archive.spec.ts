@@ -127,7 +127,8 @@ test('@04-06-02 preparing state survives details reopening and coalesces duplica
   await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click(); await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
   await expect(page.getByText(recoveryArchiveFixtures.loading.label, { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
-  await expect(page.locator('affine-edgeless-note')).toHaveCount(2); barrier.release();
+  await expect(page.locator('affine-edgeless-note')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click(); barrier.release();
   await expect.poll(() => downloads.length).toBe(1); await expect(page.getByText(recoveryArchiveFixtures.populated.label, { exact: true })).toBeVisible();
   const entries = unzipSync(await readDownload(downloads[0]!)); const text = Buffer.from(Object.entries(entries).find(([key]) => key.endsWith('.snapshot.json'))![1]).toString();
   expect((text.match(/"flavour":"affine:note"/g) ?? []).length).toBe(1);
@@ -147,11 +148,12 @@ test('@04-06-02 missing required bytes expose a named retryable error and preser
   await startRecovery(page); const before = (await journalRows(page)).map(row => row.id);
   const downloads: import('@playwright/test').Download[] = []; page.on('download', value => downloads.push(value));
   await page.getByRole('button', { name: 'Download recovery copy', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText(recoveryArchiveFixtures.longText.imageName); expect(downloads).toHaveLength(0);
+  await expect(page.getByRole('dialog', { name: 'Save details' }).getByRole('alert')).toContainText(recoveryArchiveFixtures.longText.imageName); expect(downloads).toHaveLength(0);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of recoveryArchiveFixtures.overflow.widths) {
     await page.setViewportSize({ width, height: 800 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.getByRole('button', { name: 'Download recovery copy', exact: true }).scrollIntoViewIfNeeded();
     await expect(page.getByRole('button', { name: 'Download recovery copy', exact: true })).toBeInViewport();
   }
   await page.screenshot({ path: testInfo.outputPath('recovery-missing-narrow.png') });

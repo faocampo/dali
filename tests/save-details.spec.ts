@@ -40,7 +40,7 @@ test('@04-07-02 fifty failed images and long labels fit every narrow and short v
   await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(saveTrigger(page)).toBeFocused();
 });
 
-test('@04-07-02 rendered contrast typography and native visual viewport zoom preserve reachable controls', async ({ page, baseURL }, testInfo) => {
+test('@04-07-02 rendered contrast typography and native visual viewport zoom preserve reachable controls', async ({ page, baseURL, browserName }, testInfo) => {
   await saveDetailsBoard(page, baseURL!); await addDetailImages(page, 1, '<Synthetic> & image');
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
   await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect(saveTrigger(page)).toContainText('Save failed');
@@ -58,12 +58,13 @@ test('@04-07-02 rendered contrast typography and native visual viewport zoom pre
     });
   });
   for (const item of contrast) { expect(item.textRatio, item.text ?? '').toBeGreaterThanOrEqual(4.5); expect(item.borderRatio).toBeGreaterThanOrEqual(3); expect(['12px', '13px', '14px', '20px']).toContain(item.size); expect(['400', '600']).toContain(item.weight); }
-  const cdp = await page.context().newCDPSession(page); await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
-  await expect.poll(() => page.evaluate(() => visualViewport!.scale)).toBe(2);
+  const cdp = browserName === 'chromium' ? await page.context().newCDPSession(page) : undefined;
+  if (cdp) { await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 }); await expect.poll(() => page.evaluate(() => visualViewport!.scale)).toBe(2); }
+  else await page.setViewportSize({ width: 640, height: 400 });
   await expect.poll(() => dialog.evaluate(el => { const r = el.getBoundingClientRect(), v = visualViewport!; return r.left >= v.offsetLeft && r.right <= v.offsetLeft + v.width && r.bottom <= v.offsetTop + v.height; })).toBe(true);
   const download = dialog.getByRole('button', { name: 'Download recovery copy' }); await download.scrollIntoViewIfNeeded(); await expect(download).toBeInViewport();
   await page.screenshot({ path: testInfo.outputPath('save-details-200-percent.png') });
-  await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 }); await cdp.detach();
+  if (cdp) { await cdp.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 }); await cdp.detach(); }
   await dialog.getByRole('button', { name: 'Close save details' }).click(); await expect(saveTrigger(page)).toBeFocused();
 });
 

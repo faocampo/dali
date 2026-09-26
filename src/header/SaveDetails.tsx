@@ -67,6 +67,7 @@ export function SaveDetails({ status, snapshot, scope, downloadStatus, trigger, 
   const retryButton = useRef<HTMLButtonElement>(null); const busyRef = useRef(false);
   const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const [retryFocused, setRetryFocused] = useState(false);
+  const [position, setPosition] = useState({ left: 16, top: 80, width: 384, maxHeight: 500 });
   const imageLabels = useRef(new Map<string, string>());
   const copy = saveDetailsCopy(status, snapshot, scope);
   const permitted = !!scope && currentScope(scope) && scope.role !== 'viewer';
@@ -78,6 +79,21 @@ export function SaveDetails({ status, snapshot, scope, downloadStatus, trigger, 
   }) : [];
   const retryable = permitted && status.state !== 'saved' && !['corrupt', 'epoch-mismatch', 'denied', 'expired'].includes(scope.recoveryState ?? '');
   useLayoutEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
+  useLayoutEffect(() => {
+    const header = trigger.current?.closest('header');
+    const viewport = window.visualViewport;
+    const positionPanel = () => {
+      const width = viewport?.width ?? innerWidth, height = viewport?.height ?? innerHeight;
+      const x = viewport?.offsetLeft ?? 0, y = viewport?.offsetTop ?? 0;
+      const panelWidth = width <= 600 ? width - 32 : Math.min(384, width - 32);
+      const left = x + Math.max(16, Math.min((trigger.current?.getBoundingClientRect().left ?? 16) - x, width - panelWidth - 16));
+      const top = Math.max(y + 16, Math.min((header?.getBoundingClientRect().bottom ?? y + 64) + 8, y + height - 64));
+      setPosition({ left, top, width: panelWidth, maxHeight: Math.max(44, y + height - top - 16) });
+    };
+    positionPanel(); const observer = new ResizeObserver(positionPanel); if (header) observer.observe(header);
+    window.addEventListener('resize', positionPanel); viewport?.addEventListener('resize', positionPanel); viewport?.addEventListener('scroll', positionPanel);
+    return () => { observer.disconnect(); window.removeEventListener('resize', positionPanel); viewport?.removeEventListener('resize', positionPanel); viewport?.removeEventListener('scroll', positionPanel); };
+  }, [trigger]);
   useLayoutEffect(() => {
     if (!retryable && retryFocused) { heading.current?.focus({ preventScroll: true }); setRetryFocused(false); }
   }, [retryable, retryFocused]);
@@ -92,7 +108,7 @@ export function SaveDetails({ status, snapshot, scope, downloadStatus, trigger, 
     try { await retryRecovery(); } catch { if (currentScope(scope)) setError('Changes still cannot be preserved or saved. Keep this tab open and download a recovery copy.'); }
     finally { busyRef.current = false; if (currentScope(scope)) setBusy(false); }
   };
-  return <div ref={panel} className="save-details" id="save-details" role="dialog" aria-labelledby="save-details-heading" onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); onClose(true); } }}>
+  return <div ref={panel} className="save-details" style={position} id="save-details" role="dialog" aria-labelledby="save-details-heading" onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); onClose(true); } }}>
     <div className="save-details-heading"><h2 ref={heading} id="save-details-heading" tabIndex={-1}>Save details</h2><button type="button" aria-label="Close save details" onClick={() => onClose(true)}>×</button></div>
     <p>{copy.message}</p>
     {scope?.role !== 'viewer' && <p className="save-details-time">{status.savedAt ? `Last saved to the server: ${new Date(status.savedAt).toLocaleString()}` : 'No server save confirmed yet.'}</p>}

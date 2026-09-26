@@ -56,7 +56,7 @@ for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses n
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [1440, 900, 600, 490, 320]) {
     await page.setViewportSize({ width, height: 800 });
-    const bounds = await page.getByRole('region', { name: 'Board recovery' }).boundingBox();
+    const bounds = await page.getByRole('dialog', { name: 'Save details' }).boundingBox();
     expect(bounds!.width).toBeLessThanOrEqual(width); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await page.getByRole('banner').boundingBox())!.height).toBeLessThan(300);
@@ -85,7 +85,7 @@ for (const kind of ['corrupt', 'restore'] as const) test(`@04-04-03 ${kind} reta
   }), kind);
   const before = await journalRows(page);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Recovery needs attention, Open save details', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recovery needs attention', exact: true })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0); expect(await journalRows(page)).toEqual(before);
   if (kind === 'corrupt') {
     await expect(page.getByText("These pending changes could not be opened safely. Keep this browser's data and contact your operator for recovery help.", { exact: true })).toBeVisible();

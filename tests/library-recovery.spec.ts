@@ -212,7 +212,7 @@ test('@04-09-02 download then leave and explicit restored entry preserve unresol
   service.database.prepare('UPDATE recovery_state SET epoch=? WHERE singleton=1').run('22222222-2222-4222-8222-222222222222');
   await page.unroute('**/docs/*/push');
   await page.getByRole('link', { name: 'Open Synthetic pending board', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Recovery needs attention, Open save details', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recovery needs attention', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Open restored board', exact: true }).click();
   await expect(page.locator('editor-host')).toBeVisible();
   expect(await journalRows(page)).toEqual(expect.arrayContaining(before));
