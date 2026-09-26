@@ -40,6 +40,7 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRep
         typeof options.fencing?.evidence !== 'string' || !options.fencing.evidence.trim() || options.fencing.evidence.length > 4000 ||
         !options.sourceDatabase || !/^[a-f0-9]{64}$/.test(options.expectedManifestDigest)) throw new Error('Maintenance and fencing evidence required');
     const selected = await inspectSelectedBackup(options.backup, options.expectedManifestDigest);
+    if (!Number.isSafeInteger(Date.now()) || Date.now() < selected.manifest.completedAt) throw new Error('Restore clock precedes selected backup');
     const backup = await directory(options.backup); const target = await directory(options.destination);
     // The live file may have been lost. Resolve its existing parent without opening SQLite or its WAL.
     const source = join(await realpath(dirname(resolve(options.sourceDatabase))), basename(options.sourceDatabase));
@@ -58,8 +59,9 @@ export async function restoreBackup(options: RestoreOptions): Promise<RestoreRep
     } finally { database.close(); }
     const after = validateBackupDatabase(file);
     if (JSON.stringify(after.counts) !== JSON.stringify(before.counts) || epoch! !== after.epoch || after.epoch === before.epoch) throw new Error('Restore integrity mismatch');
+    const restoredAt = Date.now(); if (!Number.isSafeInteger(restoredAt) || restoredAt < selected.manifest.completedAt) throw new Error('Restore clock changed');
     const report: RestoreReport = { schemaVersion: 1, backupId: selected.id, manifestDigest: selected.manifestDigest, recoveryPointAt: selected.manifest.recoveryPointAt,
-      restoredAt: Date.now(), previousEpoch: before.epoch, epoch: after.epoch, counts: after.counts, integrity: 'verified', sessionsInvalidated: true, ingress: 'closed' };
+      restoredAt, previousEpoch: before.epoch, epoch: after.epoch, counts: after.counts, integrity: 'verified', sessionsInvalidated: true, ingress: 'closed' };
     await sync(file); await write(join(staging, 'restore-report.json'), JSON.stringify(report) + '\n'); await sync(staging);
     // Recheck the named destination; rename refuses a competing nonempty directory. Parent directories must be operator-controlled.
     if (await directory(options.destination) !== target || (await readdir(target)).length) throw new Error('Destination changed');

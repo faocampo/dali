@@ -10,8 +10,9 @@ import { IDENTITY_COOKIE } from './oidc-provider.js';
 import { buildApp } from '../server/app.js';
 import { openDatabase } from '../server/storage/database.js';
 import { publishBackup, backupDigest, inspectBackupSet } from '../server/storage/backup.js';
-import type { RestoreReport } from '../server/storage/restore.js';
+import { restoreBackup, verifyRestore, type RestoreReport } from '../server/storage/restore.js';
 import { readRecoveryEpoch } from '../server/storage/recovery-state.js';
+import { getBackupHealth } from '../server/storage/backup-scheduler.js';
 
 /** Owned synthetic restore drill with real SQLite and a private operator ingress header. */
 export async function createRestoreService(assets: string) {
@@ -41,12 +42,25 @@ export async function createRestoreService(assets: string) {
   return { origin, operatorHeaders, get database() { return database; },
     async backup() { const selected = await publishBackup({ database, destination: { directory: backups, independentStorage: true }, applicationVersion: '0.1.0' });
       const backup = join(backups, selected.id); return { ...selected, backup, manifestDigest: await backupDigest(join(backup, 'manifest.json')) }; },
-    async restore(_selected: { backup: string; manifestDigest: string }, _revoke: { boardId: string; memberId: string }): Promise<RestoreReport> {
-      throw new Error('Restore drill unavailable');
+    async plannedRestart() {
+      ingress = false; await app.close(); database.close(); database = openDatabase(sourceDatabase); await start();
+    },
+    async restore(selected: { backup: string; manifestDigest: string }, revoke: { boardId: string; memberId: string }): Promise<RestoreReport> {
+      ingress = false; await app.close(); database.close();
+      await restoreBackup({ backup: selected.backup, expectedManifestDigest: selected.manifestDigest, destination: fresh, sourceDatabase,
+        maintenanceConfirmed: true, fencing: { method: 'writer-stopped', evidence: 'Synthetic app close awaited; owned SQLite connection closed' } });
+      const report = await verifyRestore(fresh);
+      database = openDatabase(join(fresh, 'database.sqlite'));
+      // The separate synthetic operator ledger records the post-selection revocation.
+      database.transaction(() => {
+        database.prepare('DELETE FROM board_grants WHERE board_id=? AND member_id=?').run(revoke.boardId, revoke.memberId);
+        database.prepare('UPDATE boards SET revision=revision+1 WHERE id=?').run(revoke.boardId);
+      })();
+      config.DALI_DATABASE_PATH = database.name; await start(); return report;
     },
     async completeSets() { return inspectBackupSet({ directory: backups, independentStorage: true }); },
     currentEpoch() { return readRecoveryEpoch(database); },
-    openIngress() { ingress = true; },
+    openIngress() { if (getBackupHealth(database).state !== 'healthy') throw new Error('Verified fresh coverage required'); ingress = true; },
     async close() { await app?.close(); if (database.open) database.close(); await provider.close(); await rm(directory, { recursive: true, force: true }); },
   };
 }

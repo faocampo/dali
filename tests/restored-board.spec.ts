@@ -5,6 +5,8 @@ import { createRestoreService } from './durability-fixtures';
 import { syntheticCanaries, accessIdentityLabels, type AccessIdentity } from './access-fixtures';
 
 async function signIn(context: BrowserContext, identity: AccessIdentity) {
+  context.setDefaultTimeout(15000);
+  await context.clearCookies({ name: 'dali_fixture_identity' });
   const page = await context.newPage(); await page.goto('/auth/start');
   await page.getByRole('link', { name: accessIdentityLabels[identity], exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
@@ -32,7 +34,6 @@ test('@04-12-02 selected native restore reopens cold authorized content and quar
   test.setTimeout(180_000);
   const service = await createRestoreService(baseURL!); const contexts: BrowserContext[] = [];
   const context = await browser.newContext({ baseURL: service.origin, extraHTTPHeaders: service.operatorHeaders }); contexts.push(context);
-  const plannedMaintenanceStarted = Date.now();
   try {
     const { page, member } = await signIn(context, 'owner'); const epoch = service.currentEpoch();
     const headers = { Origin: service.origin, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': epoch };
@@ -53,11 +54,18 @@ test('@04-12-02 selected native restore reopens cold authorized content and quar
     await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: png });
     await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
     const before = await snapshot(page); expect(before.images).toHaveLength(1); expect(before.images[0]!.hash).toBe(createHash('sha256').update(png).digest('hex'));
+    const maintenanceStarted = Date.now(); await service.plannedRestart();
+    const maintenanceBrowser = await browser.newContext({ baseURL: service.origin, extraHTTPHeaders: service.operatorHeaders }); contexts.push(maintenanceBrowser);
+    const maintenanceActor = await signIn(maintenanceBrowser, 'owner'); await maintenanceActor.page.goto('/?board=' + board.summary.id);
+    await expect(maintenanceActor.page.locator('affine-edgeless-note')).toContainText('Restored synthetic canary');
+    await expect(maintenanceActor.page.locator('affine-edgeless-image img')).toBeVisible(); expect(await snapshot(maintenanceActor.page)).toEqual(before);
+    service.openIngress(); const plannedMaintenanceMs = Date.now() - maintenanceStarted; await maintenanceBrowser.close();
     const acknowledgedBefore = Date.now(); const selected = await service.backup();
     // This access change occurs after the selected recovery point and must be reconciled from a separate ledger.
     service.database.prepare('DELETE FROM board_grants WHERE board_id=? AND member_id=?').run(board.summary.id, deniedId);
     const latest = await (await context.request.get('/api/boards/' + board.summary.id, { headers })).json();
-    expect((await context.request.patch('/api/boards/' + board.summary.id, { headers, data: { title: 'Acknowledged after selected backup', operationId: randomUUID(), revision: latest.revision } })).ok()).toBeTruthy();
+    const lostOperation = randomUUID();
+    expect((await context.request.patch('/api/boards/' + board.summary.id, { headers, data: { title: 'Acknowledged after selected backup', operationId: lostOperation, revision: latest.revision } })).ok()).toBeTruthy();
     const acknowledgedAfter = Date.now();
     await context.setOffline(true); await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
     await expect.poll(async () => (await journal(page)).length).toBeGreaterThan(0); const retained = await journal(page);
@@ -65,6 +73,7 @@ test('@04-12-02 selected native restore reopens cold authorized content and quar
     const incidentStarted = Date.now();
     await expect(service.restore(selected, { boardId: board.summary.id, memberId: deniedId })).resolves.toMatchObject({ integrity: 'verified', ingress: 'closed', sessionsInvalidated: true });
     expect(service.currentEpoch()).not.toBe(epoch);
+    expect(service.database.prepare('SELECT 1 FROM operations WHERE operation_id=?').get(lostOperation)).toBeUndefined();
     const publicResponse = await fetch(service.origin + '/api/session'); expect(publicResponse.status).toBe(503);
     expect((await fetch(service.origin + '/api/session', { headers: { ...service.operatorHeaders, cookie: `${oldCookie.name}=${oldCookie.value}` } })).status).toBe(401);
     const baseline = await service.completeSets(); expect(baseline.some(set => set.manifest.epoch === service.currentEpoch())).toBe(true);
@@ -77,10 +86,12 @@ test('@04-12-02 selected native restore reopens cold authorized content and quar
       expect(descriptor.status()).toBe(identity === 'nonMember' ? 404 : 200);
       const image = await cold.request.get(`/api/boards/${board.summary.id}/blobs/${before.images[0]!.key}`, { headers: access });
       if (identity === 'nonMember') { expect(image.status()).toBe(404); await cold.close(); continue; }
-      expect(descriptor && (await descriptor.json()).summary.role).toBe(identity); expect(await image.body()).toEqual(png);
+      const restored = await descriptor.json(); expect(restored.summary.role).toBe(identity); expect(restored.summary.title).toBe('Synthetic restored canvas'); expect(await image.body()).toEqual(png);
       await actor.page.goto('/?board=' + board.summary.id);
       await expect(actor.page.locator('affine-edgeless-note')).toContainText('Restored synthetic canary');
       await expect(actor.page.locator('affine-edgeless-image img')).toBeVisible(); expect(await snapshot(actor.page)).toEqual(before);
+      const permission = await cold.request.post(`/api/boards/${board.summary.id}/docs/${board.contentDocId}/push`, { headers: { ...access, Origin: service.origin, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': service.currentEpoch(), 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0, 0]) });
+      expect(permission.status()).toBe(identity === 'viewer' ? 403 : 200);
       await cold.close();
     }
     await context.setOffline(false); await signIn(context, 'owner'); await page.reload();
@@ -93,10 +104,12 @@ test('@04-12-02 selected native restore reopens cold authorized content and quar
     expect(await snapshot(page)).toEqual(before); expect(await journal(page)).toEqual(retained);
     await expect.poll(async () => (await service.completeSets()).filter(set => set.manifest.epoch === service.currentEpoch()).length).toBeGreaterThan(initialCurrentCount);
     service.openIngress(); expect((await fetch(service.origin + '/api/session')).status).toBe(401);
-    const disasterMs = Date.now() - incidentStarted; const plannedMaintenanceMs = Date.now() - plannedMaintenanceStarted;
+    const disasterMs = Date.now() - incidentStarted;
     const conservativeLossWindowMs = incidentStarted - selected.manifest.recoveryPointAt;
     expect(disasterMs).toBeLessThan(86_400_000); expect(plannedMaintenanceMs).toBeLessThan(86_400_000); expect(conservativeLossWindowMs).toBeLessThan(3_600_000);
     expect(acknowledgedBefore).toBeLessThanOrEqual(selected.manifest.recoveryPointAt); expect(acknowledgedAfter).toBeGreaterThanOrEqual(selected.manifest.recoveryPointAt);
-    await testInfo.attach('synthetic-restore-timing', { body: JSON.stringify({ disasterMs, plannedMaintenanceMs, conservativeLossWindowMs, retainedAcknowledgedCanaries: 2, lostAcknowledgedCanaries: 1, oldestLostAcknowledgmentAgeMs: incidentStarted - acknowledgedAfter }), contentType: 'application/json' });
+    const timing = { disasterMs, plannedMaintenanceMs, conservativeLossWindowMs, retainedAcknowledgedCanaries: 2, lostAcknowledgedCanaries: 1, oldestLostAcknowledgmentAgeMs: incidentStarted - acknowledgedAfter };
+    console.info('synthetic-restore-timing', JSON.stringify(timing));
+    await testInfo.attach('synthetic-restore-timing', { body: JSON.stringify(timing), contentType: 'application/json' });
   } finally { for (const item of contexts) await item.close(); await service.close(); }
 });

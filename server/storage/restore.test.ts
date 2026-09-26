@@ -55,8 +55,11 @@ beforeEach(async () => {
 });
 afterEach(async () => { await app?.close(); if (database?.open) database.close(); await provider?.close(); if (directory) await rm(directory, { recursive: true, force: true }); });
 
-async function selected() {
-  const publication = await publishBackup(options()); const backup = join(destination, publication.id);
+async function selected(now?: () => number) {
+  const session = database.prepare('SELECT id FROM sessions LIMIT 1').get() as { id: string };
+  database.prepare('INSERT INTO login_transactions(state,browser_id,nonce,verifier,return_to,expires_at) VALUES(?,?,?,?,?,?)')
+    .run(randomUUID(), session.id, 'synthetic-nonce', 'synthetic-verifier', '/', Date.now() + 60000);
+  const publication = await publishBackup({ ...options(), now }); const backup = join(destination, publication.id);
   const target = join(directory, 'fresh'); await mkdir(target, { mode: 0o700 });
   const sourceDatabase = database.name; await app.close(); database.close();
   return { backup, destination: target, sourceDatabase, expectedManifestDigest: await backupDigest(join(backup, 'manifest.json')),
@@ -112,4 +115,9 @@ it('@04-12-01 CLI explicitly inspects selects restores and verifies with sanitiz
   expect(output.join('')).not.toContain(directory); expect(output.join('')).not.toContain('example.org');
   await writeFile(join(input.destination, 'database.sqlite-wal'), 'Unexpected old WAL');
   expect(await runOperator(['verify', '--destination', input.destination], log)).toBe(1);
+});
+it('@04-12-01 future-dated selected backup cannot publish an unverifiable restore', async () => {
+  const input = await selected(() => Date.now() + 3_600_000);
+  await expect(restoreBackup(input)).rejects.toThrow();
+  expect(await readdir(input.destination)).toEqual([]);
 });
