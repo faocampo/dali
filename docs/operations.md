@@ -1,6 +1,6 @@
 # Backup publication and inspection
 
-Dali publishes verified SQLite recovery points through the live server's existing connection. The backup contains board root/content documents, image bytes, thumbnails, members, grants, operation receipts and other database state. Treat the whole set as protected data. Restore orchestration, scheduling and retention enforcement are delivered by their subsequent Phase 4 plans.
+Dali publishes verified SQLite recovery points through the live server's existing connection. The backup contains board root/content documents, image bytes, thumbnails, members, grants, operation receipts and other database state. Treat the whole set as protected data. Automatic scheduling and retention run in that process; restore orchestration follows its separate procedure.
 
 ## Destination contract
 
@@ -49,7 +49,7 @@ Filesystem failures after writing a marker can leave uncertain directory persist
 |---|---|
 | `schemaVersion` | Manifest schema, currently `1` |
 | `applicationVersion` | Caller-supplied release identifier; does not imply future binary compatibility |
-| `databaseVersion` | Supported complete database migration version, currently `8` |
+| `databaseVersion` | Supported complete database migration versions `8` and `9`; version 9 adds schedule metadata |
 | `epoch` | Captured server recovery epoch; backup itself does not rotate it |
 | `recoveryPointAt` | Snapshot start in Unix milliseconds; conservative age anchor |
 | `completedAt` | Copy validation/digest completion in Unix milliseconds, before final publication flushes |
@@ -62,7 +62,31 @@ The manifest records aggregate counters rather than titles, emails or content. L
 
 `inspectBackupSet(destination)` returns verified `{id, manifest}` records newest conservative recovery point first. It excludes partial, malformed, tampered, incompatible, permissively accessible and symlinked sets. Inspection preserves existing files and never prunes them. It throws when the destination itself is unavailable or violates its contract. Callers must handle that as unknown/unavailable recovery coverage.
 
-Only an inspected complete set establishes recoverable age. Failed attempts, scheduler wakeups and local snapshots never refresh that age. Retain the last verified set even when stale. The approved operational policy is a 15-minute cadence, at least 30 days of complete recovery points, an alert at 45 minutes, and transactional write fencing at 60 minutes or when the baseline is uncertain. Scheduling, pruning and freshness fencing are integrated in the next backup plan; this publisher retains every prior set.
+Only an inspected complete set establishes recoverable age. Failed attempts, scheduler wakeups and local snapshots never refresh that age. Retain the last verified set even when stale. The approved operational policy is a 15-minute cadence, at least 30 days of complete recovery points, an alert at 45 minutes, and transactional write fencing at 60 minutes or when the baseline is uncertain.
+
+## Automatic scheduling and startup recovery
+
+Provision the independent restricted directory before starting the service. Configure these values exclusively in operator infrastructure:
+
+| Setting | Default and permitted policy |
+|---|---|
+| `DALI_BACKUP_DIRECTORY` | Required absolute path to the existing restricted independent destination |
+| `DALI_BACKUP_INDEPENDENT_STORAGE` | Required `true`, asserting externally verified independent storage |
+| `DALI_BACKUP_INTERVAL_MS` | `900000`; may be shortened, minimum 1000, never longer than 15 minutes or maximum age |
+| `DALI_BACKUP_RETENTION_DAYS` | `30`; may be increased, never reduced below 30 |
+| `DALI_BACKUP_MAX_AGE_MS` | `3600000`; may be shortened to at least 60000, never increased beyond one hour |
+
+Startup independently inspects the destination and current recovery epoch, then publishes a due or missing baseline. Writes remain fenced until valid coverage exists. A single scheduler serializes work through the live database connection. Checks run every minute (or the shorter configured interval); missed wakeups trigger one current backup rather than a backlog. Closing the service cancels its timer and waits for the in-flight publication before closing owned storage. Scheduler completion/check metadata persists additively in `recovery_state`; metadata alone cannot establish coverage after restart.
+
+Authenticated `GET /api/storage-health` with the expected-account header returns sanitized backup state, reason, recoverable age, recovery-point timestamp and publication/retention failure category. Monitor this endpoint and alert on `alert` or `fenced`, including capacity and publication failures. Defaults alert at 45 minutes and fence at exactly 60; a stricter maximum age alerts at 75% of its bound. Logs/monitoring must retain only sanitized fields.
+
+In-process age is the maximum of wall-clock age and monotonic elapsed age. Clock rollback, invalid values, or wall/monotonic divergence exceeding 60 seconds conservatively fence the process; restart also rejects wall time earlier than its persisted last valid check or inspected recovery timestamps. Correct the host clock, restart, verify a current complete backup and inspect health before reopening writes. No process can infer unobserved clock manipulation while it was stopped: trustworthy host time and monitoring remain deployment prerequisites.
+
+After a newer independently verified publication, retention removes only complete verified sets with completion times strictly older than the retention window and older recovery points. It preserves the newest set and at least the newly verified set. Incomplete/corrupt sets remain for operator review. Failed publication never prunes; failed deletion or directory flush alerts while retaining renewed coverage and remaining sets. Pruning errors may leave some eligible old sets already removed; they never shorten the required retention window.
+
+For an unavailable destination, repair the mount, permissions or capacity while leaving the service's read/authentication paths available. The next automatic check retries publication and renewed verified coverage restores write admission. Keep current memory/local pending work while receiving `503 BACKUP_FRESHNESS_REQUIRED` with `Retry-After`; it is a retryable storage condition. Pending-grant activation is deferred during fencing, allowing sign-in to succeed; signing in again after coverage renewal retries activation.
+
+Programmatic tests can explicitly inject `storagePolicy: {kind: 'fixture'}` or a deterministic health provider. The production entrypoint accepts neither through environment configuration. Such tests establish route behavior only; they do not demonstrate real independent-storage recovery guarantees.
 
 Restore into fresh empty storage through the later restore procedure, preserve the failed original for operator handling, clear restored authentication state and rotate the recovery epoch before reopening writes. Keep verified published backup files immutable; copy a selected set into restore staging before opening it as a writable application database.
 
@@ -71,3 +95,5 @@ Restore into fresh empty storage through the later restore procedure, preserve t
 The synthetic server tests exercise real online SQLite backup during writes, corruption rejection, fresh owner/editor/viewer authorization, image fidelity, concurrent requests, publication-boundary failures, injected `ENOSPC`/I/O errors and actual child-process `SIGKILL`. They do not fill a production disk or establish independent storage, provider encryption, retention capacity, RPO, RTO or measured throughput. Those require the approved external-storage and recovery drill gates.
 
 References: better-sqlite3 backup API ([https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md](https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md)); SQLite Online Backup API ([https://www.sqlite.org/backup.html](https://www.sqlite.org/backup.html)); Node.js filesystem API ([https://nodejs.org/api/fs.html](https://nodejs.org/api/fs.html)).
+
+Scheduling references: Node.js timers ([https://nodejs.org/api/timers.html](https://nodejs.org/api/timers.html)); Node.js monotonic performance clock ([https://nodejs.org/api/perf_hooks.html#performancenow](https://nodejs.org/api/perf_hooks.html#performancenow)). Timers can run late; transaction-time admission enforces the bound independently of timer delivery.

@@ -3,12 +3,13 @@ import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import session from '@fastify/session';
 import { registerOidcRoutes } from './auth/oidc.js';
-import { SqliteSessionStore, expiresAt, SESSION_COOKIE } from './auth/session-store.js';
+import { SqliteSessionStore, expiresAt, SESSION_COOKIE, currentSession, requireExpectedMember } from './auth/session-store.js';
 export { expiresAt, currentSession, requireExpectedMember, requireMutation } from './auth/session-store.js';
 export { localReturnIntent } from './auth/oidc.js';
 export type { SessionDescriptor } from './auth/session-store.js';
 import { openDatabase, runMigrations, type AccountDatabase } from './storage/database.js';
 import { registerBoardRoutes } from './boards/routes.js';
+import { BackupScheduler, readStorageConfig, setBackupHealthPolicy, getBackupHealth, type StoragePolicy } from './storage/backup-scheduler.js';
 
 export type AuthConfig = {
   origin: string; databasePath: string; secret: string; ttl: number; issuer: string;
@@ -47,7 +48,7 @@ export function readConfig(env: Record<string, string | undefined>): AuthConfig 
       domains, emailCaseFold: emailCaseFold === 'true', secure: origin.protocol === 'https:' };
   } catch { return fail(); }
 }
-export async function buildApp(options: { config: Record<string, string | undefined>; database?: AccountDatabase; now?: () => number; beforeCommit?: () => Promise<void> }) {
+export async function buildApp(options: { config: Record<string, string | undefined>; database?: AccountDatabase; now?: () => number; beforeCommit?: () => Promise<void>; storagePolicy?: StoragePolicy }) {
   if (Object.keys({ ...process.env, ...options.config }).some(key => /(?:TEST.*AUTH|AUTH.*TEST|AUTH.*BYPASS)/i.test(key))) throw new Error('Test authentication is forbidden');
   const app = Fastify({ logger: false, bodyLimit: 16384 });
   app.addHook('onRequest', async (_request, reply) => { reply.header('Cache-Control', 'private, no-store'); });
@@ -62,15 +63,33 @@ export async function buildApp(options: { config: Record<string, string | undefi
     app.get('/auth/callback', async (_request, reply) => reply.redirect('/?authError=configuration')); return app;
   }
   const database = options.database ?? openDatabase(config.databasePath); runMigrations(database);
-  if (!options.database) app.addHook('onClose', async () => { database.close(); });
   const now = options.now ?? Date.now; await app.register(cookie);
   await app.register(session, { secret: config.secret, cookieName: SESSION_COOKIE,
     cookie: { path: '/', httpOnly: true, sameSite: 'lax', secure: config.secure },
     rolling: false, saveUninitialized: false, store: new SqliteSessionStore(database, now) });
   await registerOidcRoutes(app, config, database, now);
-  registerBoardRoutes(app, config, database, now, options.beforeCommit); return app;
+  registerBoardRoutes(app, config, database, now, options.beforeCommit);
+  let scheduler: BackupScheduler | undefined;
+  if (options.storagePolicy) {
+    const policy = options.storagePolicy;
+    setBackupHealthPolicy(database, 'health' in policy ? policy.health : () => ({ state: 'healthy', reason: 'fresh', recoverableAgeMs: 0, recoveryPointAt: now(), failure: null }));
+  } else {
+    try {
+      const storage = readStorageConfig(options.config);
+      scheduler = new BackupScheduler({ database, destination: storage.destination, policy: storage, applicationVersion: '0.1.0', onHealth: health => {
+        if (health.state !== 'healthy') app.log.warn({ backup: health }, 'Backup coverage requires attention');
+      } });
+      await scheduler.start();
+    } catch { /* Configuration failure leaves durable writes fenced; authentication and repair remain available. */ }
+  }
+  app.get('/api/storage-health', async (request, reply) => {
+    const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
+    return { backup: getBackupHealth(database) };
+  });
+  app.addHook('onClose', async () => { await scheduler?.close(); if (!options.database) database.close(); });
+  return app;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  readConfig(process.env); const app = await buildApp({ config: process.env });
+  readConfig(process.env); readStorageConfig(process.env); const app = await buildApp({ config: process.env });
   await app.listen({ host: '127.0.0.1', port: Number(process.env.PORT ?? 3000) });
 }

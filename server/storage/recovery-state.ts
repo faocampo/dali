@@ -14,6 +14,15 @@ export function readRecoveryEpoch(database: AccountDatabase): string {
   if (!state || state.schema_version !== 1 || !/^[0-9a-f-]{36}$/.test(state.epoch)) throw new Error('Recovery state unavailable');
   return state.epoch;
 }
+export type BackupScheduleState = { backup_point: number | null; backup_completed: number | null; backup_checked: number | null };
+export function initializeBackupSchedule(database: AccountDatabase) {
+  runMigrations(database, [{ version: 9, sql: `ALTER TABLE recovery_state ADD COLUMN backup_point INTEGER;
+    ALTER TABLE recovery_state ADD COLUMN backup_completed INTEGER;
+    ALTER TABLE recovery_state ADD COLUMN backup_checked INTEGER;` }]);
+}
+export function readBackupSchedule(database: AccountDatabase): BackupScheduleState {
+  return database.prepare('SELECT backup_point,backup_completed,backup_checked FROM recovery_state WHERE singleton=1').get() as BackupScheduleState;
+}
 /** Call only after current authorization, and again inside the write transaction. */
 export function requireRecoveryEpoch(database: AccountDatabase, request: FastifyRequest, reply: FastifyReply): string | undefined {
   const supplied = request.headers['x-dali-recovery-epoch'];

@@ -4,7 +4,7 @@ import { IMAGE_LIMITS, validateStoredImage, validateImageBytes, validBlobKey } f
 import type { BoardRow } from '../boards/routes.js';
 import { readRecoveryEpoch } from './recovery-state.js';
 
-export const BACKUP_DATABASE_VERSION = 8;
+export const BACKUP_DATABASE_VERSION = 9;
 const tables = ['schema_migrations', 'members', 'sessions', 'login_transactions', 'boards', 'board_grants', 'pending_grants', 'board_documents', 'operations', 'board_thumbnails', 'board_blobs', 'import_staging', 'import_staging_blobs', 'recovery_state'];
 const bounded = (value: unknown, maximum = 4000): value is string => typeof value === 'string' && value.length > 0 && value.length <= maximum;
 function json(value: string): any {
@@ -20,7 +20,8 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
     const schema = (database.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[]).map(row => row.name);
     if (JSON.stringify(schema) !== JSON.stringify([...tables].sort())) throw new Error('Unsupported schema');
     const migrations = (database.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as { version: number }[]).map(row => row.version);
-    if (JSON.stringify(migrations) !== JSON.stringify(Array.from({ length: BACKUP_DATABASE_VERSION }, (_, index) => index + 1))) throw new Error('Unsupported database version');
+    const databaseVersion = migrations.at(-1)!;
+    if (![8, BACKUP_DATABASE_VERSION].includes(databaseVersion) || JSON.stringify(migrations) !== JSON.stringify(Array.from({ length: databaseVersion }, (_, index) => index + 1))) throw new Error('Unsupported database version');
     const epoch = readRecoveryEpoch(database);
     if ((database.prepare('SELECT count(*) AS n FROM recovery_state').get() as { n: number }).n !== 1) throw new Error('Invalid recovery state');
     const exists = (table: string, id: string) => !!database!.prepare(`SELECT 1 FROM ${table} WHERE id=?`).get(id);
@@ -76,7 +77,7 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
     }
     const count = (table: string) => (database!.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n;
     if (count('board_documents') !== documents) throw new Error('Unbound document');
-    return { databaseVersion: BACKUP_DATABASE_VERSION, epoch, counts: { boards: count('boards'), documents, images: count('board_blobs'), grants: count('board_grants'), pendingGrants: count('pending_grants'), members: count('members'), receipts: count('operations'), stagedImports: count('import_staging'), stagedImages: count('import_staging_blobs'), thumbnails: count('board_thumbnails') } };
+    return { databaseVersion, epoch, counts: { boards: count('boards'), documents, images: count('board_blobs'), grants: count('board_grants'), pendingGrants: count('pending_grants'), members: count('members'), receipts: count('operations'), stagedImports: count('import_staging'), stagedImages: count('import_staging_blobs'), thumbnails: count('board_thumbnails') } };
   } catch { throw new Error('Backup database validation failed'); }
   finally { database?.close(); }
 }
