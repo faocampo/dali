@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 8
+open_count: 9
 waived_count: 1
 fixed_count: 8
-total_count: 17
-last_updated: 2026-09-26T04:29:31.962Z
+total_count: 18
+last_updated: 2026-09-26T19:33:30.654Z
 ---
 
 # Broken Windows Ledger
@@ -32,6 +32,7 @@ last_updated: 2026-09-26T04:29:31.962Z
 | 15 | 04 | deviation | server/app.ts |  | Bounded router parameter length expanded to support required pending-grant admission routes; all 95 route/time cases pass. | fixed |  | 2026-09-26T03:38:38.344Z | 2026-09-26T03:41:00.992Z |
 | 16 | 04 | deviation | src/canvas/account/outbox.ts |  | Plan 04-05 connected journal acknowledgments and Header status to exact save coverage, and verified image-only retry through real server reads; 20 reducer and nine browser cases pass. | fixed |  | 2026-09-26T04:07:37.553Z | 2026-09-26T04:09:03.108Z |
 | 17 | 04 | deviation | server/storage/restore.ts |  | Fixed future-dated selected backup publishing an unverifiable restore; final restore suite passes. | fixed |  | 2026-09-26T04:27:37.952Z | 2026-09-26T04:29:31.962Z |
+| 18 | 04 | unmet-truth | scripts/deployment-smoke.mjs |  | Actual Kubernetes deployment smoke remains pending: no explicitly selected disposable context or verified independent storage fixture is configured. | open |  | 2026-09-26T19:33:30.654Z |  |
 
 ````json
 [
@@ -244,6 +245,19 @@ last_updated: 2026-09-26T04:29:31.962Z
     "reason": "",
     "recorded_at": "2026-09-26T04:27:37.952Z",
     "resolved_at": "2026-09-26T04:29:31.962Z",
+    "milestone": null
+  },
+  {
+    "id": 18,
+    "kind": "unmet-truth",
+    "phase": "04",
+    "file": "scripts/deployment-smoke.mjs",
+    "line": null,
+    "description": "Actual Kubernetes deployment smoke remains pending: no explicitly selected disposable context or verified independent storage fixture is configured.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-26T19:33:30.654Z",
+    "resolved_at": null,
     "milestone": null
   }
 ]
