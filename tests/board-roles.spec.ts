@@ -45,7 +45,16 @@ async function role(page: Page, id: string, value: 'viewer' | 'editor') {
   ownerId = accountId; ownerRequest = await request.newContext({ storageState: await page.context().storageState() });
   await page.context().clearCookies(); await page.goto(origin + '/auth/start');
   await page.getByRole('link', { name: value === 'viewer' ? 'Synthetic Viewer' : 'Synthetic Editor', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  // A pending owner request can detect the cookie replacement and preserve its
+  // recovery scope. Explicitly accept the new account before granting test access.
+  const library = page.getByRole('heading', { name: 'Your boards', exact: true });
+  const changed = page.getByRole('heading', { name: 'Account changed', exact: true });
+  await expect(library.or(changed)).toBeVisible();
+  if (await changed.isVisible()) {
+    await expect(page.locator('editor-host')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back to your boards', exact: true }).click();
+  }
+  await expect(library).toBeVisible();
   accountId = (await (await page.request.get(origin + '/api/session')).json()).accountId;
   database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?) ON CONFLICT(board_id,member_id) DO UPDATE SET role=excluded.role').run(id, accountId, value);
   await page.goto(origin + '/?board=' + id); await expect(page.locator('affine-edgeless-root')).toBeVisible();
