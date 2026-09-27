@@ -7,6 +7,7 @@ import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createHash, randomUUID } from 'node:crypto';
 import https from 'node:https';
+import { isIP } from 'node:net';
 import { crc32, deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
@@ -17,7 +18,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const get = (rs, kind, name) => rs.find(r => r.kind === kind && (!name || r.metadata.name === name));
 let gate = 'arguments and synthetic prerequisites';
 
-export function validateResources(rs) {
+export function validateResources(rs, { local = false } = {}) {
   const deployments = rs.filter(r => r.kind === 'Deployment');
   assert.equal(deployments.length, 1, 'single writer Deployment');
   const d = deployments[0];
@@ -47,7 +48,7 @@ export function validateResources(rs) {
   for (const [name, path, claim] of [['live', '/data', 'dali-live'], ['backup', '/backups', 'dali-backup']]) {
     assert(app.volumeMounts.some(m => m.name === name && m.mountPath === path && !m.readOnly), 'missing persistent mount');
     assert(p.volumes.some(v => v.name === name && v.persistentVolumeClaim?.claimName === claim), 'persistent claim');
-    assert.deepEqual(get(rs, 'PersistentVolumeClaim', claim)?.spec.accessModes, ['ReadWriteOncePod'], 'single pod storage');
+    assert.deepEqual(get(rs, 'PersistentVolumeClaim', claim)?.spec.accessModes, [local ? 'ReadWriteOnce' : 'ReadWriteOncePod'], 'single pod storage');
   }
   const service = get(rs, 'Service'); assert(service, 'service');
   assert.equal(service.spec.type, 'ClusterIP', 'private service');
@@ -109,14 +110,24 @@ function argumentsForRuntime(args) {
   const appImage = option('--app-image'); const webImage = option('--web-image');
   assert(appImage && webImage && ![appImage, webImage].some(x => x.startsWith('-')), 'explicit built images required');
   assert(option('--fixture'), 'external synthetic fixture file required');
-  return { context, namespace, appImage, webImage, fixture: option('--fixture') };
+  return { context, namespace, appImage, webImage, fixture: option('--fixture'), local: args.includes('--local') };
 }
 
-function validateFixture(f) {
+function validateFixture(f, local = false) {
   assert.equal(f.synthetic, true, 'synthetic fixture declaration required');
   assert.equal(f.disposable, true, 'disposable environment declaration required');
-  assert.equal(f.storageSemanticsVerified, true, 'CSI locking/fsync and mode-0700 UID-1000 roots required');
-  assert.equal(f.independentBackupVerified, true, 'independent backup destination required');
+  assert.equal(f.validationScope === 'local', local, 'local scope requires explicit --local and cannot establish production acceptance');
+  assert.equal(f.storageSemanticsVerified, true, 'storage locking/fsync and mode-0700 UID-1000 roots required');
+  if (local) {
+    assert.equal(f.independentBackupVerified, false, 'local host independence must remain unverified');
+    assert.equal(f.liveStorageLossIsolationVerified, true, 'local live-volume loss isolation required');
+    assert.equal(f.singleWriterFencingVerified, true, 'local single-writer fencing required');
+    assert.equal(f.storageAccessMode, 'ReadWriteOnce', 'local RWO contract');
+    assert.equal(f.ingressMode, 'synthetic-https-proxy', 'local HTTPS fixture contract');
+  } else {
+    assert.equal(f.independentBackupVerified, true, 'independent backup destination required');
+    assert(!f.hostLookup && !f.hostAliases, 'local host mappings require local scope');
+  }
   const origin = new URL(f.config.DALI_ORIGIN); const issuer = new URL(f.config.DALI_OIDC_ISSUER);
   for (const u of [origin, issuer]) assert(u.protocol === 'https:' && !u.username && !u.password && !u.hash && !u.search, 'verified HTTPS fixture');
   assert.equal(origin.href, origin.origin + '/', 'canonical origin');
@@ -125,6 +136,13 @@ function validateFixture(f) {
   assert(f.auth.DALI_SESSION_SECRET?.length >= 32 && f.auth.DALI_OIDC_CLIENT_SECRET, 'external auth secrets');
   assert(f.tls?.['tls.crt'] && f.tls?.['tls.key'] && f.caFile, 'TLS fixture and trust required');
   assert(f.liveStorageClass && f.backupStorageClass && f.ingressClass && f.networkPolicy, 'operator bindings required');
+  if (local) {
+    assert(f.hostLookup && Object.keys(f.hostLookup).length === 2, 'local loopback host mappings required');
+    for (const u of [origin, issuer]) assert.equal(f.hostLookup[u.hostname], '127.0.0.1', 'local loopback mapping required');
+    assert(Array.isArray(f.hostAliases) && f.hostAliases.length === 1, 'exact issuer pod host mapping required');
+    assert(isIP(f.hostAliases[0].ip) === 4, 'issuer Service IPv4 required');
+    assert.deepEqual(f.hostAliases[0].hostnames, [issuer.hostname], 'only issuer pod host mapping permitted');
+  }
   return f;
 }
 
@@ -145,6 +163,28 @@ async function selfTest() {
   await test('rejects missing explicit context', () => assert.throws(() => argumentsForRuntime([]), /explicit disposable context/));
   await test('rejects default context', () => assert.throws(() => argumentsForRuntime(['--context', 'default']), /explicit disposable context/));
   await test('rejects nonsynthetic fixture', () => assert.throws(() => validateFixture({ synthetic: false }), /synthetic fixture/));
+  const localFixture = {
+    synthetic: true, disposable: true, validationScope: 'local', storageSemanticsVerified: true,
+    independentBackupVerified: false, liveStorageLossIsolationVerified: true,
+    singleWriterFencingVerified: true, storageAccessMode: 'ReadWriteOnce', ingressMode: 'synthetic-https-proxy',
+    config: { DALI_ORIGIN: 'https://app.dali.test:19443', DALI_OIDC_ISSUER: 'https://oidc.dali.test:19444',
+      DALI_OIDC_CALLBACK_URL: 'https://app.dali.test:19443/auth/callback', DALI_BACKUP_INDEPENDENT_STORAGE: 'true' },
+    auth: { DALI_SESSION_SECRET: 'x'.repeat(32), DALI_OIDC_CLIENT_SECRET: 'synthetic' },
+    tls: { 'tls.crt': 'synthetic', 'tls.key': 'synthetic' }, caFile: 'synthetic',
+    liveStorageClass: 'local-live', backupStorageClass: 'local-backup', ingressClass: 'synthetic', networkPolicy: {},
+    hostLookup: { 'app.dali.test': '127.0.0.1', 'oidc.dali.test': '127.0.0.1' },
+    hostAliases: [{ ip: '10.96.0.2', hostnames: ['oidc.dali.test'] }],
+  };
+  await test('accepts explicitly local scoped storage evidence', () => validateFixture(localFixture, true));
+  await test('rejects local evidence for production acceptance', () => assert.throws(() => validateFixture(localFixture), /local scope/));
+  await test('rejects local storage without live-loss isolation', () => assert.throws(() => validateFixture({ ...localFixture, liveStorageLossIsolationVerified: false }, true), /live-volume loss/));
+  await test('rejects local DNS mapping to external addresses', () => assert.throws(() => validateFixture({ ...localFixture, hostLookup: { 'app.dali.test': '203.0.113.1' } }, true), /loopback/));
+  await test('accepts RWO only in explicit local manifest validation', () => {
+    const value = structuredClone(valid);
+    for (const claim of value.filter(r => r.kind === 'PersistentVolumeClaim')) claim.spec.accessModes = ['ReadWriteOnce'];
+    validateResources(value, { local: true });
+    assert.throws(() => validateResources(value), /single pod storage/);
+  });
 }
 
 // Host-held expected bytes are never supplied to the replacement pod.
@@ -153,7 +193,12 @@ async function client(f) {
   const issuer = new URL(f.config.DALI_OIDC_ISSUER).origin; let cookie = '';
   const request = (path, method = 'GET', body, headers = {}) => new Promise((resolve, reject) => {
     const url = new URL(path, origin); assert([origin, issuer].includes(url.origin), 'fixture redirect origin');
-    const req = https.request(url, { ca, method, headers: { ...(cookie && url.origin === origin ? { cookie } : {}), ...headers, ...(body ? { 'content-length': body.length } : {}) } }, response => {
+    const lookup = f.validationScope === 'local' ? (hostname, options, callback) => {
+      const address = f.hostLookup[hostname];
+      if (address !== '127.0.0.1') return callback(new Error('Unmapped local fixture host'));
+      callback(null, options.all ? [{ address, family: 4 }] : address, 4);
+    } : undefined;
+    const req = https.request(url, { ca, lookup, method, headers: { ...(cookie && url.origin === origin ? { cookie } : {}), ...headers, ...(body ? { 'content-length': body.length } : {}) } }, response => {
       if (url.origin === origin && response.headers['set-cookie']) cookie = response.headers['set-cookie'].at(-1).split(';')[0];
       const chunks = []; let size = 0;
       response.on('data', b => { size += b.length; if (size > 32 * 1024 * 1024) req.destroy(new Error('Response limit')); else chunks.push(b); });
@@ -203,7 +248,7 @@ async function client(f) {
 }
 
 async function runtime(args) {
-  const o = argumentsForRuntime(args); const f = validateFixture(JSON.parse(await readFile(o.fixture, 'utf8')));
+  const o = argumentsForRuntime(args); const f = validateFixture(JSON.parse(await readFile(o.fixture, 'utf8')), o.local);
   const kubectl = async (...argv) => (await run('kubectl', ['--context', o.context, '--namespace', o.namespace, '--request-timeout=30s', ...argv], { timeout: 360000, maxBuffer: 2 ** 20 })).stdout;
   gate = 'selected context connectivity and absent namespace';
   // Discovery errors must never be interpreted as an absent namespace.
@@ -212,9 +257,13 @@ async function runtime(args) {
   app.image = o.appImage; d.spec.template.spec.containers[1].image = o.webImage;
   get(rs, 'PersistentVolumeClaim', 'dali-live').spec.storageClassName = f.liveStorageClass;
   get(rs, 'PersistentVolumeClaim', 'dali-backup').spec.storageClassName = f.backupStorageClass;
+  if (o.local) {
+    for (const claim of rs.filter(r => r.kind === 'PersistentVolumeClaim')) claim.spec.accessModes = ['ReadWriteOnce'];
+    d.spec.template.spec.hostAliases = f.hostAliases;
+  }
   const ingress = get(rs, 'Ingress'); const host = new URL(f.config.DALI_ORIGIN).hostname;
   ingress.spec.ingressClassName = f.ingressClass; ingress.spec.tls[0].hosts = [host]; ingress.spec.rules[0].host = host;
-  get(rs, 'NetworkPolicy').spec = f.networkPolicy; validateResources(rs);
+  get(rs, 'NetworkPolicy').spec = f.networkPolicy; validateResources(rs, { local: o.local });
   app.env.push({ name: 'NODE_EXTRA_CA_CERTS', value: '/trust/ca.pem' });
   app.volumeMounts.push({ name: 'trust', mountPath: '/trust', readOnly: true });
   d.spec.template.spec.volumes.push({ name: 'trust', configMap: { name: 'dali-trust' } });
@@ -254,7 +303,7 @@ async function runtime(args) {
   assert.deepEqual(await claims(), persistent, 'same PVCs and PVs');
   gate = 'fresh signed login and cold persisted content';
   await verify();
-  console.log('DEPLOYMENT_SMOKE_PASS');
+  console.log(o.local ? 'LOCAL_DEPLOYMENT_SMOKE_PASS (live-volume restart; shared host failure domain)' : 'DEPLOYMENT_SMOKE_PASS');
   console.log('Owned disposable namespace retained for inspection; cleanup requires explicit operator selection.');
 }
 

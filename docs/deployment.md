@@ -75,6 +75,16 @@ Plan 04-15 must consume the actual runtime gate result and perform the represent
 
 ## Compatible release maintenance
 
+### Disposable local validation
+
+For an explicitly selected local test cluster, `deployment-smoke.mjs --local` accepts a separately declared fixture with `validationScope: "local"`. This mode emits `LOCAL_DEPLOYMENT_SMOKE_PASS`; production mode still requires independent backup storage and ReadWriteOncePod. A local result covers the tested pod replacement and retained Kubernetes volumes only.
+
+Local fixtures declare `storageAccessMode: "ReadWriteOnce"`, `singleWriterFencingVerified: true`, `liveStorageLossIsolationVerified: true`, and `independentBackupVerified: false`. Actual storage locking, flush, root ownership and live-directory loss checks must precede those declarations. The harness terminates and waits for the previous writer before replacement. Separate local PV directories share the Docker host and can share its underlying filesystem; this does not establish survival of host, disk or VM loss, or production storage capacity.
+
+The local ingress fixture uses `ingressMode: "synthetic-https-proxy"` and a private CA. Its signed synthetic OIDC flow, HTTPS certificate/host checks and NetworkPolicy enforcement are exercised directly. It does not establish an operator ingress controller's behavior. Local-only `hostLookup` maps exactly the application and issuer hostnames to loopback for the host client; `hostAliases` maps only the issuer hostname to its cluster Service IP for the application. These fields are rejected in production mode. Keep kubeconfig, keys, fixture files and detailed runtime reports outside the repository; supply an explicit context and fresh owned namespace for every run.
+
+### Operator release sequence
+
 1. Record maintenance start and deadline (within 24 hours), proposed image digests, schema compatibility, expected capacity and rollback binary. Inspect a current complete backup through the existing operator command and retain its explicitly selected manifest digest and independent-storage evidence privately. A timer or attempted snapshot establishes no verified backup.
 2. Close external ingress and prevent new sessions/writes. Drain existing requests using the lifecycle contract. Scale the writer to zero, wait for termination, and verify storage fencing; an unreachable node requires externally confirmed fencing before another writer starts.
 3. Review migrations against both proposed and rollback binaries. Apply compatible changes with only one writer and the same intact SQLite companions. A destructive schema change, storage replacement/deletion or changed recovery point is an explicit operator decision checkpoint with affected resources, data-loss consequences and a recovery path. Preserve old storage until approved disposal.
