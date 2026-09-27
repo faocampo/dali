@@ -36,7 +36,7 @@ last_updated: 2026-09-27T15:12:32.805Z
 | 19 | 04 | unrun-verify | tests/save-details.spec.ts |  | Native browser UI 200% zoom remains a final phase acceptance check; 04-07 automated Chromium evidence uses CDP visual viewport scale 2 and narrow viewport reflow. | open |  | 2026-09-26T20:09:43.019Z |  |
 | 20 | 04 | unrun-verify | scripts/recovery-drill.mjs |  | 04-15-02 local Kubernetes API recovery passed; independent physical failure-domain and production retention capacity acceptance remain open. | waived | User postponed independent storage and capacity validation on 2026-09-27 to backlog 999.6. Deferred from active Phase 4 acceptance; validation remains unverified. | 2026-09-26T20:58:18.534Z | 2026-09-27T15:12:32.805Z |
 | 21 | 04 | unrun-verify | tests/backup-fence.spec.ts |  | 04-15-03 real backup-freshness HTTP rejection and exact replay passed in Chromium, Firefox and WebKit with a simulated 24-hour scheduler interval. | fixed |  | 2026-09-26T20:58:18.675Z | 2026-09-27T14:54:16.154Z |
-| 22 | 04 | unmet-truth | src/canvas/account/board-workspace.ts |  | Local Kubernetes cold browser verification: a Viewer on a restored synthetic board fails to open because read-only hydration generates a mutation; another Viewer renders content but raises Board is read-only errors. API hashes and roles pass. Determine fixture normalization versus application defect and add a read-only-first regression before native recovery acceptance. | open |  | 2026-09-27T15:03:54.812Z |  |
+| 22 | 04 | unmet-truth | src/canvas/account/board-workspace.ts |  | Cold restored Viewer opening fails. Automated tests/restored-viewer.spec.ts @04-15-22 reproduces both board types in Chromium, Firefox and WebKit (3 failed, zero skipped); write rejection and exact unchanged server state pass. Determine fixture normalization versus application defect and make this regression pass before native recovery acceptance. | open |  | 2026-09-27T15:03:54.812Z |  |
 
 ````json
 [
@@ -309,7 +309,7 @@ last_updated: 2026-09-27T15:12:32.805Z
     "phase": "04",
     "file": "src/canvas/account/board-workspace.ts",
     "line": null,
-    "description": "Local Kubernetes cold browser verification: a Viewer on a restored synthetic board fails to open because read-only hydration generates a mutation; another Viewer renders content but raises Board is read-only errors. API hashes and roles pass. Determine fixture normalization versus application defect and add a read-only-first regression before native recovery acceptance.",
+    "description": "Cold restored Viewer opening fails. Automated tests/restored-viewer.spec.ts @04-15-22 reproduces both board types in Chromium, Firefox and WebKit (3 failed, zero skipped); write rejection and exact unchanged server state pass. Determine fixture normalization versus application defect and make this regression pass before native recovery acceptance.",
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-27T15:03:54.812Z",

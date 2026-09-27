@@ -80,3 +80,18 @@ On 2026-09-27, the user accepted the reported local Kubernetes setup and test re
 ## Approved validation deferral — 2026-09-27
 
 The user postponed independent storage and capacity validation to backlog **999.6**. These infrastructure checks are deferred from active Phase 4 acceptance and remain unverified. Existing local test evidence is retained; WINDOWS 20 is waived for the documented deferral. The cold native Viewer rendering failure (WINDOWS 22) remains active. Production ingress/provider validation retains its separate disposition.
+
+
+## Automated Viewer-first regression — 2026-09-27
+
+`tests/restored-viewer.spec.ts` (`@04-15-22`) reproduces the native opening failure with an isolated real SQLite backup/restore fixture and production frontend assets. It seeds the same representative data via HTTP, restores after owned live-file loss, and opens boards 2 and 0 in separate fresh Viewer browser contexts before any writer browser hydrates either board.
+
+Run:
+
+```sh
+npm exec playwright test -- tests/restored-viewer.spec.ts --project=prod --project=prod-firefox --project=prod-webkit --grep @04-15-22
+```
+
+Result: **3 failed, zero skipped** across Chromium, Firefox and WebKit. Both board-opening assertions fail in each browser (six reproduced scenarios). Viewer role checks, explicit write rejection (HTTP 403), absence of browser mutation requests, and exact unchanged document/image/grant graph assertions pass. Native content/image checks run only when the canvas opens. Diagnostics and screenshots are attached for compatible Playwright reporters; failure contexts identify both opening failures.
+
+This is an ordinary failing regression, with no expected-failure annotation or skip. Both repository typechecks pass. The application and recovery fixture remain unchanged; WINDOWS 22 stays open for diagnosis and correction. This reproduction uses local fixture services and does not repeat the destructive Kubernetes drill.
