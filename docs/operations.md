@@ -168,3 +168,19 @@ npm exec playwright test -- tests/backup-fence.spec.ts --project=prod --project=
 ```
 
 The fixture runs the production backup scheduler and publishes real SQLite backups. A test-only scheduler clock advances to the 45-minute alert, the 60-minute write cutoff, and a further 24-hour maintenance interval. Document and image writes receive actual `503 BACKUP_FRESHNESS_REQUIRED` responses. Browser journal entries remain pending; resumed verified coverage triggers a fresh access check, and an older held acknowledgment cannot mark a newer edit Saved. Final exact acknowledgment clears the journal, and a reload retains both notes and the image. The 24-hour advance establishes clock-boundary behavior; elapsed maintenance time is measured separately by the Kubernetes recovery drill.
+
+## Disposable local Kubernetes recovery drill
+
+After the explicitly local deployment smoke succeeds, use the same external synthetic fixture and isolated context:
+
+```sh
+node scripts/recovery-drill.mjs --local --synthetic \
+  --context kind-dali-local-example --namespace dali-smoke-example \
+  --fixture /private-runtime/fixture.json --report /private-runtime/recovery-report.json \
+  --rollback-app-image dali-app:previous-compatible \
+  --rollback-web-image dali-web:previous-compatible
+```
+
+The command requires existing owned smoke resources, verified storage semantics and explicit previous compatible images. It seeds 50 boards and 50 generated images through authenticated APIs, verifies cold content after fenced restart and rollback, records acknowledgments during backup, and selects the manifest digest. With ingress closed and the old writer terminated, an operator pod removes only the three selected synthetic SQLite companion files and restores into a fresh directory. It verifies the restored epoch, invalidated sessions, exact content, reconciled post-backup revocation, current roles and resumed backup coverage before reopening ingress. The private report records observed timings and capacity estimates. `LOCAL_RECOVERY_DRILL_PASS` applies to this local envelope.
+
+Separate local PV directories share the container host and backing volume. Host/disk failure survival, production storage capacity and production infrastructure acceptance require an independently provisioned environment. The private runtime fixture and generated state/report stay outside the repository. A successful drill leaves the restored deployment running for inspection; further destructive runs require a fresh explicitly selected synthetic deployment.
