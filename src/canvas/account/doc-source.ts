@@ -7,7 +7,7 @@ export type SourceOptions = {
   onPendingDocument?: (docId: string, data: Uint8Array) => unknown | Promise<unknown>;
   onAcknowledged?: (token: unknown) => void | Promise<void>;
   durableLocalBlobs?: boolean;
-  beforeDocumentWrite?: () => Promise<void>;
+  beforeDocumentWrite?: (docId: string, data: Uint8Array) => Promise<'acknowledged' | void>;
   getRecoveryEpoch?: () => string;
   onDocumentOutcome?: (docId: string, data: Uint8Array, outcome: 'loaded' | 'sending' | 'acknowledged' | 'failed', attempt: string) => void;
   onImageOutcome?: (key: string, outcome: 'loaded' | 'sending' | 'acknowledged' | 'failed', attempt: string) => void;
@@ -69,17 +69,23 @@ export class BoardDocSource implements DocSource {
     const copy = new Uint8Array(data);
     this.options.onDocumentOutcome?.(docId, copy, 'sending', attempt);
     try {
-    const epoch = sourceRecoveryEpoch(this.options);
-    const token = await this.options.onPendingDocument?.(docId, copy);
-    try { await this.options.beforeDocumentWrite?.(); }
-    catch (error) { if (error instanceof SourceAccessError) this.options.onAuthorizationLost?.(error); throw error; }
-    confirmRecoveryEpoch(this.options, epoch);
-    const response = await this.request(docId, 'push', copy, epoch);
-    const result: unknown = await response.json(); this.assertCurrent(docId, true);
-    if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true) throw new Error('Document commit unconfirmed');
-    confirmRecoveryEpoch(this.options, epoch, response);
-    await this.options.onAcknowledged?.(token);
-    this.assertCurrent(docId, true); this.options.onDocumentOutcome?.(docId, copy, 'acknowledged', attempt);
+      const epoch = sourceRecoveryEpoch(this.options);
+      const token = await this.options.onPendingDocument?.(docId, copy);
+      let replayOutcome: 'acknowledged' | void;
+      try { replayOutcome = await this.options.beforeDocumentWrite?.(docId, copy); }
+      catch (error) { if (error instanceof SourceAccessError) this.options.onAuthorizationLost?.(error); throw error; }
+      confirmRecoveryEpoch(this.options, epoch);
+      this.assertCurrent(docId, true);
+      // Recovery may already have committed this exact update while preparing
+      // the write. Its explicit acknowledgment avoids a second transport.
+      if (replayOutcome !== 'acknowledged') {
+        const response = await this.request(docId, 'push', copy, epoch);
+        const result: unknown = await response.json(); this.assertCurrent(docId, true);
+        if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true) throw new Error('Document commit unconfirmed');
+        confirmRecoveryEpoch(this.options, epoch, response);
+      }
+      await this.options.onAcknowledged?.(token);
+      this.assertCurrent(docId, true); this.options.onDocumentOutcome?.(docId, copy, 'acknowledged', attempt);
     } catch (error) { this.options.onDocumentOutcome?.(docId, copy, 'failed', attempt); throw error; }
   }
   subscribe(_callback: (docId: string, data: Uint8Array) => void, disconnect: (reason: string) => void) {

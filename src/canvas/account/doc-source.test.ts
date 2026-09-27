@@ -48,4 +48,33 @@ describe('BoardDocSource', () => {
     const active = new BoardDocSource({ ...options(), fetch: fetcher, onPendingDocument: () => { throw new Error('quota'); } });
     await expect(active.push('content', new Uint8Array([0, 0]))).rejects.toThrow('quota'); expect(fetcher).not.toHaveBeenCalled();
   });
+  it('uses an exact replay acknowledgment without sending a duplicate update', async () => {
+    const fetcher = vi.fn(); const ack = vi.fn(); const outcome = vi.fn();
+    const source = new BoardDocSource({ ...options(), fetch: fetcher, onPendingDocument: () => 7,
+      beforeDocumentWrite: async (id, data) => { expect(id).toBe('content'); expect(data).toEqual(new Uint8Array([1, 2])); return 'acknowledged'; },
+      onAcknowledged: ack, onDocumentOutcome: outcome });
+    await source.push('content', new Uint8Array([1, 2]));
+    expect(fetcher).not.toHaveBeenCalled(); expect(ack).toHaveBeenCalledExactlyOnceWith(7);
+    expect(outcome.mock.calls.map(call => call[2])).toEqual(['sending', 'acknowledged']);
+  });
+  it('sends normally when recovery does not confirm the submitted update', async () => {
+    const fetcher = vi.fn(async () => Response.json({ acknowledged: true }, { headers: { 'X-Dali-Recovery-Epoch': epoch } }));
+    const source = new BoardDocSource({ ...options(), fetch: fetcher, beforeDocumentWrite: async () => {} });
+    await source.push('content', new Uint8Array([1, 2])); expect(fetcher).toHaveBeenCalledOnce();
+  });
+  it.each(['epoch', 'scope', 'abort'] as const)('rejects replay acknowledgment after %s changes', async fault => {
+    let currentEpoch = epoch; let current = true; const controller = new AbortController();
+    const fetcher = vi.fn(); const ack = vi.fn();
+    const source = new BoardDocSource({ ...options(), fetch: fetcher, signal: controller.signal,
+      isCurrent: () => current, getRecoveryEpoch: () => currentEpoch, onAcknowledged: ack,
+      beforeDocumentWrite: async () => {
+        if (fault === 'epoch') currentEpoch = '22222222-2222-4222-8222-222222222222';
+        if (fault === 'scope') current = false;
+        if (fault === 'abort') controller.abort();
+        return 'acknowledged';
+      } });
+    await expect(source.push('content', new Uint8Array([1, 2]))).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled(); expect(ack).not.toHaveBeenCalled();
+  });
+
 });

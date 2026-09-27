@@ -61,7 +61,14 @@ for (const sourceRole of ['owner', 'editor']) test(`@CR-02 @CR-07 ${sourceRole} 
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   if (sourceRole === 'editor') {
     await page.context().clearCookies(); await page.goto(origin + '/auth/start'); await page.getByRole('link', { name: 'Synthetic Editor', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+    const library = page.getByRole('heading', { name: 'Your boards', exact: true });
+    const changed = page.getByRole('heading', { name: 'Account changed', exact: true });
+    await expect(library.or(changed)).toBeVisible();
+    if (await changed.isVisible()) {
+      await expect(page.locator('editor-host')).toHaveCount(0);
+      await page.getByRole('button', { name: 'Back to your boards', exact: true }).click();
+    }
+    await expect(library).toBeVisible();
     accountId = (await (await page.request.get(origin + '/api/session')).json()).accountId;
     database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, accountId, 'editor');
     await page.goto(origin + '/?board=' + board.summary.id); await expect(page.locator('affine-edgeless-root')).toBeVisible();

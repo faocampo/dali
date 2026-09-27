@@ -64,7 +64,7 @@ test('picker centers proportional images, supports repeated selection and persis
   await input.setInputFiles(file);
   await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
   expect((await images(page))[1]!.id).not.toBe(first.id);
-  await page.getByRole('button',{name:'Saved',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Saved, Open save details',exact:true}).waitFor();
   await page.reload();
   await expect(page.locator('affine-edgeless-image')).toHaveCount(2);
   expect((await images(page)).find(i=>i.id===first.id)).toEqual(moved);

@@ -7,6 +7,7 @@ import * as Y from 'yjs';
 import { AccountJournal, replayJournal, requestRecoveryStorage, pendingRecords, readCheckpoint, validRecord, RecoveryStorageError, type ReplayObserver } from './account/outbox';
 import { RecoveryCoordinator, type RecoveryOutcome } from './account/recovery';
 import { RecoveryEpochError, SourceAccessError } from './account/doc-source';
+import { acknowledgedUpdateCovered } from './account/acknowledged-update';
 import { interruptSession, revalidateSession } from '../auth/session';
 import { attachLocalCapture } from './account/local-capture';
 import { titleIntentStore, inspectPendingScopes } from './account/outbox';
@@ -348,7 +349,19 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (receipt?.scope !== scopedJournal.scope || !Array.isArray(receipt.ids)) return Promise.reject(new Error('Recovery acknowledgment scope changed'));
       return scopedJournal.acknowledge(receipt.ids);
     },
-    beforeDocumentWrite: async () => { await coordinator.retryRecovery(); if (!isCurrent() || scope?.recoveryState !== 'saved') throw new Error('Recovery is pending'); },
+    beforeDocumentWrite: async (docId, data) => {
+      const epoch = authorizedDescriptor.recoveryEpoch;
+      const authority = await coordinator.retryRecovery();
+      if (!isCurrent() || scope?.recoveryState !== 'saved' || !scope.canWrite || scope.role === 'viewer' ||
+          !authority || authority.accountId !== initial.accountId || authority.descriptor.summary.id !== initial.boardId)
+        throw new Error('Recovery is pending');
+      if (authority.descriptor.recoveryEpoch !== epoch || authorizedDescriptor.recoveryEpoch !== epoch)
+        throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+      // The journal may already have submitted this exact update while the
+      // native sync peer waited for recovery. Avoid another transport only
+      // when actual server acknowledgments cover its operations and deletes.
+      if (acknowledgedUpdateCovered(confirmed.get(docId), data)) return 'acknowledged';
+    },
     onAuthorizationLost: error => {
       if (isCurrent()) { suspendAccessScope('authorization'); if (error.status === 401) void interruptSession(); else if (error.status === 409) void revalidateSession(); }
       if (![401, 409].includes(error.status)) options.onAuthorizationLost?.(error);

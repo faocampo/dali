@@ -65,7 +65,7 @@ test('@02-06-03 daily workflow retains formatted collapsed independent maps besi
   await openMindmapProperties(page);
   await page.getByLabel('Font size',{exact:true}).fill('40');await page.getByLabel('Font size',{exact:true}).press('Tab');
   expect((await maps(page)).find(m=>m.id===source.id)).toEqual(source);
-  await page.getByRole('button',{name:'Saved',exact:true}).waitFor();const saved=await maps(page);
+  await page.getByRole('button',{name:'Saved, Open save details',exact:true}).waitFor();const saved=await maps(page);
   await page.reload();await expect.poll(()=>maps(page)).toEqual(saved);
   await selectLayer(page,copy.id);
   await fileAction(page, 'Export board');await page.getByRole('radio',{name:'PNG image'}).check();
