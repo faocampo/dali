@@ -22,7 +22,7 @@ test('@04-15-22 cold Viewer opens restored boards before any writer without muta
           const page = await context.newPage();
           const errors: string[] = [];
           const writes: string[] = [];
-          page.on('pageerror', error => errors.push(error.message));
+          page.on('pageerror', error => errors.push(error.stack ?? error.message));
           page.on('request', request => {
             if (request.url().includes(`/api/boards/${board.summary.id}/`) &&
                 (request.url().endsWith('/push') || request.method() === 'PUT' || request.method() === 'PATCH' || request.method() === 'DELETE')) writes.push(request.method() + ' ' + new URL(request.url()).pathname);
@@ -46,7 +46,9 @@ test('@04-15-22 cold Viewer opens restored boards before any writer without muta
           expect.soft(opened, `board ${sample.index}: Viewer-first hydration must open`).toBe(true);
           if (opened) {
             await expect.poll(() => page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.surface!.elementModels.length))
-              .toBe(spec.ordinaryObjects + spec.mindmapNodes);
+              .toBe(spec.ordinaryObjects - 1 + spec.mindmapNodes + (spec.mindmapNodes ? 1 : 0));
+            // Frames are blocks, while mind maps include an additional surface container.
+            expect(await page.locator('affine-edgeless-root').evaluate(el => (el as HTMLElement & { gfx: GfxController }).gfx.doc.getBlocksByFlavour('affine:frame').length)).toBe(1);
             const images = await page.locator('affine-edgeless-root').evaluate(async el => {
               const doc = (el as HTMLElement & { gfx: GfxController }).gfx.doc;
               return Promise.all(doc.getBlocksByFlavour('affine:image').map(async ({ model }) => {

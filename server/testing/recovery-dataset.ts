@@ -61,7 +61,7 @@ export function populateRecoveryDocument(bytes: Uint8Array, board: RecoveryBoard
   for (let n = 0; n < board.ordinaryObjects - 2; n++) elements.set(`${prefix}-shape-${n}`, shape(`${prefix}-shape-${n}`, n));
   const frameId = `${prefix}-frame`;
   blocks.set(frameId, map({ 'sys:id': frameId, 'sys:flavour': 'affine:frame', 'sys:version': 1, 'sys:children': new Y.Array(),
-    'prop:title': new Y.Text('Synthetic frame'), 'prop:xywh': '[-20,-20,600,400]', 'prop:index': 'a0', 'prop:background': 'transparent', 'prop:childElementIds': { [`${prefix}-shape-0`]: true } }));
+    'prop:title': new Y.Text('Synthetic frame'), 'prop:xywh': '[-20,-20,600,400]', 'prop:index': 'a0', 'prop:presentationIndex': 'a0', 'prop:lockedBySelf': false, 'prop:background': 'transparent', 'prop:childElementIds': { [`${prefix}-shape-0`]: true } }));
   (surface.get('sys:children') as Y.Array<string>).push([frameId]);
   elements.set(`${prefix}-connector`, map({ id: `${prefix}-connector`, type: 'connector', index: 'b0', xywh: '[0,0,140,100]', mode: 0,
     source: { id: `${prefix}-shape-0`, position: [1, 0.5] }, target: { id: `${prefix}-shape-1`, position: [0, 0.5] }, stroke: '#334455', strokeWidth: 2 }));
@@ -74,7 +74,7 @@ export function populateRecoveryDocument(bytes: Uint8Array, board: RecoveryBoard
   for (const [position, imageIndex] of board.imageIndexes.entries()) {
     const image = manifest.imageSpecs[imageIndex]!; const id = `${prefix}-image-${position}`;
     blocks.set(id, map({ 'sys:id': id, 'sys:flavour': 'affine:image', 'sys:version': 1, 'sys:children': new Y.Array(),
-      'prop:sourceId': image.key, 'prop:xywh': `[${position * 330},-300,300,200]`, 'prop:index': 'd0', 'prop:width': image.width, 'prop:height': image.height, 'prop:size': image.byteLength, 'prop:rotate': 0 }));
+      'prop:caption': '', 'prop:lockedBySelf': false, 'prop:sourceId': image.key, 'prop:xywh': `[${position * 330},-300,300,200]`, 'prop:index': 'd0', 'prop:width': image.width, 'prop:height': image.height, 'prop:size': image.byteLength, 'prop:rotate': 0 }));
     (page.get('sys:children') as Y.Array<string>).push([id]);
     if (position === 1) { const original = manifest.imageSpecs[board.imageIndexes[0]!]!; const editId = `${id}-edit`;
       blocks.set(editId, map({ 'sys:id': editId, 'sys:flavour': 'djai:image-visual-edit', 'sys:version': 1, 'sys:children': new Y.Array(),

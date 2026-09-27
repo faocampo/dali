@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Durable Boards and Recovery
 current_plan: 15
-status: blocked
-stopped_at: 04-15 local Kubernetes tests complete; native read-only browser finding remains; storage/capacity validation deferred to 999.6
-last_updated: "2026-09-27T15:13:17.461Z"
+status: in_progress
+stopped_at: 04-15 Viewer regression fixed in three browsers; final acceptance reconciliation pending; storage/capacity deferred to 999.6
+last_updated: "2026-09-27T22:48:30.345340Z"
 last_activity: 2026-09-27
-last_activity_desc: User deferred independent storage and capacity validation to backlog 999.6; native Viewer finding remains active
+last_activity_desc: WINDOWS 22 fixed; six restored Viewer scenarios pass; final plan acceptance pending
 state_head: c3cc75efd5f3b3680815fc4a7646bac77e1ab8ba
 progress:
   total_phases: 13
@@ -30,12 +30,12 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
-Phase: 04 (Durable Boards and Recovery) — Wave 9 local Kubernetes validation completed with an open native browser finding
+Phase: 04 (Durable Boards and Recovery) — Wave 9 local Kubernetes validation completed; native Viewer finding fixed in local restored-fixture regression
 Current Plan: 15
 Total Plans in Phase: 16
-Status: 14/16 plans complete; 04-15 tasks 1 and 3 complete; task 2 local API drill passed, native browser gate open; storage/capacity deferred to 999.6
-Next action: Resolve cold read-only native hydration (WINDOWS 22), then complete 04-15 and 04-16; storage/capacity validation is deferred to backlog 999.6
-Last activity: 2026-09-27 — Local kind setup, deployment and recovery drill passed; 50 boards and 143,329,267 image bytes verified. Restore-to-usable API 116.952 seconds. Freshness recovery passed in three browser engines. Cold native read-only rendering has an open failure. See [local validation](phases/04-durable-boards-and-recovery/04-LOCAL-KUBERNETES-VALIDATION.md) (measurements, limits and finding). Requirements remain unaccepted.
+Status: 14/16 plans complete; 04-15 tasks 1 and 3 complete; task 2 local API drill passed, native Viewer regression passed; final acceptance reconciliation pending; storage/capacity deferred to 999.6
+Next action: Reconcile fixed WINDOWS 22 evidence, then complete 04-15 and 04-16; storage/capacity validation is deferred to backlog 999.6
+Last activity: 2026-09-27 — Local kind setup, deployment and recovery drill passed; 50 boards and 143,329,267 image bytes verified. Restore-to-usable API 116.952 seconds. Freshness recovery passed in three browser engines. Cold native read-only rendering now passes six scenarios across three engines using fresh local restored fixtures. See [local validation](phases/04-durable-boards-and-recovery/04-LOCAL-KUBERNETES-VALIDATION.md) (measurements, limits and finding). Requirements remain unaccepted.
 
 Progress: [██░░░░░░░░] 23% (3/13 phases complete; 40/42 currently planned plans complete; later phases remain unplanned)
 
@@ -148,7 +148,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 - Cross-browser/service-restart durability, deployment and backup/restore require Phase 4 evidence. Simultaneous collaboration and reconnect convergence require Phase 5 evidence.
 - Resolved 04-13 prerequisite: operator reported ready; elevated rechecks confirmed Docker server 29.6.2 and pinned package provenance. Production packaging execution resumed.
 - Local Kubernetes deployment smoke passed; storage/capacity validation deferred to backlog 999.6; production ingress remains separately tracked in WINDOWS entry 18.
-- 04-15-02 local API recovery passed; independent storage/capacity validation deferred to backlog 999.6 (WINDOWS 20 waived), and cold read-only native rendering failed (WINDOWS 22). Task 3 passes Chromium/Firefox/WebKit; WINDOWS 21 is fixed.
+- 04-15-02 local API recovery passed; independent storage/capacity validation deferred to backlog 999.6 (WINDOWS 20 waived), and cold read-only native rendering is fixed with six passing browser scenarios (WINDOWS 22). Task 3 passes Chromium/Firefox/WebKit; WINDOWS 21 is fixed.
 
 ## Deferred Items
 
@@ -160,7 +160,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 ## Session Continuity
 
 Last session: 2026-09-26T20:58:19.120Z
-Stopped at: 04-15 local Kubernetes tests complete; native read-only browser finding remains; storage/capacity validation deferred to 999.6
+Stopped at: 04-15 Viewer regression fixed in three browsers; final acceptance reconciliation pending; storage/capacity deferred to 999.6
 Resume file: .planning/phases/04-durable-boards-and-recovery/04-15-CHECKPOINT.md
 Next action: `$gsd-execute-phase 4`
 

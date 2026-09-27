@@ -28,15 +28,21 @@ export class BoardMeta implements WorkspaceMeta {
   removeDocMeta(_id: string) { throw new Error('Board deletion requires the board service'); }
   setProperties(_properties: DocsPropertiesMeta) { throw new Error('Workspace properties are unavailable'); }
   setDocMeta(id: string, props: Partial<DocMeta>) {
-    this.writable();
+    this.readable();
     if (id !== this.contentId || (props.id !== undefined && props.id !== id)) throw new Error('Document unavailable');
+    // Native root hydration synchronizes its canvas title through this adapter.
+    // Board titles are owned by the board service; this projection must not
+    // write them back to Yjs, including when a renamed board is read-only.
+    const changes = Object.entries(props).filter(([key]) => key !== 'title' && key !== 'id');
+    if (!changes.length) return;
+    this.writable();
     const pages = this.pages;
     const record = pages.get(0);
     this.root.transact(() => {
       if (record instanceof Y.Map) {
-        for (const [key, value] of Object.entries(props)) record.set(key, value);
+        for (const [key, value] of changes) record.set(key, value);
       } else {
-        pages.delete(0); pages.insert(0, [{ ...record, ...props, id }]);
+        pages.delete(0); pages.insert(0, [{ ...record, ...Object.fromEntries(changes), id }]);
       }
     }, this.root.clientID);
     this.docMetaUpdated.next();

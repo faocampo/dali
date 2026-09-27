@@ -236,11 +236,11 @@ Plans:
 
 - [x] 04-08-PLAN.md — Preserve title intent and warn before leaving unresolved saving
 
-**Wave 9** *(tasks 04-15-01 and 04-15-03 complete; local API recovery passed; native browser gate remains; storage/capacity validation deferred to 999.6)*
+**Wave 9** *(tasks 04-15-01 and 04-15-03 complete; local API recovery passed; native Viewer regression fixed; final acceptance pending; storage/capacity validation deferred to 999.6)*
 
 - [ ] 04-15-PLAN.md — Measure independent storage-loss recovery, operational targets and browser recovery after backup fencing
 
-Task 1 representative restore and task 3 cross-browser freshness recovery passed. Task 2 local Kubernetes API recovery passed for 50 boards and 50 images; native cold read-only rendering failed; independent storage/capacity validation is deferred by the user to backlog 999.6. See [04-15-CHECKPOINT.md](phases/04-durable-boards-and-recovery/04-15-CHECKPOINT.md) (required environment and resume point). Plan remains incomplete.
+Task 1 representative restore and task 3 cross-browser freshness recovery passed. Task 2 local Kubernetes API recovery passed for 50 boards and 50 images; native cold read-only rendering now passes six local restored-fixture scenarios across three engines; final acceptance reconciliation remains; independent storage/capacity validation is deferred by the user to backlog 999.6. See [04-15-CHECKPOINT.md](phases/04-durable-boards-and-recovery/04-15-CHECKPOINT.md) (required environment and resume point). Plan remains incomplete.
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
@@ -521,7 +521,7 @@ Plans:
 **Requirements:** Deferred infrastructure-validation portions of OPS-01 and OPS-02; existing local deployment, backup and recovery behavior remains in scope.
 **Plans:** 0 plans
 **Captured context:** User postponed this validation on 2026-09-27 after accepting the local Kubernetes results. Separate local PV directories share one Docker host/backing volume. The measured 30-day full-backup forecast at 15-minute cadence with 25% headroom is approximately 500 GiB, versus the synthetic backup claim's nominal 100 GiB. Physical failure-domain independence and retention capacity remain unverified.
-**Resume trigger:** Promote when the target deployment storage topology and capacity are available for validation. Keep operator settings and operational evidence outside the public repository. This follow-up is deferred from active Phase 4 acceptance; preserve the local recovery evidence and the separate native Viewer rendering finding (WINDOWS 22).
+**Resume trigger:** Promote when the target deployment storage topology and capacity are available for validation. Keep operator settings and operational evidence outside the public repository. This follow-up is deferred from active Phase 4 acceptance; preserve the local recovery evidence and the separately resolved native Viewer rendering finding (WINDOWS 22).
 
 Plans:
 

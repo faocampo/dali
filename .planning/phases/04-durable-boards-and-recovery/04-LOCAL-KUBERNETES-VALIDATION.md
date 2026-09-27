@@ -95,3 +95,14 @@ npm exec playwright test -- tests/restored-viewer.spec.ts --project=prod --proje
 Result: **3 failed, zero skipped** across Chromium, Firefox and WebKit. Both board-opening assertions fail in each browser (six reproduced scenarios). Viewer role checks, explicit write rejection (HTTP 403), absence of browser mutation requests, and exact unchanged document/image/grant graph assertions pass. Native content/image checks run only when the canvas opens. Diagnostics and screenshots are attached for compatible Playwright reporters; failure contexts identify both opening failures.
 
 This is an ordinary failing regression, with no expected-failure annotation or skip. Both repository typechecks pass. The application and recovery fixture remain unchanged; WINDOWS 22 stays open for diagnosis and correction. This reproduction uses local fixture services and does not repeat the destructive Kubernetes drill.
+
+
+## Viewer-first correction verified — 2026-09-27
+
+WINDOWS 22 is fixed. The representative synthetic frame/image records omitted schema defaults, which BlockSuite attempted to populate during read-only hydration. The fixture now supplies those defaults. Separately, native root title synchronization called the metadata setter during initialization; `BoardMeta` now treats title synchronization as a no-op because the board service owns the title. Scope checks and all non-title write guards remain enforced.
+
+The same `@04-15-22` command above passes **3 tests in 4.2 minutes, zero skipped**: both board types open in each of Chromium, Firefox and WebKit (six scenarios). Native surface/frame counts, decoded image hashes and dimensions, no runtime errors, no browser mutation requests, HTTP 403 write rejection and exact unchanged server graph all pass. Surface counts account separately for the frame block and mind-map container.
+
+Additional checks: all **195 unit tests**, all **3 representative operations-drill tests**, frontend/server TypeScript checks and diff whitespace validation pass. Four metadata tests cover read-only and writable title projection, forbidden Viewer metadata writes, foreign IDs and authorized metadata changes; the title tests failed before the adapter correction and pass afterward.
+
+This correction was verified against freshly restored local fixture services with production frontend assets. The retained Kubernetes image has not been rebuilt or redeployed in this fix; prior cluster timings retain their original revision scope. Independent storage/capacity validation remains deferred to backlog 999.6. Final 04-15 acceptance reconciliation and dependent 04-16 verification remain pending.

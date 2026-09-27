@@ -34,7 +34,7 @@ actuals:
 plan_head_before: 3573e889f78ce453720d54d460a1aca3f7cf7305
 duration: multiple sessions
 completed: 2026-09-26
-status: halted
+status: in_progress
 coverage:
   - id: representative-local-recovery
     description: Representative real SQLite backup and fresh restore preserve exact document/image hashes and current role access
@@ -52,16 +52,16 @@ coverage:
     requirement: OPS-02
     verification: []
     human_judgment: true
-    rationale: Local Kubernetes/API recovery passed; storage/capacity validation is deferred to backlog 999.6; the failed cold read-only native rendering gate remains open.
+    rationale: Local Kubernetes/API recovery passed; storage/capacity validation is deferred to backlog 999.6; the cold Viewer regression is fixed across three browsers; final acceptance reconciliation remains.
 ---
 
 # Phase 04 Plan 15: Representative Recovery and Operational Gates
 
-**Local Kubernetes deployment and selected-backup recovery passed for 50 representative boards and 143,329,267 image bytes. Backup-fence replay passes in three browsers; native cold read-only rendering has an open failure.**
+**Local Kubernetes deployment and selected-backup recovery passed for 50 representative boards and 143,329,267 image bytes. Backup-fence replay passes in three browsers; native cold read-only rendering now passes six local restored-fixture scenarios across three browsers.**
 
 ## Completed task and commits
 
-Tasks **04-15-01** and **04-15-03** are complete. On 2026-09-27 the user explicitly authorized local Kubernetes setup: task **04-15-02** was implemented and its scoped local API recovery drill passed. Cold native read-only rendering found an open issue, and independent storage/capacity validation is deferred to backlog 999.6. The plan remains incomplete.
+Tasks **04-15-01** and **04-15-03** are complete. On 2026-09-27 the user explicitly authorized local Kubernetes setup: task **04-15-02** was implemented and its scoped local API recovery drill passed. Cold native read-only rendering found an issue subsequently fixed in WINDOWS 22, and independent storage/capacity validation is deferred to backlog 999.6. The plan remains incomplete.
 
 - `8ce0241` — RED: require representative recovery dataset envelope.
 - `dffa7c5` — GREEN: representative generator, real I/O drill, native cold browser proof and runbook.
@@ -119,7 +119,7 @@ The user authorized local setup on 2026-09-27. A disposable kind cluster with Ca
 
 The real backup-freshness browser test passes in Chromium, Firefox and WebKit, including the simulated 24-hour scheduler interval, pending note/image retention, fresh authorization and exact acknowledgment.
 
-The native restored-cluster follow-up found a cold Viewer hydration failure and read-only errors. WINDOWS entry 22 tracks investigation and a read-only-first regression. Separate PV directories share one Docker backing volume and host. The roughly 500 GiB retention forecast exceeds the synthetic claim's nominal 100 GiB. These constraints remain explicit.
+The native restored-cluster follow-up found a cold Viewer hydration failure and read-only errors. WINDOWS entry 22 is now fixed and verified by the read-only-first regression in three engines. Separate PV directories share one Docker backing volume and host. The roughly 500 GiB retention forecast exceeds the synthetic claim's nominal 100 GiB. These constraints remain explicit.
 
 See [04-LOCAL-KUBERNETES-VALIDATION.md](04-LOCAL-KUBERNETES-VALIDATION.md) (measured timings, scope, corrections and native browser finding) and [04-15-CHECKPOINT.md](04-15-CHECKPOINT.md) (remaining work). Implementation commits: `ddfd11f`, `c6c0dfb`, `c3cc75e`. Requirements remain unaccepted; plan 04-16 remains dependent on this incomplete plan.
 
@@ -129,9 +129,9 @@ Context7 resolved `/yjs/docs` for the original fixture and `/websites/kind_sigs_
 
 ## Self-check
 
-Local harness deliverables, scoped runtime evidence and cross-browser freshness tests exist. Storage/capacity acceptance is deferred to backlog 999.6; native read-only browser recovery remains open. No private fixture, key, kubeconfig or operational runtime report is committed.
+Local harness deliverables, scoped runtime evidence and cross-browser freshness tests exist. Storage/capacity acceptance is deferred to backlog 999.6; native read-only browser recovery now passes; final plan acceptance reconciliation remains. No private fixture, key, kubeconfig or operational runtime report is committed.
 
 
 ## Approved validation deferral — 2026-09-27
 
-The user postponed independent storage and capacity validation to backlog **999.6**. These infrastructure checks are deferred from active Phase 4 acceptance and remain unverified. Existing local test evidence is retained; WINDOWS 20 is waived for the documented deferral. The cold native Viewer rendering failure (WINDOWS 22) remains active. Production ingress/provider validation retains its separate disposition.
+The user postponed independent storage and capacity validation to backlog **999.6**. These infrastructure checks are deferred from active Phase 4 acceptance and remain unverified. Existing local test evidence is retained; WINDOWS 20 is waived for the documented deferral. The cold native Viewer rendering failure (WINDOWS 22) is now fixed with six passing local restored-fixture scenarios. Production ingress/provider validation retains its separate disposition.

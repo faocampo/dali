@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 11
+open_count: 10
 waived_count: 2
-fixed_count: 9
+fixed_count: 10
 total_count: 22
-last_updated: 2026-09-27T15:12:32.805Z
+last_updated: 2026-09-27T22:47:12.877Z
 ---
 
 # Broken Windows Ledger
@@ -36,7 +36,7 @@ last_updated: 2026-09-27T15:12:32.805Z
 | 19 | 04 | unrun-verify | tests/save-details.spec.ts |  | Native browser UI 200% zoom remains a final phase acceptance check; 04-07 automated Chromium evidence uses CDP visual viewport scale 2 and narrow viewport reflow. | open |  | 2026-09-26T20:09:43.019Z |  |
 | 20 | 04 | unrun-verify | scripts/recovery-drill.mjs |  | 04-15-02 local Kubernetes API recovery passed; independent physical failure-domain and production retention capacity acceptance remain open. | waived | User postponed independent storage and capacity validation on 2026-09-27 to backlog 999.6. Deferred from active Phase 4 acceptance; validation remains unverified. | 2026-09-26T20:58:18.534Z | 2026-09-27T15:12:32.805Z |
 | 21 | 04 | unrun-verify | tests/backup-fence.spec.ts |  | 04-15-03 real backup-freshness HTTP rejection and exact replay passed in Chromium, Firefox and WebKit with a simulated 24-hour scheduler interval. | fixed |  | 2026-09-26T20:58:18.675Z | 2026-09-27T14:54:16.154Z |
-| 22 | 04 | unmet-truth | src/canvas/account/board-workspace.ts |  | Cold restored Viewer opening fails. Automated tests/restored-viewer.spec.ts @04-15-22 reproduces both board types in Chromium, Firefox and WebKit (3 failed, zero skipped); write rejection and exact unchanged server state pass. Determine fixture normalization versus application defect and make this regression pass before native recovery acceptance. | open |  | 2026-09-27T15:03:54.812Z |  |
+| 22 | 04 | unmet-truth | src/canvas/account/board-workspace.ts |  | Fixed cold restored Viewer initialization: complete synthetic frame/image defaults and ignore native title synchronization through service-owned metadata. tests/restored-viewer.spec.ts @04-15-22 passes in Chromium, Firefox and WebKit (3 tests, six board scenarios, zero skipped), including native content/images, no runtime errors, HTTP 403 write rejection and exact unchanged server state. | fixed |  | 2026-09-27T15:03:54.812Z | 2026-09-27T22:47:12.877Z |
 
 ````json
 [
@@ -309,11 +309,11 @@ last_updated: 2026-09-27T15:12:32.805Z
     "phase": "04",
     "file": "src/canvas/account/board-workspace.ts",
     "line": null,
-    "description": "Cold restored Viewer opening fails. Automated tests/restored-viewer.spec.ts @04-15-22 reproduces both board types in Chromium, Firefox and WebKit (3 failed, zero skipped); write rejection and exact unchanged server state pass. Determine fixture normalization versus application defect and make this regression pass before native recovery acceptance.",
-    "status": "open",
+    "description": "Fixed cold restored Viewer initialization: complete synthetic frame/image defaults and ignore native title synchronization through service-owned metadata. tests/restored-viewer.spec.ts @04-15-22 passes in Chromium, Firefox and WebKit (3 tests, six board scenarios, zero skipped), including native content/images, no runtime errors, HTTP 403 write rejection and exact unchanged server state.",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-27T15:03:54.812Z",
-    "resolved_at": null,
+    "resolved_at": "2026-09-27T22:47:12.877Z",
     "milestone": null
   }
 ]
