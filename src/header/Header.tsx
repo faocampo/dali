@@ -110,7 +110,7 @@ export function Header({
         <img src={logo} alt="Dalí" height={34} />
       </a>
 
-      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} canCreate={member?.systemRole !== 'viewer' && !!scope?.canWrite} role={scope?.canWrite ? board?.summary.role : 'viewer'} onBoardAction={board && scope?.canWrite ? kind => { if (kind === 'rename' && onRenameBoard) document.querySelector<HTMLButtonElement>('.board-title-label')?.click(); else setAction(kind); } : undefined} />
+      <DaliMenu onOpenBoards={onOpenBoards} onExport={() => setExportOpen(true)} onNewBoard={newBoard} canCreate={member?.systemRole !== 'viewer' && scope?.phase === 'active'} role={scope?.canWrite ? board?.summary.role : 'viewer'} onBoardAction={board && scope?.canWrite ? kind => { if (kind === 'rename' && onRenameBoard) document.querySelector<HTMLButtonElement>('.board-title-label')?.click(); else setAction(kind); } : undefined} />
       <div className="board-document-heading">
       {!onRenameBoard && <h1 className="board-title-readable" title={boardTitle}>{boardTitle}</h1>}
       {onOpenBoards && onRenameBoard && <BoardTitleMenu paused={!scope?.canWrite} title={boardTitle} onRename={onRenameBoard} />}
