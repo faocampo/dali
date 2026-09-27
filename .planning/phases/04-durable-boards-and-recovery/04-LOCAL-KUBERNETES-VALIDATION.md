@@ -71,3 +71,7 @@ The first attempt's continuous synthetic writes repeatedly restarted a backup fr
 ## Acceptance boundary
 
 These results establish local deployment and recovery behavior. Independent physical host/disk failure survival, production storage capacity, production identity-provider integration and production deployment acceptance remain separate gates. The local harness emits scoped `LOCAL_DEPLOYMENT_SMOKE_PASS` and `LOCAL_RECOVERY_DRILL_PASS` markers. No requirement-wide production acceptance is inferred.
+
+## User acceptance
+
+On 2026-09-27, the user accepted the reported local Kubernetes setup and test results. This acceptance records the delivered local validation with its disclosed findings: WINDOWS entry 22 remains open for native Viewer rendering, and independent storage, retention capacity and production infrastructure acceptance remain separate gates. Phase-wide completion is unchanged.
