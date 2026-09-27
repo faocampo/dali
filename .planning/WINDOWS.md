@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 12
-waived_count: 1
+open_count: 11
+waived_count: 2
 fixed_count: 9
 total_count: 22
-last_updated: 2026-09-27T15:03:54.812Z
+last_updated: 2026-09-27T15:12:32.805Z
 ---
 
 # Broken Windows Ledger
@@ -32,9 +32,9 @@ last_updated: 2026-09-27T15:03:54.812Z
 | 15 | 04 | deviation | server/app.ts |  | Bounded router parameter length expanded to support required pending-grant admission routes; all 95 route/time cases pass. | fixed |  | 2026-09-26T03:38:38.344Z | 2026-09-26T03:41:00.992Z |
 | 16 | 04 | deviation | src/canvas/account/outbox.ts |  | Plan 04-05 connected journal acknowledgments and Header status to exact save coverage, and verified image-only retry through real server reads; 20 reducer and nine browser cases pass. | fixed |  | 2026-09-26T04:07:37.553Z | 2026-09-26T04:09:03.108Z |
 | 17 | 04 | deviation | server/storage/restore.ts |  | Fixed future-dated selected backup publishing an unverifiable restore; final restore suite passes. | fixed |  | 2026-09-26T04:27:37.952Z | 2026-09-26T04:29:31.962Z |
-| 18 | 04 | unmet-truth | scripts/deployment-smoke.mjs |  | Local Kubernetes deployment smoke passed; independent production storage and production ingress acceptance remain unverified. | open |  | 2026-09-26T19:33:30.654Z |  |
+| 18 | 04 | unmet-truth | scripts/deployment-smoke.mjs |  | Local Kubernetes deployment smoke passed; production ingress acceptance remains unverified. Independent storage/capacity validation deferred by the user to backlog 999.6. | open |  | 2026-09-26T19:33:30.654Z |  |
 | 19 | 04 | unrun-verify | tests/save-details.spec.ts |  | Native browser UI 200% zoom remains a final phase acceptance check; 04-07 automated Chromium evidence uses CDP visual viewport scale 2 and narrow viewport reflow. | open |  | 2026-09-26T20:09:43.019Z |  |
-| 20 | 04 | unrun-verify | scripts/recovery-drill.mjs |  | 04-15-02 local Kubernetes API recovery passed; independent physical failure-domain and production retention capacity acceptance remain open. | open |  | 2026-09-26T20:58:18.534Z |  |
+| 20 | 04 | unrun-verify | scripts/recovery-drill.mjs |  | 04-15-02 local Kubernetes API recovery passed; independent physical failure-domain and production retention capacity acceptance remain open. | waived | User postponed independent storage and capacity validation on 2026-09-27 to backlog 999.6. Deferred from active Phase 4 acceptance; validation remains unverified. | 2026-09-26T20:58:18.534Z | 2026-09-27T15:12:32.805Z |
 | 21 | 04 | unrun-verify | tests/backup-fence.spec.ts |  | 04-15-03 real backup-freshness HTTP rejection and exact replay passed in Chromium, Firefox and WebKit with a simulated 24-hour scheduler interval. | fixed |  | 2026-09-26T20:58:18.675Z | 2026-09-27T14:54:16.154Z |
 | 22 | 04 | unmet-truth | src/canvas/account/board-workspace.ts |  | Local Kubernetes cold browser verification: a Viewer on a restored synthetic board fails to open because read-only hydration generates a mutation; another Viewer renders content but raises Board is read-only errors. API hashes and roles pass. Determine fixture normalization versus application defect and add a read-only-first regression before native recovery acceptance. | open |  | 2026-09-27T15:03:54.812Z |  |
 
@@ -257,7 +257,7 @@ last_updated: 2026-09-27T15:03:54.812Z
     "phase": "04",
     "file": "scripts/deployment-smoke.mjs",
     "line": null,
-    "description": "Local Kubernetes deployment smoke passed; independent production storage and production ingress acceptance remain unverified.",
+    "description": "Local Kubernetes deployment smoke passed; production ingress acceptance remains unverified. Independent storage/capacity validation deferred by the user to backlog 999.6.",
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-26T19:33:30.654Z",
@@ -284,10 +284,10 @@ last_updated: 2026-09-27T15:03:54.812Z
     "file": "scripts/recovery-drill.mjs",
     "line": null,
     "description": "04-15-02 local Kubernetes API recovery passed; independent physical failure-domain and production retention capacity acceptance remain open.",
-    "status": "open",
-    "reason": "",
+    "status": "waived",
+    "reason": "User postponed independent storage and capacity validation on 2026-09-27 to backlog 999.6. Deferred from active Phase 4 acceptance; validation remains unverified.",
     "recorded_at": "2026-09-26T20:58:18.534Z",
-    "resolved_at": null,
+    "resolved_at": "2026-09-27T15:12:32.805Z",
     "milestone": null
   },
   {

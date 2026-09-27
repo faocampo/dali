@@ -75,3 +75,8 @@ These results establish local deployment and recovery behavior. Independent phys
 ## User acceptance
 
 On 2026-09-27, the user accepted the reported local Kubernetes setup and test results. This acceptance records the delivered local validation with its disclosed findings: WINDOWS entry 22 remains open for native Viewer rendering, and independent storage, retention capacity and production infrastructure acceptance remain separate gates. Phase-wide completion is unchanged.
+
+
+## Approved validation deferral — 2026-09-27
+
+The user postponed independent storage and capacity validation to backlog **999.6**. These infrastructure checks are deferred from active Phase 4 acceptance and remain unverified. Existing local test evidence is retained; WINDOWS 20 is waived for the documented deferral. The cold native Viewer rendering failure (WINDOWS 22) remains active. Production ingress/provider validation retains its separate disposition.

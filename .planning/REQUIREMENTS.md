@@ -74,6 +74,8 @@ Initial release includes the capabilities below. Delivery proceeds through small
 - [ ] **OPS-01**: Deployment operators can deploy Dali and its required services on operator-managed infrastructure using documented configuration and startup procedures.
 - [ ] **OPS-02**: Deployment operators can back up and restore board documents and images and verify that restored boards reopen with their content intact.
 
+**Approved validation deferral (2026-09-27):** Independent storage failure-domain and retention-capacity validation for OPS-01/OPS-02 is postponed to backlog 999.6. These checks remain unverified and are excluded from active Phase 4 acceptance. Local deployment/recovery validation and native Viewer rendering remain in scope.
+
 ## v2 Requirements
 
 Deferred to later iterations; exact later release allocation remains open.

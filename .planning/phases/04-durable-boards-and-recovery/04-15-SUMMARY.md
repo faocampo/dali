@@ -52,7 +52,7 @@ coverage:
     requirement: OPS-02
     verification: []
     human_judgment: true
-    rationale: Local Kubernetes/API recovery passed; independent production storage acceptance and the failed cold read-only native rendering gate remain open.
+    rationale: Local Kubernetes/API recovery passed; storage/capacity validation is deferred to backlog 999.6; the failed cold read-only native rendering gate remains open.
 ---
 
 # Phase 04 Plan 15: Representative Recovery and Operational Gates
@@ -61,7 +61,7 @@ coverage:
 
 ## Completed task and commits
 
-Tasks **04-15-01** and **04-15-03** are complete. On 2026-09-27 the user explicitly authorized local Kubernetes setup: task **04-15-02** was implemented and its scoped local API recovery drill passed. Cold native read-only rendering found an open issue, and independent production storage acceptance remains pending. The plan remains incomplete.
+Tasks **04-15-01** and **04-15-03** are complete. On 2026-09-27 the user explicitly authorized local Kubernetes setup: task **04-15-02** was implemented and its scoped local API recovery drill passed. Cold native read-only rendering found an open issue, and independent storage/capacity validation is deferred to backlog 999.6. The plan remains incomplete.
 
 - `8ce0241` — RED: require representative recovery dataset envelope.
 - `dffa7c5` — GREEN: representative generator, real I/O drill, native cold browser proof and runbook.
@@ -129,4 +129,9 @@ Context7 resolved `/yjs/docs` for the original fixture and `/websites/kind_sigs_
 
 ## Self-check
 
-Local harness deliverables, scoped runtime evidence and cross-browser freshness tests exist. Independent production infrastructure acceptance and native read-only browser recovery remain open. No private fixture, key, kubeconfig or operational runtime report is committed.
+Local harness deliverables, scoped runtime evidence and cross-browser freshness tests exist. Storage/capacity acceptance is deferred to backlog 999.6; native read-only browser recovery remains open. No private fixture, key, kubeconfig or operational runtime report is committed.
+
+
+## Approved validation deferral — 2026-09-27
+
+The user postponed independent storage and capacity validation to backlog **999.6**. These infrastructure checks are deferred from active Phase 4 acceptance and remain unverified. Existing local test evidence is retained; WINDOWS 20 is waived for the documented deferral. The cold native Viewer rendering failure (WINDOWS 22) remains active. Production ingress/provider validation retains its separate disposition.

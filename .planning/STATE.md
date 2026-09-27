@@ -4,10 +4,10 @@ current_phase: 04
 current_phase_name: Durable Boards and Recovery
 current_plan: 15
 status: blocked
-stopped_at: 04-15 local Kubernetes tests complete; native read-only browser finding and independent storage acceptance remain
-last_updated: "2026-09-27T15:06:31.556Z"
+stopped_at: 04-15 local Kubernetes tests complete; native read-only browser finding remains; storage/capacity validation deferred to 999.6
+last_updated: "2026-09-27T15:13:17.461Z"
 last_activity: 2026-09-27
-last_activity_desc: Local Kubernetes recovery passed; freshness browser gate passed; cold read-only native rendering failed
+last_activity_desc: User deferred independent storage and capacity validation to backlog 999.6; native Viewer finding remains active
 state_head: c3cc75efd5f3b3680815fc4a7646bac77e1ab8ba
 progress:
   total_phases: 13
@@ -33,8 +33,8 @@ Phase 3 is complete within approved scope. Its final source/test commit `63f352b
 Phase: 04 (Durable Boards and Recovery) — Wave 9 local Kubernetes validation completed with an open native browser finding
 Current Plan: 15
 Total Plans in Phase: 16
-Status: 14/16 plans complete; 04-15 tasks 1 and 3 complete; task 2 local API drill passed, native browser and independent storage gates open
-Next action: Resolve cold read-only native hydration (WINDOWS 22), retain independent storage/capacity acceptance, then complete 04-15 and 04-16
+Status: 14/16 plans complete; 04-15 tasks 1 and 3 complete; task 2 local API drill passed, native browser gate open; storage/capacity deferred to 999.6
+Next action: Resolve cold read-only native hydration (WINDOWS 22), then complete 04-15 and 04-16; storage/capacity validation is deferred to backlog 999.6
 Last activity: 2026-09-27 — Local kind setup, deployment and recovery drill passed; 50 boards and 143,329,267 image bytes verified. Restore-to-usable API 116.952 seconds. Freshness recovery passed in three browser engines. Cold native read-only rendering has an open failure. See [local validation](phases/04-durable-boards-and-recovery/04-LOCAL-KUBERNETES-VALIDATION.md) (measurements, limits and finding). Requirements remain unaccepted.
 
 Progress: [██░░░░░░░░] 23% (3/13 phases complete; 40/42 currently planned plans complete; later phases remain unplanned)
@@ -147,8 +147,8 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 - No remaining Phase 3 blocker within approved scope. Real-provider and spoken assistive-technology acceptance have explicit backlog follow-ups.
 - Cross-browser/service-restart durability, deployment and backup/restore require Phase 4 evidence. Simultaneous collaboration and reconnect convergence require Phase 5 evidence.
 - Resolved 04-13 prerequisite: operator reported ready; elevated rechecks confirmed Docker server 29.6.2 and pinned package provenance. Production packaging execution resumed.
-- Local Kubernetes deployment smoke passed; independent production storage/ingress acceptance remains open in WINDOWS entry 18.
-- 04-15-02 local API recovery passed; independent storage/capacity gate remains open (WINDOWS 20), and cold read-only native rendering failed (WINDOWS 22). Task 3 passes Chromium/Firefox/WebKit; WINDOWS 21 is fixed.
+- Local Kubernetes deployment smoke passed; storage/capacity validation deferred to backlog 999.6; production ingress remains separately tracked in WINDOWS entry 18.
+- 04-15-02 local API recovery passed; independent storage/capacity validation deferred to backlog 999.6 (WINDOWS 20 waived), and cold read-only native rendering failed (WINDOWS 22). Task 3 passes Chromium/Firefox/WebKit; WINDOWS 21 is fixed.
 
 ## Deferred Items
 
@@ -160,7 +160,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 ## Session Continuity
 
 Last session: 2026-09-26T20:58:19.120Z
-Stopped at: 04-15 local Kubernetes tests complete; native read-only browser finding and independent storage acceptance remain
+Stopped at: 04-15 local Kubernetes tests complete; native read-only browser finding remains; storage/capacity validation deferred to 999.6
 Resume file: .planning/phases/04-durable-boards-and-recovery/04-15-CHECKPOINT.md
 Next action: `$gsd-execute-phase 4`
 
