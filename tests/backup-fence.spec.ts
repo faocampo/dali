@@ -1,0 +1,58 @@
+import { test, expect } from '@playwright/test';
+import { createRestoreService } from './durability-fixtures';
+import { recoveryBoardFixture, journalRows } from './recovery-fixtures';
+import { syntheticCanaries } from './access-fixtures';
+import { documentResponseBarrier } from './save-status-fixtures';
+
+test('@04-15-03 real backup freshness rejection preserves edits and images through simulated maintenance then exactly acknowledges recovery', async ({ browser, baseURL }) => {
+  test.setTimeout(180_000);
+  const service = await createRestoreService(baseURL!, 900_000, true);
+  const context = await browser.newContext({ baseURL: service.origin });
+  const page = await context.newPage();
+  try {
+    const { member, descriptor } = await recoveryBoardFixture(page, service.origin);
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+    const health = async () => (await (await context.request.get('/api/storage-health', { headers: { 'X-Dali-Account': member.accountId } })).json()).backup;
+    expect((await health()).state).toBe('healthy');
+    service.advanceBackupClock(45 * 60_000);
+    expect((await health()).state).toBe('alert');
+    service.advanceBackupClock(15 * 60_000);
+    expect((await health()).state).toBe('fenced');
+    const rejectedDocument = page.waitForResponse(r => r.url().includes('/docs/') && r.url().endsWith('/push') && r.status() === 503);
+    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    expect((await (await rejectedDocument).json()).code).toBe('BACKUP_FRESHNESS_REQUIRED');
+    const rejectedImage = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().includes('/blobs/') && r.status() === 503);
+    await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'Pending maintenance image.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes });
+    expect((await (await rejectedImage).json()).code).toBe('BACKUP_FRESHNESS_REQUIRED');
+    await expect.poll(async () => (await journalRows(page)).length).toBeGreaterThan(0);
+    const retained = (await journalRows(page)).map(row => row.id);
+    service.advanceBackupClock(24 * 60 * 60_000);
+    expect((await health()).state).toBe('fenced');
+    expect((await journalRows(page)).map(row => row.id)).toEqual(expect.arrayContaining(retained));
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toHaveCount(0);
+    let accessChecks = 0;
+    page.on('request', request => { if (request.method() === 'GET' && request.url().endsWith('/api/boards/' + descriptor.summary.id)) accessChecks++; });
+    const barrier = await documentResponseBarrier(page, descriptor.summary.id);
+    await service.refreshBackupCoverage();
+    expect((await health()).state).toBe('healthy');
+    await page.getByRole('button', { name: /Open save details$/ }).click();
+    await page.getByRole('button', { name: 'Retry now', exact: true }).click();
+    await expect.poll(() => barrier.held()).toBeGreaterThan(0);
+    expect(accessChecks).toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    const newer = (await journalRows(page)).map(row => row.id);
+    expect(newer.length).toBeGreaterThan(0);
+    await barrier.release(0);
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toHaveCount(0);
+    await barrier.releaseAll();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+    await expect.poll(async () => (await journalRows(page)).length).toBe(0);
+    await expect(page.locator('affine-edgeless-note')).toHaveCount(2);
+    await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
+    await page.reload();
+    await expect(page.locator('affine-edgeless-note')).toHaveCount(2);
+    await expect(page.locator('affine-edgeless-image img')).toBeVisible();
+    console.info('BACKUP_FENCE_BROWSER_PASS (24-hour clock advance is simulated; storage publication and HTTP rejection are real)');
+  } finally { await context.close(); await service.close(); }
+});

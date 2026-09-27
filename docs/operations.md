@@ -157,3 +157,14 @@ Generated `.gsd/representative-recovery.json` contains the measured local report
 This gate establishes the measured local filesystem envelope. Its live/backup directories share one host. Production acceptance still requires the explicit disposable Kubernetes context, surviving independent storage, synthetic TLS/OIDC, image availability, writer fencing and complete timed deployment/disaster/maintenance gates. Preserve those prerequisites and the separate 1-hour RPO / 24-hour RTO / 24-hour maintenance bounds when recording acceptance.
 
 Fixture encoding reference: Yjs document update API ([https://docs.yjs.dev/api/document-updates](https://docs.yjs.dev/api/document-updates)); native object representation follows the installed BlockSuite 0.22.4 schemas used by board creation.
+
+
+## Browser recovery after backup freshness fencing
+
+Run the real HTTP rejection and recovery scenario in each supported browser:
+
+```sh
+npm exec playwright test -- tests/backup-fence.spec.ts --project=prod --project=prod-firefox --project=prod-webkit --grep @04-15-03
+```
+
+The fixture runs the production backup scheduler and publishes real SQLite backups. A test-only scheduler clock advances to the 45-minute alert, the 60-minute write cutoff, and a further 24-hour maintenance interval. Document and image writes receive actual `503 BACKUP_FRESHNESS_REQUIRED` responses. Browser journal entries remain pending; resumed verified coverage triggers a fresh access check, and an older held acknowledgment cannot mark a newer edit Saved. Final exact acknowledgment clears the journal, and a reload retains both notes and the image. The 24-hour advance establishes clock-boundary behavior; elapsed maintenance time is measured separately by the Kubernetes recovery drill.

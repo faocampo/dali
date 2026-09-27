@@ -12,11 +12,11 @@ import { openDatabase } from '../server/storage/database.js';
 import { publishBackup, backupDigest, inspectBackupSet } from '../server/storage/backup.js';
 import { restoreBackup, verifyRestore, type RestoreReport } from '../server/storage/restore.js';
 import { readRecoveryEpoch } from '../server/storage/recovery-state.js';
-import { getBackupHealth } from '../server/storage/backup-scheduler.js';
+import { BackupScheduler, getBackupHealth, unavailableBackupHealth } from '../server/storage/backup-scheduler.js';
 import { createRecoveryDataset, populateRecoveryDocument, recoveryIdentities, recoveryImage, sha256 } from '../server/testing/recovery-dataset.js';
 
 /** Owned synthetic restore drill with real SQLite and a private operator ingress header. */
-export async function createRestoreService(assets: string, intervalMs = 1000) {
+export async function createRestoreService(assets: string, intervalMs = 1000, controlledFreshness = false) {
   const directory = await mkdtemp(join(tmpdir(), 'dali-restore-drill-'));
   const old = join(directory, 'old'); const fresh = join(directory, 'fresh'); const backups = join(directory, 'backups');
   for (const path of [old, fresh, backups]) await mkdir(path, { mode: 0o700 });
@@ -33,14 +33,27 @@ export async function createRestoreService(assets: string, intervalMs = 1000) {
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',
     DALI_BACKUP_DIRECTORY: backups, DALI_BACKUP_INDEPENDENT_STORAGE: 'true', DALI_BACKUP_INTERVAL_MS: String(intervalMs) };
   let ingress = true; let app: Awaited<ReturnType<typeof buildApp>>;
+  let backupClockOffset = 0;
+  let controlledScheduler: BackupScheduler | undefined;
   async function start() {
-    app = await buildApp({ config, database });
+    app = await buildApp({ config, database, ...(controlledFreshness ? { storagePolicy: { health: () => controlledScheduler?.health() ?? unavailableBackupHealth() } } : {}) });
+    if (controlledFreshness && !controlledScheduler) {
+      controlledScheduler = new BackupScheduler({ database,
+        destination: { directory: backups, independentStorage: true }, applicationVersion: '0.1.0',
+        wall: () => Date.now() + backupClockOffset, monotonic: () => performance.now() + backupClockOffset,
+        schedule: () => () => {},
+      });
+      await controlledScheduler.start();
+    }
     app.addHook('onRequest', async (request, reply) => { if (!ingress && request.headers['x-synthetic-operator'] !== operatorToken) return reply.code(503).send({ code: 'SYNTHETIC_MAINTENANCE' }); });
     app.get('/*', async (request, reply) => { const response = await fetch(assets + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
     await app.listen({ host: '127.0.0.1', port });
   }
   await start();
   return { origin, operatorHeaders, get database() { return database; },
+    advanceBackupClock(ms: number) { if (!controlledScheduler || !Number.isSafeInteger(ms) || ms < 0) throw new Error('Controlled synthetic clock required'); backupClockOffset += ms; },
+    async refreshBackupCoverage() { if (!controlledScheduler) throw new Error('Controlled synthetic clock required'); await controlledScheduler.check(); },
+    backupHealth() { return getBackupHealth(database); },
     async backup() { const selected = await publishBackup({ database, destination: { directory: backups, independentStorage: true }, applicationVersion: '0.1.0' });
       const backup = join(backups, selected.id); return { ...selected, backup, manifestDigest: await backupDigest(join(backup, 'manifest.json')) }; },
     async plannedRestart() {
@@ -63,7 +76,7 @@ export async function createRestoreService(assets: string, intervalMs = 1000) {
     async completeSets() { return inspectBackupSet({ directory: backups, independentStorage: true }); },
     currentEpoch() { return readRecoveryEpoch(database); },
     openIngress() { if (getBackupHealth(database).state !== 'healthy') throw new Error('Verified fresh coverage required'); ingress = true; },
-    async close() { await app?.close(); if (database.open) database.close(); await provider.close(); await rm(directory, { recursive: true, force: true }); },
+    async close() { await app?.close(); await controlledScheduler?.close(); if (database.open) database.close(); await provider.close(); await rm(directory, { recursive: true, force: true }); },
   };
 }
 
