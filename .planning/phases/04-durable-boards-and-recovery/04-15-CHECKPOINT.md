@@ -1,20 +1,21 @@
-# Plan 04-15 Operational Prerequisite Checkpoint
+# Plan 04-15 Recovery Acceptance Checkpoint
 
-**Type:** human-verify
-**Gate:** blocking-human
-**Plan:** 04-15
-**Progress:** 1/3 tasks complete
+Date: 2026-09-27
 
-| Task | Name | Commits | Files |
-|---|---|---|---|
-| 04-15-01 | Representative real I/O restore | `8ce0241`, `dffa7c5` | recovery dataset, operations drill, durability fixture, native browser test, operational runbook |
+Tasks 04-15-01 and 04-15-03 are complete. Task 04-15-02 has implemented and passed the user-authorized local Kubernetes API recovery drill. The cluster remains available through a private isolated kubeconfig; runtime paths and credentials stay outside the repository.
 
-**Current task:** 04-15-02 — production Kubernetes restart, maintenance and disaster drills.
-**Status:** blocked before implementation.
-**Blocked by:** Precondition not met: DALI_ACCEPTANCE_CONTEXT names an explicitly disposable cluster; container images are available there; synthetic TLS/OIDC and independently surviving live/backup storage have passed read-only prerequisite checks.
+## Completed local evidence
 
-Read-only checks on 2026-09-26: acceptance context and report variables absent; Kubernetes context inventory empty. Real deployment and recovery gates remain unrun. Task 3 remains unexecuted in sequence. No requirements were marked accepted.
+- Production images, synthetic signed OIDC/PKCE over HTTPS, enforced network restrictions and local storage semantics.
+- One-writer fencing, replacement pod persistence, actual compatible rollback and return.
+- Fifty representative boards and 50 images; explicit backup selection, live SQLite file loss and fresh-target restore.
+- Exact cold API document/image hashes and role checks; invalidated sessions, changed epoch, reconciled post-backup revocation and renewed backups.
+- Chromium, Firefox and WebKit freshness-fence recovery, with a simulated 24-hour scheduler interval and actual HTTP rejection/publication.
 
-Await explicit identification and authorization of a disposable acceptance environment with the private fixture inputs described in [deployment.md](../../../docs/deployment.md) (cluster, images, synthetic TLS/OIDC and storage contract), followed by agent-run read-only prerequisite verification. Operator infrastructure/configuration remains outside public repository artifacts. Existing image smoke evidence alone cannot establish this cluster prerequisite.
+## Remaining work
 
-Resume from task 04-15-02, preserving completed task commits and user work. [04-15-SUMMARY.md](04-15-SUMMARY.md) (completed local measurements and remaining acceptance limits) records the exact evidence. Plan 04-16 stays blocked by this incomplete dependency.
+1. Investigate WINDOWS entry 22: a cold Viewer cannot open an untouched restored synthetic board because native hydration creates a mutation; another Viewer renders but emits read-only errors. Determine fixture normalization versus application behavior, add a read-only-first regression, and rerun native browser validation.
+2. Independent physical storage failure survival and production capacity acceptance remain external gates. Separate local PV directories share one Docker backing volume/host. The measured 30-day forecast is about 500 GiB versus the test claim's nominal 100 GiB.
+3. Finish plan 04-15 acceptance before the dependent 04-16 final verification.
+
+See [04-LOCAL-KUBERNETES-VALIDATION.md](04-LOCAL-KUBERNETES-VALIDATION.md) (test results and measurements). Preserve completed work and private runtime evidence. Do not rerun destructive recovery against the already restored target; use a freshly selected synthetic deployment.

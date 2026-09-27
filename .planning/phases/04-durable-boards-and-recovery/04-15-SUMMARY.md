@@ -27,11 +27,12 @@ key-decisions:
 requirements-covered: [SAVE-01, OPS-02]
 requirements-completed: []
 actuals:
+  token_estimate_scope: original-task-1
   tokens: 8894
-  tasks: 1
-  commits: 2
+  tasks: 2
+  commits: 5
 plan_head_before: 3573e889f78ce453720d54d460a1aca3f7cf7305
-duration: 13min
+duration: multiple sessions
 completed: 2026-09-26
 status: halted
 coverage:
@@ -51,21 +52,21 @@ coverage:
     requirement: OPS-02
     verification: []
     human_judgment: true
-    rationale: Task 2 prerequisite is unmet; there is no explicit disposable acceptance context or configured Kubernetes context.
+    rationale: Local Kubernetes/API recovery passed; independent production storage acceptance and the failed cold read-only native rendering gate remain open.
 ---
 
 # Phase 04 Plan 15: Representative Recovery and Operational Gates
 
-**Seeded native boards and 143,329,267 bytes of valid PNG assets survive real local live-file loss and selected backup restoration with exact hashes and cold role verification; production drill remains blocked.**
+**Local Kubernetes deployment and selected-backup recovery passed for 50 representative boards and 143,329,267 image bytes. Backup-fence replay passes in three browsers; native cold read-only rendering has an open failure.**
 
 ## Completed task and commits
 
-Only task **04-15-01** is complete. Task **04-15-02** stopped before implementation at its explicit precondition; **04-15-03** remains unexecuted in plan sequence.
+Tasks **04-15-01** and **04-15-03** are complete. On 2026-09-27 the user explicitly authorized local Kubernetes setup: task **04-15-02** was implemented and its scoped local API recovery drill passed. Cold native read-only rendering found an open issue, and independent production storage acceptance remains pending. The plan remains incomplete.
 
 - `8ce0241` — RED: require representative recovery dataset envelope.
 - `dffa7c5` — GREEN: representative generator, real I/O drill, native cold browser proof and runbook.
 
-The ledger measures two commits before this metadata close-out. Actual tokens are changed deliverable diff characters divided by four, rounded up. Five deliverable files changed. No requirement-wide acceptance changed.
+The original task-1 token estimate is retained below; the continuation adds three implementation commits. No requirement-wide acceptance changed.
 
 ## Dataset and integrity evidence
 
@@ -112,24 +113,20 @@ The named RED assertion expected 50 boards and observed 0 from the compile-safe 
 
 **[Rule 1 — fixture bug] Application-compatible image keys.** The first native browser run rejected unpadded generated blob keys in local recovery caching. The generator now uses the application's padded URL-safe SHA-256 convention. The corrected exact server and native browser gates pass. Files: `server/testing/recovery-dataset.ts`; commit: `dffa7c5`. This was a synthetic fixture correction; no production hash policy changed.
 
-## Blocking prerequisite and remaining tasks
+## Local Kubernetes continuation and remaining gates
 
-Task 2 precondition: **DALI_ACCEPTANCE_CONTEXT names an explicitly disposable cluster; container images are available there; synthetic TLS/OIDC and independently surviving live/backup storage have passed read-only prerequisite checks.**
+The user authorized local setup on 2026-09-27. A disposable kind cluster with Calico, synthetic signed TLS/OIDC, isolated kubeconfig and separate local PV directories now passes image, network-policy, deployment, fenced restart, compatible rollback, explicit backup selection and offline recovery gates. The exact scoped marker is `LOCAL_RECOVERY_DRILL_PASS`; production acceptance remains distinct.
 
-Fresh read-only checks found `DALI_ACCEPTANCE_CONTEXT` absent, `DALI_ACCEPTANCE_REPORT` absent, and `kubectl config get-contexts -o name` returned an empty list. Consequently image availability, synthetic TLS/OIDC, independent volume survival/flush/locking/capacity and exclusive writer in a selected cluster cannot be established.
+The real backup-freshness browser test passes in Chromium, Firefox and WebKit, including the simulated 24-hour scheduler interval, pending note/image retention, fresh authorization and exact acknowledgment.
 
-No cluster resource was created, no cluster acceptance was simulated, and no task-2 implementation was started. The exact `RECOVERY_DRILL_PASS` gate remains unrun. Task 3's browser backup-fence integration remains unexecuted because it follows this blocked task. Resume from **04-15-02** only after the explicit disposable environment is supplied and its read-only checks pass, or after an explicit user-approved plan change.
+The native restored-cluster follow-up found a cold Viewer hydration failure and read-only errors. WINDOWS entry 22 tracks investigation and a read-only-first regression. Separate PV directories share one Docker backing volume and host. The roughly 500 GiB retention forecast exceeds the synthetic claim's nominal 100 GiB. These constraints remain explicit.
 
-See [04-15-CHECKPOINT.md](04-15-CHECKPOINT.md) (blocking prerequisite and continuation record). Plan 04-16 remains dependent on this halted plan. Existing deployment blocker in the cross-phase ledger remains open; additional unrun task gates are recorded there.
-
-## Known Stubs and Threat Surface
-
-No stub remains in completed task 1. Tasks 2 and 3 are unexecuted deliverables. New helper data and file deletion remain restricted to generated synthetic resources owned by the fixture; no production endpoint or authentication bypass was introduced. Physical storage independence retains the existing operational threat gate.
+See [04-LOCAL-KUBERNETES-VALIDATION.md](04-LOCAL-KUBERNETES-VALIDATION.md) (measured timings, scope, corrections and native browser finding) and [04-15-CHECKPOINT.md](04-15-CHECKPOINT.md) (remaining work). Implementation commits: `ddfd11f`, `c6c0dfb`, `c3cc75e`. Requirements remain unaccepted; plan 04-16 remains dependent on this incomplete plan.
 
 ## Documentation Consulted
 
-Context7 resolved `/yjs/docs` and fetched the document-update API: Yjs ([https://docs.yjs.dev/api/document-updates](https://docs.yjs.dev/api/document-updates)). Pinned BlockSuite wire schemas and existing repository API/restore implementations supplied the fixture contracts.
+Context7 resolved `/yjs/docs` for the original fixture and `/websites/kind_sigs_k8s_io` for local setup. Yjs document updates: https://docs.yjs.dev/api/document-updates ; kind quick start: https://kind.sigs.k8s.io/docs/user/quick-start/ . Installed native schemas and production code supplied the data and restore contracts.
 
-## Self-Check: PASSED
+## Self-check
 
-All five task deliverables and RED evidence exist. Commits `8ce0241` and `dffa7c5` exist. The final local report matches the recorded measurements. Task 2 and task 3 remain visibly incomplete; requirements remain unchecked.
+Local harness deliverables, scoped runtime evidence and cross-browser freshness tests exist. Independent production infrastructure acceptance and native read-only browser recovery remain open. No private fixture, key, kubeconfig or operational runtime report is committed.
