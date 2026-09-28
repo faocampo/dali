@@ -10,7 +10,9 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  reporter: [['list']],
+  reporter: process.env.DALI_UI_MATRIX === '1'
+    ? [['list'], ['./tests/recovery-ui-matrix-reporter.ts']]
+    : [['list']],
   timeout: 120_000,
   expect: { timeout: 20_000 },
   use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
