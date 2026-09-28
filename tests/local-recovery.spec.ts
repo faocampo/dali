@@ -107,7 +107,7 @@ test('@04-04-03 loading respects intervening user focus and opens a valid empty 
   await page.evaluate(({ accountId, boardId }) => sessionStorage.setItem('dali-recovery-focus', JSON.stringify({ accountId, boardId, label: 'Add sticky note', tag: 'button', elements: [], editing: false })), { accountId: member.accountId, boardId: descriptor.summary.id });
   let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; });
   await page.route('**/docs/*/pull', async route => { await barrier; await route.continue(); });
-  await page.reload(); await expect(page.getByText('Opening board…', { exact: true })).toBeVisible();
+  await page.reload(); await expect(page.getByText('Recovering changes…', { exact: true })).toBeVisible();
   await page.evaluate(() => { const button = document.createElement('button'); button.id = 'synthetic-focus-target'; button.textContent = 'Synthetic focus target'; document.body.append(button); });
   await page.getByRole('button', { name: 'Synthetic focus target', exact: true }).click();
   await page.getByRole('button', { name: 'Synthetic focus target', exact: true }).focus();

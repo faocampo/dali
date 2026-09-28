@@ -317,13 +317,16 @@ test('@03-10-03 long account recovery fits 490px and short viewport with reachab
   expect((await records(page)).every(record => record.boardId === descriptor.summary.id)).toBe(true);
 });
 test('@03-10-03 failed replay stays pending without resume and retries committed content', async ({ page }) => {
-  const descriptor = await board(page); await text(page, 'Replay retry canary'); await expire(page);
+  const descriptor = await board(page);
   let unavailable = true; let release!: () => void;
   const acknowledgment = new Promise<void>(resolve => { release = resolve; });
-  await page.clock.setFixedTime(new Date()); await page.route('**/docs/*/push', async route => {
+  await page.route('**/docs/*/push', async route => {
     if (unavailable) return route.fulfill({ status: 503, json: { code: 'SYNTHETIC_UNAVAILABLE' } });
     await acknowledgment; await route.continue();
   });
+  await text(page, 'Replay retry canary');
+  await expect.poll(async () => (await records(page)).length).toBeGreaterThan(0);
+  await expire(page); await page.clock.setFixedTime(new Date());
   await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
   const failed = page.getByRole('button', { name: 'Save failed, Open save details', exact: true });
   await expect(failed).toBeVisible(); await expect(page.getByText('Editing resumed.', { exact: true })).toHaveCount(0); await expect(page.locator('editor-host')).toBeVisible();
