@@ -44,3 +44,19 @@ it('@04-04-01 preservation failure and corrupt or restored journals stay isolate
   }
   const f = fixture(); f.dependencies.preserve.mockRejectedValue(new Error('Quota')); await f.coordinator.open(); expect(f.events.at(-1)).toBe('storage-paused'); expect(f.dependencies.drain).not.toHaveBeenCalled();
 });
+
+it('late native sync retries cannot authorize a disposed or stale recovery scope', async () => {
+  for (const invalidation of ['disposed', 'stale'] as const) {
+    const f = fixture();
+    await f.coordinator.open();
+    f.dependencies.authorize.mockClear();
+    f.events.length = 0;
+    if (invalidation === 'disposed') f.coordinator.dispose();
+    else f.dependencies.current.mockReturnValue(false);
+    await expect(f.coordinator.retryRecovery()).resolves.toBeUndefined();
+    f.coordinator.retryIfIdle();
+    expect(f.dependencies.authorize).not.toHaveBeenCalled();
+    expect(f.events).toEqual([]);
+    f.coordinator.dispose();
+  }
+});

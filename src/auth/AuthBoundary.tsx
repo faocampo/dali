@@ -51,12 +51,13 @@ export function AuthBoundary({ children }: { children: (session: SessionDescript
     {state.member && ['authenticated', 'preserving', 'preservation-failed'].includes(state.phase) && <div hidden={interrupted} style={interrupted ? { display: 'none' } : { display: 'contents' }}>{children(state.member, signOut)}</div>}
     {state.phase === 'authenticated' && state.notice && <p className="session-recovery__notice" role="status">{state.notice}</p>}
     {interrupted ? <dialog ref={dialog} className="session-recovery" aria-labelledby="session-heading" onCancel={event => event.preventDefault()} onKeyDown={event => {
+      event.stopPropagation();
       if (event.key !== 'Tab' || event.nativeEvent.isComposing) return;
       const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),a[href]')];
       const first = controls[0]; const last = controls.at(-1);
       if (!first) { event.preventDefault(); return; }
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    }}>{content}</dialog> : state.phase !== 'authenticated' && <main className="session-recovery">{['loading', 'recovering'].includes(state.phase) ? <p role="status">{state.phase === 'loading' ? 'Signing you in…' : 'Checking your account and board access…'}</p> : state.phase === 'identity-changed' ? <><h1 ref={heading} tabIndex={-1}>Account changed</h1><p role="alert">You're signed in with a different account. Return to your boards or sign in with the previous account to recover its pending changes.</p><button onClick={openCurrentBoards}>Back to your boards</button><button onClick={() => { void signOut(); }}>Sign out of Dalí</button></> : content}</main>}
+    }}>{content}</dialog> : state.phase !== 'authenticated' && <main className="session-recovery" onKeyDown={event => event.stopPropagation()}>{['loading', 'recovering'].includes(state.phase) ? <p role="status">{state.phase === 'loading' ? 'Signing you in…' : 'Checking your account and board access…'}</p> : state.phase === 'identity-changed' ? <><h1 ref={heading} tabIndex={-1}>Account changed</h1><p role="alert">You're signed in with a different account. Return to your boards or sign in with the previous account to recover its pending changes.</p><button onClick={openCurrentBoards}>Back to your boards</button><button onClick={() => { void signOut(); }}>Sign out of Dalí</button></> : content}</main>}
   </>;
 }

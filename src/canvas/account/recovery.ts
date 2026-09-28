@@ -17,6 +17,7 @@ export class RecoveryCoordinator {
   retryIfIdle() { if (!this.flight && !this.timer && !this.disposed) void this.run(true); }
   dispose() { this.disposed = true; clearTimeout(this.timer); this.controller?.abort(); }
   private run(retry: boolean): Promise<RecoveryAuthority | undefined> {
+    if (this.disposed || !this.dependencies.current()) return Promise.resolve(undefined);
     if (this.flight) return this.flight;
     clearTimeout(this.timer); this.timer = undefined;
     const controller = this.controller = new AbortController();
