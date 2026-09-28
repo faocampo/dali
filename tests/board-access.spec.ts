@@ -132,7 +132,7 @@ test('@03-06-01 loading blank board gates mutations and native history publishes
   const hold = new Promise<void>(resolve => { release = resolve; });
   await page.route('**/api/boards/' + board.summary.id, async route => { await hold; await route.continue(); });
   await page.goto('/?board=' + board.summary.id);
-  await expect(page.getByText('Opening board…', { exact: true })).toBeVisible();
+  await expect(page.getByText('Checking access…', { exact: true })).toBeVisible();
   await expect(page.locator('editor-host')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Add mind map', exact: true })).toHaveCount(0);
   release();

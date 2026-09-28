@@ -24,3 +24,9 @@ describe('authorized Viewer recovery feedback', () => {
     expect(saveDetailsCopy(saved, undefined, { ...viewer, role: 'editor', canWrite: true, retainedPending: true }).label).toBe('Saved');
   });
 });
+
+it('offers distinct storage-full and storage-unavailable recovery steps', () => {
+  const paused = { ...viewer, role: 'editor' as const, recoveryState: 'storage-paused' as const };
+  expect(saveDetailsCopy(saved, undefined, { ...paused, storageFailure: 'quota' }).message).toContain('free space for this site');
+  expect(saveDetailsCopy(saved, undefined, { ...paused, storageFailure: 'unavailable' }).message).toContain('allow storage for this site');
+});

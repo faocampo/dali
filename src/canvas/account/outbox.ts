@@ -95,13 +95,18 @@ async function database(): Promise<IDBDatabase> {
     request.onblocked = () => { failed = true; reject(new RecoveryStorageError('BLOCKED')); };
   });
 }
+const transactionFailures = new WeakMap<IDBTransaction, unknown>();
+function abortWithFailure(tx: IDBTransaction, error: unknown) {
+  transactionFailures.set(tx, error);
+  tx.abort();
+}
 async function transaction<T>(stores: string[], mode: IDBTransactionMode, action: (tx: IDBTransaction, result: (value: T) => void) => void): Promise<T> {
   const db = await database();
   try {
     return await new Promise<T>((resolve, reject) => {
       const tx = db.transaction(stores, mode, { durability: 'strict' }); let value: T;
       tx.oncomplete = () => { if (mode === 'readwrite') invalidate(); resolve(value); };
-      tx.onabort = tx.onerror = () => reject(tx.error ?? new RecoveryStorageError('FAILED'));
+      tx.onabort = tx.onerror = () => reject(transactionFailures.get(tx) ?? tx.error ?? new RecoveryStorageError('FAILED'));
       try { action(tx, result => { value = result; }); } catch (error) { tx.abort(); reject(error); }
     });
   } finally { db.close(); }
@@ -179,7 +184,7 @@ export async function readCheckpoint(scope: JournalScope, tab: string): Promise<
         }
         done(request.result);
       }
-      catch { tx.abort(); }
+      catch (error) { abortWithFailure(tx, error); }
     };
   });
 }
@@ -221,7 +226,7 @@ export async function acknowledgeRecords(scope: JournalScope, ids: readonly stri
                 assertCheckpoint(value); checkpoints.put({ ...value, id: checkpointId(scope, tab) });
               }
               if (--baselines === 0) { for (const record of records) store.delete(record.id); done(undefined); }
-            } catch { tx.abort(); }
+            } catch (error) { abortWithFailure(tx, error); }
           };
         }
       };
@@ -267,7 +272,7 @@ async function persistRecord(record: JournalRecord) {
           stored.sequence = sequence; record.sequence = sequence;
           if (!validRecord(stored)) throw new RecoveryStorageError('CORRUPT');
           sequences.put({ id, sequence }); journal.put(stored); done(record.id);
-        } catch { tx.abort(); }
+        } catch (error) { abortWithFailure(tx, error); }
       };
     };
   });
@@ -280,7 +285,7 @@ export class AccountJournal {
   private writes = new Set<Promise<unknown>>();
   private baseline?: RecoveryCheckpoint;
   private baselinePending = false;
-  constructor(readonly scope: JournalScope, private onFailure: () => void) { assertScope(scope); this.scope = Object.freeze({ ...scope }); }
+  constructor(readonly scope: JournalScope, private onFailure: (error: unknown) => void) { assertScope(scope); this.scope = Object.freeze({ ...scope }); }
   get tabId() { return tabId; }
   pendingMemory() { return [...this.memory.values()].map(record => structuredClone(record)); }
   captureUpdate(resource: string, data: Uint8Array) { return this.capture('document', resource, data); }
@@ -330,7 +335,7 @@ export class AccountJournal {
               sequences.put({ id: key, sequence: next.sequence }); store.put(next);
               for (const record of records) store.delete(record.id);
               done({ record: next, removed: next.coveredIds! });
-            } catch { tx.abort(); }
+            } catch (error) { abortWithFailure(tx, error); }
           };
         };
       }
@@ -348,7 +353,7 @@ export class AccountJournal {
     if (!this.baseline) return;
     const write = this.persistAsset(key, asset); this.writes.add(write);
     try { await write; if (this.assets.get(key) === asset) this.assets.delete(key); }
-    catch (error) { this.onFailure(); throw error; } finally { this.writes.delete(write); }
+    catch (error) { this.onFailure(error); throw error; } finally { this.writes.delete(write); }
   }
   private persistAsset(key: string, asset: { mime: string; data: Uint8Array }) {
     return transaction(['checkpoints'], 'readwrite', (tx, done) => {
@@ -360,7 +365,7 @@ export class AccountJournal {
           if (value.accountId !== this.scope.accountId || value.boardId !== this.scope.boardId || value.epoch !== this.scope.recoveryEpoch || value.tabId !== tabId) throw new RecoveryStorageError('CORRUPT');
           value.assets[key] = asset; assertCheckpoint(value);
           store.put({ ...value, id: checkpointId(this.scope) }); done(undefined);
-        } catch { tx.abort(); }
+        } catch (error) { abortWithFailure(tx, error); }
       };
     });
   }
@@ -370,7 +375,7 @@ export class AccountJournal {
     assertCheckpoint(baseline); this.baseline = baseline; this.baselinePending = true;
     const write = this.persistCheckpoint(baseline); this.writes.add(write);
     try { await write; if (this.baseline === baseline) this.baselinePending = false; }
-    catch (error) { this.onFailure(); throw error; } finally { this.writes.delete(write); }
+    catch (error) { this.onFailure(error); throw error; } finally { this.writes.delete(write); }
   }
   private persistCheckpoint(value: RecoveryCheckpoint) {
     return transaction(['checkpoints'], 'readwrite', (tx, done) => {
@@ -385,7 +390,7 @@ export class AccountJournal {
           for (const [key, asset] of Object.entries(value.assets)) assets[key] = asset.data ? asset : assets[key] ?? asset;
           const merged = { ...value, assets, id: checkpointId(this.scope) };
           assertCheckpoint(merged); store.put(merged); done(undefined);
-        } catch { tx.abort(); }
+        } catch (error) { abortWithFailure(tx, error); }
       };
     });
   }
@@ -395,7 +400,7 @@ export class AccountJournal {
     this.memory.set(record.id, record); this.owned.set(record.id, record);
     const write = (async () => { if (kind === 'blob' && data instanceof Blob) await this.cacheAsset(resource, data); await persistRecord(record); })(); this.writes.add(write);
     try { await write; this.memory.delete(record.id); return record.id; }
-    catch (error) { this.onFailure(); throw error; }
+    catch (error) { this.onFailure(error); throw error; }
     finally { this.writes.delete(write); }
   }
   async preserve() {

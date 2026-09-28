@@ -78,7 +78,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   }, [member.accountId, target, retry, restored]);
   if (state === 'corrupt' || state === 'epoch-mismatch') return <RecoveryStateView state={state} openRestored={() => setRestored(true)} />;
   if (state === 'ready' && activeScope?.recoveryState === 'denied' && board?.summary.role !== 'viewer') return <RecoveryDenied accountId={member.accountId} boardId={target} />;
-  if (state === 'loading') return <p role="status">{activeScope?.recoveryState === 'recovering' ? 'Recovering changes…' : 'Opening board…'}</p>;
+  if (state === 'loading') return <p role="status">{activeScope?.recoveryState === 'recovering' ? 'Recovering changes…' : activeScope?.phase === 'active' && activeScope.accountId === member.accountId && activeScope.boardId === target && activeScope.recoveryState === 'saved' ? 'Opening board…' : 'Checking access…'}</p>;
   if (state === 'expired') return <section><h1 ref={heading} tabIndex={-1}>Session expired — sign in to continue.</h1><a href={'/auth/start?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search)}>Sign in to continue</a></section>;
   if (state === 'denied' && hasRecovery) return <RecoveryDenied accountId={member.accountId} boardId={target} />;
   if (state === 'denied') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>You don't have access to this board</h1><p>Ask the board owner to grant access to your internal account.</p><a href="/">Back to your boards</a></section>;

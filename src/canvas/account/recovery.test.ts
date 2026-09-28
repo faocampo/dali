@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { RecoveryCoordinator, type RecoveryAuthority } from './recovery';
+import { RecoveryCoordinator, recoveryStorageFailure, type RecoveryAuthority } from './recovery';
 const authority = { accountId: 'synthetic-member', expiresAt: 100000, descriptor: { summary: { id: 'synthetic-board', accountId: 'synthetic-member', role: 'editor' }, recoveryEpoch: '11111111-1111-4111-8111-111111111111', capabilities: ['write'] } } as RecoveryAuthority;
 it('@04-04-01 authorizes before local inspection and confirms saved only after drain', async () => {
   const events: string[] = [];
@@ -59,4 +59,20 @@ it('late native sync retries cannot authorize a disposed or stale recovery scope
     expect(f.events).toEqual([]);
     f.coordinator.dispose();
   }
+});
+
+it('retains quota identity through preservation wrappers and clears it on a successful retry', async () => {
+  const f = fixture(); const changed = vi.fn();
+  f.dependencies.preserve.mockRejectedValueOnce(new DOMException('Synthetic quota', 'QuotaExceededError'));
+  const coordinator = new RecoveryCoordinator({ ...f.dependencies, changed });
+  await coordinator.open();
+  const paused = changed.mock.calls.find(([state]) => state === 'storage-paused');
+  expect(paused).toBeDefined(); expect(recoveryStorageFailure(paused![2])).toBe('quota');
+  await coordinator.retryRecovery(); expect(changed.mock.calls.at(-1)).toEqual(['saved', false, undefined]);
+  coordinator.dispose();
+});
+it('unavailable and cyclic errors remain bounded and do not impersonate quota failures', () => {
+  const cyclic: { cause?: unknown } = {}; cyclic.cause = cyclic;
+  expect(recoveryStorageFailure(cyclic)).toBe('unavailable');
+  expect(recoveryStorageFailure(new Error('QuotaExceededError'))).toBe('unavailable');
 });

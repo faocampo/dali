@@ -47,7 +47,7 @@ export async function advanceLiveTitleIntent(store: TitleStore, operationIds: Re
 }
 
 /** Serialize local title persistence independently of network recovery. */
-export function bufferedTitleStore(durable: TitleStore, onFailure: () => void, onWrite: (value: TitleIntent) => void = () => {}) {
+export function bufferedTitleStore(durable: TitleStore, onFailure: (error: unknown) => void, onWrite: (value: TitleIntent) => void = () => {}) {
   let retained: TitleIntent | undefined;
   const proofs: Array<DocumentRevisionReceipt & { id: string }> = [];
   let queue = Promise.resolve();
@@ -60,7 +60,7 @@ export function bufferedTitleStore(durable: TitleStore, onFailure: () => void, o
     try {
       await durable.write(value);
       if (retained === value) retained = undefined;
-    } catch (error) { onFailure(); throw error; }
+    } catch (error) { onFailure(error); throw error; }
   }
   async function flushProofs() {
     // Preserve an explicit local rename first; revision-only updates always use
@@ -70,7 +70,7 @@ export function bufferedTitleStore(durable: TitleStore, onFailure: () => void, o
     while (proofs.length) {
       const proof = proofs[0]!;
       try { advanced = await durable.advance?.(proof.id, proof.previousRevision, proof.revision); }
-      catch (error) { onFailure(); throw error; }
+      catch (error) { onFailure(error); throw error; }
       proofs.shift();
     }
     return advanced;

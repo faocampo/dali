@@ -5,7 +5,7 @@ import { resetSaveStatus, dispatchSaveEvent, reportSaveCoverage, reportImageOutc
 import { BoardBlobSource } from './account/blob-source';
 import * as Y from 'yjs';
 import { AccountJournal, replayJournal, requestRecoveryStorage, pendingRecords, readCheckpoint, validRecord, RecoveryStorageError, type ReplayObserver } from './account/outbox';
-import { RecoveryCoordinator, type RecoveryOutcome } from './account/recovery';
+import { RecoveryCoordinator, recoveryStorageFailure, type RecoveryStorageFailure, type RecoveryOutcome } from './account/recovery';
 import { RecoveryEpochError, SourceAccessError } from './account/doc-source';
 import { acknowledgedUpdateCovered } from './account/acknowledged-update';
 import { interruptSession, revalidateSession } from '../auth/session';
@@ -18,7 +18,7 @@ let preserveTitle: (() => Promise<void>) | undefined;
 export async function renameActiveBoard(title: string) { if (!captureTitle) throw new Error('Board access is unavailable'); await captureTitle(title); }
 
 export type BoardRole = BoardSummary['role'];
-export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; retainedPending?: boolean | 'unavailable'; stalled?: boolean; title?: string }>;
+export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; storageFailure?: RecoveryStorageFailure; retainedPending?: boolean | 'unavailable'; stalled?: boolean; title?: string }>;
 export type CanvasRuntime = { workspace: Workspace & Pick<BoardWorkspace, 'docSync' | 'waitForSynced'>; store: Store; descriptor: BoardDescriptor; scope: AccessScope; stopSaveStatus: () => void; dispose: () => void };
 let scope: AccessScope | null = null;
 let current: CanvasRuntime | null = null;
@@ -34,11 +34,11 @@ let replayObserver: ReplayObserver | undefined;
 let replayDocumentCommit: ((receipt: DocumentRevisionReceipt) => Promise<void>) | undefined;
 let recoveryAssets = new Map<string, Blob>();
 export const retryRecovery = () => recovery?.retryRecovery();
-export function pauseRecoveryStorage() {
+export function pauseRecoveryStorage(error?: unknown) {
   if (!scope || scope.phase !== 'active') return;
   storagePaused = true;
   if (current) { current.store.readonly = true; current.workspace.docSync.forceStop(); }
-  publish({ ...scope, canWrite: false, recoveryState: 'storage-paused' });
+  publish({ ...scope, canWrite: false, recoveryState: 'storage-paused', storageFailure: error === undefined ? scope.storageFailure ?? 'unavailable' : recoveryStorageFailure(error) });
   if (saveScope) dispatchSaveEvent({ type: 'recovery', scope: saveScope, state: 'storage-paused' });
 }
 const listeners = new Set<() => void>();
@@ -134,15 +134,15 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   capture = [];
   storagePaused = false;
   const retainedAssets = recoveryAssets = new Map<string, Blob>();
-  const scopedJournal = new AccountJournal({ ...initial, recoveryEpoch: options.descriptor.recoveryEpoch }, () => { if (scope?.generation === initial.generation) pauseRecoveryStorage(); });
+  const scopedJournal = new AccountJournal({ ...initial, recoveryEpoch: options.descriptor.recoveryEpoch }, error => { if (scope?.generation === initial.generation) pauseRecoveryStorage(error); });
   journal = scopedJournal;
   const isCurrent = () => scope?.generation === initial.generation && scope.phase === 'active';
   let baseline: AccountWorkspaceOptions['recoveryBaseline'];
   let initializing = true;
   let authorizedDescriptor = options.descriptor;
   const liveTitleOperations = new Set<string>();
-  const titles = bufferedTitleStore(titleIntentStore(scopedJournal.scope), () => {
-    if (isCurrent()) pauseRecoveryStorage();
+  const titles = bufferedTitleStore(titleIntentStore(scopedJournal.scope), error => {
+    if (isCurrent()) pauseRecoveryStorage(error);
   }, value => liveTitleOperations.add(value.operationId));
   const documentCommit = async (receipt: DocumentRevisionReceipt) => {
     if (!isCurrent() || !validDocumentRevisionReceipt(receipt)) throw new Error('Stale document receipt');
@@ -315,17 +315,17 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       authorizedDescriptor = fresh.descriptor;
       if (current) current.descriptor = fresh.descriptor;
     },
-    changed: (recoveryState, stalled) => {
+    changed: (recoveryState, stalled, error) => {
       if (!isCurrent()) return;
       dispatchSaveEvent({ type: 'recovery', scope: statusScope, state: recoveryState, stalled, at: Date.now() });
-      if (recoveryState === 'storage-paused') { pauseRecoveryStorage(); return; }
+      if (recoveryState === 'storage-paused') { pauseRecoveryStorage(error); return; }
       if (recoveryState === 'saved' && storagePaused) {
         storagePaused = false;
         if (current) { current.store.readonly = false; current.workspace.docSync.start(); }
       }
       const blocked = storagePaused || ['corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(recoveryState);
       if (current && blocked) current.store.readonly = true;
-      publish({ ...scope!, canWrite: !blocked && initial.role !== 'viewer', recoveryState: storagePaused ? 'storage-paused' : recoveryState, stalled });
+      publish({ ...scope!, canWrite: !blocked && initial.role !== 'viewer', recoveryState: storagePaused ? 'storage-paused' : recoveryState, storageFailure: storagePaused ? scope?.storageFailure : undefined, stalled });
       if (recoveryState === 'expired') void interruptSession();
     },
   });
@@ -407,7 +407,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     const store = workspace.getDoc(options.descriptor.contentDocId)!.getStore();
     const local = authorizedDescriptor.summary.role !== 'viewer' ? attachLocalCapture({ journal: scopedJournal, root: workspace.doc, content: store.spaceDoc, title: options.descriptor.summary.title, isCurrent }) : undefined;
     try {
-      try { await local?.ready; } catch { pauseRecoveryStorage(); }
+      try { await local?.ready; } catch (error) { pauseRecoveryStorage(error); }
       if (local) {
         void requestRecoveryStorage();
         const keys = new Set<string>();

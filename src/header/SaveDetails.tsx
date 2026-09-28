@@ -1,3 +1,4 @@
+import { recoveryStorageMessage } from '../canvas/account/recovery';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, type GfxModel } from '@blocksuite/affine/std/gfx';
@@ -52,7 +53,7 @@ export function saveDetailsCopy(status: LocalSaveStatus, snapshot?: SaveSnapshot
     return { label: 'Read only', message: 'You can view this board. Editing requires access from the board owner.' };
   }
   const recovery = scope?.recoveryState;
-  if (recovery === 'storage-paused') return { label: 'Editing paused', message: "This browser cannot preserve more changes. Keep this tab open. Download a recovery copy, allow storage for this site, then retry saving." };
+  if (recovery === 'storage-paused') return { label: 'Editing paused', message: recoveryStorageMessage(scope?.storageFailure) };
   if (recovery === 'epoch-mismatch') return { label: 'Recovery needs attention', message: 'The server copy changed after a restore. Pending changes have been kept separately. Download a recovery copy before continuing with the restored board.' };
   if (recovery === 'corrupt') return { label: 'Recovery needs attention', message: "These pending changes could not be opened safely. Keep this browser's data and contact your operator for recovery help." };
   if (status.state === 'saved') return { label: 'Saved', message: 'All changes and images are saved to the server.' };
