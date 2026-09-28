@@ -15,7 +15,14 @@ export function installShapeTextTypography(): void {
     // topics retain automatic layout. Ordinary shape geometry belongs to resize.
     const resize = editor as unknown as { _updateElementWH(): void };
     const nativeResize = resize._updateElementWH.bind(editor);
-    resize._updateElementWH = () => { if (editor.isMindMapNode) nativeResize(); };
+    resize._updateElementWH = () => {
+      // Deferred native measurements may settle after recovery pauses editing
+      // or removes the editor. Recheck before geometry and selection writes.
+      if (!editor.isConnected || !editor.std.host.isConnected || editor.std.store.readonly ||
+          !editor.richText?.isConnected || !editor.element ||
+          editor.gfx.surface?.getElementById(editor.element.id) !== editor.element) return;
+      if (editor.isMindMapNode) nativeResize();
+    };
     let preparedInput = false;
     let restoreInput = () => {};
     editor.addController({
