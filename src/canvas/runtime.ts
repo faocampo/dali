@@ -362,6 +362,10 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     },
     beforeDocumentWrite: async (docId, data) => {
       const epoch = authorizedDescriptor.recoveryEpoch;
+      // A delayed native callback can arrive after replay has already committed
+      // its exact bytes. Complete that no-op before starting another request.
+      if (isCurrent() && scope?.canWrite && scope.role !== 'viewer' &&
+          epoch === options.descriptor.recoveryEpoch && acknowledgedUpdateCovered(confirmed.get(docId), data)) return 'acknowledged';
       const authority = await coordinator.retryRecovery();
       if (!isCurrent() || scope?.recoveryState !== 'saved' || !scope.canWrite || scope.role === 'viewer' ||
           !authority || authority.accountId !== initial.accountId || authority.descriptor.summary.id !== initial.boardId)
