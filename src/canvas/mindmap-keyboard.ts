@@ -37,6 +37,9 @@ export function installMindmapShortcuts(host: EditorHost, onError: (error: unkno
     const external = path.some(target => target instanceof HTMLElement && !editor &&
       (target.isContentEditable || target.matches('input,textarea,select,button,[role="dialog"],[role="menu"],[role="textbox"]')));
     if (external) {
+      // External controls must receive their own target/React handlers. Their
+      // boundaries isolate bubbling shortcuts after handling the key.
+      if (!path.includes(host)) return;
       // Portalled menus own their Escape/activation keys and never bubble
       // through the native canvas host.
       if (path.some(target => target instanceof HTMLElement && (target.matches('editor-menu-button') || (target.matches('[role="menu"],.mindmap-panel') && !host.contains(target))))) return;

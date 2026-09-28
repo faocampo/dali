@@ -1,3 +1,4 @@
+import { validDocumentRevisionReceipt, type DocumentRevisionReceipt } from './title-intent';
 import type { DocSource } from '@blocksuite/affine/sync';
 
 export type SourceOptions = {
@@ -5,6 +6,7 @@ export type SourceOptions = {
   signal?: AbortSignal; readonly?: boolean; isCurrent?: (generation: number) => boolean; fetch?: typeof fetch;
   onAuthorizationLost?: (error: SourceAccessError) => void;
   onPendingDocument?: (docId: string, data: Uint8Array) => unknown | Promise<unknown>;
+  onDocumentCommit?: (receipt: DocumentRevisionReceipt) => Promise<void>;
   onAcknowledged?: (token: unknown) => void | Promise<void>;
   durableLocalBlobs?: boolean;
   beforeDocumentWrite?: (docId: string, data: Uint8Array) => Promise<'acknowledged' | void>;
@@ -83,6 +85,8 @@ export class BoardDocSource implements DocSource {
         const result: unknown = await response.json(); this.assertCurrent(docId, true);
         if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true) throw new Error('Document commit unconfirmed');
         confirmRecoveryEpoch(this.options, epoch, response);
+        if (validDocumentRevisionReceipt(result)) await this.options.onDocumentCommit?.(result);
+        this.assertCurrent(docId, true);
       }
       await this.options.onAcknowledged?.(token);
       this.assertCurrent(docId, true); this.options.onDocumentOutcome?.(docId, copy, 'acknowledged', attempt);

@@ -66,7 +66,9 @@ describe('@04-05-01 immutable current-scope coverage', () => {
     state = coverage(state, false, 1, []); state = reduceSaveStatus(state, { type: 'recovery', scope, state: 'retrying', stalled: true });
     expect(state).toMatchObject({ label: 'Save failed', savedAt: 1000 });
     state = reduceSaveStatus(state, { type: 'recovery', scope, state: 'retrying' }); expect(state.label).toBe('Save failed');
-    state = coverage(state, true, 1, [], 2000); expect(state).toMatchObject({ label: 'Saved', savedAt: 2000 });
+    state = coverage(state, true, 1, [], 2000); expect(state).toMatchObject({ label: 'Recovering changes…', savedAt: 1000 });
+    state = reduceSaveStatus(state, { type: 'recovery', scope, state: 'saved', at: 2100 });
+    expect(state).toMatchObject({ label: 'Saved', savedAt: 2100 });
   });
   it.each(['storage-paused', 'expired', 'denied', 'epoch-mismatch', 'corrupt'])('%s takes precedence over otherwise saved coverage', recovery => {
     let state = coverage(createSaveSnapshot(scope), true, 0, []); state = reduceSaveStatus(state, { type: 'recovery', scope, state: recovery });
@@ -123,4 +125,18 @@ describe('local save status', () => {
     reportDocEngineStatus(engineStatus(2));
     expect(getSaveStatus().state).toBe('saved');
   });
+});
+
+it('waits for recovery completion before exposing acknowledged document coverage as Saved', () => {
+  const scope = 'synthetic-revision-refresh';
+  let state = createSaveSnapshot(scope);
+  state = reduceSaveStatus(state, { type: 'recovery', scope, state: 'recovering' });
+  state = reduceSaveStatus(state, { type: 'coverage', scope, documents: { root: { revision: 1, acknowledged: true }, content: { revision: 2, acknowledged: true } }, images: [], at: 2000 });
+  expect(state.state).toBe('saving');
+  state = reduceSaveStatus(state, { type: 'recovery', scope, state: 'pending' });
+  expect(state.state).toBe('saving');
+  state = reduceSaveStatus(state, { type: 'recovery', scope, state: 'retrying' });
+  expect(state.state).toBe('saving');
+  state = reduceSaveStatus(state, { type: 'recovery', scope, state: 'saved' });
+  expect(state.state).toBe('saved');
 });

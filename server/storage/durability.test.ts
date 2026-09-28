@@ -41,17 +41,17 @@ for (const boundary of ['before', 'after', 'response'] as const) it(`@04-01-02 d
   const fixture = await setup();
   try {
     const baseline = await fixture.request(fixture.path + '/push', 'POST', fixture.edit('acknowledged;'));
-    expect(await baseline.json()).toEqual({ acknowledged: true });
+    expect(await baseline.json()).toEqual({ acknowledged: true, previousRevision: 1, revision: 2 });
     const update = fixture.edit('uncertain;');
     if (boundary !== 'response') expect(await fixture.service.command(boundary)).toBe(true);
     const reached = boundary !== 'response' ? fixture.service.waitForBoundary() : undefined;
     const pending = fixture.request(fixture.path + '/push', 'POST', update).then(async response => ({ status: response.status, body: await response.text() }), () => null);
     if (reached) expect(await reached).toBe(boundary);
-    else expect((await pending)?.body).toBe('{"acknowledged":true}');
+    else expect(JSON.parse((await pending)!.body)).toEqual({ acknowledged: true, previousRevision: 2, revision: 3 });
     await fixture.service.killAndRestart();
     if (boundary !== 'response') expect(await pending).toBeNull();
     expect(await fixture.semantic()).toBe(boundary === 'before' ? 'Crash boundaryacknowledged;' : 'Crash boundaryacknowledged;uncertain;');
-    for (let i = 0; i < 2; i++) expect(await (await fixture.request(fixture.path + '/push', 'POST', update)).json()).toEqual({ acknowledged: true });
+    for (let i = 0; i < 2; i++) expect(await (await fixture.request(fixture.path + '/push', 'POST', update)).json()).toEqual({ acknowledged: true, previousRevision: boundary === 'before' && i === 0 ? 2 : 3, revision: 3 });
     expect(await fixture.semantic()).toBe('Crash boundaryacknowledged;uncertain;'); fixture.integrity();
   } finally { await fixture.close(); }
 }, 20000);
@@ -77,7 +77,7 @@ for (const boundary of ['before', 'after', 'response'] as const) it(`@04-01-02 i
 for (const fault of ['readonly', 'full'] as const) it(`@04-01-02 ${fault} write failure emits no acknowledgment and survives restart`, async () => {
   const fixture = await setup();
   try {
-    expect(await (await fixture.request(fixture.path + '/push', 'POST', fixture.edit('preserved;'))).json()).toEqual({ acknowledged: true });
+    expect(await (await fixture.request(fixture.path + '/push', 'POST', fixture.edit('preserved;'))).json()).toEqual({ acknowledged: true, previousRevision: 1, revision: 2 });
     expect(await fixture.service.command(fault)).toBe(true);
     const failed = fixture.service.waitForBoundary();
     const response = await fixture.request(fixture.path + '/push', 'POST', fixture.edit('x'.repeat(200000)));

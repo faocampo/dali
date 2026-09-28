@@ -144,15 +144,30 @@ describe('protected board resources', () => {
 
   it('@03-04-01 editor update round-trips through reader pull and replay converges', async () => {
     const update = edit();
-    expect((await requestDoc('push', update, 'editor')).statusCode).toBe(200);
+    const previousRevision = (database.prepare('SELECT revision FROM boards WHERE id=?').get(board.summary.id) as { revision: number }).revision;
+    const committed = await requestDoc('push', update, 'editor');
+    expect(committed.statusCode).toBe(200);
+    expect(committed.json()).toEqual({ acknowledged: true, previousRevision, revision: previousRevision + 1 });
+    expect(database.prepare('SELECT revision FROM boards WHERE id=?').get(board.summary.id)).toEqual({ revision: previousRevision + 1 });
     const saved = Buffer.from(bytes()); const vector = Y.encodeStateVectorFromUpdate(saved);
     const read = await requestDoc('pull', new Uint8Array([0]), 'viewer');
     expect(read.statusCode).toBe(200); expect(read.headers['cache-control']).toBe('private, no-store');
     const doc = new Y.Doc(); Y.applyUpdate(doc, read.rawPayload);
     expect(JSON.stringify(doc.getMap('blocks').toJSON())).toContain('authorized-text');
     expect(Y.encodeStateVector(doc)).toEqual(vector);
-    expect((await requestDoc('push', update, 'editor')).statusCode).toBe(200);
+    const duplicate = await requestDoc('push', update, 'editor');
+    expect(duplicate.statusCode).toBe(200);
+    expect(duplicate.json()).toEqual({ acknowledged: true, previousRevision: previousRevision + 1, revision: previousRevision + 1 });
+    expect(database.prepare('SELECT revision FROM boards WHERE id=?').get(board.summary.id)).toEqual({ revision: previousRevision + 1 });
     expect(bytes()).toEqual(saved); expect(Y.encodeStateVectorFromUpdate(bytes())).toEqual(vector); doc.destroy();
+  });
+  it('document acknowledgment starts at the revision authorized inside the commit transaction', async () => {
+    const previousRevision = (database.prepare('SELECT revision FROM boards WHERE id=?').get(board.summary.id) as { revision: number }).revision;
+    barrier = async () => { database.prepare('UPDATE boards SET revision=revision+1 WHERE id=?').run(board.summary.id); };
+    const response = await requestDoc('push', edit(), 'editor');
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ acknowledged: true, previousRevision: previousRevision + 1, revision: previousRevision + 2 });
+    expect(database.prepare('SELECT revision FROM boards WHERE id=?').get(board.summary.id)).toEqual({ revision: previousRevision + 2 });
   });
   it('@CR-01 malformed native metadata cannot replace a reopenable root', async () => {
     database.prepare('INSERT INTO board_thumbnails(board_id,bytes,mime) VALUES(?,?,?)').run(board.summary.id, syntheticCanaries().imageBytes, 'image/png');
@@ -212,6 +227,9 @@ describe('protected board resources', () => {
     for (const test of cases) for (let i = 0; i < 2; i++) {
       const response = await requestDoc('push', edit(), test.actor, board.contentDocId, board, test.extra);
       expect(response.statusCode).toBe(test.status); expect(response.body).not.toContain('Owner canary'); expect(response.body).not.toContain('Foreign private canary');
+      expect(response.json()).not.toHaveProperty('acknowledged');
+      expect(response.json()).not.toHaveProperty('previousRevision');
+      expect(response.json()).not.toHaveProperty('revision');
       const owner = await requestDoc('pull', new Uint8Array([0])); expect(owner.statusCode).toBe(200);
       expect(owner.rawPayload).toEqual(bytes()); expect(snapshot()).toEqual(before); expect(Y.encodeStateVectorFromUpdate(owner.rawPayload)).toEqual(vector);
     }

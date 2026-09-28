@@ -1,3 +1,4 @@
+import { validDocumentRevisionReceipt, type DocumentRevisionReceipt } from './title-intent';
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
 import { SourceAccessError, RecoveryEpochError, validRecoveryEpoch } from './doc-source';
 import * as Y from 'yjs';
@@ -141,6 +142,16 @@ export function titleIntentStore(scope: JournalScope): TitleStore {
     write: value => transaction(['sequences'], 'readwrite', (tx, done) => {
       if (!validTitleIntent(value) || value.accountId !== scope.accountId || value.boardId !== scope.boardId || value.epoch !== scope.recoveryEpoch) throw new RecoveryStorageError('CORRUPT');
       tx.objectStore('sequences').put({ ...value, id }); done(undefined);
+    }),
+    advance: (operationId, previousRevision, revision) => transaction(['sequences'], 'readwrite', (tx, done) => {
+      if (!validDocumentRevisionReceipt({ previousRevision, revision })) throw new RecoveryStorageError('CORRUPT');
+      const store = tx.objectStore('sequences'); const request = store.get(id);
+      request.onsuccess = () => {
+        const row = request.result as (TitleIntent & { id: string }) | undefined;
+        if (!row || row.operationId !== operationId || row.baseRevision !== previousRevision) { done(undefined); return; }
+        if (!validTitleIntent(row) || row.accountId !== scope.accountId || row.boardId !== scope.boardId || row.epoch !== scope.recoveryEpoch) { tx.abort(); return; }
+        const next = { ...row, baseRevision: revision }; store.put(next); done(next);
+      };
     }),
     acknowledge: operationId => transaction(['sequences'], 'readwrite', (tx, done) => {
       const store = tx.objectStore('sequences'); const request = store.get(id);
@@ -397,7 +408,7 @@ export class AccountJournal {
   }
 }
 /** Fresh descriptor and expected identity precede every replay; Yjs/hash keys are idempotent. */
-export type ReplayObserver = (record: JournalRecord, outcome: 'sending' | 'acknowledged' | 'failed', attempt: string) => void;
+export type ReplayObserver = (record: JournalRecord, outcome: 'sending' | 'acknowledged' | 'failed', attempt: string) => void | Promise<void>;
 // Bound merge work and acknowledgment transactions independently of backlog size.
 // Individual existing updates may use the server's full 8 MiB document limit.
 const REPLAY_BATCH_RECORDS = 256;
@@ -424,7 +435,7 @@ function replayBatches(records: JournalRecord[]): JournalRecord[][] {
   }
   return batches;
 }
-export async function replayJournal(descriptor: BoardDescriptor, accountId: string, signal: AbortSignal, blobsOnly = false, currentEpochOnly = false, observer?: ReplayObserver): Promise<boolean> {
+export async function replayJournal(descriptor: BoardDescriptor, accountId: string, signal: AbortSignal, blobsOnly = false, currentEpochOnly = false, observer?: ReplayObserver, onDocumentCommit?: (receipt: DocumentRevisionReceipt) => Promise<void>): Promise<boolean> {
   if (descriptor.summary.accountId !== accountId) throw new SourceAccessError(409);
   const records = (await pendingRecords(accountId, descriptor.summary.id)).filter(record => (!blobsOnly || record.kind === 'blob') && (!currentEpochOnly || record.epoch === descriptor.recoveryEpoch));
   if (!records.length) return false;
@@ -435,7 +446,7 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
   for (const batch of replayBatches(records)) {
     const record = batch[0]!;
     const attempts = batch.map(row => ({ record: row, id: crypto.randomUUID() }));
-    for (const attempt of attempts) observer?.(attempt.record, 'sending', attempt.id);
+    for (const attempt of attempts) await observer?.(attempt.record, 'sending', attempt.id);
     try {
     if (signal.aborted) throw new Error('Recovery interrupted');
     if (record.kind === 'document' && ![descriptor.rootDocId, descriptor.contentDocId].includes(record.resource)) throw new Error('Recovery document unavailable');
@@ -457,9 +468,11 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
     if (descriptor.recoveryEpoch !== epoch || response.headers.get('X-Dali-Recovery-Epoch') !== epoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
     if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true ||
       (record.kind === 'blob' && (!('key' in result) || result.key !== record.resource))) throw new Error('Recovery commit unconfirmed');
+    // Persist dependent title revision proof before deleting replayable bytes.
+    if (record.kind === 'document' && validDocumentRevisionReceipt(result)) await onDocumentCommit?.(result);
     await acknowledgeRecords({ accountId, boardId: descriptor.summary.id, recoveryEpoch: epoch, generation: record.generation }, batch.map(row => row.id));
-    for (const attempt of attempts) observer?.(attempt.record, 'acknowledged', attempt.id);
-    } catch (error) { for (const attempt of attempts) observer?.(attempt.record, 'failed', attempt.id); throw error; }
+    for (const attempt of attempts) await observer?.(attempt.record, 'acknowledged', attempt.id);
+    } catch (error) { for (const attempt of attempts) await observer?.(attempt.record, 'failed', attempt.id); throw error; }
   }
   return true;
 }

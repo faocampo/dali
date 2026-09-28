@@ -25,6 +25,18 @@ export function BoardTitleMenu({ title, onRename, paused = false }: {
     if (editing) { input.current?.focus(); input.current?.select(); }
     else if (restoreFocus.current) { restoreFocus.current = false; trigger.current?.focus(); }
   }, [editing]);
+  useEffect(() => {
+    if (!editing) return;
+    const moved = (event: Event) => {
+      if (event.isTrusted && event.target !== input.current) restoreFocus.current = false;
+    };
+    document.addEventListener('pointerdown', moved, true);
+    document.addEventListener('keydown', moved, true);
+    return () => {
+      document.removeEventListener('pointerdown', moved, true);
+      document.removeEventListener('keydown', moved, true);
+    };
+  }, [editing]);
   const save = () => {
     if (paused || composing.current || cancelled.current || saving.current || closing.current) return;
     let clean: string;

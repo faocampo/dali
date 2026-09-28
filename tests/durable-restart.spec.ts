@@ -47,7 +47,10 @@ test('@04-01-01 acknowledged native sticky and PNG survive SIGKILL and cold sign
     const pushed = page.waitForResponse(r => r.url().endsWith('/push') && r.request().method() === 'POST' && r.ok());
     await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
     await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type('Durable synthetic sticky'); await page.keyboard.press('Escape');
-    expect(await (await pushed).json()).toEqual({ acknowledged: true });
+    const receipt = await (await pushed).json();
+    expect(receipt).toEqual({ acknowledged: true, previousRevision: expect.any(Number), revision: expect.any(Number) });
+    expect(Number.isSafeInteger(receipt.previousRevision) && receipt.previousRevision > 0).toBe(true);
+    expect([receipt.previousRevision, receipt.previousRevision + 1]).toContain(receipt.revision);
     const png = syntheticCanaries().imageBytes;
     const uploaded = page.waitForResponse(r => r.url().includes('/blobs/') && r.request().method() === 'PUT' && r.ok());
     await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: png });

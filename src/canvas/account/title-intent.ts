@@ -1,7 +1,7 @@
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
 import type { RecoveryAuthority } from './recovery';
 export type TitleIntent = { schemaVersion: 1; accountId: string; boardId: string; epoch: string; operationId: string; baseRevision: number; title: string };
-export type TitleStore = { read(): Promise<TitleIntent | undefined>; write(value: TitleIntent): Promise<void>; acknowledge(id: string): Promise<void> };
+export type TitleStore = { read(): Promise<TitleIntent | undefined>; write(value: TitleIntent): Promise<void>; acknowledge(id: string): Promise<void>; advance?(id: string, previousRevision: number, revision: number): Promise<TitleIntent | undefined> };
 export function validTitleIntent(value: TitleIntent): boolean {
   return value?.schemaVersion === 1 && [value.accountId, value.boardId, value.epoch, value.operationId].every(part => typeof part === 'string' && part.length > 0 && part.length <= 256) && Number.isSafeInteger(value.baseRevision) && value.baseRevision > 0 && typeof value.title === 'string' && !!value.title.trim() && [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(value.title)].length <= 200;
 }
@@ -29,4 +29,69 @@ export async function replayTitleIntent(store: TitleStore, authority: RecoveryAu
   if (!result || result.summary?.id !== intent.boardId || result.summary.accountId !== intent.accountId || result.summary.title !== intent.title || result.recoveryEpoch !== intent.epoch || !Number.isSafeInteger(result.revision) || result.revision <= intent.baseRevision) throw new Error('The saved name could not be confirmed.');
   await store.acknowledge(intent.operationId);
   return result;
+}
+
+/** A receipt proves only this request's contiguous server revision transition. */
+export type DocumentRevisionReceipt = { previousRevision: number; revision: number };
+export function validDocumentRevisionReceipt(value: unknown): value is DocumentRevisionReceipt {
+  if (!value || typeof value !== 'object') return false;
+  const row = value as DocumentRevisionReceipt;
+  return Number.isSafeInteger(row.previousRevision) && row.previousRevision > 0 &&
+    Number.isSafeInteger(row.revision) && (row.revision === row.previousRevision || row.revision === row.previousRevision + 1);
+}
+export async function advanceLiveTitleIntent(store: TitleStore, operationIds: ReadonlySet<string>, receipt: DocumentRevisionReceipt) {
+  if (!validDocumentRevisionReceipt(receipt) || receipt.revision === receipt.previousRevision) return;
+  const intent = await store.read();
+  if (!intent || !operationIds.has(intent.operationId) || intent.baseRevision !== receipt.previousRevision) return;
+  return store.advance?.(intent.operationId, receipt.previousRevision, receipt.revision);
+}
+
+/** Serialize local title persistence independently of network recovery. */
+export function bufferedTitleStore(durable: TitleStore, onFailure: () => void, onWrite: (value: TitleIntent) => void = () => {}) {
+  let retained: TitleIntent | undefined;
+  const proofs: Array<DocumentRevisionReceipt & { id: string }> = [];
+  let queue = Promise.resolve();
+  function serial<T>(work: () => Promise<T>): Promise<T> {
+    const result = queue.then(work);
+    queue = result.then(() => {}, () => {});
+    return result;
+  }
+  async function persist(value: TitleIntent) {
+    try {
+      await durable.write(value);
+      if (retained === value) retained = undefined;
+    } catch (error) { onFailure(); throw error; }
+  }
+  async function flushProofs() {
+    // Preserve an explicit local rename first; revision-only updates always use
+    // the durable transaction's CAS so another tab's newer intent wins.
+    if (retained) await persist(retained);
+    let advanced: TitleIntent | undefined;
+    while (proofs.length) {
+      const proof = proofs[0]!;
+      try { advanced = await durable.advance?.(proof.id, proof.previousRevision, proof.revision); }
+      catch (error) { onFailure(); throw error; }
+      proofs.shift();
+    }
+    return advanced;
+  }
+  const store: TitleStore & { preserve(): Promise<void> } = {
+    read: async () => retained ?? durable.read(),
+    write: value => {
+      onWrite(value);
+      retained = value;
+      return serial(() => persist(value));
+    },
+    preserve: () => serial(async () => { await flushProofs(); }),
+    acknowledge: id => serial(async () => {
+      await durable.acknowledge(id);
+      if (retained?.operationId === id) retained = undefined;
+    }),
+    advance: (id, previousRevision, revision) => serial(async () => {
+      if (!validDocumentRevisionReceipt({ previousRevision, revision })) return;
+      proofs.push({ id, previousRevision, revision });
+      return flushProofs();
+    }),
+  };
+  return store;
 }

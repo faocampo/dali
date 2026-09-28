@@ -11,7 +11,7 @@ import { acknowledgedUpdateCovered } from './account/acknowledged-update';
 import { interruptSession, revalidateSession } from '../auth/session';
 import { attachLocalCapture } from './account/local-capture';
 import { titleIntentStore, inspectPendingScopes } from './account/outbox';
-import { captureTitleIntent, replayTitleIntent, type TitleIntent, type TitleStore } from './account/title-intent';
+import { captureTitleIntent, replayTitleIntent, advanceLiveTitleIntent, validDocumentRevisionReceipt, type DocumentRevisionReceipt, bufferedTitleStore } from './account/title-intent';
 
 let captureTitle: ((title: string) => Promise<void>) | undefined;
 let preserveTitle: (() => Promise<void>) | undefined;
@@ -31,6 +31,7 @@ let recovery: RecoveryCoordinator | undefined;
 let storagePaused = false;
 let saveScope: string | undefined;
 let replayObserver: ReplayObserver | undefined;
+let replayDocumentCommit: ((receipt: DocumentRevisionReceipt) => Promise<void>) | undefined;
 let recoveryAssets = new Map<string, Blob>();
 export const retryRecovery = () => recovery?.retryRecovery();
 export function pauseRecoveryStorage() {
@@ -94,7 +95,7 @@ export async function synchronizeActiveBoard(accountId: string, boardId: string)
           await localJournal.capture('document', runtime.descriptor.rootDocId, root);
           await localJournal.capture('document', runtime.descriptor.contentDocId, content);
           await localJournal.preserve(); assertCurrent();
-          await replayJournal(runtime.descriptor, accountId, controller.signal, false, false, replayObserver); assertCurrent();
+          await replayJournal(runtime.descriptor, accountId, controller.signal, false, false, replayObserver, replayDocumentCommit); assertCurrent();
           if (same(root, Y.encodeStateAsUpdate(runtime.workspace.doc)) && same(content, Y.encodeStateAsUpdate(runtime.store.spaceDoc))) return;
         }
         throw new Error('The board is still changing');
@@ -109,7 +110,7 @@ export async function synchronizeActiveBoard(accountId: string, boardId: string)
 export function disposeCanvasRuntime(expectedGeneration = scope?.generation): void {
   if (!scope || scope.generation !== expectedGeneration) return;
   const old = current; current = null; pending = null;
-  captureTitle = undefined; preserveTitle = undefined;
+  captureTitle = undefined; preserveTitle = undefined; replayDocumentCommit = undefined;
   recoveryAssets = new Map();
   recovery?.dispose(); recovery = undefined;
   if (saveScope) dispatchSaveEvent({ type: 'recovery', scope: saveScope, state: 'disposed' });
@@ -139,14 +140,18 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   let baseline: AccountWorkspaceOptions['recoveryBaseline'];
   let initializing = true;
   let authorizedDescriptor = options.descriptor;
-  const durableTitles = titleIntentStore(scopedJournal.scope);
-  let unpreservedTitle: TitleIntent | undefined;
-  const titles: TitleStore = { ...durableTitles, read: async () => unpreservedTitle ?? durableTitles.read(), write: async value => {
-    unpreservedTitle = value;
-    try { await durableTitles.write(value); if (unpreservedTitle?.operationId === value.operationId) unpreservedTitle = undefined; }
-    catch (error) { if (isCurrent()) pauseRecoveryStorage(); throw error; }
-  } };
-  preserveTitle = async () => { if (unpreservedTitle) await titles.write(unpreservedTitle); };
+  const liveTitleOperations = new Set<string>();
+  const titles = bufferedTitleStore(titleIntentStore(scopedJournal.scope), () => {
+    if (isCurrent()) pauseRecoveryStorage();
+  }, value => liveTitleOperations.add(value.operationId));
+  const documentCommit = async (receipt: DocumentRevisionReceipt) => {
+    if (!isCurrent() || !validDocumentRevisionReceipt(receipt)) throw new Error('Stale document receipt');
+    if (authorizedDescriptor.revision === receipt.previousRevision) authorizedDescriptor.revision = receipt.revision;
+    await advanceLiveTitleIntent(titles, liveTitleOperations, receipt);
+    if (!isCurrent()) throw new Error('Stale document receipt');
+  };
+  preserveTitle = () => titles.preserve();
+  replayDocumentCommit = documentCommit;
   let titleQueue = Promise.resolve();
   let attemptedTitle: string | undefined;
   captureTitle = title => {
@@ -204,12 +209,29 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     else documentOutcome(record.resource, record.data as Uint8Array, outcome, attempt);
   };
   replayObserver = observeReplay;
+  const authorize = async (signal: AbortSignal) => {
+      if (!isCurrent() || signal.aborted) throw new Error('Stale recovery');
+      const session = await fetch('/api/session', { cache: 'no-store', signal, headers: { 'X-Dali-Account': options.accountId } });
+      if (!session.ok) throw [401, 403, 404, 409].includes(session.status) ? new SourceAccessError(session.status) : new Error('Session unavailable');
+      const member = await session.json() as { accountId: string; expiresAt: number };
+      if (!isCurrent() || signal.aborted || member.accountId !== options.accountId) throw new SourceAccessError(409);
+      if (!Number.isSafeInteger(member.expiresAt) || member.expiresAt <= Date.now()) throw new SourceAccessError(401);
+      const response = await fetch(`/api/boards/${encodeURIComponent(initial.boardId)}`, { cache: 'no-store', signal, headers: { 'X-Dali-Account': options.accountId } });
+      if (!response.ok) throw [401, 403, 404, 409].includes(response.status) ? new SourceAccessError(response.status) : new Error('Board unavailable');
+      const descriptor = await response.json() as BoardDescriptor;
+      if (!isCurrent() || signal.aborted || !validDescriptor(descriptor, options.accountId) || descriptor.summary.id !== initial.boardId) throw new SourceAccessError(409);
+      if (descriptor.recoveryEpoch !== options.descriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+      return { ...member, descriptor };
+  };
   const coordinator = recovery = new RecoveryCoordinator({
     current: isCurrent,
     title: async (authority, signal) => {
       const titleScopes = await inspectPendingScopes(initial.accountId);
+      if (!isCurrent() || signal.aborted) throw new Error('Stale title recovery');
       if (!options.openRestored && titleScopes.some(row => row.boardId === initial.boardId && row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
-      const intent = await titles.read(); if (!intent) { authorizedDescriptor = authority.descriptor; return; }
+      const intent = await titles.read();
+      if (!isCurrent() || signal.aborted) throw new Error('Stale title recovery');
+      if (!intent) { authorizedDescriptor = authority.descriptor; if (current) current.descriptor = authority.descriptor; return; }
       attemptedTitle = intent.operationId;
       if (!isCurrent()) throw new Error('Stale title recovery');
       publish({ ...scope!, title: intent.title });
@@ -243,19 +265,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
         timers.set('title-retry', setTimeout(() => { timers.delete('title-retry'); if (isCurrent()) coordinator.retryIfIdle(); }, 5000));
       }
     },
-    authorize: async signal => {
-      const session = await fetch('/api/session', { cache: 'no-store', signal, headers: { 'X-Dali-Account': options.accountId } });
-      if (!session.ok) throw [401, 403, 404, 409].includes(session.status) ? new SourceAccessError(session.status) : new Error('Session unavailable');
-      const member = await session.json() as { accountId: string; expiresAt: number };
-      if (!isCurrent() || member.accountId !== options.accountId) throw new SourceAccessError(409);
-      if (!Number.isSafeInteger(member.expiresAt) || member.expiresAt <= Date.now()) throw new SourceAccessError(401);
-      const response = await fetch(`/api/boards/${encodeURIComponent(initial.boardId)}`, { cache: 'no-store', signal, headers: { 'X-Dali-Account': options.accountId } });
-      if (!response.ok) throw [401, 403, 404, 409].includes(response.status) ? new SourceAccessError(response.status) : new Error('Board unavailable');
-      const descriptor = await response.json() as BoardDescriptor;
-      if (!isCurrent() || !validDescriptor(descriptor, options.accountId) || descriptor.summary.id !== initial.boardId) throw new SourceAccessError(409);
-      if (descriptor.recoveryEpoch !== options.descriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
-      return { ...member, descriptor };
-    },
+    authorize,
     inspect: async authority => {
       const allRows = await pendingRecords(initial.accountId, initial.boardId);
       const rows = options.openRestored ? allRows.filter(row => row.epoch === authority.descriptor.recoveryEpoch) : allRows;
@@ -277,7 +287,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       }
       return rows.length > 0;
     },
-    preserve: async () => { await scopedJournal.preserve(); if (unpreservedTitle) await titles.write(unpreservedTitle); },
+    preserve: async () => { await scopedJournal.preserve(); await titles.preserve(); },
     verify: async (authority, signal) => {
       const snapshot = getAccountSaveSnapshot();
       if (snapshot?.scope !== statusScope) return;
@@ -291,13 +301,23 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       } finally { source.dispose(); }
     },
     drain: async (authority, signal) => {
-      await replayJournal(authority.descriptor, initial.accountId, signal, false, options.openRestored, observeReplay);
+      await replayJournal(authority.descriptor, initial.accountId, signal, false, options.openRestored, observeReplay, documentCommit);
       const remaining = await pendingRecords(initial.accountId, initial.boardId);
       if (remaining.some(row => !options.openRestored || row.epoch === authority.descriptor.recoveryEpoch)) throw new Error('New changes are waiting to save');
+      // Document commits advance the board revision. Keep the next rename's
+      // conflict baseline aligned with that committed state before Saved.
+      const fresh = await authorize(signal);
+      if (fresh.descriptor.summary.role === 'viewer' || !fresh.descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
+      const arrived = await pendingRecords(initial.accountId, initial.boardId);
+      if (!isCurrent() || signal.aborted) throw new Error('Stale recovery');
+      if (arrived.some(row => !options.openRestored || row.epoch === fresh.descriptor.recoveryEpoch)) throw new Error('New changes are waiting to save');
+      Object.assign(authority, fresh);
+      authorizedDescriptor = fresh.descriptor;
+      if (current) current.descriptor = fresh.descriptor;
     },
     changed: (recoveryState, stalled) => {
       if (!isCurrent()) return;
-      dispatchSaveEvent({ type: 'recovery', scope: statusScope, state: recoveryState, stalled });
+      dispatchSaveEvent({ type: 'recovery', scope: statusScope, state: recoveryState, stalled, at: Date.now() });
       if (recoveryState === 'storage-paused') { pauseRecoveryStorage(); return; }
       if (recoveryState === 'saved' && storagePaused) {
         storagePaused = false;
@@ -336,6 +356,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     // Workspace lifetime is distinct from request cancellation while preservation is pending.
     durableLocalBlobs: true,
     onDocumentOutcome: documentOutcome,
+    onDocumentCommit: documentCommit,
     onImageOutcome: imageOutcome,
     fetch: (input, init) => {
       const url = new URL(String(input), location.href); const key = decodeURIComponent(url.pathname.split('/blobs/')[1] ?? '');

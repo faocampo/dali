@@ -22,7 +22,7 @@ export type SaveEvent =
   | { type: 'coverage'; scope: string; documents: Record<string, { revision: number; acknowledged: boolean }>; images: { id: string; label: string }[]; at: number }
   | { type: 'image'; scope: string; id: string; label?: string; outcome: 'sending' | 'acknowledged' | 'failed'; attempt: string; at: number }
   | { type: 'document-failure'; scope: string; docId: string }
-  | { type: 'recovery'; scope: string; state: string; stalled?: boolean }
+  | { type: 'recovery'; scope: string; state: string; stalled?: boolean; at?: number }
   | { type: 'preserved' | 'retry' | 'dispatched' | 'local-complete' | 'exported'; scope: string };
 const freeze = (value: SaveSnapshot): SaveSnapshot => Object.freeze({ ...value, documents: Object.freeze(Object.fromEntries(Object.entries(value.documents).map(([id, row]) => [id, Object.freeze(row)]))), images: Object.freeze(Object.fromEntries(Object.entries(value.images).map(([id, row]) => [id, Object.freeze(row)]))) });
 export function createSaveSnapshot(scope: string): SaveSnapshot { return freeze({ scope, state: 'saving', label: 'Saving…', documents: {}, images: {}, preserved: false, retrying: false }); }
@@ -56,6 +56,7 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
     next.documents[event.docId] = { revision: 0, acknowledged: false, ...doc, failure: 'Board changes have not reached the server.' };
   } else if (event.type === 'recovery') {
     if ((event.state === 'pending' || event.stalled) && next.title && !next.title.acknowledged) next.title = { ...next.title, failed: true };
+    if (event.state === 'saved') time = event.at;
     next.recovery = event.state; next.retrying = event.state === 'retrying' || event.state === 'recovering';
     if (event.stalled) for (const [id, row] of Object.entries(next.documents)) if (!row.acknowledged) next.documents[id] = { ...row, failure: 'Saving is taking longer than expected.' };
   } else if (event.type === 'preserved') next.preserved = true;
@@ -74,7 +75,7 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
   } else if (failed.length || contentFailed) {
     next.state = 'failed'; next.label = covered && failed.length ? 'Image not saved' : 'Save failed';
     next.message = failed.length ? `${covered ? 'Board changes are saved, but' : 'Board changes and'} ${failed.length === 1 ? failed[0]!.label : `${failed.length} images`} ${covered && failed.length === 1 ? 'has' : 'have'} not reached the server. Retry now or download a recovery copy.` : 'Board changes have not reached the server. Retry now or download a recovery copy.';
-  } else if (next.retrying && !allSaved) { next.state = 'saving'; next.label = 'Recovering changes…'; next.message = 'Retrying your pending changes and images.'; }
+  } else if (next.retrying || ['checking-access', 'pending'].includes(next.recovery ?? '')) { next.state = 'saving'; next.label = 'Recovering changes…'; next.message = 'Retrying your pending changes and images.'; }
   else if (!allSaved) { next.state = 'saving'; next.label = next.preserved ? 'Changes pending' : 'Saving…'; next.message = next.preserved ? 'Changes are preserved in this browser and waiting to reach the server.' : 'Sending your latest changes and images to the server.'; }
   else {
     next.state = 'saved'; next.label = 'Saved'; next.message = 'All changes and images are saved to the server.'; next.retrying = false;

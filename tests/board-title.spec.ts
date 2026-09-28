@@ -64,3 +64,59 @@ test('hand drags the viewport without changing objects and Select restores selec
   await expect(page.getByRole('button', { name: 'Select', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Select', exact: true }).locator('svg')).toHaveCount(1);
 });
+
+test('pending keyboard rename preserves focus moved into a new topic', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+  let release!: () => void;
+  const barrier = new Promise<void>(resolve => { release = resolve; });
+  let held = false;
+  await page.route('**/api/boards/*', async route => {
+    if (route.request().method() !== 'PATCH') return route.continue();
+    const response = await route.fetch();
+    expect(response.status()).toBe(200); held = true;
+    await barrier; await route.fulfill({ response });
+  });
+  try {
+    await (await editBoardTitle(page)).fill('Synthetic delayed rename');
+    await page.getByRole('textbox', { name: 'Board name' }).press('Enter');
+    await expect.poll(() => held).toBe(true);
+    await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
+    release();
+    await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe('Central topic');
+    await page.keyboard.type('Continued topic');
+    await expect(page.locator('edgeless-shape-text-editor')).toContainText('Continued topic');
+  } finally { release(); }
+});
+
+test('Saved waits for committed document revision before an immediate rename', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+  let committed = false; let held = false; let release!: () => void;
+  const barrier = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/docs/*/push', async route => {
+    const response = await route.fetch(); expect(response.status()).toBe(200);
+    committed = true; await route.fulfill({ response });
+  });
+  await page.route('**/api/boards/*', async route => {
+    if (route.request().method() !== 'GET' || !committed || held) return route.continue();
+    const response = await route.fetch(); expect(response.status()).toBe(200);
+    held = true; await barrier; await route.fulfill({ response });
+  });
+  try {
+    await page.getByRole('button', { name: 'Add mind map', exact: true }).click();
+    await page.keyboard.type('Synthetic committed topic'); await page.keyboard.press('Escape');
+    await expect.poll(() => held).toBe(true);
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toHaveCount(0);
+    release();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+    await (await editBoardTitle(page)).fill('Synthetic revision aligned');
+    await page.getByRole('textbox', { name: 'Board name' }).press('Enter');
+    await expect(page.getByRole('textbox', { name: 'Board name' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Rename board: Synthetic revision aligned', exact: true })).toBeVisible();
+  } finally { release(); }
+});

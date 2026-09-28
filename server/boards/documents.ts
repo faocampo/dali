@@ -89,12 +89,15 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
         if (merged.length > DOCUMENT_LIMITS.update) return reply.code(413).send({ code: 'PAYLOAD_REJECTED' });
       } catch { return reply.code(400).send({ code: 'INVALID_DOCUMENT' }); }
       finally { doc.destroy(); }
+      const previousRevision = latest.revision;
+      let revision = previousRevision;
       if (!merged.equals(stored)) {
         database.prepare('UPDATE board_documents SET update_bytes=? WHERE board_id=? AND doc_id=?').run(merged, boardId, docId);
         database.prepare('UPDATE boards SET updated_at=?,revision=revision+1 WHERE id=?').run(now(), boardId);
+        revision = previousRevision + 1;
         database.prepare('DELETE FROM board_thumbnails WHERE board_id=?').run(boardId);
       }
-      return { acknowledged: true };
+      return { acknowledged: true, previousRevision, revision };
     })();
   });
 }
