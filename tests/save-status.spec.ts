@@ -87,6 +87,13 @@ test('@04-05-02 unrelated image success retains the failed image through coalesc
   });
   await page.reload(); await expect.poll(() => successes).toBeGreaterThan(0);
   await expect(page.getByRole('button', { name: 'Image not saved, Open save details', exact: true })).toBeVisible();
+  // Background preservation can report failure before the native image mounts.
+  // Finish that independent failed read before restoring transport; otherwise
+  // its initial hydration is counted as a second recovery retry.
+  await expect.poll(() => page.locator('affine-edgeless-image').evaluateAll((elements, id) => {
+    const image = elements.find(element => (element as unknown as { model: { props: { sourceId: string } } }).model.props.sourceId === id);
+    return (image as unknown as { resourceController: { resolvedState$: { value: { error: boolean } } } } | undefined)?.resourceController.resolvedState$.value.error;
+  }, failedId)).toBe(true);
   fail = false; await expect.poll(() => held).toBe(1);
   await page.getByRole('button', { name: 'Image not saved, Open save details', exact: true }).click();
   await page.getByRole('button', { name: 'Retry now', exact: true }).click({ clickCount: 3 });

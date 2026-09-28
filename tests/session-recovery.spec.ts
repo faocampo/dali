@@ -218,7 +218,9 @@ for (const resource of ['document', 'image', 'thumbnail'] as const) test.describ
   page.on('requestfailed', request => { if (request.url() === heldImageUrl) abortedRequests.push({ url: request.url(), afterSwitch: accountSwitchInjected }); });
   page.on('console', message => {
     if (message.type() !== 'error') return; const afterSwitch = accountSwitchInjected;
-    cancellationReads.push(Promise.all(message.args().map(arg => arg.evaluate(value => value?.name).catch(() => null))).then(names => { if (names.includes('AbortError')) cancellationPhases.push(afterSwitch); }));
+    cancellationReads.push(Promise.all(message.args().map(arg => arg.evaluate(value => ({ name: value?.name, message: value?.message })).catch(() => null))).then(args => {
+      if (args.some(arg => arg?.name === 'AbortError' || arg?.message === 'Account source is stale')) cancellationPhases.push(afterSwitch);
+    }));
   });
   const descriptor = await board(page); await text(page, 'Delayed identity canary');
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'canary.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes }); await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
@@ -243,7 +245,11 @@ for (const resource of ['document', 'image', 'thumbnail'] as const) test.describ
   await page.goto(resource === 'thumbnail' ? origin : origin + '/?board=' + descriptor.summary.id); await expect.poll(() => received).toBe(true);
   await Promise.all(cancellationReads); expect(cancellationPhases).toEqual([]);
   expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]);
-  if (resource === 'image') expectErrors.push('AbortError: The operation was aborted. ', 'AbortError: Fetch is aborted');
+  // Native loading logs either transport abort or the source's post-response
+  // lifetime check, depending on which completes first during identity change.
+  // Both remain forbidden before this boundary and are checked by phase below.
+  if (resource === 'image') expectErrors.push('AbortError: The operation was aborted. ', 'AbortError: Fetch is aborted',
+    'console: Error: Account source is stale', 'console: Error [Error: Account source is stale]');
   accountSwitchInjected = true;
   await context.clearCookies({ name: 'dali_fixture_identity' }); const other = await context.newPage(); await other.goto(origin + '/auth/start');
   await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click(); await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
