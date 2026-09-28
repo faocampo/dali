@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './browser-fixtures.js';
 import type { BrowserContext, Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { createHash, randomUUID } from 'node:crypto';

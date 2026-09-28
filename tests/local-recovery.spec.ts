@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './browser-fixtures.js';
 import { build } from 'esbuild';
 import type * as Recovery from '../src/canvas/account/outbox';
 import type * as Capture from '../src/canvas/account/local-capture';

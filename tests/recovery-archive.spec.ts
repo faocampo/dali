@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './browser-fixtures.js';
 import { recoveryBoardFixture, journalRows, failRecoveryStorage } from './recovery-fixtures';
 import { addSavedImage } from './save-status-fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';

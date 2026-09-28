@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './browser-fixtures.js';
 import { saveBoardFixture, addSavedImage, documentResponseBarrier } from './save-status-fixtures';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { randomUUID } from 'node:crypto';

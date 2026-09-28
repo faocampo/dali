@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './browser-fixtures.js';
 import { createRestoreService } from './durability-fixtures';
 import { recoveryBoardFixture, journalRows } from './recovery-fixtures';
 import { syntheticCanaries } from './access-fixtures';

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './browser-fixtures.js';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { createRepresentativeRecoveryService } from './durability-fixtures';
 import { accessIdentityLabels } from './access-fixtures';

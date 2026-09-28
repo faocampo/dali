@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './browser-fixtures.js';
 import { recoveryBoardFixture, journalRows, failRecoveryStorage } from './recovery-fixtures';
 
 test('@04-08-02 Stay and Escape retain pending work; Leave transitions once with destination focus', async ({ page, baseURL }) => {

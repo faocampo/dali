@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './browser-fixtures.js';
 import { saveDetailsBoard, openSaveDetails, saveTrigger, addDetailImages, saveDetailsFixtures } from './save-details-fixtures';
 import { documentResponseBarrier } from './save-status-fixtures';
 import { recoveryAuthorizationBarrier } from './recovery-archive-fixtures';

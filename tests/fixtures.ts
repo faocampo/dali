@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect } from './browser-fixtures.js';
 import { randomUUID } from 'node:crypto';
 import type { Page, APIRequestContext } from '@playwright/test';
 
@@ -43,26 +43,6 @@ export const test = base.extend<{
   /** Public and explicit legacy inventory tests retain their own entry flow. */
   entryMode: 'auto' | 'account' | 'public-entry' | 'local-only';
 }>({
-  browser: [async ({ browser, browserName, playwright, launchOptions }, use) => {
-    if (browserName !== 'webkit') { await use(browser); return; }
-    // The installed WebKit runtime stalls on navigation in its 64th context,
-    // including a minimal app-readiness probe. Isolate its process lifecycle
-    // while preserving Playwright's complete native context options/fixtures.
-    const original = browser.newContext.bind(browser);
-    browser.newContext = async options => {
-      const isolated = await playwright.webkit.launch(launchOptions);
-      try {
-        const context = await isolated.newContext(options);
-        const close = context.close.bind(context);
-        context.close = async options => {
-          try { await close(options); } finally { await isolated.close(); }
-        };
-        return context;
-      } catch (error) { await isolated.close(); throw error; }
-    };
-    try { await use(browser); } finally { browser.newContext = original; }
-  }, { scope: 'worker' }],
-
   expectErrors: [[], { option: true }],
   entryMode: ['auto', { option: true }],
   page: async ({ page, context, baseURL, entryMode }, use, testInfo) => {

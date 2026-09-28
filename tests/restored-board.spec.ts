@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext, type Page } from '@playwright/test';
+import { test, expect, type BrowserContext, type Page } from './browser-fixtures.js';
 import type { JournalRecord } from '../src/canvas/account/outbox';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { randomUUID, createHash } from 'node:crypto';
