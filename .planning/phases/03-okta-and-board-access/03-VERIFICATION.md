@@ -1,10 +1,10 @@
 ---
 phase: 03-okta-and-board-access
-verified: 2026-09-25
+verified: 2026-09-28T14:47:14.607147+00:00
 status: passed
-refresh_status: needs_human
+refresh_status: passed
 candidate_worktree_changes: true
-candidate_source_head: 348de1859bf1065ca6e01d2949b907db4203fe90
+candidate_source_head: 5aefe81d00ca618c2985c8a4801131cdcb6044e6
 score: "5/5 approved Phase 3 requirements verified"
 historical_score: "99/104 at the original independent verification revision"
 behavior_unverified: 0
@@ -129,6 +129,7 @@ covered_files:
   - "src/canvas/SelectionInspector.tsx"
   - "src/canvas/Tooltips.tsx"
   - "src/canvas/ViewportControls.tsx"
+  - "src/canvas/account/acknowledged-update.ts"
   - "src/canvas/account/blob-source.test.ts"
   - "src/canvas/account/blob-source.ts"
   - "src/canvas/account/board-doc.ts"
@@ -140,6 +141,8 @@ covered_files:
   - "src/canvas/account/mutation-guard.ts"
   - "src/canvas/account/outbox.test.ts"
   - "src/canvas/account/outbox.ts"
+  - "src/canvas/account/recovery.ts"
+  - "src/canvas/account/title-intent.ts"
   - "src/canvas/arrangement.ts"
   - "src/canvas/blocksuite-editor.ts"
   - "src/canvas/canvas-affordances.ts"
@@ -215,6 +218,7 @@ covered_files:
   - "tests/board-roles.spec.ts"
   - "tests/board-sharing.spec.ts"
   - "tests/board-title.spec.ts"
+  - "tests/browser-fixtures.ts"
   - "tests/canvas-arrangement.spec.ts"
   - "tests/canvas-controls-accessibility.spec.ts"
   - "tests/canvas-editing.spec.ts"
@@ -256,7 +260,10 @@ covered_files:
   - "tests/object-actions-submenu.spec.ts"
   - "tests/object-actions.ts"
   - "tests/oidc-provider.ts"
+  - "tests/restored-viewer.spec.ts"
+  - "tests/save-status.spec.ts"
   - "tests/session-recovery.spec.ts"
+  - "tests/shape-text-lifecycle.spec.ts"
   - "tests/sticky-shadow.spec.ts"
   - "tests/text-placement.spec.ts"
   - "tests/topic-focus-new-board.spec.ts"
@@ -266,7 +273,7 @@ covered_files:
   - "tsconfig.server.json"
   - "vite.config.ts"
   - "vitest.server.config.ts"
-covered_digest: "v1:sha256:ebaede90aafe7c6c2395bb1c5e06cfe10e37564bdccc99f788cd6b274420b2af"
+covered_digest: v1:sha256:3def03af53b5ecf9a78078c4319b7817958a1644775df70cd6cd43bf1c58b42f
 prohibitions:
   - statement: "Explicit Dali sign-out MUST NOT silently sign the member back in or terminate their provider-wide session."
     verification: test
@@ -293,7 +300,20 @@ prohibitions:
     flagged: false
     enforcement_evidence: []
     disposition: Scoped UAT privacy review and subsequent staged-content delta reviews; publication recheck remains required.
+refresh_source_head: 5aefe81d00ca618c2985c8a4801131cdcb6044e6
+refresh_browser_passed: 1960
 ---
+
+## Current prerequisite verification refresh — 2026-09-28
+
+**Passed on source/test revision `5aefe81d00ca618c2985c8a4801131cdcb6044e6`:** complete `npm run test:browser`, **1,960 selected / 1,960 passed / zero failed / zero skipped**, approximately 1.8 hours. Projects: development Chromium 463, production Chromium 457, Firefox 457, WebKit 457, access Chromium 126. Production build is included. Standalone `npm run test:access` also passed **126/126** in this resumed run. Both TypeScript checks passed after the final fixture corrections.
+
+Client units **233/233** and serialized server tests **311/311** passed on unchanged application source at `5388e7b`; later commits modified browser fixtures and planning evidence only. The fresh full browser run includes all restored Viewer, native read-only lifecycle, save coverage, account-transition, image retry and prior-phase behavior regressions. The synthetic hydration/cancellation fixture corrections passed another 56 focused/repeated cases before the full run.
+
+Historical user acceptance and approved deferrals remain unchanged. This refresh supersedes the earlier stale/needs-human prerequisite halt after the user explicitly resumed execution. Current fingerprints include shared runtime and browser fixture dependencies; actual working-tree content is hashed, including pre-existing user changes to package metadata/documentation where already covered. Those unrelated changes were preserved and are not included in the correction commits. Phase 4 requirement acceptance remains a separate pending gate.
+
+Earlier dated results below retain their original revision scope.
+
 
 # Phase 3: regression refresh pending — 2026-09-27
 

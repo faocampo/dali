@@ -29,12 +29,12 @@ requirements-completed: []
 actuals:
   token_estimate_scope: original-task-1
   tokens: 8894
-  tasks: 2
+  tasks: 3
   commits: 5
 plan_head_before: 3573e889f78ce453720d54d460a1aca3f7cf7305
 duration: multiple sessions
-completed: 2026-09-26
-status: in_progress
+completed: 2026-09-28
+status: complete
 coverage:
   - id: representative-local-recovery
     description: Representative real SQLite backup and fresh restore preserve exact document/image hashes and current role access
@@ -61,7 +61,7 @@ coverage:
 
 ## Completed task and commits
 
-Tasks **04-15-01** and **04-15-03** are complete. On 2026-09-27 the user explicitly authorized local Kubernetes setup: task **04-15-02** was implemented and its scoped local API recovery drill passed. Cold native read-only rendering found an issue subsequently fixed in WINDOWS 22, and independent storage/capacity validation is deferred to backlog 999.6. The plan remains incomplete.
+Tasks **04-15-01** and **04-15-03** are complete. On 2026-09-27 the user explicitly authorized local Kubernetes setup: task **04-15-02** was implemented and its scoped local API recovery drill passed. Cold native read-only rendering found an issue subsequently fixed in WINDOWS 22, and independent storage/capacity validation is deferred to backlog 999.6. The plan is complete within the user-approved local deployment/recovery scope; independent storage and capacity remain deferred to 999.6.
 
 - `8ce0241` — RED: require representative recovery dataset envelope.
 - `dffa7c5` — GREEN: representative generator, real I/O drill, native cold browser proof and runbook.
@@ -121,7 +121,7 @@ The real backup-freshness browser test passes in Chromium, Firefox and WebKit, i
 
 The native restored-cluster follow-up found a cold Viewer hydration failure and read-only errors. WINDOWS entry 22 is now fixed and verified by the read-only-first regression in three engines. Separate PV directories share one Docker backing volume and host. The roughly 500 GiB retention forecast exceeds the synthetic claim's nominal 100 GiB. These constraints remain explicit.
 
-See [04-LOCAL-KUBERNETES-VALIDATION.md](04-LOCAL-KUBERNETES-VALIDATION.md) (measured timings, scope, corrections and native browser finding) and [04-15-CHECKPOINT.md](04-15-CHECKPOINT.md) (remaining work). Implementation commits: `ddfd11f`, `c6c0dfb`, `c3cc75e`. Requirements remain unaccepted; plan 04-16 remains dependent on this incomplete plan.
+See [04-LOCAL-KUBERNETES-VALIDATION.md](04-LOCAL-KUBERNETES-VALIDATION.md) (measured timings, scope, corrections and native browser finding) and [04-15-CHECKPOINT.md](04-15-CHECKPOINT.md) (remaining work). Implementation commits: `ddfd11f`, `c6c0dfb`, `c3cc75e`. Requirements remain unaccepted pending final Phase 4 verification; plan 04-16 is now eligible to execute.
 
 ## Documentation Consulted
 
@@ -135,3 +135,15 @@ Local harness deliverables, scoped runtime evidence and cross-browser freshness 
 ## Approved validation deferral — 2026-09-27
 
 The user postponed independent storage and capacity validation to backlog **999.6**. These infrastructure checks are deferred from active Phase 4 acceptance and remain unverified. Existing local test evidence is retained; WINDOWS 20 is waived for the documented deferral. The cold native Viewer rendering failure (WINDOWS 22) is now fixed with six passing local restored-fixture scenarios. Production ingress/provider validation retains its separate disposition.
+
+## Final acceptance reconciliation — 2026-09-28
+
+All three tasks are complete within the user-approved scope. Task 04-15-02 applies an explicit scope exception to its original independent-storage/production criteria: the user accepted the scoped local Kubernetes drill and deferred independent failure-domain and capacity proof to 999.6. The actual markers are `LOCAL_DEPLOYMENT_SMOKE_PASS` and `LOCAL_RECOVERY_DRILL_PASS`. No production `RECOVERY_DRILL_PASS` is inferred.
+
+The local measurements remain tied to their tested environment and revision: restart 16.882 seconds, compatible rollback/return 32.214 seconds, backup publication 9.058 seconds, incident through verified usable API 116.952 seconds, selected recovery-point age 9.050 seconds and acknowledgment loss gap 6.933 seconds. The retained cluster image has not been redeployed with subsequent corrections. The corrected cold Viewer behavior is proved separately by fresh real backup/restore fixture services and production browser assets.
+
+The complete prerequisite gate at `5aefe81` passed **1,960/1,960** browser cases with zero skips, including restored Viewer/native-content/image integrity and freshness-fence cases. Standalone access passed **126/126**; both static checks pass. The unchanged application source retains 233 unit and 311 serialized-server passing results. Phase 1–3 canonical verification is fresh.
+
+Seven descriptor-less prohibition judgments remain individually flagged in COVERAGE.md for the final acceptance report. Local drill acceptance does not silently approve those judgments. Actual provider (999.4), speech interaction (999.3), and independent storage/capacity (999.6) retain their approved deferrals. SAVE-01, SAVE-02, OPS-01 and OPS-02 remain pending phase-level acceptance in 04-16.
+
+Self-check: all named local deliverables and synthetic reports exist; current native regressions pass; private operator artifacts remain outside the public repository. No destructive drill was repeated against the retained restored target.

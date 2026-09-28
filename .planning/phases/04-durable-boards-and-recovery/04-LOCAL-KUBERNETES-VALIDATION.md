@@ -106,3 +106,7 @@ The same `@04-15-22` command above passes **3 tests in 4.2 minutes, zero skipped
 Additional checks: all **195 unit tests**, all **3 representative operations-drill tests**, frontend/server TypeScript checks and diff whitespace validation pass. Four metadata tests cover read-only and writable title projection, forbidden Viewer metadata writes, foreign IDs and authorized metadata changes; the title tests failed before the adapter correction and pass afterward.
 
 This correction was verified against freshly restored local fixture services with production frontend assets. The retained Kubernetes image has not been rebuilt or redeployed in this fix; prior cluster timings retain their original revision scope. Independent storage/capacity validation remains deferred to backlog 999.6. Final 04-15 acceptance reconciliation and dependent 04-16 verification remain pending.
+
+## Final local-scope reconciliation — 2026-09-28
+
+Plan 04-15 is complete within the user-accepted local deployment/recovery scope. WINDOWS 22 is fixed and the complete corrected-source browser gate at `5aefe81` passes 1,960/1,960, including the three production-engine Viewer tests and six restored-board scenarios. Earlier failure paragraphs above are historical. The retained cluster image was not redeployed; the fresh fixture/browser evidence is separate from the recorded cluster timings. Independent storage/capacity remains unverified and deferred to 999.6. Final Phase 4 UI/native acceptance and individual prohibition judgments remain in plan 04-16.

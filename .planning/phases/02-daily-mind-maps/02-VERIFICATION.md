@@ -1,89 +1,103 @@
 ---
 phase: 02-daily-mind-maps
-verified: 2026-09-15
+verified: 2026-09-28T14:47:14.607147+00:00
 status: passed
-refresh_status: needs_human
+refresh_status: passed
 candidate_worktree_changes: true
-candidate_source_head: 348de1859bf1065ca6e01d2949b907db4203fe90
+candidate_source_head: 5aefe81d00ca618c2985c8a4801131cdcb6044e6
 score: 4/4 Phase 2 requirements verified and user-approved
 covered_files:
-  - .planning/REQUIREMENTS.md
-  - .planning/phases/02-daily-mind-maps/02-01-PLAN.md
-  - .planning/phases/02-daily-mind-maps/02-01-SUMMARY.md
-  - .planning/phases/02-daily-mind-maps/02-02-PLAN.md
-  - .planning/phases/02-daily-mind-maps/02-02-SUMMARY.md
-  - .planning/phases/02-daily-mind-maps/02-03-PLAN.md
-  - .planning/phases/02-daily-mind-maps/02-03-SUMMARY.md
-  - .planning/phases/02-daily-mind-maps/02-04-PLAN.md
-  - .planning/phases/02-daily-mind-maps/02-04-SUMMARY.md
-  - .planning/phases/02-daily-mind-maps/02-05-PLAN.md
-  - .planning/phases/02-daily-mind-maps/02-05-SUMMARY.md
-  - .planning/phases/02-daily-mind-maps/02-06-PLAN.md
-  - .planning/phases/02-daily-mind-maps/02-06-SUMMARY.md
-  - .planning/phases/02-daily-mind-maps/02-07-PLAN.md
-  - .planning/phases/02-daily-mind-maps/02-07-SUMMARY.md
-  - .planning/phases/02-daily-mind-maps/02-08-PLAN.md
-  - .planning/phases/02-daily-mind-maps/02-08-SUMMARY.md
-  - .planning/phases/02-daily-mind-maps/02-09-PLAN.md
-  - .planning/phases/02-daily-mind-maps/02-09-SUMMARY.md
-  - .planning/phases/02-daily-mind-maps/02-UAT.md
-  - .planning/phases/02-daily-mind-maps/02-UI-SPEC.md
-  - .planning/phases/02-daily-mind-maps/02-VALIDATION.md
-  - .planning/quick/260915-canvas-interactions/SUMMARY.md
-  - .planning/quick/260915-topic-editing-new-board/SUMMARY.md
-  - src/boards/operations.ts
-  - src/canvas/BlockSuiteCanvas.tsx
-  - src/canvas/LayersInspector.tsx
-  - src/canvas/MindMapInspector.tsx
-  - src/canvas/ObjectContextMenu.tsx
-  - src/canvas/SelectionInspector.tsx
-  - src/canvas/ViewportControls.tsx
-  - src/canvas/arrangement.ts
-  - src/canvas/blocksuite-editor.ts
-  - src/canvas/canvas-affordances.ts
-  - src/canvas/extensions.ts
-  - src/canvas/mindmap-compatibility.ts
-  - src/canvas/mindmap-export.test.ts
-  - src/canvas/mindmap-export.ts
-  - src/canvas/mindmap-keyboard.ts
-  - src/canvas/mindmap-node-copy.ts
-  - src/canvas/mindmap-state.test.ts
-  - src/canvas/mindmap-state.ts
-  - src/canvas/mindmap.ts
-  - src/canvas/object-actions-toolbar.ts
-  - src/canvas/presentation-export.ts
-  - src/canvas/selection-summary.ts
-  - src/canvas/shape-text-editor.ts
-  - src/header/DaliMenu.tsx
-  - src/header/ExportDialog.tsx
-  - src/index.css
-  - tests/canvas-arrangement.spec.ts
-  - tests/canvas-editing.spec.ts
-  - tests/canvas-feedback.spec.ts
-  - tests/clipboard-route.ts
-  - tests/fixtures.ts
-  - tests/image-visual-edits.spec.ts
-  - tests/mindmap-accessibility.spec.ts
-  - tests/mindmap-collapse.spec.ts
-  - tests/mindmap-compatibility.spec.ts
-  - tests/mindmap-copy.spec.ts
-  - tests/mindmap-edit-format.spec.ts
-  - tests/mindmap-export.spec.ts
-  - tests/mindmap-formatting.spec.ts
-  - tests/mindmap-keyboard.spec.ts
-  - tests/mindmap-layout.spec.ts
-  - tests/mindmap-lock.spec.ts
-  - tests/mindmap-node-copy.spec.ts
-  - tests/mindmap-properties.spec.ts
-  - tests/mindmap-properties.ts
-  - tests/mindmap-visibility.spec.ts
-  - tests/mindmap-workflow.spec.ts
-  - tests/mindmap.spec.ts
-  - tests/object-actions-submenu.spec.ts
-  - tests/object-actions.ts
-  - tests/topic-focus-new-board.spec.ts
-  - vite.config.ts
-covered_digest: "v1:sha256:4eec9ff68ff049519b53cea2248b929a3bebaa5474b1207b709c2f23f91af0f7"
+  - ".planning/REQUIREMENTS.md"
+  - ".planning/phases/02-daily-mind-maps/02-01-PLAN.md"
+  - ".planning/phases/02-daily-mind-maps/02-01-SUMMARY.md"
+  - ".planning/phases/02-daily-mind-maps/02-02-PLAN.md"
+  - ".planning/phases/02-daily-mind-maps/02-02-SUMMARY.md"
+  - ".planning/phases/02-daily-mind-maps/02-03-PLAN.md"
+  - ".planning/phases/02-daily-mind-maps/02-03-SUMMARY.md"
+  - ".planning/phases/02-daily-mind-maps/02-04-PLAN.md"
+  - ".planning/phases/02-daily-mind-maps/02-04-SUMMARY.md"
+  - ".planning/phases/02-daily-mind-maps/02-05-PLAN.md"
+  - ".planning/phases/02-daily-mind-maps/02-05-SUMMARY.md"
+  - ".planning/phases/02-daily-mind-maps/02-06-PLAN.md"
+  - ".planning/phases/02-daily-mind-maps/02-06-SUMMARY.md"
+  - ".planning/phases/02-daily-mind-maps/02-07-PLAN.md"
+  - ".planning/phases/02-daily-mind-maps/02-07-SUMMARY.md"
+  - ".planning/phases/02-daily-mind-maps/02-08-PLAN.md"
+  - ".planning/phases/02-daily-mind-maps/02-08-SUMMARY.md"
+  - ".planning/phases/02-daily-mind-maps/02-09-PLAN.md"
+  - ".planning/phases/02-daily-mind-maps/02-09-SUMMARY.md"
+  - ".planning/phases/02-daily-mind-maps/02-UAT.md"
+  - ".planning/phases/02-daily-mind-maps/02-UI-SPEC.md"
+  - ".planning/phases/02-daily-mind-maps/02-VALIDATION.md"
+  - ".planning/quick/260915-canvas-interactions/SUMMARY.md"
+  - ".planning/quick/260915-topic-editing-new-board/SUMMARY.md"
+  - "src/boards/operations.ts"
+  - "src/canvas/BlockSuiteCanvas.tsx"
+  - "src/canvas/LayersInspector.tsx"
+  - "src/canvas/MindMapInspector.tsx"
+  - "src/canvas/ObjectContextMenu.tsx"
+  - "src/canvas/SelectionInspector.tsx"
+  - "src/canvas/ViewportControls.tsx"
+  - "src/canvas/account/acknowledged-update.ts"
+  - "src/canvas/account/blob-source.ts"
+  - "src/canvas/account/board-workspace.ts"
+  - "src/canvas/account/doc-source.ts"
+  - "src/canvas/account/outbox.ts"
+  - "src/canvas/account/recovery.ts"
+  - "src/canvas/account/title-intent.ts"
+  - "src/canvas/arrangement.ts"
+  - "src/canvas/blocksuite-editor.ts"
+  - "src/canvas/canvas-affordances.ts"
+  - "src/canvas/extensions.ts"
+  - "src/canvas/mindmap-compatibility.ts"
+  - "src/canvas/mindmap-export.test.ts"
+  - "src/canvas/mindmap-export.ts"
+  - "src/canvas/mindmap-keyboard.ts"
+  - "src/canvas/mindmap-node-copy.ts"
+  - "src/canvas/mindmap-state.test.ts"
+  - "src/canvas/mindmap-state.ts"
+  - "src/canvas/mindmap.ts"
+  - "src/canvas/object-actions-toolbar.ts"
+  - "src/canvas/presentation-export.ts"
+  - "src/canvas/runtime.ts"
+  - "src/canvas/selection-summary.ts"
+  - "src/canvas/shape-text-editor.ts"
+  - "src/header/DaliMenu.tsx"
+  - "src/header/ExportDialog.tsx"
+  - "src/index.css"
+  - "tests/board-roles.spec.ts"
+  - "tests/browser-fixtures.ts"
+  - "tests/canvas-arrangement.spec.ts"
+  - "tests/canvas-editing.spec.ts"
+  - "tests/canvas-feedback.spec.ts"
+  - "tests/clipboard-route.ts"
+  - "tests/fixtures.ts"
+  - "tests/image-visual-edits.spec.ts"
+  - "tests/mindmap-accessibility.spec.ts"
+  - "tests/mindmap-collapse.spec.ts"
+  - "tests/mindmap-compatibility.spec.ts"
+  - "tests/mindmap-copy.spec.ts"
+  - "tests/mindmap-edit-format.spec.ts"
+  - "tests/mindmap-export.spec.ts"
+  - "tests/mindmap-formatting.spec.ts"
+  - "tests/mindmap-keyboard.spec.ts"
+  - "tests/mindmap-layout.spec.ts"
+  - "tests/mindmap-lock.spec.ts"
+  - "tests/mindmap-node-copy.spec.ts"
+  - "tests/mindmap-properties.spec.ts"
+  - "tests/mindmap-properties.ts"
+  - "tests/mindmap-visibility.spec.ts"
+  - "tests/mindmap-workflow.spec.ts"
+  - "tests/mindmap.spec.ts"
+  - "tests/object-actions-submenu.spec.ts"
+  - "tests/object-actions.ts"
+  - "tests/restored-viewer.spec.ts"
+  - "tests/save-status.spec.ts"
+  - "tests/session-recovery.spec.ts"
+  - "tests/shape-text-lifecycle.spec.ts"
+  - "tests/topic-focus-new-board.spec.ts"
+  - "vite.config.ts"
+covered_digest: v1:sha256:3105ba9a55b1a5d85a27f07eed8001f8cde91af8a490ffa11315f91497826e6a
 behavior_unverified: 0
 overrides_applied: 0
 human_verification: []
@@ -91,7 +105,20 @@ human_acceptance:
   date: 2026-09-15
   source: "Phase 2 tested and approved."
   scope: Phase-wide user acceptance; per-environment details not separately reported
+refresh_source_head: 5aefe81d00ca618c2985c8a4801131cdcb6044e6
+refresh_browser_passed: 1960
 ---
+
+## Current prerequisite verification refresh — 2026-09-28
+
+**Passed on source/test revision `5aefe81d00ca618c2985c8a4801131cdcb6044e6`:** complete `npm run test:browser`, **1,960 selected / 1,960 passed / zero failed / zero skipped**, approximately 1.8 hours. Projects: development Chromium 463, production Chromium 457, Firefox 457, WebKit 457, access Chromium 126. Production build is included. Standalone `npm run test:access` also passed **126/126** in this resumed run. Both TypeScript checks passed after the final fixture corrections.
+
+Client units **233/233** and serialized server tests **311/311** passed on unchanged application source at `5388e7b`; later commits modified browser fixtures and planning evidence only. The fresh full browser run includes all restored Viewer, native read-only lifecycle, save coverage, account-transition, image retry and prior-phase behavior regressions. The synthetic hydration/cancellation fixture corrections passed another 56 focused/repeated cases before the full run.
+
+Historical user acceptance and approved deferrals remain unchanged. This refresh supersedes the earlier stale/needs-human prerequisite halt after the user explicitly resumed execution. Current fingerprints include shared runtime and browser fixture dependencies; actual working-tree content is hashed, including pre-existing user changes to package metadata/documentation where already covered. Those unrelated changes were preserved and are not included in the correction commits. Phase 4 requirement acceptance remains a separate pending gate.
+
+Earlier dated results below retain their original revision scope.
+
 
 # Phase 2: regression refresh pending — 2026-09-27
 

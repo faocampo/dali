@@ -1,10 +1,10 @@
 ---
 phase: 01-editable-canvas-and-image-portability
-verified: 2026-09-12T21:38:05.203183+00:00
+verified: 2026-09-28T14:47:14.607147+00:00
 status: passed
-refresh_status: needs_human
+refresh_status: passed
 candidate_worktree_changes: true
-candidate_source_head: 348de1859bf1065ca6e01d2949b907db4203fe90
+candidate_source_head: 5aefe81d00ca618c2985c8a4801131cdcb6044e6
 score: 29/29 must-haves verified through automated evidence and user acceptance
 behavior_unverified: 0
 overrides_applied: 0
@@ -16,90 +16,117 @@ unverified_prohibitions: []
 behavior_unverified_items: []
 human_verification: []
 covered_files:
-  - .planning/REQUIREMENTS.md
-  - .planning/ROADMAP.md
-  - .planning/WINDOWS.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-01-PLAN.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-01-SUMMARY.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-02-PLAN.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-02-SUMMARY.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-03-PLAN.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-03-SUMMARY.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-04-PLAN.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-04-SUMMARY.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-05-PLAN.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-05-SUMMARY.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-CONTEXT.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-FIXES.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-HISTORY-REMEDIATION.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-IMAGE-INTERACTION-FOLLOWUP.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-IMAGE-SIZE-FOLLOWUP.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-REVIEW-FIX.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-SECURITY.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-STICKY-SHADOW-FOLLOWUP.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-UAT.md
-  - .planning/phases/01-editable-canvas-and-image-portability/01-VALIDATION.md
-  - AGENTS.md
-  - LICENSE
-  - README.md
-  - index.html
-  - package-lock.json
-  - package.json
-  - playwright.config.ts
-  - scripts/gen-blocksuite-paths.mjs
-  - src/App.tsx
-  - src/assets/djai-design-logo.png
-  - src/boards/BoardLibrary.tsx
-  - src/boards/catalog.ts
-  - src/boards/operations.ts
-  - src/boards/preferences.ts
-  - src/boards/templates.ts
-  - src/canvas/BlockSuiteCanvas.tsx
-  - src/canvas/EdgelessToolbarDragHandle.tsx
-  - src/canvas/FrameBorderOverlay.tsx
-  - src/canvas/ImageCropOverlay.tsx
-  - src/canvas/LayersInspector.tsx
-  - src/canvas/ObjectContextMenu.tsx
-  - src/canvas/SelectionInspector.tsx
-  - src/canvas/arrangement.ts
-  - src/canvas/blocksuite-editor.ts
-  - src/canvas/chrome-drag.ts
-  - src/canvas/export-board.ts
-  - src/canvas/export-plan.test.ts
-  - src/canvas/export-plan.ts
-  - src/canvas/extensions.ts
-  - src/canvas/image-input.test.ts
-  - src/canvas/image-input.ts
-  - src/canvas/image-visual-edits.ts
-  - src/canvas/presentation-export.ts
-  - src/canvas/resize-affordance.ts
-  - src/canvas/runtime.ts
-  - src/canvas/save-status.test.ts
-  - src/canvas/save-status.ts
-  - src/canvas/selection-summary.test.ts
-  - src/canvas/selection-summary.ts
-  - src/canvas/sticky.ts
-  - src/canvas/text.ts
-  - src/canvas/workspace.ts
-  - src/header/ExportDialog.tsx
-  - src/header/Header.tsx
-  - src/header/links.ts
-  - src/index.css
-  - src/main.tsx
-  - src/vite-env.d.ts
-  - tests/canvas-arrangement.spec.ts
-  - tests/canvas-editing.spec.ts
-  - tests/community.spec.ts
-  - tests/fixtures.ts
-  - tests/image-export.spec.ts
-  - tests/image-import.spec.ts
-  - tests/image-visual-edits.spec.ts
-  - tests/sticky-shadow.spec.ts
-  - tsconfig.blocksuite-paths.json
-  - tsconfig.json
-  - vite.config.ts
-covered_digest: "v1:sha256:de6d14ff98c1391a7594c0d4c3a2e48fe348d50428689e8a30db2b23b31e3351"
+  - ".planning/REQUIREMENTS.md"
+  - ".planning/ROADMAP.md"
+  - ".planning/WINDOWS.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-01-PLAN.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-01-SUMMARY.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-02-PLAN.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-02-SUMMARY.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-03-PLAN.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-03-SUMMARY.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-04-PLAN.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-04-SUMMARY.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-05-PLAN.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-05-SUMMARY.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-CONTEXT.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-FIXES.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-HISTORY-REMEDIATION.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-IMAGE-INTERACTION-FOLLOWUP.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-IMAGE-SIZE-FOLLOWUP.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-REVIEW-FIX.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-SECURITY.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-STICKY-SHADOW-FOLLOWUP.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-UAT.md"
+  - ".planning/phases/01-editable-canvas-and-image-portability/01-VALIDATION.md"
+  - "AGENTS.md"
+  - "LICENSE"
+  - "README.md"
+  - "index.html"
+  - "package-lock.json"
+  - "package.json"
+  - "playwright.config.ts"
+  - "scripts/gen-blocksuite-paths.mjs"
+  - "src/App.tsx"
+  - "src/assets/djai-design-logo.png"
+  - "src/boards/BoardLibrary.tsx"
+  - "src/boards/catalog.ts"
+  - "src/boards/operations.ts"
+  - "src/boards/preferences.ts"
+  - "src/boards/templates.ts"
+  - "src/canvas/BlockSuiteCanvas.tsx"
+  - "src/canvas/EdgelessToolbarDragHandle.tsx"
+  - "src/canvas/FrameBorderOverlay.tsx"
+  - "src/canvas/ImageCropOverlay.tsx"
+  - "src/canvas/LayersInspector.tsx"
+  - "src/canvas/ObjectContextMenu.tsx"
+  - "src/canvas/SelectionInspector.tsx"
+  - "src/canvas/account/acknowledged-update.ts"
+  - "src/canvas/account/blob-source.ts"
+  - "src/canvas/account/board-workspace.ts"
+  - "src/canvas/account/doc-source.ts"
+  - "src/canvas/account/outbox.ts"
+  - "src/canvas/account/recovery.ts"
+  - "src/canvas/account/title-intent.ts"
+  - "src/canvas/arrangement.ts"
+  - "src/canvas/blocksuite-editor.ts"
+  - "src/canvas/chrome-drag.ts"
+  - "src/canvas/export-board.ts"
+  - "src/canvas/export-plan.test.ts"
+  - "src/canvas/export-plan.ts"
+  - "src/canvas/extensions.ts"
+  - "src/canvas/image-input.test.ts"
+  - "src/canvas/image-input.ts"
+  - "src/canvas/image-visual-edits.ts"
+  - "src/canvas/presentation-export.ts"
+  - "src/canvas/resize-affordance.ts"
+  - "src/canvas/runtime.ts"
+  - "src/canvas/save-status.test.ts"
+  - "src/canvas/save-status.ts"
+  - "src/canvas/selection-summary.test.ts"
+  - "src/canvas/selection-summary.ts"
+  - "src/canvas/shape-text-editor.ts"
+  - "src/canvas/sticky.ts"
+  - "src/canvas/text.ts"
+  - "src/canvas/workspace.ts"
+  - "src/header/ExportDialog.tsx"
+  - "src/header/Header.tsx"
+  - "src/header/links.ts"
+  - "src/index.css"
+  - "src/main.tsx"
+  - "src/vite-env.d.ts"
+  - "tests/board-roles.spec.ts"
+  - "tests/browser-fixtures.ts"
+  - "tests/canvas-arrangement.spec.ts"
+  - "tests/canvas-editing.spec.ts"
+  - "tests/community.spec.ts"
+  - "tests/fixtures.ts"
+  - "tests/image-export.spec.ts"
+  - "tests/image-import.spec.ts"
+  - "tests/image-visual-edits.spec.ts"
+  - "tests/restored-viewer.spec.ts"
+  - "tests/save-status.spec.ts"
+  - "tests/session-recovery.spec.ts"
+  - "tests/shape-text-lifecycle.spec.ts"
+  - "tests/sticky-shadow.spec.ts"
+  - "tsconfig.blocksuite-paths.json"
+  - "tsconfig.json"
+  - "vite.config.ts"
+covered_digest: v1:sha256:c6e622266f2ef590c0c70d228e71214fbb9284d3c3e84e5b12502d0204b8e3ea
+refresh_source_head: 5aefe81d00ca618c2985c8a4801131cdcb6044e6
+refresh_browser_passed: 1960
 ---
+
+## Current prerequisite verification refresh — 2026-09-28
+
+**Passed on source/test revision `5aefe81d00ca618c2985c8a4801131cdcb6044e6`:** complete `npm run test:browser`, **1,960 selected / 1,960 passed / zero failed / zero skipped**, approximately 1.8 hours. Projects: development Chromium 463, production Chromium 457, Firefox 457, WebKit 457, access Chromium 126. Production build is included. Standalone `npm run test:access` also passed **126/126** in this resumed run. Both TypeScript checks passed after the final fixture corrections.
+
+Client units **233/233** and serialized server tests **311/311** passed on unchanged application source at `5388e7b`; later commits modified browser fixtures and planning evidence only. The fresh full browser run includes all restored Viewer, native read-only lifecycle, save coverage, account-transition, image retry and prior-phase behavior regressions. The synthetic hydration/cancellation fixture corrections passed another 56 focused/repeated cases before the full run.
+
+Historical user acceptance and approved deferrals remain unchanged. This refresh supersedes the earlier stale/needs-human prerequisite halt after the user explicitly resumed execution. Current fingerprints include shared runtime and browser fixture dependencies; actual working-tree content is hashed, including pre-existing user changes to package metadata/documentation where already covered. Those unrelated changes were preserved and are not included in the correction commits. Phase 4 requirement acceptance remains a separate pending gate.
+
+Earlier dated results below retain their original revision scope.
+
 
 # Phase 1: regression refresh pending — 2026-09-27
 
