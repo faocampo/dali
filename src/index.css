@@ -1883,7 +1883,7 @@ affine-edgeless-note { --affine-font-base:24px; --affine-font-h-1:32px; --affine
 .board-library__empty { padding: 48px 0; max-width: 60ch; }
 .board-card__metadata { color: var(--dali-muted); font-size: var(--dali-text-xs); font-weight: 500; }
 .board-card__metadata span + span::before { content: '·'; margin-right: 8px; color: var(--dali-muted); }
-.board-card__preview { font-size: var(--dali-text-sm); }
+.board-card__preview { font-size: var(--dali-text-sm); color: var(--dali-ink); }
 .board-card__open { border-radius: var(--dali-radius-panel) var(--dali-radius-panel) 0 0; }
 .board-card__actions > div { padding: 6px; width: 196px; }
 .board-card__actions button { padding: 8px 10px; }

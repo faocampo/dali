@@ -83,14 +83,29 @@ export async function textContrast(surface: Locator) {
       if (!el.getClientRects().length || el.matches(':disabled') || ![...el.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim())) continue;
       const style = getComputedStyle(el); const chain: Element[] = []; let parent: Element | null = el;
       while (parent) { chain.unshift(parent); parent = parent.parentElement; }
-      let bg: RGB = [255, 255, 255, 1];
+      // Bound every sRGB background channel, including the preview's radial dots.
+      // Bounds cover the entire gradient, so glyph position cannot select a
+      // more favorable background. Opaque child backgrounds hide ancestors.
+      let low: RGB = [255, 255, 255, 1], high: RGB = [255, 255, 255, 1];
       for (const ancestor of chain) {
         const css = getComputedStyle(ancestor);
-        if (css.backgroundImage !== 'none' || Number(css.opacity) !== 1) throw new Error('Contrast requires explicit image/opacity sampling for this surface');
-        bg = blend(parse(css.backgroundColor), bg);
+        if (Number(css.opacity) !== 1) throw new Error(`Contrast requires opacity sampling: ${ancestor.className}`);
+        const color = parse(css.backgroundColor);
+        low = blend(color, low); high = blend(color, high);
+        if (css.backgroundImage !== 'none') {
+          const gradients = css.backgroundImage.match(/(?:radial|linear)-gradient\(/g) ?? [];
+          const colors = css.backgroundImage.match(/rgba?\([^)]*\)/g) ?? [];
+          if (gradients.length !== 1 || colors.length < 2 || /url\(|color\(|okl|hsl/.test(css.backgroundImage)) throw new Error(`Unsupported background: ${css.backgroundImage}`);
+          const candidates = colors.flatMap(value => [blend(parse(value), low), blend(parse(value), high)]);
+          low = [0, 1, 2].map(i => Math.min(...candidates.map(value => value[i]!))).concat(1) as RGB;
+          high = [0, 1, 2].map(i => Math.max(...candidates.map(value => value[i]!))).concat(1) as RGB;
+        }
       }
-      const fg = blend(parse(style.color), bg); const a = luminance(fg), b = luminance(bg);
-      const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+      const fgLow = luminance(blend(parse(style.color), low)), fgHigh = luminance(blend(parse(style.color), high));
+      const bgLow = luminance(low), bgHigh = luminance(high);
+      // Overlapping foreground/background luminance intervals cannot certify contrast.
+      const ratio = fgHigh < bgLow ? (bgLow + 0.05) / (fgHigh + 0.05)
+        : bgHigh < fgLow ? (fgLow + 0.05) / (bgHigh + 0.05) : 1;
       const large = parseFloat(style.fontSize) >= 24 || (parseFloat(style.fontSize) >= 18.66 && Number(style.fontWeight) >= 700);
       if (ratio < (large ? 3 : 4.5)) failures.push(`${el.textContent?.trim().slice(0, 60)}: ${ratio.toFixed(2)}`);
     }
