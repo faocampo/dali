@@ -30,6 +30,7 @@ try {
     else {
       console.log(`Dali local development ready: ${runtime.origin}`);
       console.log('Synthetic sign-in only. Choose a synthetic account; local boards and sessions survive a normal restart.');
+      console.log('Development storage: board data persists locally; backup freshness is simulated.');
       console.log('Press Ctrl+C to stop all local services.');
       await runtime.closed;
     }

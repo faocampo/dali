@@ -10,9 +10,11 @@ The local development sign-in page provides synthetic accounts. Open **Shared ro
 | Synthetic Internal Member | No grant | Sign in, with no access to this sample board. |
 | Synthetic External Account | Not admitted | Sign-in is rejected. |
 
-Viewer is a system-wide read-only role. Synthetic Viewer cannot create, import or modify boards, including any boards it owned before this policy was enabled. Other admitted members can create boards and receive Owner, Editor or Viewer access separately on each board.
+Viewer is a system-wide read-only role. Synthetic Viewer cannot create or import boards and has read-only access to shared boards. Creators retain Owner privileges on boards they already own. Other admitted members can create boards and receive Owner, Editor or Viewer access separately on each board.
 
 The local launcher creates the sample once per local development state directory. Existing boards retain their content and permissions. Sample edits, sharing changes and deletion survive restarts. The synthetic sign-in and sample seeding are part of local development only.
+
+The loopback-only synthetic launcher uses an explicit development storage policy: board data persists in local SQLite, while backup freshness is simulated. Its startup log identifies this mode. Production deployments continue to require configured independent backup storage and fresh recovery coverage. Local lifecycle tests do not establish production backup acceptance.
 
 To retest, sign in as Synthetic Editor and add an object to Shared role test. Open the same board as Synthetic Viewer in a separate browser profile. Confirm the **Viewer · View only** account-menu label, hidden creation tools, unchanged content after typing or deletion, and working navigation.
 

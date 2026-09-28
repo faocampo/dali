@@ -84,7 +84,9 @@ export async function startLocalDevelopment(options: DevOptions, stopped: () => 
     provider = await createOidcProvider({ port: options.providerPort, clients: [registration],
       signInPage: { title: 'Dali local development — synthetic sign-in', notice: 'Local development only. Open Shared role test to try Owner, Editor or Viewer access with the matching synthetic account. Viewer is read-only throughout the system. Other members can create boards and receive board-specific access.' },
     }); ensureRunning();
-    app = await buildApp({ config: {
+    // Synthetic loopback development persists boards locally; backup freshness is simulated.
+    // Production entrypoints continue to require a configured backup scheduler.
+    app = await buildApp({ storagePolicy: { kind: 'fixture' }, config: {
       DALI_ORIGIN: state.origin, DALI_DATABASE_PATH: join(options.stateDirectory, 'boards.sqlite'),
       DALI_SESSION_SECRET: state.sessionSecret, DALI_SESSION_TTL_MS: '86400000',
       DALI_OIDC_ISSUER: state.issuer, DALI_OIDC_CLIENT_ID: registration.clientId,

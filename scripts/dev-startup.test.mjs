@@ -79,6 +79,9 @@ test('npm dev signs in, saves and reopens after restart, and preserves authoriza
     const page = await signIn(owner, config.origin);
     const session = await (await owner.request.get(config.origin + '/api/session')).json();
     const headers = { Origin: config.origin, 'X-Dali-Request': '1', 'X-Dali-Account': session.accountId };
+    const health = await (await owner.request.get(config.origin + '/api/storage-health', { headers })).json();
+    assert.equal(health.backup.state, 'healthy', 'Local development must admit synthetic board writes');
+    headers['X-Dali-Recovery-Epoch'] = (await (await owner.request.get(config.origin + '/api/recovery-state', { headers })).json()).epoch;
     const samples = await (await owner.request.get(config.origin + '/api/boards', { headers })).json();
     assert.equal(samples.length, 1); assert.equal(samples[0].title, 'Shared role test'); assert.equal(samples[0].role, 'owner');
     const sharedPath = config.origin + '/api/boards/' + samples[0].id;
@@ -88,8 +91,9 @@ test('npm dev signs in, saves and reopens after restart, and preserves authoriza
     await expect(page.locator('editor-host')).toBeVisible({ timeout: 60_000 });
     const boardUrl = page.url(); const boardId = new URL(boardUrl).searchParams.get('board'); assert.ok(boardId);
     await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Note colors' }).getByRole('button', { name: 'Yellow note', exact: true }).click();
     await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.insertText('Synthetic saved content'); await page.keyboard.press('Escape');
-    await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     const text = p => p.locator('editor-host').evaluate(el => el.std.store.getBlocksByFlavour('affine:paragraph').map(({ model }) => model.text?.toString()));
     await expect.poll(() => text(page)).toContain('Synthetic saved content');
     const wrongOrigin = await owner.request.post(config.origin + '/api/boards', { headers: { ...headers, Origin: 'https://foreign.example.org' }, data: { title: 'Rejected', operationId: randomUUID() } });
@@ -100,10 +104,13 @@ test('npm dev signs in, saves and reopens after restart, and preserves authoriza
     const sharedEditor = await (await editor.request.get(sharedPath, { headers: editorHeaders })).json();
     assert.equal(sharedEditor.summary.role, 'editor'); assert.ok(sharedEditor.capabilities.includes('write'));
     await editorPage.getByRole('link', { name: 'Open Shared role test', exact: true }).click();
+    await editorPage.getByLabel('Account for Synthetic Editor', { exact: true }).click();
     await expect(editorPage.locator('.board-role')).toHaveText('Editor');
+    await editorPage.keyboard.press('Escape');
     await editorPage.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    await editorPage.getByRole('dialog', { name: 'Note colors' }).getByRole('button', { name: 'Yellow note', exact: true }).click();
     await editorPage.locator('affine-edgeless-note').dblclick(); await editorPage.keyboard.insertText('Shared role canary'); await editorPage.keyboard.press('Escape');
-    await expect(editorPage.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    await expect(editorPage.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     const viewer = await browser.newContext(); const viewerPage = await signIn(viewer, config.origin, 'Viewer');
     await expect(viewerPage.getByRole('button', { name: 'New board', exact: true })).toHaveCount(0);
     await expect(viewerPage.locator('.board-library__import')).toHaveCount(0);
@@ -112,7 +119,9 @@ test('npm dev signs in, saves and reopens after restart, and preserves authoriza
     const sharedViewer = await (await viewer.request.get(sharedPath, { headers: viewerHeaders })).json();
     assert.equal(sharedViewer.summary.role, 'viewer'); assert.ok(!sharedViewer.capabilities.includes('write'));
     await viewerPage.getByRole('link', { name: 'Open Shared role test', exact: true }).click();
+    await viewerPage.getByLabel('Account for Synthetic Viewer', { exact: true }).click();
     await expect(viewerPage.locator('.board-role')).toHaveText('Viewer · View only');
+    await viewerPage.keyboard.press('Escape');
     await expect.poll(() => text(viewerPage)).toContain('Shared role canary');
     await expect(viewerPage.getByRole('button', { name: 'Add mind map', exact: true })).toHaveCount(0);
     assert.equal(await viewerPage.locator('editor-host').evaluate(el => el.store.readonly), true);
@@ -163,7 +172,43 @@ test('npm dev signs in, saves and reopens after restart, and preserves authoriza
     await reopened.goto(config.origin);
     await reopened.getByRole('link', { name: 'Open Synthetic restart board', exact: true }).click();
     await expect.poll(() => text(reopened)).toContain('Synthetic saved content');
-    await reopened.goto(config.origin); await reopened.locator('.board-account summary').click();
+    // File > New opens a separate, saved board and preserves the source.
+    await reopened.getByRole('button', { name: 'Main Menu', exact: true }).click();
+    await reopened.getByRole('menuitem', { name: 'File', exact: true }).click();
+    const popupReady = reopened.waitForEvent('popup');
+    await reopened.getByRole('menuitem', { name: 'New', exact: true }).click();
+    const popup = await popupReady;
+    await expect(popup.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+    assert.notEqual(popup.url(), reopened.url());
+    await expect.poll(() => text(reopened)).toContain('Synthetic saved content');
+    await popup.getByRole('button', { name: 'Main Menu', exact: true }).click();
+    await popup.getByRole('menuitem', { name: 'File', exact: true }).click();
+    await popup.getByRole('menuitem', { name: 'Delete board', exact: true }).click();
+    await popup.getByRole('dialog', { name: 'Delete board' }).getByRole('button', { name: 'Delete board', exact: true }).click();
+    await expect(popup.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+    await popup.close();
+    // Delete the board from the canvas, then verify the library and server agree.
+    await reopened.getByRole('button', { name: 'Main Menu', exact: true }).click();
+    await reopened.getByRole('menuitem', { name: 'File', exact: true }).click();
+    await reopened.getByRole('menuitem', { name: 'Delete board', exact: true }).click();
+    await reopened.getByRole('dialog', { name: 'Delete board' }).getByRole('button', { name: 'Delete board', exact: true }).click();
+    await expect(reopened.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+    await expect(reopened.getByRole('link', { name: 'Open Synthetic restart board', exact: true })).toHaveCount(0);
+    assert.equal((await clean.request.get(boardPath, { headers })).status(), 404);
+    // Create once more and delete from the library card menu.
+    await reopened.getByLabel('Board name', { exact: true }).fill('Synthetic library deletion');
+    await reopened.getByRole('button', { name: 'New board', exact: true }).click();
+    await expect(reopened.locator('editor-host')).toBeVisible();
+    await expect(reopened.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+    await reopened.goto(config.origin);
+    await reopened.getByLabel('Actions for Synthetic library deletion', { exact: true }).click();
+    await reopened.getByRole('button', { name: 'Delete board', exact: true }).click();
+    await reopened.getByRole('dialog', { name: 'Delete board' }).getByRole('button', { name: 'Delete board', exact: true }).click();
+    await expect(reopened.getByRole('link', { name: 'Open Synthetic library deletion', exact: true })).toHaveCount(0);
+    await reopened.reload();
+    await expect(reopened.getByRole('link', { name: 'Open Shared role test', exact: true })).toBeVisible();
+    await expect(reopened.getByRole('link', { name: 'Open Synthetic library deletion', exact: true })).toHaveCount(0);
+    await reopened.goto(config.origin); await reopened.getByLabel('Account for Synthetic Owner', { exact: true }).click();
     await reopened.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
     await expect(reopened.getByRole('heading', { name: "You're signed out of Dalí" })).toBeVisible();
     await reopened.reload(); await expect(reopened.getByRole('button', { name: 'Sign in again' })).toBeVisible();
@@ -171,6 +216,9 @@ test('npm dev signs in, saves and reopens after restart, and preserves authoriza
     await clean.close(); await retained.close();
     assert.deepEqual(pageErrors, []);
     await run.stop('SIGTERM'); await portsFree(config);
+  } catch (error) {
+    for (const context of browser?.contexts() ?? []) for (const page of context.pages()) console.error((await page.locator('body').innerText()).slice(0, 2000));
+    throw error;
   } finally { await browser?.close(); await run?.stop(); await rm(config.directory, { recursive: true, force: true }); }
 });
 
