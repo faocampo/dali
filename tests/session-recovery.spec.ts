@@ -229,7 +229,17 @@ for (const resource of ['document', 'image', 'thumbnail'] as const) test.describ
   const before = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
   let release!: () => void; const barrier = new Promise<void>(resolve => { release = resolve; }); let received = false;
   const pattern = resource === 'document' ? '**/docs/*/pull' : resource === 'image' ? '**/blobs/*' : '**/thumbnail';
-  await page.route(pattern, async route => { const response = await route.fetch(); expect(response.status()).toBe(200); expect(route.request().headers()['x-dali-account']).toBe(accountId); if (resource === 'image') heldImageUrl = route.request().url(); received = true; await barrier; await route.fulfill({ response }).catch(() => {}); });
+  let captured = false;
+  await page.route(pattern, async route => {
+    // Hold exactly the original authorized response. Subsequent reads can
+    // legitimately be denied while sign-in replaces the shared cookie.
+    if (captured) return route.continue();
+    captured = true;
+    const response = await route.fetch(); expect(response.status()).toBe(200);
+    expect(route.request().headers()['x-dali-account']).toBe(accountId);
+    if (resource === 'image') heldImageUrl = route.request().url();
+    received = true; await barrier; await route.fulfill({ response }).catch(() => {});
+  });
   await page.goto(resource === 'thumbnail' ? origin : origin + '/?board=' + descriptor.summary.id); await expect.poll(() => received).toBe(true);
   await Promise.all(cancellationReads); expect(cancellationPhases).toEqual([]);
   expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]);

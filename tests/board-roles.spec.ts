@@ -42,6 +42,9 @@ async function localState(page: Page) {
   });
 }
 async function role(page: Page, id: string, value: 'viewer' | 'editor') {
+  // Native fonts load before the canvas mounts. Finish that mount before
+  // replacing the account so fixture navigation cannot cancel those assets.
+  await expect(page.locator('affine-edgeless-root')).toBeVisible();
   ownerId = accountId; ownerRequest = await request.newContext({ storageState: await page.context().storageState() });
   await page.context().clearCookies(); await page.goto(origin + '/auth/start');
   await page.getByRole('link', { name: value === 'viewer' ? 'Synthetic Viewer' : 'Synthetic Editor', exact: true }).click();
