@@ -1,4 +1,5 @@
 /** Test-only process entrypoint. Never imported by production startup. */
+import { proxyApplicationAssets } from './application-assets.js';
 import { buildApp } from '../app.js';
 import { openDatabase } from '../storage/database.js';
 
@@ -44,12 +45,9 @@ process.once('message', async (input: { config: Record<string, string>; assets: 
     if (mode === 'none') { database.pragma('query_only = OFF'); database.pragma('max_page_count = 4294967294'); }
     process.send?.({ type: 'armed' });
   });
-  app.get('/*', async (request, reply) => {
-    const response = await fetch(input.assets + request.url);
-    return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer()));
-  });
+  const closeAssets = proxyApplicationAssets(app, input.assets);
   await app.listen({ host: '127.0.0.1', port: input.port });
-  process.once('SIGTERM', () => { void app.close().then(() => { database.close(); process.exit(0); }); });
+  process.once('SIGTERM', () => { closeAssets(); void app.close().then(() => { database.close(); process.exit(0); }); });
   process.send?.({ type: 'ready', pragmas: {
     journal: database.pragma('journal_mode', { simple: true }),
     synchronous: database.pragma('synchronous', { simple: true }),

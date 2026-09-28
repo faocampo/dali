@@ -95,7 +95,7 @@ test('@04-07-01 failed image rows retain focus during retry and select without m
   const dialog = await openSaveDetails(page); await expect(dialog.getByRole('listitem')).toHaveCount(2);
   const first = dialog.getByRole('listitem').first(); await expect(first).toContainText('Image not saved');
   await expect(dialog.getByRole('listitem').last()).toContainText('Saved');
-  fail = false; const retry = dialog.getByRole('button', { name: 'Retry now', exact: true }); await retry.click();
+  fail = false; const retry = dialog.getByRole('button', { name: 'Retry now', exact: true }); await retry.focus(); await retry.press('Enter');
   await expect.poll(() => held).toBe(1); await expect(retry).toBeFocused(); await expect(first).toContainText('Image not saved');
   await expect(dialog.getByRole('button', { name: 'Download recovery copy' })).toBeEnabled();
   release(); await expect(saveTrigger(page)).toContainText('Saved'); await expect(first).toContainText('Saved');

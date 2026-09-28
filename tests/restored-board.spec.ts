@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
+import type { JournalRecord } from '../src/canvas/account/outbox';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { randomUUID, createHash } from 'node:crypto';
 import { createRestoreService, createRepresentativeRecoveryService } from './durability-fixtures';
@@ -23,11 +24,22 @@ async function snapshot(page: Page) {
   });
 }
 async function journal(page: Page) {
-  return page.evaluate(() => new Promise<{ id: string; epoch: string }[]>((resolve, reject) => {
-    const opening = indexedDB.open('dali-account-recovery-v1'); opening.onerror = () => reject(opening.error);
-    opening.onsuccess = () => { const db = opening.result; const request = db.transaction('journal').objectStore('journal').getAll();
-      request.onsuccess = () => { db.close(); resolve(request.result.map(row => ({ id: row.id, epoch: row.epoch }))); }; request.onerror = () => reject(request.error); };
-  }));
+  return page.evaluate(async () => {
+    const rows = await new Promise<JournalRecord[]>((resolve, reject) => {
+      const opening = indexedDB.open('dali-account-recovery-v1'); opening.onerror = () => reject(opening.error);
+      opening.onsuccess = () => {
+        const db = opening.result; const tx = db.transaction('journal');
+        const request = tx.objectStore('journal').getAll();
+        tx.oncomplete = () => { db.close(); resolve(request.result); };
+        tx.onabort = () => { db.close(); reject(tx.error); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+      };
+    });
+    // Compare every stored field and exact bytes, including scope and coverage metadata.
+    return Promise.all(rows.sort((a, b) => a.id.localeCompare(b.id)).map(async row => ({
+      ...row, data: Array.from(row.data instanceof Blob ? new Uint8Array(await row.data.arrayBuffer()) : row.data),
+    })));
+  });
 }
 
 test('@04-15-01 representative restored canvas hydrates native shapes hierarchy frame connector and original images in cold browsers', async ({ browser, baseURL }, testInfo) => {
@@ -137,13 +149,34 @@ test('@04-12-02 selected native restore reopens cold authorized content and quar
     }
     await context.setOffline(false); await signIn(context, 'owner'); await page.reload();
     await expect(page.getByText('The server copy changed after a restore.', { exact: false })).toBeVisible();
-    expect(await journal(page)).toEqual(retained);
+    const quarantined = await journal(page);
+    // The first committed row is an early retention baseline. Native editing can
+    // capture further updates while the original tab remains open before quarantine.
+    for (const original of retained) expect(quarantined.find(row => row.id === original.id)).toEqual(original);
+    expect(quarantined.length).toBeGreaterThanOrEqual(retained.length);
+    for (const row of quarantined) {
+      expect(row).toMatchObject({ accountId: member.accountId, boardId: board.summary.id, epoch, recoveryEpoch: epoch });
+      expect([board.rootDocId, board.contentDocId]).toContain(row.resource);
+      expect(row.kind).toBe('document'); expect(row.data.length).toBeGreaterThan(0);
+    }
+    const browserWrites: { path: string; epoch: string | undefined }[] = [];
+    page.on('request', request => {
+      const path = new URL(request.url()).pathname;
+      if (path.startsWith(`/api/boards/${board.summary.id}`) &&
+          ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method()) && !path.endsWith('/pull')) {
+        browserWrites.push({ path, epoch: request.headers()['x-dali-recovery-epoch'] });
+      }
+    });
     const stale = await context.request.post(`/api/boards/${board.summary.id}/docs/${board.contentDocId}/push`, { headers: { ...headers, 'Content-Type': 'application/octet-stream' }, data: Buffer.from([0, 0]) });
     expect(stale.status()).toBe(409); expect((await stale.json()).code).toBe('RECOVERY_EPOCH_MISMATCH');
+    expect(browserWrites).toEqual([]);
     await page.getByRole('button', { name: 'Open restored board', exact: true }).click();
     await expect(page.locator('affine-edgeless-note')).toContainText('Restored synthetic canary');
-    expect(await snapshot(page)).toEqual(before); expect(await journal(page)).toEqual(retained);
+    expect(await snapshot(page)).toEqual(before); expect(await journal(page)).toEqual(quarantined);
+    expect(browserWrites.filter(request => request.epoch !== service.currentEpoch())).toEqual([]);
     await expect.poll(async () => (await service.completeSets()).filter(set => set.manifest.epoch === service.currentEpoch()).length).toBeGreaterThan(initialCurrentCount);
+    expect(await journal(page)).toEqual(quarantined);
+    expect(browserWrites.filter(request => request.epoch !== service.currentEpoch())).toEqual([]);
     service.openIngress(); expect((await fetch(service.origin + '/api/session')).status).toBe(401);
     const disasterMs = Date.now() - incidentStarted;
     const conservativeLossWindowMs = incidentStarted - selected.manifest.recoveryPointAt;

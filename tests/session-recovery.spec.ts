@@ -193,7 +193,16 @@ test('@03-10-02 explicit logout quota failure retains tab and only sends logout 
   await page.evaluate(() => { const put = IDBObjectStore.prototype.put; Object.assign(window, { restoreJournal: () => { IDBObjectStore.prototype.put = put; } }); IDBObjectStore.prototype.put = function (...args) { if (this.transaction.db.name.startsWith('dali-account-recovery')) throw new DOMException('Synthetic quota', 'QuotaExceededError'); return put.apply(this, args); }; });
   let logout = 0; page.on('request', request => { if (request.url().endsWith('/api/logout')) logout++; });
   await page.locator('.board-account summary').click(); await page.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Retry preservation', exact: true })).toBeVisible(); expect(logout).toBe(0);
+  const retry = page.getByRole('button', { name: 'Retry preservation', exact: true });
+  const leave = page.getByRole('dialog', { name: 'Leave with changes waiting to save?', exact: true });
+  // A final native capture can discover quota failure before sign-out is clicked.
+  // Honor the ordinary pending-work confirmation before testing preservation.
+  await expect(retry.or(leave)).toBeVisible();
+  if (await leave.isVisible()) {
+    expect(logout).toBe(0);
+    await leave.getByRole('button', { name: 'Leave board', exact: true }).click();
+  }
+  await expect(retry).toBeVisible(); expect(logout).toBe(0);
   await page.evaluate(() => (window as unknown as { restoreJournal(): void }).restoreJournal());
   await page.getByRole('button', { name: 'Retry preservation', exact: true }).click();
   await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible(); expect(logout).toBe(1);

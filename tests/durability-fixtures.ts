@@ -1,3 +1,4 @@
+import { proxyApplicationAssets } from '../server/testing/application-assets.js';
 import { fork, type ChildProcess } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { mkdtemp, mkdir, rm, readdir } from 'node:fs/promises';
@@ -33,6 +34,7 @@ export async function createRestoreService(assets: string, intervalMs = 1000, co
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',
     DALI_BACKUP_DIRECTORY: backups, DALI_BACKUP_INDEPENDENT_STORAGE: 'true', DALI_BACKUP_INTERVAL_MS: String(intervalMs) };
   let ingress = true; let app: Awaited<ReturnType<typeof buildApp>>;
+  let closeAssets: (() => void) | undefined;
   let backupClockOffset = 0;
   let controlledScheduler: BackupScheduler | undefined;
   async function start() {
@@ -46,7 +48,7 @@ export async function createRestoreService(assets: string, intervalMs = 1000, co
       await controlledScheduler.start();
     }
     app.addHook('onRequest', async (request, reply) => { if (!ingress && request.headers['x-synthetic-operator'] !== operatorToken) return reply.code(503).send({ code: 'SYNTHETIC_MAINTENANCE' }); });
-    app.get('/*', async (request, reply) => { const response = await fetch(assets + request.url); return reply.type(response.headers.get('content-type') ?? 'text/html').send(Buffer.from(await response.arrayBuffer())); });
+    closeAssets = proxyApplicationAssets(app, assets);
     await app.listen({ host: '127.0.0.1', port });
   }
   await start();
@@ -57,10 +59,10 @@ export async function createRestoreService(assets: string, intervalMs = 1000, co
     async backup() { const selected = await publishBackup({ database, destination: { directory: backups, independentStorage: true }, applicationVersion: '0.1.0' });
       const backup = join(backups, selected.id); return { ...selected, backup, manifestDigest: await backupDigest(join(backup, 'manifest.json')) }; },
     async plannedRestart() {
-      ingress = false; await app.close(); database.close(); database = openDatabase(sourceDatabase); await start();
+      ingress = false; closeAssets?.(); await app.close(); database.close(); database = openDatabase(sourceDatabase); await start();
     },
     async restore(selected: { backup: string; manifestDigest: string }, revoke?: { boardId: string; memberId: string }, loseOwnedLiveStorage = false): Promise<RestoreReport> {
-      ingress = false; await app.close(); database.close();
+      ingress = false; closeAssets?.(); await app.close(); database.close();
       if (loseOwnedLiveStorage) for (const entry of await readdir(old)) await rm(join(old, entry), { force: true });
       await restoreBackup({ backup: selected.backup, expectedManifestDigest: selected.manifestDigest, destination: fresh, sourceDatabase,
         maintenanceConfirmed: true, fencing: { method: 'writer-stopped', evidence: 'Synthetic app close awaited; owned SQLite connection closed' } });
@@ -76,7 +78,7 @@ export async function createRestoreService(assets: string, intervalMs = 1000, co
     async completeSets() { return inspectBackupSet({ directory: backups, independentStorage: true }); },
     currentEpoch() { return readRecoveryEpoch(database); },
     openIngress() { if (getBackupHealth(database).state !== 'healthy') throw new Error('Verified fresh coverage required'); ingress = true; },
-    async close() { await app?.close(); await controlledScheduler?.close(); if (database.open) database.close(); await provider.close(); await rm(directory, { recursive: true, force: true }); },
+    async close() { closeAssets?.(); await app?.close(); await controlledScheduler?.close(); if (database.open) database.close(); await provider.close(); await rm(directory, { recursive: true, force: true }); },
   };
 }
 

@@ -56,8 +56,10 @@ for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses n
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [1440, 900, 600, 490, 320]) {
     await page.setViewportSize({ width, height: 800 });
-    const bounds = await page.getByRole('dialog', { name: 'Save details' }).boundingBox();
-    expect(bounds!.width).toBeLessThanOrEqual(width); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+    await expect.poll(async () => {
+      const bounds = await page.getByRole('dialog', { name: 'Save details' }).boundingBox();
+      return !!bounds && bounds.width <= width && bounds.x >= 0 && bounds.x + bounds.width <= width;
+    }).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect((await page.getByRole('banner').boundingBox())!.height).toBeLessThan(300);
     await expect(page.getByRole('button', { name: 'Retry saving', exact: true })).toBeInViewport();
@@ -107,6 +109,8 @@ test('@04-04-03 loading respects intervening user focus and opens a valid empty 
   await page.reload(); await expect(page.getByText('Opening board…', { exact: true })).toBeVisible();
   await page.evaluate(() => { const button = document.createElement('button'); button.id = 'synthetic-focus-target'; button.textContent = 'Synthetic focus target'; document.body.append(button); });
   await page.getByRole('button', { name: 'Synthetic focus target', exact: true }).click();
+  await page.getByRole('button', { name: 'Synthetic focus target', exact: true }).focus();
+  await expect(page.getByRole('button', { name: 'Synthetic focus target', exact: true })).toBeFocused();
   release(); await expect(page.locator('editor-host')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Synthetic focus target', exact: true })).toBeFocused();
   await expect(page.locator('affine-edgeless-note')).toHaveCount(0);
@@ -207,9 +211,10 @@ for (const failure of ['denied', 'expired', 'different-account'] as const) test(
   await page.addInitScript(() => { const open = indexedDB.open.bind(indexedDB); Object.assign(window, { recoveryReads: 0 }); indexedDB.open = (...args) => { if (args[0].startsWith('dali-account-recovery')) (window as unknown as { recoveryReads: number }).recoveryReads++; return open(...args); }; });
   if (failure === 'denied') await page.route('**/api/boards/' + descriptor.summary.id, route => route.fulfill({ status: 404, json: { code: 'BOARD_UNAVAILABLE' } }));
   else {
-    let sessions = 0;
     await page.route('**/api/session', route => {
-      if (++sessions === 1) return route.continue();
+      // Fail the scoped recovery reauthorization, independently of initial
+      // authentication and development Strict Mode's cancelled requests.
+      if (route.request().headers()['x-dali-account'] !== member.accountId) return route.continue();
       return failure === 'expired' ? route.fulfill({ status: 401, json: { code: 'SESSION_EXPIRED' } }) : route.fulfill({ status: 200, json: { ...member, accountId: 'synthetic-other-account' } });
     });
   }
