@@ -112,7 +112,7 @@ covered_files:
   - "tsconfig.blocksuite-paths.json"
   - "tsconfig.json"
   - "vite.config.ts"
-covered_digest: v1:sha256:c6e622266f2ef590c0c70d228e71214fbb9284d3c3e84e5b12502d0204b8e3ea
+covered_digest: v1:sha256:b6bf65f3acfc5d468ab86e06fe2870a5c72b577884842fad7743276f80017909
 refresh_source_head: 5aefe81d00ca618c2985c8a4801131cdcb6044e6
 refresh_browser_passed: 1960
 ---

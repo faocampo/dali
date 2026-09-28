@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Durable Boards and Recovery
-current_plan: 15
-status: needs_human
-stopped_at: Prerequisite regression retry ceiling; full run 1958 passed and 2 failed; corrected fixtures pass 30 focused cases
-last_updated: "2026-09-28T07:04:29Z"
+current_plan: 16
+status: in_progress
+stopped_at: Prerequisite gate passed; 04-15 reconciled; executing final UI acceptance plan 04-16
+last_updated: "2026-09-28T14:45:49Z"
 last_activity: 2026-09-28
-last_activity_desc: Full prerequisite run completed; two Firefox fixture races fixed; both static checks and 30 focused browser cases pass; full corrected gate pending
-state_head: 348de1859bf1065ca6e01d2949b907db4203fe90
+last_activity_desc: Full browser gate 1960/1960; local recovery plan complete; final UI acceptance underway
+state_head: 5aefe81
 progress:
   total_phases: 13
   completed_phases: 3
   total_plans: 42
-  completed_plans: 40
+  completed_plans: 41
   percent: 23
 ---
 
@@ -30,26 +30,19 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
-Phase: 04 (Durable Boards and Recovery) — Wave 9 local Kubernetes validation completed; native Viewer finding fixed in local restored-fixture regression
-Current Plan: 15
+Phase: 04 (Durable Boards and Recovery) — Wave 9 complete within accepted local scope; final UI acceptance underway
+Current Plan: 16
 Total Plans in Phase: 16
-Status: needs_human; 14/16 plans complete; 04-15 tasks 1 and 3 complete; task 2 local API drill passed, native Viewer regression passed; final acceptance reconciliation pending; storage/capacity deferred to 999.6
-Next action: Review the prerequisite retry ceiling and resume the corrected full gate before 04-15 reconciliation and 04-16; storage/capacity remains deferred to 999.6
-Last activity: 2026-09-27 — Local kind setup, deployment and recovery drill passed; 50 boards and 143,329,267 image bytes verified. Restore-to-usable API 116.952 seconds. Freshness recovery passed in three browser engines. Cold native read-only rendering now passes six scenarios across three engines using fresh local restored fixtures. See [local validation](phases/04-durable-boards-and-recovery/04-LOCAL-KUBERNETES-VALIDATION.md) (measurements, limits and finding). Requirements remain unaccepted.
+Status: in_progress; 15/16 plans complete. Independent storage/capacity remains deferred to 999.6.
+Next action: Execute 04-16 UI matrix, reconcile final evidence and retain actual native/manual acceptance gates.
+Last activity: 2026-09-28 — The full browser gate at `5aefe81` passed 1,960/1,960 with zero failures or skips. Standalone access passed 126/126; both typechecks pass. Phase 1–3 canonical verification is fresh. Plan 04-15 is reconciled with accepted local drill measurements, fixed restored Viewer behavior and explicit infrastructure deferral.
 
-Progress: [██░░░░░░░░] 23% (3/13 phases complete; 40/42 currently planned plans complete; later phases remain unplanned)
+Progress: [██░░░░░░░░] 23% (3/13 phases complete; 41/42 currently planned plans complete; later phases remain unplanned)
 
-## Active prerequisite verification refresh
+## Active verification
 
-The latest full browser run on `5388e7b` completed: **1,958 passed, two failed, zero skipped**. Development Chromium, production Chromium, WebKit and the access project passed completely. Two Firefox account-transition fixture races were corrected in `348de18`; **20 focused cases across four projects and 10 repeated Firefox cases pass**, as do both TypeScript checks. The unchanged application source passed 233 client unit and 311 serialized server tests. The original cold restored Viewer defect passes all six production-engine scenarios.
+The corrected prerequisite gate is **passed**. The two fixture corrections in `5aefe81` passed 56 focused/repeated browser cases before the complete 1,960-case run. Unchanged application source retains its recorded 233 unit and 311 serialized server passes. The retained Kubernetes image was not redeployed; its operational measurements retain their original revision scope. Current native Viewer evidence uses fresh real restore fixture services with production frontend assets. See [04-PREREQUISITE-REFRESH.md](phases/04-durable-boards-and-recovery/04-PREREQUISITE-REFRESH.md) (failed history, corrections and final passing result) and [04-15-SUMMARY.md](phases/04-durable-boards-and-recovery/04-15-SUMMARY.md) (local acceptance and deferrals).
 
-Canonical Phase 1–3 verification remains stale pending a successful full gate on the corrected revision. The autonomous retry ceiling has been reached after repeated failed full-gate attempts; status is **needs_human**. See [04-PREREQUISITE-REFRESH.md](phases/04-durable-boards-and-recovery/04-PREREQUISITE-REFRESH.md) (complete results, corrections and retry history). No later phase has started.
-
-## Needs Human
-
-| Phase | State | Resume |
-|---|---|---|
-| 04 | needs_human — prerequisite full-regression retry ceiling; latest failures corrected and focused checks pass | Review retry history, then `$gsd-autonomous --from 4` to run the corrected full gate before acceptance reconciliation |
 
 ## Performance Metrics
 
@@ -218,6 +211,18 @@ Phase 2 was tested and approved on 2026-09-15. Canonical phase verification reco
 
 260915-u2a delivers editable stars, arrows and classical polygons, expanding Shapes to 16 choices. It also updates the supplied symbol/favicon assets, reflows connector labels with preserved Undo/Redo, and removes informational-only selection inspectors. Validation: 79 unit tests and 119 distinct browser/project cases passed across focused runs, with TypeScript and production build passing. See [summary](quick/260915-u2a-refine-dal-branding-connector-labels-sel/260915-u2a-SUMMARY.md) (implementation and validation evidence).
 
-## Latest prerequisite continuation
+## Historical prerequisite continuation
 
 `5781eaf` fixes deferred native measurement after read-only/detached transitions; `5388e7b` shares WebKit process isolation across recovery suites. The full run passed both corrected behaviors and the restored Viewer scenarios. `348de18` corrects the final two Firefox fixture races and passes 30 focused/repeated cases. Full corrected-revision acceptance remains pending at the autonomous retry ceiling; Phase 4 stays at 14/16.
+
+## Historical autonomous resume — 2026-09-28
+
+The user explicitly resumed `$gsd-autonomous --from 4` after reviewing the retry checkpoint. The prior needs_human halt is superseded for this resumed run; its evidence remains historical. A fresh retry budget applies. The corrected standalone access gate and full browser gate run sequentially on `e6466eb` (application/test source `348de18`). Canonical prerequisite verification remains stale until those gates pass. Existing deferrals and unrelated changes remain preserved.
+
+### Resumed gate result
+
+Standalone access passed **126/126**. The resumed full run at `e6466eb` was stopped after Firefox failures: **1,398 passed, two failed, one interrupted, 559 not run**. Development and production Chromium passed completely. Firefox failures concern native image hydration racing the retry fixture and an expected stale-source cancellation during intentional identity replacement. The interrupted WebKit case is not recorded as an observed product failure. Diagnostic image tracing reproduced the race (four passes, one failure); a native-error barrier is under repeated validation. Phase 4 acceptance remains pending.
+
+## Current autonomous continuation
+
+The passing full gate supersedes the preceding failed/in-progress entries. Plan 04-15 is committed complete; 04-16 is executing inline under the GSD skill. No Phase 4 requirement is marked accepted yet. Native zoom/navigation-warning observation and seven individual prohibition judgments retain their final-verification dispositions.

@@ -172,7 +172,7 @@ Plans:
 - [x] 03-09-PLAN.md — Enforce native read-only editing and permitted viewer exports.
 - [x] 03-10-PLAN.md — Preserve interrupted work and isolate account recovery.
 
-**Wave 10** *(blocked on Wave 9 completion)*
+**Wave 10** *(in progress)*
 
 - [x] 03-11-PLAN.md — Copy selected browser-local work into private account boards.
 
@@ -236,13 +236,13 @@ Plans:
 
 - [x] 04-08-PLAN.md — Preserve title intent and warn before leaving unresolved saving
 
-**Wave 9** *(tasks 04-15-01 and 04-15-03 complete; local API recovery passed; native Viewer regression fixed; final acceptance pending; storage/capacity validation deferred to 999.6)*
+**Wave 9** *(complete within accepted local scope; independent storage/capacity deferred to 999.6)*
 
-- [ ] 04-15-PLAN.md — Measure independent storage-loss recovery, operational targets and browser recovery after backup fencing
+- [x] 04-15-PLAN.md — Measure independent storage-loss recovery, operational targets and browser recovery after backup fencing
 
-Task 1 representative restore and task 3 cross-browser freshness recovery passed. Task 2 local Kubernetes API recovery passed for 50 boards and 50 images; native cold read-only rendering now passes six local restored-fixture scenarios across three engines; final acceptance reconciliation remains; independent storage/capacity validation is deferred by the user to backlog 999.6. See [04-15-CHECKPOINT.md](phases/04-durable-boards-and-recovery/04-15-CHECKPOINT.md) (required environment and resume point). Plan remains incomplete.
+All three tasks are complete within the accepted local scope. The local Kubernetes API drill covers 50 boards and 50 images; the corrected cold Viewer regression passes six scenarios across three production engines. The full prerequisite browser gate passes 1,960/1,960 at `5aefe81`. Independent storage/capacity remains deferred to 999.6. See [04-15-SUMMARY.md](phases/04-durable-boards-and-recovery/04-15-SUMMARY.md) (scope adjustment, evidence and retained cluster-image limits).
 
-**Wave 10** *(blocked on Wave 9 completion)*
+**Wave 10** *(in progress)*
 
 - [ ] 04-16-PLAN.md — Complete cross-browser recovery and source-mapped acceptance
 

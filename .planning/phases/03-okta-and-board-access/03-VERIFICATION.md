@@ -273,7 +273,7 @@ covered_files:
   - "tsconfig.server.json"
   - "vite.config.ts"
   - "vitest.server.config.ts"
-covered_digest: v1:sha256:3def03af53b5ecf9a78078c4319b7817958a1644775df70cd6cd43bf1c58b42f
+covered_digest: v1:sha256:6c44a40a2723d62170f6e711a9d59edcbfaf55549b4ab284914ae6576b021d81
 prohibitions:
   - statement: "Explicit Dali sign-out MUST NOT silently sign the member back in or terminate their provider-wide session."
     verification: test
