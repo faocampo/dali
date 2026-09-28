@@ -2,6 +2,9 @@
 phase: 03-okta-and-board-access
 verified: 2026-09-25
 status: passed
+refresh_status: needs_human
+candidate_worktree_changes: true
+candidate_source_head: 348de1859bf1065ca6e01d2949b907db4203fe90
 score: "5/5 approved Phase 3 requirements verified"
 historical_score: "99/104 at the original independent verification revision"
 behavior_unverified: 0
@@ -68,7 +71,6 @@ covered_files:
   - ".planning/phases/03-okta-and-board-access/03-VALIDATION.md"
   - ".planning/phases/03-okta-and-board-access/COVERAGE.md"
   - ".planning/phases/03-okta-and-board-access/deferred-items.md"
-  - ".planning/state.json"
   - "AGENTS.md"
   - "README.md"
   - "docs/access-acceptance.md"
@@ -291,6 +293,44 @@ prohibitions:
     flagged: false
     enforcement_evidence: []
     disposition: Scoped UAT privacy review and subsequent staged-content delta reviews; publication recheck remains required.
+---
+
+# Phase 3: regression refresh pending — 2026-09-27
+
+**Current refresh disposition: STALE — pending complete regression evidence.** The frontmatter verification date, status, score and digest retain the earlier acceptance record. They do not certify the current candidate. The canonical status remains stale while covered inputs differ; no new passing verdict or fingerprint has been issued.
+
+84 of 246 previously covered files changed since recorded baseline `63f352b`, including authenticated runtime, recovery epochs/journals, protected documents/images and Viewer initialization. These counts were collected before the current refresh corrections. All previously listed covered files exist. The seven accepted UAT items and three approved skips remain unchanged. Actual-provider acceptance stays deferred to backlog 999.4, spoken assistive-technology acceptance to 999.3, and optional local-copy acceptance remains waived. No additional native-environment observation is claimed.
+
+The current committed candidate is `e906986`; its complete regression gate is pending. Source review covered the cold Viewer title-projection correction and the corrections exposed during this refresh. `664122c` makes New available to eligible system members viewing a read-only source board; creation retains its active-scope guard and server identity/system-permission checks. `fca7d1e` lets the role-test setup explicitly accept the existing Account changed route after replacing synthetic identity cookies, while asserting the old editor is absent and retaining the independent owner request used for source-preservation checks.
+
+## Chronological refresh evidence
+
+Entries retain their original revision and observation time. The final prerequisite-refresh disposition below supersedes intermediate running or pending statements.
+
+- Both TypeScript checks passed. The orchestrator reported 195/195 unit tests passed on the initial candidate.
+- The first server attempt encountered sandbox loopback restrictions. A later parallel run reached 309 passes and one restore timeout at the default five-second limit; the isolated restore suite passed 11/11. The complete serialized server run passed 310/310 in 170.57 seconds. These are distinct attempts.
+- The first complete browser attempt stopped with 56 passed, one failed, one interrupted and 1,862 unrun cases. It exposed the New-board visibility regression. The correction passed 12 focused permission cases across development Chromium and production Chromium, Firefox and WebKit, plus both static checks.
+- The second complete browser attempt reached 66 passes before the role-fixture account-change setup failed. The explicit recovery-route correction passed eight focused Owner/Editor cases across those four projects.
+- The third complete browser attempt selected 1,920 cases and ended with 211 passed, three failed, one interrupted and 1,705 unrun. Subsequent test corrections updated stale save-status labels, the storage-pause recovery flow and the explicit account-switch route while retaining behavioral assertions.
+- The targeted legacy regression rerun passed 22/24 cases. The two WebKit failures were strict page-error failures in image import and sticky-shadow reload tests; content assertions passed. Repeated diagnostic execution reproduced late document pushes after beforeunload and before pagehide, with the request signal still active.
+- Source tracing identified duplicate submission: recovery first acknowledged the captured native update, then the waiting native source submitted it again. The working-tree correction omits that second transport only when a fully integrated, confirmed Yjs snapshot covers the exact submitted operations and deletes, with current writable account/board/generation and unchanged recovery epoch. Unit coverage checks newer/independent operations, deletes, unresolved state, malformed input, normal submission fallback, and scope/epoch/abort rejection.
+- The orchestrator reported **206/206 unit tests**, both TypeScript checks and **10/10 repeated WebKit reload cases** passed with this correction, committed as `c52bf29`. The fourth complete browser attempt on that candidate ended with **323 passed, eight failed, one interrupted and 1,588 unrun**. Confirmed fixture/selector corrections preserve sharing epochs, scope mind-map alerts, compare settled save-state geometry and remove a race with automatic retry from the library acknowledgment check.
+- The 50-topic case reached its Saved checkpoint after completing its geometry assertions, then exposed a real replay backlog: approximately **4,144 journal rows / 256 KiB**, successful server responses, and repeated 30-second recovery timeouts. The correction committed as `635ce88` batches compatible document updates with bounded record/byte counts, atomically acknowledges exact captured IDs, merges checkpoint updates once per document, and coalesces status-preservation checks while retaining synchronous capture.
+- The orchestrator reported **214/214 unit tests** and successful focused 50-topic Saved/reload/exact-geometry checks in **all four browser projects**, each requiring fewer than 100 pushes: development Chromium 38.3 seconds, production Chromium 33.0 seconds, Firefox approximately 78 seconds, and WebKit 58.1 seconds. Both TypeScript checks and **48/48 focused correction cases across all four browser projects** passed. The fifth complete matrix on `635ce88` ended with **381 passed, three failed, one interrupted and 1,535 unrun**.
+- That attempt exposed two product gaps: the active Viewer branch hid the approved warning for retained pending changes, and generic navigation preservation could lose the explicit logout intent before the sign-out flow ran. The correction preserves ordinary read-only feedback, adds authorized account/board-scoped pending metadata with an explicit unavailable state, and delegates logout preservation to its owning flow while retaining leave confirmation and native warning behavior. Failed-replay assertions now use the current status label and a controlled acknowledgment barrier.
+- The orchestrator reported **44/44 Viewer and leave-navigation cases**, **12/12 session-recovery correction cases**, **218/218 unit tests**, and both TypeScript checks passed. Five new Viewer metadata cases increased the complete matrix to **1,940 cases**. The complete run on committed candidate `a3a8020` ended with **1,921 passed, 19 failed and zero skipped**, taking approximately **1.6 hours**. This is completed failing evidence; the regression refresh remains **STALE** pending correction and successful complete validation. Focused passes and earlier interrupted attempts are not combined into a complete-matrix pass.
+- The candidate now includes uncommitted fixture and test corrections: shared HTTP/WebSocket asset proxying for synthetic durability services; local-recovery geometry polling, scoped authorization checks and explicit keyboard focus; keyboard retry activation; and exact-byte retained-record checks with a separate restore-quarantine baseline. Their application does not establish passing runtime evidence. Firefox native lifecycle console errors and WebKit session-request access-control errors remain under diagnosis. The historical verification fields and canonical fingerprint remain unchanged.
+- The interim candidate head is `bf02db0`, with fixture and test changes still uncommitted. The orchestrator reported successful `npm run typecheck` and `npm run typecheck:server`, **219/219 unit tests across 20 files**, and **4/4 focused Firefox/WebKit recovery-keyboard cases**. A disposed/stale coordinator authorization regression was observed failing before the guard and passing afterward. These results establish targeted correction evidence only.
+- The **116-case cross-engine focused run** ended with **109 passed and seven failed**: four loading-focus fixture cases, one logout-confirmation branch, and two WebKit session-request errors after Saved. The focus correction retains a trusted click before explicitly focusing the target; the logout test accepts the existing leave confirmation before exercising preservation. The native document callback now recognizes exact previously acknowledged update coverage before starting recovery authorization, with active writable scope and unchanged epoch checks, while retaining fresh authorization for uncovered data.
+- The subsequent **36-case targeted run passed all 36 cases**, covering the remaining failures across all four browser projects plus durable restart and the different-account recovery case omitted from the earlier selection. Source corrections are committed in `69058bc` and fixture corrections in `e906986`, following `bf02db0`. The complete browser attempt on `e906986` stopped after **437 passed, two failed, one interrupted and 1,500 not run**, taking approximately **16.7 minutes**. Both static checks, **219/219 unit tests**, and **310/310 serialized server tests** passed on that candidate.
+- The two browser failures exposed title-revision freshness during native document commits and title-focus restoration after intervening editing. Subsequent uncommitted corrections address the keyboard event boundary, recovery completion status, scoped descriptor freshness, and proven own document revision transitions while preserving independent title conflicts. The orchestrator reported a subsequent **48/48 targeted pass** on the working fixes. Additional persistence-concurrency review and tests remain in progress. The required complete regression gate remains **pending**; no new complete-matrix pass or canonical fingerprint is recorded.
+
+- Corrections were committed at `d0958e1` after both static checks, **233/233 client unit tests** and **311/311 serialized server tests** passed. Storage-concurrency tests cover delayed and failed persistence plus another tab replacing a pending intent. Crash-boundary assertions now check transaction revision receipts. The complete **1,948-case browser matrix** is running on that unchanged source; no complete passing verdict is recorded yet.
+
+This section is a regression-refresh progress record. Historical audits, their revision-specific counts and accepted human dispositions remain below. Pending automated evidence does not reopen approved product scope or manufacture a new human acceptance requirement.
+
+The refreshed coverage inventory excludes `.planning/state.json` because it is mutable orchestration state rather than a semantic contract or implementation input. Phase plans/summaries, requirements, accepted UAT and source/test evidence remain covered. The old digest is intentionally retained until final evidence and canonical fingerprint generation.
+
 ---
 
 # Phase 3: approved-scope acceptance refresh
@@ -774,3 +814,17 @@ The parent reviewed the nine-file development correction at `2d0dae4` and refres
 Fresh evidence: four actual-command startup regression cases; 63 adjacent server tests; four existing development/production-preview sign-in and recovery cases; static checks, development compilation and a production build. The 1,533-case complete matrix, independent security review and UI review retain their original source scope at `7341672`; they are not represented as fresh full-suite reviews of this delta. The original verifier findings are retained, with all ten actual-provider/native/prohibition acceptance items still pending and status **human_needed (99/104)**. This delta was reviewed by the parent, separately from the earlier independent verifier.
 
 The refreshed digest covers the prior verification inventory plus the development launcher, regression test, configuration, startup documentation, resolved journal and UAT checklist. Runtime secrets, private board state, real screenshots and operator settings are excluded.
+
+## Revision d0958e1 broad-run outcome
+
+The complete-matrix attempt stopped after **1,810 passed, two failed and 136 not run** (approximately 1.5 hours). Firefox quota recovery completed its behavioral assertions but logged a deferred native measurement attempting a write after the store became read-only. WebKit stalled during `/auth/start` navigation in the final save-details case and reported an internal WebLoaderStrategy error; those suites bypassed the existing per-context WebKit lifecycle fixture. Both findings are being corrected and revalidated. This is incomplete failing evidence, and canonical verification remains stale.
+
+### Lifecycle correction follow-up
+
+`5781eaf` fences deferred native text measurements after read-only or detached transitions; deterministic red evidence reproduced the exact readonly exception and detached write. All **16 lifecycle/quota cases pass across four browser projects**, with writable measurement still verified. `5388e7b` shares existing WebKit process isolation with all recovery suites. A separate **65-consecutive-context authentication check passed** (39.4-second test body). Both static checks and 233 unit tests passed before these commits. The complete expanded browser gate is running on the unchanged implementation at `5388e7b`; prior failing runs remain historical and are not combined into a pass.
+
+## Final prerequisite-refresh disposition — 2026-09-28
+
+The complete browser run on `5388e7b` finished with **1,958 passed, two failed and zero skipped** across 1,960 selected cases. Both failures were synthetic account-transition fixture races in Firefox. Corrections in `348de18` pass **20 focused cases across four projects** plus **10 repeated Firefox cases**, with both TypeScript checks passing. Client units (233/233) and serialized server tests (311/311) passed on the unchanged application source. The restored Viewer regression passed in all three production engines.
+
+The autonomous retry ceiling is reached: **needs_human**. A passing full gate on the corrected test revision remains outstanding, so the historical acceptance and old covered digest are retained and canonical freshness remains stale. See [04-PREREQUISITE-REFRESH.md](../04-durable-boards-and-recovery/04-PREREQUISITE-REFRESH.md) (complete counts, corrections, failed attempts and resume boundary). Approved UAT dispositions and deferrals are unchanged.

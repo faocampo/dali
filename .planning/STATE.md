@@ -3,12 +3,12 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Durable Boards and Recovery
 current_plan: 15
-status: in_progress
-stopped_at: 04-15 Viewer regression fixed in three browsers; final acceptance reconciliation pending; storage/capacity deferred to 999.6
-last_updated: "2026-09-27T22:48:30.345340Z"
-last_activity: 2026-09-27
-last_activity_desc: WINDOWS 22 fixed; six restored Viewer scenarios pass; final plan acceptance pending
-state_head: c3cc75efd5f3b3680815fc4a7646bac77e1ab8ba
+status: needs_human
+stopped_at: Prerequisite regression retry ceiling; full run 1958 passed and 2 failed; corrected fixtures pass 30 focused cases
+last_updated: "2026-09-28T07:04:29Z"
+last_activity: 2026-09-28
+last_activity_desc: Full prerequisite run completed; two Firefox fixture races fixed; both static checks and 30 focused browser cases pass; full corrected gate pending
+state_head: 348de1859bf1065ca6e01d2949b907db4203fe90
 progress:
   total_phases: 13
   completed_phases: 3
@@ -33,11 +33,23 @@ Phase 3 is complete within approved scope. Its final source/test commit `63f352b
 Phase: 04 (Durable Boards and Recovery) — Wave 9 local Kubernetes validation completed; native Viewer finding fixed in local restored-fixture regression
 Current Plan: 15
 Total Plans in Phase: 16
-Status: 14/16 plans complete; 04-15 tasks 1 and 3 complete; task 2 local API drill passed, native Viewer regression passed; final acceptance reconciliation pending; storage/capacity deferred to 999.6
-Next action: Reconcile fixed WINDOWS 22 evidence, then complete 04-15 and 04-16; storage/capacity validation is deferred to backlog 999.6
+Status: needs_human; 14/16 plans complete; 04-15 tasks 1 and 3 complete; task 2 local API drill passed, native Viewer regression passed; final acceptance reconciliation pending; storage/capacity deferred to 999.6
+Next action: Review the prerequisite retry ceiling and resume the corrected full gate before 04-15 reconciliation and 04-16; storage/capacity remains deferred to 999.6
 Last activity: 2026-09-27 — Local kind setup, deployment and recovery drill passed; 50 boards and 143,329,267 image bytes verified. Restore-to-usable API 116.952 seconds. Freshness recovery passed in three browser engines. Cold native read-only rendering now passes six scenarios across three engines using fresh local restored fixtures. See [local validation](phases/04-durable-boards-and-recovery/04-LOCAL-KUBERNETES-VALIDATION.md) (measurements, limits and finding). Requirements remain unaccepted.
 
 Progress: [██░░░░░░░░] 23% (3/13 phases complete; 40/42 currently planned plans complete; later phases remain unplanned)
+
+## Active prerequisite verification refresh
+
+The latest full browser run on `5388e7b` completed: **1,958 passed, two failed, zero skipped**. Development Chromium, production Chromium, WebKit and the access project passed completely. Two Firefox account-transition fixture races were corrected in `348de18`; **20 focused cases across four projects and 10 repeated Firefox cases pass**, as do both TypeScript checks. The unchanged application source passed 233 client unit and 311 serialized server tests. The original cold restored Viewer defect passes all six production-engine scenarios.
+
+Canonical Phase 1–3 verification remains stale pending a successful full gate on the corrected revision. The autonomous retry ceiling has been reached after repeated failed full-gate attempts; status is **needs_human**. See [04-PREREQUISITE-REFRESH.md](phases/04-durable-boards-and-recovery/04-PREREQUISITE-REFRESH.md) (complete results, corrections and retry history). No later phase has started.
+
+## Needs Human
+
+| Phase | State | Resume |
+|---|---|---|
+| 04 | needs_human — prerequisite full-regression retry ceiling; latest failures corrected and focused checks pass | Review retry history, then `$gsd-autonomous --from 4` to run the corrected full gate before acceptance reconciliation |
 
 ## Performance Metrics
 
@@ -140,7 +152,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ### Pending Todos
 
-- Research and plan Phase 4 from its approved 04-CONTEXT.md: SAVE-01, SAVE-02, OPS-01 and OPS-02. Phase 4 plans remain to be created and checked.
+- Complete the corrected prerequisite regression gate, then reconcile 04-15 and execute the existing approved 04-16 plan.
 
 ### Blockers/Concerns
 
@@ -159,18 +171,18 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-09-26T20:58:19.120Z
-Stopped at: 04-15 Viewer regression fixed in three browsers; final acceptance reconciliation pending; storage/capacity deferred to 999.6
-Resume file: .planning/phases/04-durable-boards-and-recovery/04-15-CHECKPOINT.md
-Next action: `$gsd-execute-phase 4`
+Last session: 2026-09-28T07:04:29Z
+Stopped at: Prerequisite full-regression retry ceiling; latest fixture corrections validated; needs_human
+Resume file: .planning/phases/04-durable-boards-and-recovery/04-PREREQUISITE-REFRESH.md
+Next action: Review retry history, then `$gsd-autonomous --from 4`
 
 ## Phase 1 verification outcome
 
-Complete: five plans, five requirements, and four user-approved UAT checks. Current regression: 51 unit tests and 256 browser cases passed, with typecheck and production build passing. Canonical verification is refreshed; all 17 registered security threats are closed. Individual native OS steps were not separately reported, and that limit remains documented. Phase 2 plan 02-01 now supplies the native mind-map tracer and compatibility evidence.
+Complete: five plans, five requirements, and four user-approved UAT checks. Historical phase-acceptance regression: 51 unit tests and 256 browser cases passed, with typecheck and production build passing. Historical verification records all 17 registered security threats closed; current canonical freshness awaits the prerequisite gate. Individual native OS steps were not separately reported, and that limit remains documented. Phase 2 plan 02-01 now supplies the native mind-map tracer and compatibility evidence.
 
 ## Phase 2 verification outcome
 
-Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted UAT checklist items and six resolved reported gaps. User statement: "Phase 2 tested and approved." Current revision refresh passed 29 production Chromium cases, all 67 unit tests, TypeScript checks and the production build. Earlier broad and cross-browser runs retain their original revision scope. Individual native browser/OS/input details were not separately supplied; the approval is recorded at phase level. No Phase 2 acceptance blocker remains.
+Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted UAT checklist items and six resolved reported gaps. User statement: "Phase 2 tested and approved." Historical revision refresh passed 29 production Chromium cases, all 67 unit tests, TypeScript checks and the production build. Earlier broad and cross-browser runs retain their original revision scope. Individual native browser/OS/input details were not separately supplied; the approval is recorded at phase level. No Phase 2 acceptance blocker remains.
 
 ### Quick Tasks Completed
 
@@ -205,3 +217,7 @@ Phase 2 was tested and approved on 2026-09-15. Canonical phase verification reco
 ### Drawing palette follow-up complete
 
 260915-u2a delivers editable stars, arrows and classical polygons, expanding Shapes to 16 choices. It also updates the supplied symbol/favicon assets, reflows connector labels with preserved Undo/Redo, and removes informational-only selection inspectors. Validation: 79 unit tests and 119 distinct browser/project cases passed across focused runs, with TypeScript and production build passing. See [summary](quick/260915-u2a-refine-dal-branding-connector-labels-sel/260915-u2a-SUMMARY.md) (implementation and validation evidence).
+
+## Latest prerequisite continuation
+
+`5781eaf` fixes deferred native measurement after read-only/detached transitions; `5388e7b` shares WebKit process isolation across recovery suites. The full run passed both corrected behaviors and the restored Viewer scenarios. `348de18` corrects the final two Firefox fixture races and passes 30 focused/repeated cases. Full corrected-revision acceptance remains pending at the autonomous retry ceiling; Phase 4 stays at 14/16.
