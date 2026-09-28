@@ -46,7 +46,11 @@ function ImageRow({ row, scope, onSelect }: { row: ImageSaveRow; scope: AccessSc
 }
 
 export function saveDetailsCopy(status: LocalSaveStatus, snapshot?: SaveSnapshot, scope?: AccessScope | null) {
-  if (scope?.role === 'viewer' && scope.phase === 'active') return { label: 'Read only', message: 'You can view this board. Editing requires access from the board owner.' };
+  if (scope?.role === 'viewer' && scope.phase === 'active') {
+    if (scope.retainedPending === true) return { label: 'Your access has changed', message: 'Your access has changed. Pending changes have not been applied. Contact the board owner to restore editing access.' };
+    if (scope.retainedPending === 'unavailable') return { label: 'Recovery status unavailable', message: "You can view this board, but this browser could not check for pending changes. Keep this browser's data and reopen the board to check again." };
+    return { label: 'Read only', message: 'You can view this board. Editing requires access from the board owner.' };
+  }
   const recovery = scope?.recoveryState;
   if (recovery === 'storage-paused') return { label: 'Editing paused', message: "This browser cannot preserve more changes. Keep this tab open. Download a recovery copy, allow storage for this site, then retry saving." };
   if (recovery === 'epoch-mismatch') return { label: 'Recovery needs attention', message: 'The server copy changed after a restore. Pending changes have been kept separately. Download a recovery copy before continuing with the restored board.' };

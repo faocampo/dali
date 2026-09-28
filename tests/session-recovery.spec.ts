@@ -159,7 +159,7 @@ for (const access of ['viewer', 'revoked'] as const) test(`@03-10-02 ${access} r
   await page.clock.setFixedTime(new Date()); await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
   if (access === 'viewer') {
     await expect(page.locator('editor-host')).toBeVisible();
-    await page.getByRole('button', { name: 'Your access has changed', exact: true }).click();
+    await page.getByRole('button', { name: 'Your access has changed, Open save details', exact: true }).click();
     await expect(page.getByText('Your access has changed. Pending changes have not been applied. Contact the board owner to restore editing access.', { exact: true })).toBeVisible();
     expect(writes).toBe(0); expect(await records(page)).toEqual(pending);
     expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(serverBefore);
@@ -286,11 +286,18 @@ test('@03-10-03 long account recovery fits 490px and short viewport with reachab
 });
 test('@03-10-03 failed replay stays pending without resume and retries committed content', async ({ page }) => {
   const descriptor = await board(page); await text(page, 'Replay retry canary'); await expire(page);
-  await page.clock.setFixedTime(new Date()); await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_UNAVAILABLE' } }));
+  let unavailable = true; let release!: () => void;
+  const acknowledgment = new Promise<void>(resolve => { release = resolve; });
+  await page.clock.setFixedTime(new Date()); await page.route('**/docs/*/push', async route => {
+    if (unavailable) return route.fulfill({ status: 503, json: { code: 'SYNTHETIC_UNAVAILABLE' } });
+    await acknowledgment; await route.continue();
+  });
   await page.getByRole('button', { name: 'Sign in to continue', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Changes waiting to save', exact: true })).toBeVisible(); await expect(page.getByText('Editing resumed.', { exact: true })).toHaveCount(0); await expect(page.locator('editor-host')).toBeVisible();
-  expect((await records(page)).length).toBeGreaterThan(0); await page.unrouteAll({ behavior: 'ignoreErrors' });
-  await page.getByRole('button', { name: 'Changes waiting to save', exact: true }).click(); await page.getByRole('button', { name: 'Retry now', exact: true }).click();
+  const failed = page.getByRole('button', { name: 'Save failed, Open save details', exact: true });
+  await expect(failed).toBeVisible(); await expect(page.getByText('Editing resumed.', { exact: true })).toHaveCount(0); await expect(page.locator('editor-host')).toBeVisible();
+  expect((await records(page)).length).toBeGreaterThan(0);
+  await failed.click(); unavailable = false;
+  await page.getByRole('button', { name: 'Retry now', exact: true }).click(); release();
   await expect.poll(async () => (await records(page)).length).toBe(0); expect(await model(page)).toContain('Replay retry canary');
   const independent = await page.request.get(origin + '/api/boards/' + descriptor.summary.id + '/editable-export', { headers: { 'X-Dali-Account': accountId } }); expect(independent.status()).toBe(200);
 });

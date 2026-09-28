@@ -11,7 +11,7 @@ import { discardRecords } from './canvas/account/outbox';
 import { getSessionState, interruptSession, preserveBeforeNavigation, recoveryBoard, subscribeSession } from './auth/session';
 
 import { getAccountSaveSnapshot, subscribeSaveStatus } from './canvas/save-status';
-import { installBoardNavigationGuard, requestBoardNavigation, shouldWarnOnLeave } from './canvas/leave-policy';
+import { installBoardNavigationGuard, requestBoardNavigation, shouldWarnOnLeave, type NavigationOperation } from './canvas/leave-policy';
 import { LeaveRecoveryDialog } from './header/LeaveRecoveryDialog';
 
 function RecoveryDenied({ accountId, boardId }: { accountId: string; boardId: string }) {
@@ -93,26 +93,30 @@ export default function App() {
   const [intent, setIntent] = useState(() => accountIntent());
   const snapshot = useSyncExternalStore(subscribeSaveStatus, getAccountSaveSnapshot);
   const access = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
-  const [destination, setDestination] = useState<{ run: () => void | Promise<void>; origin: HTMLElement | null }>();
+  const [destination, setDestination] = useState<{ run: () => void | Promise<void>; origin: HTMLElement | null; operation: NavigationOperation }>();
   const pendingDestination = useRef(false); const navigating = useRef(false);
   const nativeNavigationApproved = useRef(false);
   const [leaving, setLeaving] = useState(false);
   const currentUrl = useRef(window.location.href);
   useEffect(() => { nativeNavigationApproved.current = false; }, [intent]);
-  const finish = async (run: () => void | Promise<void>, confirmed: boolean) => {
+  const finish = async (run: () => void | Promise<void>, confirmed: boolean, operation: NavigationOperation) => {
     if (navigating.current) return;
     navigating.current = true; nativeNavigationApproved.current = true; setLeaving(true);
     try {
-      if (await preserveBeforeNavigation(confirmed)) { await run(); currentUrl.current = window.location.href; }
+      // Sign-out owns preservation and retains its intent if storage needs retry.
+      if (operation === 'sign-out' || await preserveBeforeNavigation(confirmed)) {
+        await run(); currentUrl.current = window.location.href;
+        if (operation === 'sign-out' && getSessionState().phase !== 'signed-out') nativeNavigationApproved.current = false;
+      }
       else nativeNavigationApproved.current = false;
     } finally { navigating.current = false; pendingDestination.current = false; setLeaving(false); setDestination(undefined); }
   };
-  useEffect(() => installBoardNavigationGuard(run => {
+  useEffect(() => installBoardNavigationGuard((run, operation) => {
     if (pendingDestination.current || navigating.current) return;
     const scope = getActiveAccessScope();
     if (scope?.phase === 'active' && scope.role !== 'viewer' && shouldWarnOnLeave(getAccountSaveSnapshot(), scope.stalled)) {
-      pendingDestination.current = true; setDestination({ run, origin: document.activeElement instanceof HTMLElement ? document.activeElement : null });
-    } else void finish(run, false);
+      pendingDestination.current = true; setDestination({ run, operation, origin: document.activeElement instanceof HTMLElement ? document.activeElement : null });
+    } else void finish(run, false, operation);
   }), []);
   useEffect(() => {
     if (intent.kind !== 'board' || !access || access.role === 'viewer' || !shouldWarnOnLeave(snapshot, access.stalled)) return;
@@ -135,13 +139,16 @@ export default function App() {
       const link = event.composedPath().find(node => node instanceof HTMLAnchorElement) as HTMLAnchorElement | undefined;
       if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || link.target === '_blank' || link.hasAttribute('download') || getActiveAccessScope()?.phase !== 'active' || new URL(link.href).origin !== location.origin) return;
       event.preventDefault(); event.stopPropagation(); const href = link.href;
+      // Mouse activation does not focus links in every browser. The leave
+      // dialog must restore the actual trigger when the member stays.
+      link.focus({ preventScroll: true });
       requestBoardNavigation(() => go(href));
     };
     window.addEventListener('popstate', changed); document.addEventListener('click', clicked, true);
     return () => { window.removeEventListener('popstate', changed); document.removeEventListener('click', clicked, true); };
   }, []);
   const openBoards = () => requestBoardNavigation(() => { window.history.pushState(null, '', '/'); setIntent({ kind: 'home' }); });
-  return <><AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId + session.revision} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId + session.revision} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} signOut={async () => { requestBoardNavigation(signOut); }} /> : <BoardLibrary key={member.accountId + session.revision} member={member} signOut={signOut} />}</AuthBoundary>
-    {destination && <LeaveRecoveryDialog preserved={!!snapshot?.preserved} busy={leaving} onStay={() => { const origin = destination.origin; pendingDestination.current = false; setDestination(undefined); requestAnimationFrame(() => { if (origin?.isConnected) origin.focus(); }); }} onLeave={() => { void finish(destination.run, true); }} />}
+  return <><AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId + session.revision} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId + session.revision} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} signOut={async () => { requestBoardNavigation(signOut, 'sign-out'); }} /> : <BoardLibrary key={member.accountId + session.revision} member={member} signOut={signOut} />}</AuthBoundary>
+    {destination && <LeaveRecoveryDialog preserved={!!snapshot?.preserved} busy={leaving} onStay={() => { const origin = destination.origin; pendingDestination.current = false; setDestination(undefined); requestAnimationFrame(() => { if (origin?.isConnected) origin.focus(); }); }} onLeave={() => { void finish(destination.run, true, destination.operation); }} />}
   </>;
 }

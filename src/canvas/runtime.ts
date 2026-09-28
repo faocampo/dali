@@ -18,7 +18,7 @@ let preserveTitle: (() => Promise<void>) | undefined;
 export async function renameActiveBoard(title: string) { if (!captureTitle) throw new Error('Board access is unavailable'); await captureTitle(title); }
 
 export type BoardRole = BoardSummary['role'];
-export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; stalled?: boolean; title?: string }>;
+export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; retainedPending?: boolean | 'unavailable'; stalled?: boolean; title?: string }>;
 export type CanvasRuntime = { workspace: Workspace & Pick<BoardWorkspace, 'docSync' | 'waitForSynced'>; store: Store; descriptor: BoardDescriptor; scope: AccessScope; stopSaveStatus: () => void; dispose: () => void };
 let scope: AccessScope | null = null;
 let current: CanvasRuntime | null = null;
@@ -310,16 +310,27 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     },
   });
   requestAbort.signal.addEventListener('abort', () => coordinator.dispose(), { once: true });
-  const promise = coordinator.open().then(authority => {
+  const promise = coordinator.open().then(async authority => {
     if (!authority) { if (scope?.recoveryState === 'denied') throw new SourceAccessError(404); throw new Error('Board unavailable'); }
     if (scope?.recoveryState === 'denied' && authority.descriptor.summary.role !== 'viewer') throw new SourceAccessError(403);
     if (['corrupt', 'epoch-mismatch'].includes(scope?.recoveryState ?? '')) throw Object.assign(new Error('Recovery needs attention'), { recoveryState: scope!.recoveryState });
     // Once replay is acknowledged, ordinary server hydration owns freshness and
     // image loading/error feedback. Local hydration is reserved for pending work.
     if (scope?.recoveryState === 'saved') baseline = undefined;
+    if (!isCurrent() || requestAbort.signal.aborted || scope?.accountId !== authority.accountId || scope.boardId !== authority.descriptor.summary.id) throw new SourceAccessError(409);
+    let retainedPending: AccessScope['retainedPending'];
+    if (authority.descriptor.summary.role === 'viewer') {
+      // Inspect only metadata after fresh read authorization. Pending content
+      // remains isolated; a Viewer always hydrates the authorized server copy.
+      try {
+        const pending = await inspectPendingScopes(authority.accountId);
+        retainedPending = pending.some(row => row.accountId === authority.accountId && row.boardId === authority.descriptor.summary.id && row.count > 0);
+      } catch { retainedPending = 'unavailable'; }
+    }
+    if (!isCurrent() || requestAbort.signal.aborted || scope?.accountId !== authority.accountId || scope.boardId !== authority.descriptor.summary.id) throw new SourceAccessError(409);
     initializing = false;
     authorizedDescriptor = authority.descriptor;
-    publish({ ...scope!, role: authority.descriptor.summary.role, canWrite: !storagePaused && authority.descriptor.summary.role !== 'viewer' });
+    publish({ ...scope!, role: authority.descriptor.summary.role, canWrite: !storagePaused && authority.descriptor.summary.role !== 'viewer', retainedPending });
     return import('./account/board-workspace');
   }).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, descriptor: authorizedDescriptor, isCurrent, recoveryBaseline: baseline,
     // Workspace lifetime is distinct from request cancellation while preservation is pending.
