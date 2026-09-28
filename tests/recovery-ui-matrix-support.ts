@@ -52,12 +52,15 @@ export async function panelControls(page: Page, panel: Locator) {
   for (const button of await panel.getByRole('button').all()) await targetSize(button);
   const actions = panel.locator('.save-details-actions, .leave-recovery-actions');
   if (width <= 490 && await actions.count()) {
-    const parent = (await actions.boundingBox())!; let bottom = parent.y;
-    for (const button of await actions.getByRole('button').all()) {
-      const box = (await button.boundingBox())!;
-      expect(box.width).toBeGreaterThanOrEqual(parent.width - 2);
-      expect(box.y).toBeGreaterThanOrEqual(bottom - 1); bottom = box.y + box.height;
-    }
+    // Scrolling/reflow can move the panel between separate bounding-box reads.
+    await expect.poll(() => actions.evaluate(el => {
+      const parent = el.getBoundingClientRect(); let bottom = parent.top;
+      return [...el.querySelectorAll('button')].every(button => {
+        const box = button.getBoundingClientRect();
+        const valid = box.width >= parent.width - 2 && box.top >= bottom - 1;
+        bottom = box.bottom; return valid;
+      });
+    })).toBe(true);
   }
   if (await panel.locator('.save-details-heading').count()) {
     const header = (await page.locator('header.djai-header').boundingBox())!;

@@ -32,8 +32,8 @@ test('@04-07-02 fifty failed images and long labels fit every narrow and short v
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
     const header = await page.locator('.djai-header').boundingBox(); const box = await dialog.boundingBox(); expect(box!.y).toBeGreaterThanOrEqual(header!.y + header!.height - 1);
-    const last = dialog.getByRole('button', { name: `Select image: ${saveDetailsFixtures.name}`, exact: true }).last();
-    await last.scrollIntoViewIfNeeded(); await expect(last).toBeInViewport(); expect((await last.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    const last = dialog.getByRole('listitem').last();
+    await last.scrollIntoViewIfNeeded(); await expect(last).toBeInViewport(); expect((await last.boundingBox())!.height).toBeGreaterThan(0);
     await dialog.getByRole('button', { name: 'Download recovery copy' }).scrollIntoViewIfNeeded(); await expect(dialog.getByRole('button', { name: 'Download recovery copy' })).toBeInViewport();
   }
   await page.setViewportSize({ width: 320, height: 480 }); await dialog.evaluate(el => { el.scrollTop = 0; });
@@ -47,7 +47,7 @@ test('@04-07-02 rendered contrast typography and native visual viewport zoom pre
   await addStickyNote(page); await expect(saveTrigger(page)).toContainText('Save failed');
   const dialog = await openSaveDetails(page); await expect(dialog.locator('img')).toHaveCount(1);
   await expect(dialog.locator('img')).toHaveJSProperty('naturalWidth', 8);
-  await expect(dialog.getByRole('button', { name: 'Select image: <Synthetic> & image', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /Select image/ })).toHaveCount(0);
   const contrast = await dialog.evaluate(el => {
     const rgb = (s: string) => (s.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
     const luminance = (s: string) => rgb(s).map(n => n / 255).map(n => n <= .04045 ? n / 12.92 : ((n + .055) / 1.055) ** 2.4).reduce((sum, n, i) => sum + n * [.2126, .7152, .0722][i]!, 0);
@@ -83,7 +83,7 @@ test('@04-07-01 pending details preserve age and focus through acknowledgement a
   await openSaveDetails(page); await page.locator('.dali-menu-trigger').click(); await expect(dialog).toHaveCount(0);
 });
 
-test('@04-07-01 failed image rows retain focus during retry and select without mutation', async ({ page, baseURL }) => {
+test('@04-07-01 image rows retain focus during retry and close without mutation', async ({ page, baseURL }) => {
   await saveDetailsBoard(page, baseURL!); await addDetailImages(page, 2); await expect(saveTrigger(page)).toContainText('Saved');
   const key = await page.locator('editor-host').evaluate(el => ((el as EditorHost).store.getBlocksByFlavour('affine:image')[0]!.model.props as { sourceId: string }).sourceId);
   let fail = true; let held = 0; let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
@@ -100,8 +100,8 @@ test('@04-07-01 failed image rows retain focus during retry and select without m
   await expect.poll(() => held).toBe(1); await expect(retry).toBeFocused(); await expect(first).toContainText('Image not saved');
   await expect(dialog.getByRole('button', { name: 'Download recovery copy' })).toBeEnabled();
   release(); await expect(saveTrigger(page)).toContainText('Saved'); await expect(first).toContainText('Saved');
-  const before = await nativeRecoveryModel(page); await first.getByRole('button', { name: /Select image:/ }).click();
-  await expect(dialog).toHaveCount(0); await expect(page.locator('editor-host')).toBeFocused(); expect(await nativeRecoveryModel(page)).toBe(before);
+  const before = await nativeRecoveryModel(page); await dialog.getByRole('button', { name: 'Close save details' }).click();
+  await expect(dialog).toHaveCount(0); await expect(saveTrigger(page)).toBeFocused(); expect(await nativeRecoveryModel(page)).toBe(before);
 });
 
 test('@04-07-01 actual dialog download coalesces preparation and retains pending work', async ({ page, baseURL }) => {
@@ -130,13 +130,13 @@ test('@04-07-01 missing image preparation fails through dialog with retry availa
   expect(downloads).toHaveLength(0); await expect(dialog.getByRole('button', { name: 'Download recovery copy' })).toBeEnabled();
 });
 
-test('@04-07-01 removed image action is omitted until reference removal is acknowledged', async ({ page, baseURL }) => {
+test('@04-07-01 image removal remains pending until reference removal is acknowledged', async ({ page, baseURL }) => {
   await saveDetailsBoard(page, baseURL!); await addDetailImages(page); await expect(saveTrigger(page)).toContainText('Saved');
   await page.route('**/blobs/*', route => route.request().method() === 'GET' ? route.fulfill({ status: 503, json: { code: 'SYNTHETIC_IMAGE_FAILURE' } }) : route.continue());
   await page.reload(); await expect(saveTrigger(page)).toContainText('Image not saved'); const dialog = await openSaveDetails(page);
   const barrier = await documentResponseBarrier(page);
   await page.locator('editor-host').evaluate(el => { const store = (el as EditorHost).store; store.deleteBlock(store.getBlocksByFlavour('affine:image')[0]!.model); });
-  await expect.poll(barrier.held).toBeGreaterThan(0); await expect(dialog).toContainText('Image is no longer on this board.');
+  await expect.poll(barrier.held).toBeGreaterThan(0); await expect(dialog).toContainText('Removal is waiting to save.');
   await expect(dialog.getByRole('button', { name: /Select image:/ })).toHaveCount(0); expect(await dialog.getByRole('listitem').count()).toBeGreaterThan(0);
   await barrier.releaseAll(); await expect(dialog.getByRole('list')).toHaveCount(0);
 });

@@ -2,7 +2,8 @@
 import { BlockFlavourIdentifier } from '@blocksuite/affine/std';
 import type { GfxViewInteractionConfig } from '@blocksuite/affine/std/gfx';
 import { createIdentifier } from '@blocksuite/global/di';
-import { MindmapElementModel } from '@blocksuite/affine/model';
+import { canvasFonts, canvasFontFamilies } from './canvas-fonts';
+import { MindmapElementModel, FontWeight, FontStyle } from '@blocksuite/affine/model';
 import { ViewExtensionProvider, type ViewExtensionContext } from '@blocksuite/affine/ext-loader';
 import { ToolbarModuleIdentifier, type ToolbarModule, type ToolbarContext, type ToolbarGenericAction } from '@blocksuite/affine/shared/services';
 import { EdgelessCRUDIdentifier } from '@blocksuite/affine/blocks/surface';
@@ -25,7 +26,11 @@ const controlStyle = 'box-sizing:border-box;border:0;border-radius:6px;padding:6
 const stop = (event: Event) => event.stopPropagation();
 function typographyActions(kind: 'shape' | 'text'): ToolbarGenericAction[] {
   const klass = kind === 'shape' ? ShapeElementModel : TextElementModel;
-  const models = (ctx: ToolbarContext) => ctx.getSurfaceModelsByType(klass as typeof ShapeElementModel);
+  const models = (ctx: ToolbarContext) => {
+    // Track selection/model refreshes; the native helper reads this signal with peek().
+    void ctx.elementsMap$.value;
+    return ctx.getSurfaceModelsByType(klass as typeof ShapeElementModel);
+  };
   const apply = (ctx: ToolbarContext, props: Record<string, unknown>) => {
     if (ctx.store.readonly) return;
     ctx.store.captureSync();
@@ -39,9 +44,20 @@ function typographyActions(kind: 'shape' | 'text'): ToolbarGenericAction[] {
   return [...actions, {
     id: prefix + 'a.font',
     content: ctx => html`<select style=${controlStyle} class="dali-format-select" aria-label="Font" @pointerdown=${stop} @mousedown=${stop} @click=${stop} @input=${stop} @keydown=${stop}
-      @change=${(event: Event) => apply(ctx, { fontFamily: (event.target as HTMLSelectElement).value as FontFamily })}>
-      ${FontFamilyList.filter(([value]) => [FontFamily.Inter, FontFamily.Kalam].includes(value) || models(ctx)[0]?.fontFamily === value).map(([value, name]) => html`<option value=${value} ?selected=${models(ctx)[0]?.fontFamily === value}>${name}</option>`)}
+      @change=${(event: Event) => { const fontFamily = (event.target as HTMLSelectElement).value as FontFamily; const model = models(ctx)[0]; const faces = canvasFonts.filter(face => face.font === fontFamily); const match = faces.find(face => face.weight === model?.fontWeight && face.style === model?.fontStyle) ?? faces.find(face => face.weight === FontWeight.Regular && face.style === FontStyle.Normal); if (match) apply(ctx, { fontFamily, fontWeight: match.weight, fontStyle: match.style }); }}>
+      ${FontFamilyList.filter(([value]) => canvasFontFamilies.includes(value) || models(ctx)[0]?.fontFamily === value).map(([value, name]) => html`<option value=${value} ?selected=${models(ctx)[0]?.fontFamily === value}>${name}</option>`)}
     </select>`,
+  }, {
+    id: prefix + 'c.font-style',
+    content: ctx => {
+      const model = models(ctx)[0];
+      const faces = canvasFonts.filter(face => face.font === (model?.fontFamily ?? FontFamily.Inter));
+      const names: Record<string, string> = { '300': 'Light', '400': 'Regular', '500': 'Medium', '600': 'Semibold', '700': 'Bold' };
+      return html`<select style=${controlStyle} aria-label="Font style" ?disabled=${faces.length < 2} @pointerdown=${stop} @mousedown=${stop} @click=${stop} @keydown=${stop}
+        @change=${(event: Event) => { const face = faces.find(face => `${face.weight}:${face.style}` === (event.target as HTMLSelectElement).value); if (face) apply(ctx, { fontWeight: face.weight, fontStyle: face.style }); }}>
+        ${faces.map(face => html`<option value=${`${face.weight}:${face.style}`} ?selected=${face.weight === model?.fontWeight && face.style === model?.fontStyle}>${names[face.weight]}${face.style === FontStyle.Italic ? ' Italic' : ''}</option>`)}
+      </select>`;
+    },
   }, {
     id: prefix + 'd.font-size',
     content: ctx => html`<input style=${controlStyle + ";width:64px"} class="dali-font-size" aria-label="Font size" type="number" min="1" max="400" step="1" .value=${String(models(ctx)[0]?.fontSize ?? 16)}

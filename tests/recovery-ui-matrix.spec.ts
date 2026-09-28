@@ -11,7 +11,7 @@ import { addDetailImages, openSaveDetails, saveTrigger, saveDetailsFixtures } fr
 import { recoveryAuthorizationBarrier } from './recovery-archive-fixtures';
 import { acceptanceService } from './access-fixtures';
 import { libraryRecoveryMember, libraryRecoveryBoard, seedLibraryPending } from './library-recovery-fixtures';
-import { exactJournal, retainsRecords, panelControls, boardErrorLayout, textContrast, wrapsText, targetSize, selectedImage, holdDescriptor, failDetailsPreview, restoreDetailsPreview } from './recovery-ui-matrix-support';
+import { exactJournal, retainsRecords, panelControls, boardErrorLayout, textContrast, wrapsText, targetSize, holdDescriptor, failDetailsPreview, restoreDetailsPreview } from './recovery-ui-matrix-support';
 
 // Exact predicate text inserted from the approved UI-SPEC when preparing this draft.
 const predicates: Record<string, string> = {
@@ -22,7 +22,7 @@ const predicates: Record<string, string> = {
   "E2/empty": "Omit an empty image list; healthy details show the saved message and acknowledged time.",
   "E2/loading": "Update individual upload/retry rows in place without stealing focus or removing access to recovery download.",
   "E2/error": "Identify each failed image; keep its error until that required image is acknowledged or confirmed obsolete.",
-  "E2/populated": "Show stable image labels, available thumbnails, row status and permitted Select image actions.",
+  "E2/populated": "Show stable image labels, available thumbnails, row status without unrelated selection controls.",
   "E2/partial": "Use a neutral placeholder for missing previews; mixed success and failure retains unresolved rows.",
   "E2/overflow": "Use the Responsive Layout contract: viewport-clamped surfaces, vertical scrolling, reachable controls and no horizontal page overflow.",
   "E2/zero-one-many": "Omit zero-image sections, use singular/plural copy and vertically scroll the specified 50-row case.",
@@ -96,7 +96,7 @@ async function boundedPanel(page: Page, panel: Locator, action: Locator) {
 }
 async function longLabels(page: Page) {
   await expect(page.getByRole('button', { name: `Rename board: ${saveDetailsFixtures.title}`, exact: true })).toBeVisible();
-  await expect(details(page).getByRole('button', { name: `Select image: ${saveDetailsFixtures.name}`, exact: true }).first()).toBeVisible();
+  await expect(details(page).locator('.save-details-image-copy strong').first()).toHaveText(saveDetailsFixtures.name);
   await wrapsText(details(page).locator('.save-details-image-copy strong').first());
   await targetSize(page.getByRole('button', { name: `Rename board: ${saveDetailsFixtures.title}`, exact: true }));
   expect(await page.locator('.board-document-heading').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -223,10 +223,9 @@ test('@04-16 @04-ui-E2 individual image rows survive preview failure and acknowl
     await group('E2/populated', async () => {
       await page.keyboard.press('Escape'); await openSaveDetails(page);
       await expect(details(page).locator('img').first()).toHaveJSProperty('naturalWidth', 8);
-      const imageId = await page.locator('editor-host').evaluate(el => (el as EditorHost).store.getBlocksByFlavour('affine:image')[0]!.model.id);
-      const before = await nativeRecoveryModel(page); await details(page).getByRole('button', { name: /^Select image:/ }).first().click();
-      await expect(details(page)).toHaveCount(0); await expect(page.locator('editor-host')).toBeFocused(); expect(await nativeRecoveryModel(page)).toBe(before);
-      await selectedImage(page, imageId);
+      const before = await nativeRecoveryModel(page); await expect(details(page).getByRole('button', { name: /^Select image:/ })).toHaveCount(0); await details(page).getByRole('button', { name: 'Close save details' }).click();
+      await expect(details(page)).toHaveCount(0); await expect(saveTrigger(page)).toBeFocused(); expect(await nativeRecoveryModel(page)).toBe(before);
+
     });
   } finally { release(); await restoreDetailsPreview(page); }
 });
@@ -241,7 +240,7 @@ test('@04-16 @04-ui-E1 @04-ui-E2 details cardinality full labels and responsive 
     await page.route('**/blobs/*', route => route.request().method() === 'GET' ? route.fulfill({ status: 503, json: {} }) : route.continue());
     await page.reload(); await expect(saveTrigger(page)).toContainText('Image not saved'); dialog = await openSaveDetails(page);
     await expect(dialog.getByRole('heading', { name: '50 images', exact: true })).toBeVisible(); await expect(dialog.getByRole('listitem')).toHaveCount(50);
-    await dialog.getByRole('button', { name: /^Select image:/ }).last().scrollIntoViewIfNeeded(); await expect(dialog.getByRole('button', { name: /^Select image:/ }).last()).toBeInViewport();
+    await dialog.getByRole('listitem').last().scrollIntoViewIfNeeded(); await expect(dialog.getByRole('listitem').last()).toBeInViewport();
   });
   await group('E1/overflow', async () => {
     await boundedPanel(page, details(page), downloadButton(page));
@@ -255,7 +254,7 @@ test('@04-16 @04-ui-E1 @04-ui-E2 details cardinality full labels and responsive 
     }
   });
   await group('E1/long-text', async () => { await page.setViewportSize({ width: 320, height: 480 }); await longLabels(page); });
-  await group('E2/overflow', async () => { await boundedPanel(page, details(page), details(page).getByRole('button', { name: /^Select image:/ }).last()); await reducedMotion(page, details(page)); });
+  await group('E2/overflow', async () => { await boundedPanel(page, details(page), downloadButton(page)); await reducedMotion(page, details(page)); });
   await group('E2/long-text', async () => { await longLabels(page); expect(await details(page).evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true); });
 });
 

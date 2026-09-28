@@ -6,7 +6,7 @@ import { BoardBlobSource } from './account/blob-source';
 import * as Y from 'yjs';
 import { AccountJournal, replayJournal, requestRecoveryStorage, pendingRecords, readCheckpoint, validRecord, RecoveryStorageError, type ReplayObserver } from './account/outbox';
 import { RecoveryCoordinator, recoveryStorageFailure, type RecoveryStorageFailure, type RecoveryOutcome } from './account/recovery';
-import { RecoveryEpochError, SourceAccessError } from './account/doc-source';
+import { BoardDocSource, RecoveryEpochError, SourceAccessError } from './account/doc-source';
 import { acknowledgedUpdateCovered } from './account/acknowledged-update';
 import { interruptSession, revalidateSession } from '../auth/session';
 import { attachLocalCapture } from './account/local-capture';
@@ -289,6 +289,13 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     verify: async (authority, signal) => {
       const snapshot = getAccountSaveSnapshot();
       if (snapshot?.scope !== statusScope) return;
+      // Rebuild missing acknowledgment history from the server, never from a
+      // local checkpoint. Incremental replay alone may lack its base structs.
+      const documents = new BoardDocSource({ ...authority.descriptor, boardId: initial.boardId, accountId: initial.accountId, generation: initial.generation,
+        signal, isCurrent, fetch: options.fetch, onDocumentOutcome: documentOutcome });
+      for (const id of [authority.descriptor.rootDocId, authority.descriptor.contentDocId]) {
+        if (!covered(id)) await documents.pull(id, new Uint8Array([0]));
+      }
       const source = new BoardBlobSource({ ...authority.descriptor, boardId: initial.boardId, accountId: initial.accountId, generation: initial.generation,
         signal, isCurrent, fetch: options.fetch, onImageOutcome: (id, outcome, attempt) => imageOutcome(id, outcome === 'loaded' ? 'acknowledged' : outcome, attempt),
         onFetchedBlob: (id, value) => scopedJournal.cacheAsset(id, value) });

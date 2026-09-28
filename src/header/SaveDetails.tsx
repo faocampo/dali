@@ -1,7 +1,6 @@
 import { recoveryStorageMessage } from '../canvas/account/recovery';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { EditorHost } from '@blocksuite/affine/std';
-import { GfxControllerIdentifier, type GfxModel } from '@blocksuite/affine/std/gfx';
 import { getActiveAccessScope, getRecoveryRuntime, retryRecovery, type AccessScope } from '../canvas/runtime';
 import { downloadRecoveryCopy } from '../canvas/recovery-archive';
 import type { ImageSaveRow, LocalSaveStatus, RecoveryDownloadState, SaveSnapshot } from '../canvas/save-status';
@@ -14,19 +13,8 @@ function imageObject(id: string, scope: AccessScope) {
   const model = host?.store.getBlocksByFlavour('affine:image').find(({ model }) => (model.props as { sourceId?: string }).sourceId === id)?.model;
   return host && model ? { host, model } : undefined;
 }
-/** Selection is a presentation action and never updates the document. */
-export function selectRecoveryImage(id: string, scope: AccessScope) {
-  const found = imageObject(id, scope); if (!found) return false;
-  const gfx = found.host.std.get(GfxControllerIdentifier);
-  const model = gfx.getElementById<GfxModel>(found.model.id); if (!model) return false;
-  gfx.selection.set({ elements: [model.id], editing: false });
-  gfx.viewport.setCenter(model.x + model.w / 2, model.y + model.h / 2);
-  found.host.tabIndex = -1; found.host.focus({ preventScroll: true }); return true;
-}
-
-function ImageRow({ row, scope, onSelect }: { row: ImageSaveRow; scope: AccessScope; onSelect: () => void }) {
+function ImageRow({ row, scope }: { row: ImageSaveRow; scope: AccessScope }) {
   const [preview, setPreview] = useState<string>();
-  const found = imageObject(row.id, scope);
   useEffect(() => {
     let disposed = false; let url: string | undefined;
     if (scope.role === 'viewer' || !currentScope(scope)) return;
@@ -41,7 +29,7 @@ function ImageRow({ row, scope, onSelect }: { row: ImageSaveRow; scope: AccessSc
   return <li className="save-details-image">
     {preview ? <img src={preview} alt="" onError={() => setPreview(undefined)} /> : <span className="save-details-preview" aria-hidden="true">▧</span>}
     <div className="save-details-image-copy"><strong>{row.label}</strong><span>{({ waiting: 'Waiting to upload', uploading: 'Uploading…', failed: 'Image not saved', saved: 'Saved' })[row.state]}</span>
-      {found ? <button type="button" aria-label={`Select image: ${row.label}`} onClick={() => { if (selectRecoveryImage(row.id, scope)) onSelect(); }}>Select image</button> : <span>Image is no longer on this board.</span>}
+      {!row.required && <span>Removal is waiting to save.</span>}
     </div>
   </li>;
 }
@@ -57,7 +45,7 @@ export function saveDetailsCopy(status: LocalSaveStatus, snapshot?: SaveSnapshot
   if (recovery === 'epoch-mismatch') return { label: 'Recovery needs attention', message: 'The server copy changed after a restore. Pending changes have been kept separately. Download a recovery copy before continuing with the restored board.' };
   if (recovery === 'corrupt') return { label: 'Recovery needs attention', message: "These pending changes could not be opened safely. Keep this browser's data and contact your operator for recovery help." };
   if (status.state === 'saved') return { label: 'Saved', message: 'All changes and images are saved to the server.' };
-  if (status.state === 'failed') return { label: status.label, message: status.label === 'Save failed' && !snapshot?.title?.failed && !Object.values(snapshot?.images ?? {}).some(row => row.state === 'failed') ? "Some changes have not reached the server. We'll retry automatically. You can retry now or download a recovery copy." : status.message };
+  if (status.state === 'failed') return { label: status.label, message: status.label === 'Save failed' && !snapshot?.title?.failed && !Object.values(snapshot?.images ?? {}).some(row => row.state === 'failed') ? "We couldn't confirm that all board changes are saved. We'll retry automatically. You can retry now or download a recovery copy." : status.message };
   if (snapshot?.recovery === 'checking-access') return { label: 'Checking access…', message: 'Checking your access before recovering changes.' };
   if (snapshot?.retrying) return { label: 'Recovering changes…', message: 'Restoring changes kept in this browser and checking their save status.' };
   if (snapshot?.preserved || snapshot?.recovery === 'pending') return { label: 'Changes waiting to save', message: snapshot.preserved ? "Changes are kept in this browser. We'll retry automatically when the service is available." : 'Some changes have not reached the server. Keep this tab open while we check local recovery.' };
@@ -117,7 +105,7 @@ export function SaveDetails({ status, snapshot, scope, downloadStatus, trigger, 
     <div className="save-details-heading"><h2 ref={heading} id="save-details-heading" tabIndex={-1}>Save details</h2><button type="button" aria-label="Close save details" onClick={() => onClose(true)}>×</button></div>
     <p>{copy.message}</p>
     {scope?.role !== 'viewer' && <p className="save-details-time">{status.savedAt ? `Last saved to the server: ${new Date(status.savedAt).toLocaleString()}` : 'No server save confirmed yet.'}</p>}
-    {!!images.length && <section aria-label="Image save status"><h3>{images.length === 1 ? '1 image' : `${images.length} images`}</h3><ul>{images.map(row => <ImageRow key={row.id} row={row} scope={scope!} onSelect={() => onClose(false)} />)}</ul></section>}
+    {!!images.length && <section aria-label="Image save status"><p>Image uploads are tracked separately from board changes.</p><h3>{images.length === 1 ? '1 image' : `${images.length} images`}</h3><ul>{images.map(row => <ImageRow key={row.id} row={row} scope={scope!} />)}</ul></section>}
     {(busy || snapshot?.retrying) && <p>Retrying…</p>}
     {error && <p role="alert">{error}</p>}
     {permitted && downloadStatus && downloadStatus.phase !== 'idle' && <p className="save-details-download" role={downloadStatus.phase === 'error' ? 'alert' : undefined}>{downloadStatus.label}{downloadStatus.message && ` ${downloadStatus.message}`}</p>}

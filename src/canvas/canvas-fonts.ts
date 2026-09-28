@@ -4,11 +4,25 @@ import { IS_FIREFOX } from '@blocksuite/global/env';
 import inter from '../../node_modules/@toeverything/theme/fonts/inter/Inter-VariableFont_slnt,wght.ttf?url';
 import kalam from '../../node_modules/@toeverything/theme/fonts/kalam/Kalam-Regular.ttf?url';
 import kalamBold from '../../node_modules/@toeverything/theme/fonts/kalam/Kalam-Bold.ttf?url';
-const canvasFonts = [
+import lora from '../assets/fonts/lora/Lora[wght].ttf?url';
+import loraItalic from '../assets/fonts/lora/Lora-Italic[wght].ttf?url';
+import poppins from '../assets/fonts/poppins/Poppins-Regular.ttf?url';
+import poppinsBold from '../assets/fonts/poppins/Poppins-Bold.ttf?url';
+import poppinsItalic from '../assets/fonts/poppins/Poppins-Italic.ttf?url';
+import poppinsBoldItalic from '../assets/fonts/poppins/Poppins-BoldItalic.ttf?url';
+import bebas from '../assets/fonts/bebasneue/BebasNeue-Regular.ttf?url';
+import orelega from '../assets/fonts/orelegaone/OrelegaOne-Regular.ttf?url';
+export const canvasFonts = [
+  ...[FontWeight.Regular, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold].flatMap(weight => [FontStyle.Normal, FontStyle.Italic].map(style => ({ font: FontFamily.Lora, weight, style, url: style === FontStyle.Italic ? loraItalic : lora }))),
+  ...[FontWeight.Regular, FontWeight.Bold].flatMap(weight => [FontStyle.Normal, FontStyle.Italic].map(style => ({ font: FontFamily.Poppins, weight, style, url: weight === FontWeight.Bold ? (style === FontStyle.Italic ? poppinsBoldItalic : poppinsBold) : (style === FontStyle.Italic ? poppinsItalic : poppins) }))),
+  { font: FontFamily.BebasNeue, weight: FontWeight.Regular, style: FontStyle.Normal, url: bebas },
+  { font: FontFamily.OrelegaOne, weight: FontWeight.Regular, style: FontStyle.Normal, url: orelega },
   ...[FontWeight.Light, FontWeight.Regular, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold].flatMap(weight => [FontStyle.Normal, FontStyle.Italic].map(style => ({ font: FontFamily.Inter, weight, style, url: inter }))),
   { font: FontFamily.Kalam, weight: FontWeight.Regular, style: FontStyle.Normal, url: kalam },
   { font: FontFamily.Kalam, weight: FontWeight.Bold, style: FontStyle.Normal, url: kalamBold },
 ];
+
+export const canvasFontFamilies = [...new Set(canvasFonts.map(face => face.font))];
 
 let ready: Promise<void> | undefined;
 
