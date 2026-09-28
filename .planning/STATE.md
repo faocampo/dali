@@ -5,9 +5,9 @@ current_phase_name: Durable Boards and Recovery
 current_plan: 16
 status: in_progress
 stopped_at: Prerequisite gate passed; 04-15 reconciled; executing final UI acceptance plan 04-16
-last_updated: "2026-09-28T14:45:49Z"
+last_updated: "2026-09-28T18:41:31Z"
 last_activity: 2026-09-28
-last_activity_desc: Full browser gate 1960/1960; local recovery plan complete; final UI acceptance underway
+last_activity_desc: Completed quick task 260928-ljp; corner rotation and note palette; Phase 4 final acceptance remains incomplete
 state_head: 5aefe81
 progress:
   total_phases: 13
@@ -35,7 +35,7 @@ Current Plan: 16
 Total Plans in Phase: 16
 Status: in_progress; 15/16 plans complete. Independent storage/capacity remains deferred to 999.6.
 Next action: Execute 04-16 UI matrix, reconcile final evidence and retain actual native/manual acceptance gates.
-Last activity: 2026-09-28 — The full browser gate at `5aefe81` passed 1,960/1,960 with zero failures or skips. Standalone access passed 126/126; both typechecks pass. Phase 1–3 canonical verification is fresh. Plan 04-15 is reconciled with accepted local drill measurements, fixed restored Viewer behavior and explicit infrastructure deferral.
+Last activity: 2026-09-28 — Completed quick task `260928-ljp`: visible corner rotation and note-color selection (`0b35555`); 54/54 focused browser tests, 236/236 client unit tests, typecheck and production build passed. Phase 4 final acceptance remains incomplete; the prior broad run was interrupted with seven known assertion failures.
 
 Progress: [██░░░░░░░░] 23% (3/13 phases complete; 41/42 currently planned plans complete; later phases remain unplanned)
 
@@ -204,6 +204,7 @@ Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted
 | 260924-qq8 | Stable zoom, connector hints, color and text editing, creator ownership | 2026-09-24 | d071a44 | Complete | [Quick task](quick/260924-qq8-fix-zoom-menus-and-shortcuts-connector-h/260924-qq8-SUMMARY.md) |
 | 260924-roh | Draw text boxes, focus editing, reuse text format, waive optional-copy UAT | 2026-09-24 | f26bd35 | Complete | [Quick task](quick/260924-roh-draw-text-boxes-with-immediate-editing-a/260924-roh-SUMMARY.md) |
 | 260924-s1x | Replace local copying with file picker/drop import and verify recovery | 2026-09-24 | 07f3170 | Complete | [Quick task](quick/260924-s1x-replace-local-board-copying-with-file-se/260924-s1x-SUMMARY.md) |
+| 260928-ljp | Visible corner rotation and note-color palette | 2026-09-28 | 0b35555 | Complete | [Quick task](quick/260928-ljp-corner-rotation-and-note-color-selection/260928-ljp-SUMMARY.md) |
 
 Phase 2 was tested and approved on 2026-09-15. Canonical phase verification records the acceptance revision; subsequent quick tasks retain separate validation provenance. Quick task 260915-s9s passed 79 unit tests and 51 distinct browser/project cases across focused runs, with TypeScript checks and production build passing.
 
