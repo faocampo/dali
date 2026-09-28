@@ -26,17 +26,26 @@ coverage:
   - id: D-01
     description: Stable deliberate details activation, save age, focus return and live acknowledgment
     requirement: SAVE-02
-    verification: [{kind: integration, ref: "tests/save-details.spec.ts#@04-07-01", status: pass}]
+    verification:
+      - kind: integration
+        ref: "tests/save-details.spec.ts#@04-07-01"
+        status: pass
     human_judgment: false
   - id: D-02
     description: Coalesced retry and real recovery download success and failure retain pending records
     requirement: SAVE-02
-    verification: [{kind: integration, ref: "tests/save-details.spec.ts#@04-07-01", status: pass}]
+    verification:
+      - kind: integration
+        ref: "tests/save-details.spec.ts#@04-07-01"
+        status: pass
     human_judgment: false
   - id: D-03
-    description: Stable image labels, failures, previews and permitted selection
+    description: Stable image labels, failures and previews
     requirement: SAVE-02
-    verification: [{kind: integration, ref: "tests/save-details.spec.ts#@04-07-01", status: pass}]
+    verification:
+      - kind: integration
+        ref: "tests/save-details.spec.ts#@04-07-01"
+        status: pass
     human_judgment: false
 actuals:
   tokens: 30700
@@ -130,3 +139,7 @@ Context7 supplied React effect cleanup/stale-result guidance from React document
 ## Self-Check: PASSED
 
 All five plan artifacts exist; all four listed commits exist. Both tasks passed their exact selected native gates and static checks. Requirement acceptance remains pending at phase level.
+
+## Acceptance scope update — 2026-09-28
+
+The user requested removal of the Select image control and misleading image-presence message. Commit `9d4976b` implements that approved refinement; the save-status-and-font-controls quick summary records cross-browser validation. Earlier selection descriptions above document the original implementation and are superseded for current acceptance. Coverage metadata uses expanded mappings for compatibility with the GSD classifier.

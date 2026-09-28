@@ -4,15 +4,15 @@ current_phase: 04
 current_phase_name: Durable Boards and Recovery
 current_plan: 16
 status: in_progress
-stopped_at: Prerequisite gate passed; 04-15 reconciled; executing final UI acceptance plan 04-16
-last_updated: "2026-09-28T19:54:17Z"
+stopped_at: Verification gaps_found; seven judgments accepted; 04-17 gap closure ready
+last_updated: "2026-09-28T20:30:06.291787+00:00"
 last_activity: 2026-09-28
-last_activity_desc: Repaired and verified local board creation and deletion; Phase 4 final acceptance remains incomplete
+last_activity_desc: Seven judgments accepted; full gate 2029/2036 and focused gate 31/32; regression gap G-04-38 planned in 04-17
 state_head: 5aefe81
 progress:
   total_phases: 13
   completed_phases: 3
-  total_plans: 42
+  total_plans: 43
   completed_plans: 41
   percent: 23
 ---
@@ -30,14 +30,14 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
-Phase: 04 (Durable Boards and Recovery) — Wave 9 complete within accepted local scope; final UI acceptance underway
+Phase: 04 (Durable Boards and Recovery) — Wave 9 complete within accepted local scope; regression gap G-04-38 open
 Current Plan: 16
-Total Plans in Phase: 16
-Status: in_progress; 15/16 plans complete. Independent storage/capacity remains deferred to 999.6.
-Next action: Execute 04-16 UI matrix, reconcile final evidence and retain actual native/manual acceptance gates.
+Total Plans in Phase: 17
+Status: in_progress; 15/17 plans complete. Plan 16 awaits final acceptance; plan 17 closes the regression gap. Independent storage/capacity remains deferred to 999.6.
+Next action: Execute 04-17 gap closure: diagnose WebKit recovery focus, classify intermittent runtime errors, then pass the complete stable-source regression. User judgments and native checks remain accepted.
 Last activity: 2026-09-28 — Completed quick task `260928-ljp`: visible corner rotation and note-color selection (`0b35555`); 54/54 focused browser tests, 236/236 client unit tests, typecheck and production build passed. Phase 4 final acceptance remains incomplete; the prior broad run was interrupted with seven known assertion failures.
 
-Progress: [██░░░░░░░░] 23% (3/13 phases complete; 41/42 currently planned plans complete; later phases remain unplanned)
+Progress: [██░░░░░░░░] 23% (3/13 phases complete; 41/43 currently planned plans complete; later phases remain unplanned)
 
 ## Active verification
 

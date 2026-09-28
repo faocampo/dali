@@ -35,21 +35,31 @@ coverage:
     description: Durable title retries, cold reopen, receipt matching and revision/authority fencing
     requirement: SAVE-02
     verification:
-      - {kind: unit, ref: "src/canvas/account/title-intent.test.ts", status: pass}
-      - {kind: integration, ref: "tests/recovery-navigation.spec.ts#title outage; independent server title; late old title receipt", status: pass}
+      - kind: unit
+        ref: "src/canvas/account/title-intent.test.ts"
+        status: pass
+      - kind: integration
+        ref: "tests/recovery-navigation.spec.ts#title outage; independent server title; late old title receipt"
+        status: pass
     human_judgment: false
   - id: D-04
     description: Stay, Escape, explicit Leave, preserved markers and actual native reload warning
     requirement: SAVE-02
     verification:
-      - {kind: integration, ref: "tests/recovery-navigation.spec.ts#@04-08-02", status: pass}
-      - {kind: integration, ref: "tests/library-recovery.spec.ts#download then leave", status: pass}
+      - kind: integration
+        ref: "tests/recovery-navigation.spec.ts#@04-08-02"
+        status: pass
+      - kind: integration
+        ref: "tests/library-recovery.spec.ts#download then leave"
+        status: pass
     human_judgment: false
   - id: E5
     description: Safe focus, duplicate navigation suppression, local-storage loss copy and 320px containment
     requirement: SAVE-02
     verification:
-      - {kind: integration, ref: "tests/recovery-navigation.spec.ts#Stay and Escape; failed local title preservation", status: pass}
+      - kind: integration
+        ref: "tests/recovery-navigation.spec.ts#Stay and Escape; failed local title preservation"
+        status: pass
     human_judgment: false
 actuals:
   tokens: 19693

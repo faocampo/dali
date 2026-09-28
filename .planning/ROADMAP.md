@@ -245,6 +245,7 @@ All three tasks are complete within the accepted local scope. The local Kubernet
 **Wave 10** *(in progress)*
 
 - [ ] 04-16-PLAN.md — Complete cross-browser recovery and source-mapped acceptance
+- [ ] 04-17-PLAN.md — Close G-04-38: recovery focus, intermittent runtime errors and the complete regression
 
 **UI hint**: yes
 

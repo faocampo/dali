@@ -29,7 +29,7 @@ coverage:
     description: Independent capture reconstructs a second edit after native push failure and reload
     requirement: SAVE-01
     verification:
-      - kind: browser
+      - kind: e2e
         ref: tests/local-recovery.spec.ts
         status: pass
     human_judgment: false
@@ -37,7 +37,7 @@ coverage:
     description: Scoped checkpoints retain root, content, title and available image bytes
     requirement: SAVE-02
     verification:
-      - kind: browser
+      - kind: e2e
         ref: tests/local-recovery.spec.ts
         status: pass
     human_judgment: false

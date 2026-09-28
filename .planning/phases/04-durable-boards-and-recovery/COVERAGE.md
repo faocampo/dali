@@ -1,6 +1,8 @@
 # Phase 4 — Coverage and Source Audit
 
-No external API integration: this phase extends existing Dali browser/server persistence and packages it for Kubernetes; it adds no new third-party application API or SDK integration. The compiled API detector examined the plan set and returned detected:false. Existing OIDC uses its approved interface; actual-provider acceptance remains backlog999.4.
+No external API integration: this phase extends existing browser/server persistence and Kubernetes packaging using established interfaces.
+
+The compiled API detector examined the plan set and returned detected:false. Existing OIDC uses its approved interface; actual-provider acceptance remains backlog999.4.
 
 This is a planning coverage record, not execution evidence. Sources: [CONTEXT](04-CONTEXT.md) (15locked decisions), [RESEARCH](04-RESEARCH.md) (durability and operations mechanisms), [UI-SPEC](04-UI-SPEC.md) (36confirmed predicates), [REQUIREMENTS](../../REQUIREMENTS.md) (approved acceptance) and [ROADMAP](../../ROADMAP.md) (phase outcome and allocation).
 
@@ -143,17 +145,17 @@ No-silent-drop equality:6surfaced=4explicit truths+2flagged assumptions. No auto
 
 ## Prohibition recall and projection
 
-The two-stage requirement recall retained7bespoke intent constraints; routine correctness is covered by tests and canon security items route to secure-phase/STRIDE. Shared projectProhibitions projected exactly7descriptor-less rows. They remain flagged-unverified judgment items, with no invented check_kind/check_target/check_rule/fixture. No automatic passing disposition is claimed.
+The two-stage requirement recall retained7bespoke intent constraints; routine correctness is covered by tests and canon security items route to secure-phase/STRIDE. Shared projectProhibitions projected exactly7descriptor-less rows. They were presented individually as scoped source/evidence judgments. On 2026-09-28 the user accepted all seven scoped dispositions. The rationale is recorded in docs/recovery-acceptance.md; full regression and canonical verification remain required. No check_kind/check_target/check_rule/fixture was invented.
 
 | Requirement | Kept intent | Owning plan | Disposition |
 |---|---|---|---|
-| SAVE-01 | SAVE-01: MUST NOT silently apply browser pending work over the operator-selected restored server state. | 04-01 | flagged-unverified judgment |
-| SAVE-01 | SAVE-01: MUST NOT present a browser-local or cached reopen as proof that acknowledged work survived server restart. | 04-01 | flagged-unverified judgment |
-| SAVE-02 | SAVE-02: MUST NOT claim preserved or saved work from request dispatch, incomplete local transactions, export handoff, or an unrelated image success. | 04-05 | flagged-unverified judgment |
-| SAVE-02 | SAVE-02: MUST NOT clear pending work merely because the user downloads recovery, leaves, or opens the restored board. | 04-05 | flagged-unverified judgment |
-| OPS-01 | OPS-01: MUST NOT place real operator deployment settings or private operational evidence into public repository artifacts or history. | 04-13 | flagged-unverified judgment |
-| OPS-02 | OPS-02: MUST NOT automatically select a restore or reopen traffic before the operator verifies content and access. | 04-12 | flagged-unverified judgment |
-| OPS-02 | OPS-02: MUST NOT claim RPO or RTO from scheduling, static manifests, local staging or simulated clocks alone. | 04-12 | flagged-unverified judgment |
+| SAVE-01 | SAVE-01: MUST NOT silently apply browser pending work over the operator-selected restored server state. | 04-01 | user-accepted scoped judgment (2026-09-28); final regression pending |
+| SAVE-01 | SAVE-01: MUST NOT present a browser-local or cached reopen as proof that acknowledged work survived server restart. | 04-01 | user-accepted scoped judgment (2026-09-28); final regression pending |
+| SAVE-02 | SAVE-02: MUST NOT claim preserved or saved work from request dispatch, incomplete local transactions, export handoff, or an unrelated image success. | 04-05 | user-accepted scoped judgment (2026-09-28); final regression pending |
+| SAVE-02 | SAVE-02: MUST NOT clear pending work merely because the user downloads recovery, leaves, or opens the restored board. | 04-05 | user-accepted scoped judgment (2026-09-28); final regression pending |
+| OPS-01 | OPS-01: MUST NOT place real operator deployment settings or private operational evidence into public repository artifacts or history. | 04-13 | user-accepted scoped judgment (2026-09-28); final regression pending |
+| OPS-02 | OPS-02: MUST NOT automatically select a restore or reopen traffic before the operator verifies content and access. | 04-12 | user-accepted scoped judgment (2026-09-28); final regression pending |
+| OPS-02 | OPS-02: MUST NOT claim RPO or RTO from scheduling, static manifests, local staging or simulated clocks alone. | 04-12 | user-accepted scoped judgment (2026-09-28); final regression pending |
 
 ## Hook decisions and discovery
 
