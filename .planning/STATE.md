@@ -5,9 +5,9 @@ current_phase_name: Durable Boards and Recovery
 current_plan: 16
 status: in_progress
 stopped_at: Prerequisite gate passed; 04-15 reconciled; executing final UI acceptance plan 04-16
-last_updated: "2026-09-28T19:34:44Z"
+last_updated: "2026-09-28T19:54:17Z"
 last_activity: 2026-09-28
-last_activity_desc: Completed save confirmation and typography fixes; Phase 4 final acceptance remains incomplete
+last_activity_desc: Repaired and verified local board creation and deletion; Phase 4 final acceptance remains incomplete
 state_head: 5aefe81
 progress:
   total_phases: 13
@@ -206,6 +206,7 @@ Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted
 | 260924-s1x | Replace local copying with file picker/drop import and verify recovery | 2026-09-24 | 07f3170 | Complete | [Quick task](quick/260924-s1x-replace-local-board-copying-with-file-se/260924-s1x-SUMMARY.md) |
 | 260928-ljp | Visible corner rotation and note-color palette | 2026-09-28 | 0b35555 | Complete | [Quick task](quick/260928-ljp-corner-rotation-and-note-color-selection/260928-ljp-SUMMARY.md) |
 | 260928-save-fonts | Reconcile save confirmation, simplify image details and restore font/style choices | 2026-09-28 | 9d4976b | Complete | [Quick task](quick/260928-save-status-and-font-controls/SUMMARY.md) |
+| 260928-local-lifecycle | Restore local board writes and verify create/save/reopen/delete flows | 2026-09-28 | 6c5ec19 | Complete | [Quick task](quick/260928-local-board-lifecycle/SUMMARY.md) |
 
 Phase 2 was tested and approved on 2026-09-15. Canonical phase verification records the acceptance revision; subsequent quick tasks retain separate validation provenance. Quick task 260915-s9s passed 79 unit tests and 51 distinct browser/project cases across focused runs, with TypeScript checks and production build passing.
 
