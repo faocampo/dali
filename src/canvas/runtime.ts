@@ -19,7 +19,7 @@ export async function renameActiveBoard(title: string) { if (!captureTitle) thro
 
 export type BoardRole = BoardSummary['role'];
 export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; storageFailure?: RecoveryStorageFailure; retainedPending?: boolean | 'unavailable'; stalled?: boolean; title?: string }>;
-export type CanvasRuntime = { workspace: Workspace & Pick<BoardWorkspace, 'docSync' | 'waitForSynced'>; store: Store; descriptor: BoardDescriptor; scope: AccessScope; stopSaveStatus: () => void; dispose: () => void };
+export type CanvasRuntime = { workspace: Workspace & Pick<BoardWorkspace, 'docSync' | 'waitForSynced'>; store: Store; descriptor: BoardDescriptor; scope: AccessScope; captureUnacknowledged: () => Promise<unknown>[]; stopSaveStatus: () => void; dispose: () => void };
 let scope: AccessScope | null = null;
 let current: CanvasRuntime | null = null;
 let pending: { key: string; promise: Promise<CanvasRuntime> } | null = null;
@@ -65,9 +65,7 @@ export function suspendAccessScope(_reason: string): void {
   if (!scope || scope.phase !== 'active') return;
   if (current) {
     current.store.readonly = true;
-    if (scope.canWrite && journal) capture.push(
-      journal.capture('document', current.descriptor.rootDocId, Y.encodeStateAsUpdate(current.workspace.doc)).catch(() => undefined),
-      journal.capture('document', current.descriptor.contentDocId, Y.encodeStateAsUpdate(current.store.spaceDoc)).catch(() => undefined));
+    if (scope.canWrite && journal) capture.push(...current.captureUnacknowledged());
     current.workspace.docSync.forceStop(); current.workspace.blobSync.stop();
   }
   publish({ ...scope, phase: 'paused', canWrite: false });
@@ -437,6 +435,13 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     workspace.doc.on('update', changed); store.spaceDoc.on('update', changed); coverage();
     const stopStatus = () => { workspace.doc.off('update', changed); store.spaceDoc.off('update', changed); for (const timer of timers.values()) clearTimeout(timer); timers.clear(); for (const doc of confirmed.values()) doc.destroy(); confirmed.clear(); };
     const value: CanvasRuntime = { workspace, store, descriptor: structuredClone(authorizedDescriptor), scope: scope!,
+      captureUnacknowledged: () => [...live].flatMap(([id, doc]) => {
+        const data = Y.encodeStateAsUpdate(doc);
+        // Leaving must preserve uncertain work without manufacturing pending
+        // records for documents already covered by actual server receipts.
+        return acknowledgedUpdateCovered(confirmed.get(id), data) ? [] :
+          [scopedJournal.capture('document', id, data).catch(() => undefined)];
+      }),
       stopSaveStatus: stopStatus, dispose: () => { local?.dispose(); stopStatus(); workspace.dispose(); } };
     current = value;
     if (storagePaused) { store.readonly = true; workspace.docSync.forceStop(); }

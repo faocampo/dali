@@ -1,6 +1,27 @@
 import { test, expect } from './browser-fixtures.js';
 import { recoveryBoardFixture, journalRows, failRecoveryStorage } from './recovery-fixtures';
 
+test('@04-09-02 returning to the library after Saved never creates pending recovery records', async ({ page, baseURL }) => {
+  const { descriptor } = await recoveryBoardFixture(page, baseURL!, 'Saved library canary');
+  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+  await expect.poll(async () => (await journalRows(page)).length).toBe(0);
+  await page.getByRole('link', { name: 'Dalí', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await expect(page.getByText('Checking recovery status…', { exact: true })).toHaveCount(0);
+  const card = page.locator('[data-board-id="' + descriptor.summary.id + '"]');
+  await expect(card).toBeVisible();
+  await expect(card.locator('.board-card__pending')).toHaveCount(0);
+  expect(await journalRows(page)).toHaveLength(0);
+  await card.getByRole('link', { name: 'Open Saved library canary', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Dalí', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+  await expect(page.getByText('Checking recovery status…', { exact: true })).toHaveCount(0);
+  await expect(card.locator('.board-card__pending')).toHaveCount(0);
+  expect(await journalRows(page)).toHaveLength(0);
+});
+
 test('@04-08-02 Stay and Escape retain pending work; Leave transitions once with destination focus', async ({ page, baseURL }) => {
   await recoveryBoardFixture(page, baseURL!);
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));

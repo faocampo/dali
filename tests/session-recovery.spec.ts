@@ -188,9 +188,14 @@ for (const fallback of [false, true]) test(`@03-10-02 cross-tab logout preserves
   await page.reload(); await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible(); await other.close();
 });
 test('@03-10-02 explicit logout quota failure retains tab and only sends logout after retry', async ({ page }) => {
-  await board(page); await text(page, 'Logout pending canary');
+  const descriptor = await board(page); await text(page, 'Logout saved baseline');
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+  const saved = database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id);
   await page.evaluate(() => { const put = IDBObjectStore.prototype.put; Object.assign(window, { restoreJournal: () => { IDBObjectStore.prototype.put = put; } }); IDBObjectStore.prototype.put = function (...args) { if (this.transaction.db.name.startsWith('dali-account-recovery')) throw new DOMException('Synthetic quota', 'QuotaExceededError'); return put.apply(this, args); }; });
+  // Create genuinely unacknowledged work after storage fails. Leaving a fully
+  // saved board must not manufacture a pending snapshot just to hit this fault.
+  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toBeVisible();
   let logout = 0; page.on('request', request => { if (request.url().endsWith('/api/logout')) logout++; });
   await page.locator('.board-account summary').click(); await page.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();
   const retry = page.getByRole('button', { name: 'Retry preservation', exact: true });
@@ -207,6 +212,7 @@ test('@03-10-02 explicit logout quota failure retains tab and only sends logout 
   await page.getByRole('button', { name: 'Retry preservation', exact: true }).click();
   await expect(page.getByRole('heading', { name: "You're signed out of Dalí", exact: true })).toBeVisible(); expect(logout).toBe(1);
   expect((await records(page)).length).toBeGreaterThan(0); expect((await page.request.get(origin + '/api/session')).status()).toBe(401);
+  expect(database.prepare('SELECT * FROM board_documents WHERE board_id=?').all(descriptor.summary.id)).toEqual(saved);
 });
 for (const resource of ['document', 'image', 'thumbnail'] as const) test.describe(`delayed ${resource}`, () => {
   // Pinned native image loading logs this exact cancellation when its authorized request is aborted.
