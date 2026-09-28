@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { fileAction } from './app-menu';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
@@ -29,7 +30,7 @@ async function pngDownload(page: Page, scale: 1 | 2 | 4, transparent = true, sco
 
 async function mixedBoard(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.locator('affine-edgeless-note').dblclick();
   await page.keyboard.insertText('Café Fine text 123');
   await page.keyboard.press('Escape');
@@ -187,7 +188,7 @@ test('frame empty background and unavailable scopes are explained',async({page})
 });
 
 test('frame rejects oversized intermediate objects before allocation and offers explicit lower scale',async({page})=>{
-  await page.goto('/');await page.getByRole('button',{name:'Add sticky note',exact:true}).click();
+  await page.goto('/');await addStickyNote(page);
   await page.locator('affine-edgeless-root').evaluate(el=>{
     const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
     gfx.doc.updateBlock(gfx.doc.getBlocksByFlavour('affine:note')[0]!.model,{xywh:'[0,0,3000,1000]'});
@@ -264,7 +265,7 @@ test('whole board offers explicit source scale and exact downloaded dimensions',
   await page.mouse.down();
   await page.mouse.move(450, 320, { steps: 10 });
   await page.mouse.up();
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.locator('affine-edgeless-note').dblclick();
   await page.keyboard.insertText('Café Fine text 123');
   await page.keyboard.press('Escape');

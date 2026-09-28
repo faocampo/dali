@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './fixtures';
 test.use({ actionTimeout: 15000 });
 
@@ -49,7 +50,7 @@ for (const width of [390, 768, 1456]) test(`design system keeps library and edit
   await expect(zoom).toHaveText('200%'); await expect(zoom).toBeFocused();
   if (width !== 768) {
     await zoom.click(); await page.getByRole('menuitemradio', { name: '100%', exact: true }).click();
-    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    await addStickyNote(page);
     await expect(page.locator('affine-edgeless-note')).toBeVisible();
     await page.locator('affine-edgeless-note').click();
     await expect(page.getByRole('combobox', { name: 'Note size', exact: true })).toBeVisible();

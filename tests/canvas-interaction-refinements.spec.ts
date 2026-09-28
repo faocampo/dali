@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { ShapeElementModel } from '@blocksuite/affine/model';
@@ -56,7 +57,7 @@ for (const width of [390, 707, 1456]) test(`live thickness, enabled icons and cl
   await expect(page.getByRole('button', { name: 'Frame section', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Frame selection', exact: true }).click();
   await expect(page.locator('affine-frame')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.locator('affine-edgeless-note').click();
   await expect(page.getByRole('combobox', { name: 'Note size', exact: true })).toBeVisible();
   const icons = page.locator('affine-toolbar-widget editor-icon-button .icon-container');
@@ -68,9 +69,9 @@ for (const width of [390, 707, 1456]) test(`live thickness, enabled icons and cl
 
 test('automatic insertion avoids occupied viewport space and stays on top when full', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
+  await addStickyNote(page);
+  await addStickyNote(page);
   const bounds = await root(page).evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     return gfx.gfxElements.filter(m => ('flavour' in m && m.flavour === 'affine:note') || ('type' in m && m.type === 'text')).map(m => {
@@ -87,7 +88,7 @@ test('automatic insertion avoids occupied viewport space and stays on top when f
     const id = gfx.surface!.addElement({ type: 'shape', xywh: '[-5000,-5000,10000,10000]', index: gfx.layer.generateIndex() });
     return gfx.surface!.getElementById(id)!.index;
   });
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   const placed = await root(page).evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     const m = gfx.gfxElements.filter(model => 'flavour' in model && model.flavour === 'affine:note').sort((a, b) => b.index.localeCompare(a.index))[0]!; const b = gfx.viewport.toViewBound(m.elementBound);

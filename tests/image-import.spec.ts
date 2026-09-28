@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { fileAction } from './app-menu';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
@@ -202,7 +203,7 @@ test('image input rejects size budgets and stale or failed storage then retries'
 
 test('clipboard keeps rich text paste and imports a bitmap once',async({page,context,browserName},testInfo)=>{
   await page.goto('/');await page.getByRole('button',{name:'Insert image',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Add sticky note',exact:true}).click();
+  await addStickyNote(page);
   await page.locator('affine-edgeless-note').dblclick();
   if(browserName==='chromium') {
     await context.grantPermissions(['clipboard-read','clipboard-write']);

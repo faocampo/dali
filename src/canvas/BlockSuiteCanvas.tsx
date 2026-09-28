@@ -12,7 +12,7 @@ import { mountEdgelessEditor, type EdgelessEditorHandle } from './blocksuite-edi
 import { getActiveAccessScope, subscribeAccessScope, type CanvasRuntime } from './runtime';
 import { captureArchive, LocalBoardCopy, LocalCopyOutcomeUnknown } from '../boards/import-local';
 import { accessScopeCurrent } from './account/mutation-guard';
-import { insertSticky } from './sticky';
+import { StickyNoteTool } from './StickyNoteTool';
 import { TextBoxTool } from './text';
 import { insertMindmap } from './mindmap';
 import { installMindmapCompatibility } from './mindmap-compatibility';
@@ -320,17 +320,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
         />
       </ControlButton>
 
-      <ControlButton label="Add sticky note" onClick={() => {
-        insertSticky(host.std);
-      }}>
-        <path
-          d="M4.5 4.5h15v9.5l-5.5 5.5H4.5z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-        <path d="M19.5 14H14v5.5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      </ControlButton>
+      <StickyNoteTool host={host} />
 
       <ControlButton
         label="Add text"

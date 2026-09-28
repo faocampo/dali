@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { openAccount } from './app-menu';
 import { randomBytes, randomUUID, createHash } from 'node:crypto';
@@ -194,7 +195,7 @@ test('@03-10-02 explicit logout quota failure retains tab and only sends logout 
   await page.evaluate(() => { const put = IDBObjectStore.prototype.put; Object.assign(window, { restoreJournal: () => { IDBObjectStore.prototype.put = put; } }); IDBObjectStore.prototype.put = function (...args) { if (this.transaction.db.name.startsWith('dali-account-recovery')) throw new DOMException('Synthetic quota', 'QuotaExceededError'); return put.apply(this, args); }; });
   // Create genuinely unacknowledged work after storage fails. Leaving a fully
   // saved board must not manufacture a pending snapshot just to hit this fault.
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect(page.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toBeVisible();
   let logout = 0; page.on('request', request => { if (request.url().endsWith('/api/logout')) logout++; });
   await page.locator('.board-account summary').click(); await page.getByRole('button', { name: 'Sign out of Dalí', exact: true }).click();

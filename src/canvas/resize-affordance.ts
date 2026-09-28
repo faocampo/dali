@@ -18,6 +18,29 @@ const HANDLE_HIT = 14;
 const OFFSET = HANDLE_HIT / 2;
 
 const CSS = `
+  /* A separate outer grip keeps the corner circle available for resizing. */
+  .affine-edgeless-selected-rect .handle[aria-label='bottom-right'] .rotate {
+    width: 26px;
+    height: 26px;
+    left: 20px;
+    top: 20px;
+    border: 1px solid var(--affine-blue);
+    border-radius: 50%;
+    background: var(--affine-background-primary-color, white);
+    color: var(--affine-blue);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 12%);
+  }
+  .affine-edgeless-selected-rect .handle[aria-label='bottom-right'] .rotate::after {
+    content: '↻';
+    display: grid;
+    place-items: center;
+    height: 100%;
+    font: 22px/1 sans-serif;
+    pointer-events: none;
+  }
+  .affine-edgeless-selected-rect .handle[aria-label='bottom-right'] .rotate:hover {
+    background: var(--affine-hover-color);
+  }
   .affine-edgeless-selected-rect .handle[aria-label='left'],
   .affine-edgeless-selected-rect .handle[aria-label='right'] {
     width: ${HANDLE_HIT}px;
@@ -106,6 +129,11 @@ export function widenResizeHandles(): () => void {
   const tick = () => {
     const rect = findSelectedRect(document);
     const shadow = rect?.shadowRoot;
+    const rotation = shadow?.querySelector<HTMLElement>(".handle[aria-label='bottom-right'] .rotate");
+    if (rotation && !rotation.title) {
+      rotation.title = 'Drag to rotate';
+      rotation.setAttribute('aria-label', 'Drag to rotate');
+    }
     if (shadow && !PATCHED.has(shadow)) {
       try {
         sheet ??= new CSSStyleSheet();

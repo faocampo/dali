@@ -1,10 +1,11 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { NoteBlockModel } from '@blocksuite/affine/model';
 
 test('all sticky shadow presets render distinctly and persist after reload', async ({page}) => {
   await page.goto('/');
-  await page.getByRole('button',{name:'Add sticky note',exact:true}).click();
+  await addStickyNote(page);
   const note=page.locator('edgeless-note-background');
   await expect(note).toHaveCount(1);
   await expect(note).not.toHaveCSS('box-shadow','none');

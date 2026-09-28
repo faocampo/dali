@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { ShapeElementModel } from '@blocksuite/affine/model';
@@ -48,7 +49,7 @@ test('custom fill applies on blur and new shapes inherit that color', async ({ p
 
 test('blank note area focuses text and shape text has a visible editable caret', async ({ page }, info) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   const note = page.locator('affine-edgeless-note');
   await note.dblclick({ position: { x: 90, y: 180 } }); await page.keyboard.type('Focused note');
   await expect(note).toContainText('Focused note'); await page.keyboard.press('Escape');

@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect, type Page } from './browser-fixtures.js';
 import { build } from 'esbuild';
 import type * as Recovery from '../src/canvas/account/outbox';
@@ -15,7 +16,7 @@ const scope = { accountId: 'synthetic-member', boardId: 'synthetic-board', gener
 
 for (const mode of ['quota', 'abort'] as const) test(`@04-04-03 ${mode} pauses native mutations while retaining inspection, recovery and responsive controls`, async ({ page, baseURL }, testInfo) => {
   await recoveryBoardFixture(page, baseURL!, 'S'.repeat(200));
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type('Retained recovery canary'); await page.keyboard.press('Escape');
   await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'I'.repeat(120) + '.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes });
   await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
@@ -79,7 +80,7 @@ for (const kind of ['corrupt', 'restore'] as const) test(`@04-04-03 ${kind} reta
   await recoveryBoardFixture(page, baseURL!);
   await expect(page.locator('affine-edgeless-note')).toHaveCount(0);
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect.poll(async () => (await journalRows(page)).length).toBeGreaterThan(0);
   await page.evaluate(kind => new Promise<void>((resolve, reject) => {
     const request = indexedDB.open('dali-account-recovery-v1', 2); request.onerror = () => reject(request.error);
@@ -173,7 +174,7 @@ test('@04-03-01 @04-04-01 independent capture reconstructs the second edit after
   expect(response.status()).toBe(201); const descriptor = await response.json();
   await page.goto('/?board=' + descriptor.summary.id); await expect(page.locator('editor-host')).toBeVisible();
   let failed = 0; await page.route('**/docs/*/push', route => { failed++; return route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }); });
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type('First local canary'); await page.keyboard.press('Escape');
   await expect.poll(() => failed).toBeGreaterThan(0);
   await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.press('End'); await page.keyboard.type(' Second local canary'); await page.keyboard.press('Escape');

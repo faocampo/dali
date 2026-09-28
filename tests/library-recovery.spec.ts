@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './fixtures';
 import { acceptanceService } from './access-fixtures';
 import { libraryRecoveryMember, libraryRecoveryBoard, seedLibraryPending } from './library-recovery-fixtures';
@@ -176,7 +177,7 @@ test('@04-09-02 actual acknowledgment clears one board while another pending mar
   await expect(page.locator('editor-host')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect(page.getByRole('button', { name: 'Save failed, Open save details', exact: true })).toBeVisible();
   const library = await context.newPage();
   try {
@@ -197,7 +198,7 @@ test('@04-09-02 download then leave and explicit restored entry preserve unresol
   await expect(page.locator('editor-host')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
   const before = await journalRows(page);
   const downloaded = page.waitForEvent('download');

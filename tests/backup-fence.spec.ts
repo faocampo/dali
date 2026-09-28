@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './browser-fixtures.js';
 import { createRestoreService } from './durability-fixtures';
 import { recoveryBoardFixture, journalRows } from './recovery-fixtures';
@@ -19,7 +20,7 @@ test('@04-15-03 real backup freshness rejection preserves edits and images throu
     service.advanceBackupClock(15 * 60_000);
     expect((await health()).state).toBe('fenced');
     const rejectedDocument = page.waitForResponse(r => r.url().includes('/docs/') && r.url().endsWith('/push') && r.status() === 503);
-    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    await addStickyNote(page);
     expect((await (await rejectedDocument).json()).code).toBe('BACKUP_FRESHNESS_REQUIRED');
     const rejectedImage = page.waitForResponse(r => r.request().method() === 'PUT' && r.url().includes('/blobs/') && r.status() === 503);
     await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'Pending maintenance image.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes });
@@ -40,7 +41,7 @@ test('@04-15-03 real backup freshness rejection preserves edits and images throu
     await expect.poll(() => barrier.held()).toBeGreaterThan(0);
     expect(accessChecks).toBeGreaterThan(0);
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    await addStickyNote(page);
     const newer = (await journalRows(page)).map(row => row.id);
     expect(newer.length).toBeGreaterThan(0);
     await barrier.release(0);

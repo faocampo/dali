@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { fileAction } from './app-menu';
 import { expect, test } from './fixtures';
 import type { EditorHost } from '@blocksuite/affine/std';
@@ -39,7 +40,7 @@ async function notes(page: import('@playwright/test').Page) {
 
 test('creates, edits and reopens exactly one locally stored sticky note', async ({ page }) => {
   expect((await notes(page)).notes).toEqual([]);
-  await page.getByRole('button', { name: 'Add sticky note' }).click();
+  await addStickyNote(page);
   const note = page.locator('affine-edgeless-note');
   await expect(note).toHaveCount(1);
   await note.dblclick();
@@ -56,7 +57,7 @@ test('creates, edits and reopens exactly one locally stored sticky note', async 
 });
 
 test('repeated editor reopen preserves IDs without duplicate objects or handlers', async ({ page }) => {
-  await page.getByRole('button', { name: 'Add sticky note' }).click();
+  await addStickyNote(page);
   await expect(page.locator('affine-edgeless-note')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const stored = await notes(page);
@@ -69,7 +70,7 @@ test('repeated editor reopen preserves IDs without duplicate objects or handlers
     await expect.poll(() => notes(page)).toEqual(stored);
     await expect(page.locator('editor-host')).toHaveCount(1);
   }
-  await page.getByRole('button', { name: 'Add sticky note' }).click();
+  await addStickyNote(page);
   await expect.poll(async () => (await notes(page)).notes.length).toBe(2);
 });
 
@@ -89,7 +90,7 @@ test('cancelled editor setup never attaches a second host', async ({ page }) => 
 });
 
 test('interrupted mounting and rapid board switching keep the final board isolated', async ({ page }) => {
-  await page.getByRole('button', { name: 'Add sticky note' }).click();
+  await addStickyNote(page);
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const first = await notes(page);
   const firstUrl = page.url();
@@ -120,7 +121,7 @@ test('interrupted mounting and rapid board switching keep the final board isolat
   await fileAction(page, 'All boards');
   await page.locator(`a[href="/${new URL(secondUrl).search}"]`).click();
   await expect(page.getByTestId('board-action-menu')).toBeVisible();
-  await page.getByRole('button', { name: 'Add sticky note' }).click();
+  await addStickyNote(page);
   await expect.poll(async () => (await notes(page)).notes.length).toBe(1);
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await fileAction(page, 'All boards');
@@ -147,7 +148,7 @@ test.describe('account recovery write failures', () => {
         return put.apply(this, args);
       };
     });
-    await page.getByRole('button', { name: 'Add sticky note' }).click();
+    await addStickyNote(page);
     await page.getByRole('button', { name: 'Editing paused, Open save details', exact: true }).click();
     const details = page.getByRole('dialog', { name: 'Save details', exact: true });
     await expect(details.getByRole('button', { name: 'Retry saving', exact: true })).toBeVisible();

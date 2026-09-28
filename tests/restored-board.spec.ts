@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect, type BrowserContext, type Page } from './browser-fixtures.js';
 import type { JournalRecord } from '../src/canvas/account/outbox';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -101,7 +102,7 @@ test('@04-12-02 selected native restore reopens cold authorized content and quar
       await actor.close();
     }
     await page.goto('/?board=' + board.summary.id); await expect(page.locator('editor-host')).toBeVisible();
-    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    await addStickyNote(page);
     await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type('Restored synthetic canary'); await page.keyboard.press('Escape');
     const png = syntheticCanaries().imageBytes;
     await page.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: png });
@@ -120,7 +121,7 @@ test('@04-12-02 selected native restore reopens cold authorized content and quar
     const lostOperation = randomUUID();
     expect((await context.request.patch('/api/boards/' + board.summary.id, { headers, data: { title: 'Acknowledged after selected backup', operationId: lostOperation, revision: latest.revision } })).ok()).toBeTruthy();
     const acknowledgedAfter = Date.now();
-    await context.setOffline(true); await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    await context.setOffline(true); await addStickyNote(page);
     await expect.poll(async () => (await journal(page)).length).toBeGreaterThan(0); const retained = await journal(page);
     const oldCookie = (await context.cookies()).find(cookie => cookie.name === 'dali_session')!;
     const incidentStarted = Date.now();

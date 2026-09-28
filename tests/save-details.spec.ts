@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './browser-fixtures.js';
 import { saveDetailsBoard, openSaveDetails, saveTrigger, addDetailImages, saveDetailsFixtures } from './save-details-fixtures';
 import { documentResponseBarrier } from './save-status-fixtures';
@@ -43,7 +44,7 @@ test('@04-07-02 fifty failed images and long labels fit every narrow and short v
 test('@04-07-02 rendered contrast typography and native visual viewport zoom preserve reachable controls', async ({ page, baseURL, browserName }, testInfo) => {
   await saveDetailsBoard(page, baseURL!); await addDetailImages(page, 1, '<Synthetic> & image');
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect(saveTrigger(page)).toContainText('Save failed');
+  await addStickyNote(page); await expect(saveTrigger(page)).toContainText('Save failed');
   const dialog = await openSaveDetails(page); await expect(dialog.locator('img')).toHaveCount(1);
   await expect(dialog.locator('img')).toHaveJSProperty('naturalWidth', 8);
   await expect(dialog.getByRole('button', { name: 'Select image: <Synthetic> & image', exact: true })).toBeVisible();
@@ -71,7 +72,7 @@ test('@04-07-02 rendered contrast typography and native visual viewport zoom pre
 test('@04-07-01 pending details preserve age and focus through acknowledgement and light dismissal', async ({ page, baseURL }) => {
   await saveDetailsBoard(page, baseURL!); await expect(saveTrigger(page)).toContainText('Saved');
   const age = await saveTrigger(page).getAttribute('title'); const barrier = await documentResponseBarrier(page);
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect.poll(barrier.held).toBeGreaterThan(0);
+  await addStickyNote(page); await expect.poll(barrier.held).toBeGreaterThan(0);
   const dialog = await openSaveDetails(page); await expect(dialog).toContainText('Last saved to the server:');
   expect(await saveTrigger(page).getAttribute('title')).toBe(age);
   const close = dialog.getByRole('button', { name: 'Close save details' }); await close.focus();
@@ -106,7 +107,7 @@ test('@04-07-01 failed image rows retain focus during retry and select without m
 test('@04-07-01 actual dialog download coalesces preparation and retains pending work', async ({ page, baseURL }) => {
   await saveDetailsBoard(page, baseURL!);
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect(saveTrigger(page)).toContainText('Save failed');
+  await addStickyNote(page); await expect(saveTrigger(page)).toContainText('Save failed');
   const dialog = await openSaveDetails(page); const before = (await journalRows(page)).map(row => row.id);
   const barrier = await recoveryAuthorizationBarrier(page); const downloads: import('@playwright/test').Download[] = []; page.on('download', item => downloads.push(item));
   const download = dialog.getByRole('button', { name: 'Download recovery copy' });

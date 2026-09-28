@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect, type Page } from './browser-fixtures.js';
 import { recoveryBoardFixture, journalRows, failRecoveryStorage } from './recovery-fixtures';
 import { addSavedImage } from './save-status-fixtures';
@@ -14,7 +15,7 @@ async function startRecovery(page: Page) {
 }
 async function pending(page: Page) {
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect.poll(async () => (await journalRows(page)).length).toBeGreaterThan(0);
 }
 async function readDownload(download: import('@playwright/test').Download) {
@@ -41,7 +42,7 @@ async function semantic(page: Page) {
 test('@04-06-01 zero-image pending board downloads a timestamped editable recovery archive', async ({ page, baseURL }) => {
   await recoveryBoardFixture(page, baseURL!);
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect.poll(async () => (await journalRows(page)).length).toBeGreaterThan(0);
   await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
   const download = page.waitForEvent('download');
@@ -94,7 +95,7 @@ test('@04-06-01 native pending map geometry connectors adjusted images round tri
 
 test('@04-06-01 paused memory remains downloadable offline with retained image bytes', async ({ page, baseURL }) => {
   await recoveryBoardFixture(page, baseURL!); await addSavedImage(page); await failRecoveryStorage(page, 'quota');
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect(page.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toBeVisible();
   await page.route('**/api/**', route => route.abort('internetdisconnected'));
   await startRecovery(page); const download = page.waitForEvent('download', { timeout: 20000 });
@@ -126,7 +127,7 @@ test('@04-06-02 preparing state survives details reopening and coalesces duplica
   await expect(page.getByRole('button', { name: 'Download recovery copy', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click(); await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
   await expect(page.getByText(recoveryArchiveFixtures.loading.label, { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect(page.locator('affine-edgeless-note')).toHaveCount(2);
   await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click(); barrier.release();
   await expect.poll(() => downloads.length).toBe(1); await expect(page.getByText(recoveryArchiveFixtures.populated.label, { exact: true })).toBeVisible();

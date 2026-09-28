@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -67,7 +68,7 @@ for (const size of [{ width: 1280, height: 800 }, { width: 900, height: 700 }]) 
     await page.setViewportSize(size);
     await page.goto('/');
     const text = 'Café e\u0301 👩🏽‍💻 🏳️‍🌈';
-    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    await addStickyNote(page);
     await page.locator('affine-edgeless-note').dblclick();
     await page.keyboard.insertText(text);
     await page.keyboard.press('ControlOrMeta+b');
@@ -140,7 +141,7 @@ test('pointer-centered zoom and space or middle-button panning use native viewpo
 
 test('pasted HTML stays inert in native rich text', async ({ page, context, browserName }, testInfo) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.locator('affine-edgeless-note').dblclick();
   const html='<b onclick="document.body.dataset.executed=1">Synthetic markup</b><script>document.body.dataset.executed=1</script>';
   if(browserName==='chromium') {

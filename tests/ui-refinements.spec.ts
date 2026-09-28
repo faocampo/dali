@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './fixtures';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
 import type { ShapeElementModel } from '@blocksuite/affine/model';
@@ -35,7 +36,7 @@ test('shape typography preserves geometry, accepts small fonts and persists', as
 });
 
 test('notes offer t-shirt sizes with proportional text and no page action', async ({ page }) => {
-  await page.goto('/'); await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await page.goto('/'); await addStickyNote(page);
   await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.insertText('A readable note'); await page.keyboard.press('Escape');
   await page.mouse.click(900, 600); await page.locator('affine-edgeless-note').click();
   const size = page.getByRole('combobox', { name: 'Note size', exact: true });

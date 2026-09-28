@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { unzipSync } from 'fflate';
@@ -71,7 +72,7 @@ const details = (page: Page) => page.getByRole('dialog', { name: 'Save details',
 const downloadButton = (page: Page) => details(page).getByRole('button', { name: 'Download recovery copy', exact: true });
 async function outage(page: Page) { await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } })); }
 async function pendingNote(page: Page) {
-  await outage(page); await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await outage(page); await addStickyNote(page);
   await expect(saveTrigger(page)).toContainText('Save failed');
   await expect.poll(async () => (await journalRows(page)).length).toBeGreaterThan(0);
 }
@@ -146,7 +147,7 @@ test('@04-16 @04-ui-E1 status transitions preserve age and open details delibera
   await expect(page.locator('#save-age')).toBeVisible(); const barrier = await documentResponseBarrier(page);
   try {
     await group('E1/loading', async () => {
-      await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect.poll(barrier.held).toBeGreaterThan(0);
+      await addStickyNote(page); await expect.poll(barrier.held).toBeGreaterThan(0);
       await expect(saveTrigger(page)).toContainText(/Saving…|Changes waiting to save|Recovering changes…/);
       expect(await saveTrigger(page).getAttribute('title')).toBe(age); await expect(details(page)).toHaveCount(0);
       await expect(page.locator('#save-age')).toBeVisible(); await expect(saveTrigger(page)).toHaveAttribute('aria-describedby', 'save-age');
@@ -158,7 +159,7 @@ test('@04-16 @04-ui-E1 status transitions preserve age and open details delibera
     await page.route('**/blobs/*', route => route.request().method() === 'GET' ? route.fulfill({ status: 503, json: { code: 'SYNTHETIC_IMAGE_FAILURE' } }) : route.continue());
     await page.reload(); await expect(saveTrigger(page)).toContainText('Image not saved');
     await group('E1/error', async () => {
-      await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect(saveTrigger(page)).toContainText('Save failed');
+      await addStickyNote(page); await expect(saveTrigger(page)).toContainText('Save failed');
       await expect(details(page)).toHaveCount(0); await saveTrigger(page).press('Space');
       await expect(details(page)).toBeVisible(); await expect(saveTrigger(page)).toHaveAttribute('aria-expanded', 'true');
       await expect(saveTrigger(page)).toHaveAttribute('aria-controls', await details(page).getAttribute('id') ?? '');
@@ -399,7 +400,7 @@ test('@04-16 @04-ui-E4 valid retained editing context restores after acknowledge
 test('@04-16 @04-ui-E4 paused quota recovery retains readable labels and reachable controls', async ({ page, baseURL }) => {
   await recoveryBoardFixture(page, baseURL!, saveDetailsFixtures.title); await addDetailImages(page, 1, saveDetailsFixtures.name); await expect(saved(page)).toBeVisible(); await failRecoveryStorage(page, 'quota');
   try {
-    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect(saveTrigger(page)).toContainText('Editing paused'); await openSaveDetails(page);
+    await addStickyNote(page); await expect(saveTrigger(page)).toContainText('Editing paused'); await openSaveDetails(page);
     await group('E4/overflow', async () => { await boundedPanel(page, details(page), downloadButton(page)); await details(page).getByRole('button', { name: 'Retry saving', exact: true }).scrollIntoViewIfNeeded(); await expect(details(page).getByRole('button', { name: 'Retry saving', exact: true })).toBeInViewport(); });
     await group('E4/long-text', async () => {
       await longLabels(page);
@@ -413,7 +414,7 @@ test('@04-16 @04-ui-E4 paused quota recovery retains readable labels and reachab
 test('@04-16 @04-ui-E5 leave confirmation retains warnings and suppresses duplicate navigation', async ({ page, baseURL }) => {
   await recoveryBoardFixture(page, baseURL!, saveDetailsFixtures.title); await pendingNote(page); await beginNativePreservationHold(page);
   try {
-    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect.poll(() => page.evaluate(() => (window as unknown as { heldRecoveryCompletions: number }).heldRecoveryCompletions)).toBeGreaterThan(0);
+    await addStickyNote(page); await expect.poll(() => page.evaluate(() => (window as unknown as { heldRecoveryCompletions: number }).heldRecoveryCompletions)).toBeGreaterThan(0);
     await page.getByRole('link', { name: 'Dalí', exact: true }).click(); const dialog = page.getByRole('dialog', { name: 'Leave with changes waiting to save?', exact: true });
     await group('E5/error', async () => {
       await expect(dialog.getByRole('alert')).toHaveText('This browser could not preserve all pending changes. Leaving may lose them.'); await expect(dialog.getByRole('button', { name: 'Stay on board' })).toBeFocused();

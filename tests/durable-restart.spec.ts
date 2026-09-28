@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './browser-fixtures.js';
 import type { BrowserContext, Page } from '@playwright/test';
 import type { GfxController } from '@blocksuite/affine/std/gfx';
@@ -45,7 +46,7 @@ test('@04-01-01 acknowledged native sticky and PNG survive SIGKILL and cold sign
     expect(created.status()).toBe(201); const board = await created.json();
     await page.goto('/?board=' + board.summary.id); await expect(page.locator('editor-host')).toBeVisible();
     const pushed = page.waitForResponse(r => r.url().endsWith('/push') && r.request().method() === 'POST' && r.ok());
-    await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+    await addStickyNote(page);
     await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.type('Durable synthetic sticky'); await page.keyboard.press('Escape');
     const receipt = await (await pushed).json();
     expect(receipt).toEqual({ acknowledged: true, previousRevision: expect.any(Number), revision: expect.any(Number) });

@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { fileAction } from './app-menu';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
@@ -214,7 +215,7 @@ test('@02-06-03 stale map edits reject download and explicit retry uses current 
 });
 
 test('@02-06-03 visible oversized content blocks allocation and requires explicit lower scale',async({page})=>{
-  await seed(page);await page.getByRole('button',{name:'Add sticky note',exact:true}).click();await page.keyboard.press('Escape');
+  await seed(page);await addStickyNote(page);await page.keyboard.press('Escape');
   await page.locator('affine-edgeless-root').evaluate(el=>{
     const gfx=(el as HTMLElement & {gfx:GfxController}).gfx;
     gfx.doc.updateBlock(gfx.doc.getBlocksByFlavour('affine:note')[0]!.model,{xywh:'[0,0,3000,1000]'});

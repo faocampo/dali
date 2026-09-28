@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './browser-fixtures.js';
 import { saveBoardFixture, addSavedImage, documentResponseBarrier } from './save-status-fixtures';
 import type { EditorHost } from '@blocksuite/affine/std';
@@ -31,9 +32,9 @@ test('@04-05-02 older document acknowledgment cannot save newer native edits or 
   await saveBoardFixture(page, baseURL!);
   const saved = page.getByRole('button', { name: 'Saved, Open save details', exact: true }); await expect(saved).toBeVisible();
   const age = await saved.getAttribute('title'); const barrier = await documentResponseBarrier(page);
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect.poll(barrier.held).toBeGreaterThan(0);
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect(page.locator('affine-edgeless-note')).toHaveCount(2);
   await expect(saved).toHaveCount(0); expect(await page.locator('.djai-save__status').getAttribute('title')).toBe(age);
   await barrier.release(0); await expect(saved).toHaveCount(0);
@@ -44,7 +45,7 @@ test('@04-05-02 real response stall becomes failed at fifteen seconds and retain
   await saveBoardFixture(page, baseURL!); await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   const age = await page.locator('.djai-save__status').getAttribute('title');
   const barrier = await documentResponseBarrier(page); const started = Date.now();
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect.poll(barrier.held).toBeGreaterThan(0);
+  await addStickyNote(page); await expect.poll(barrier.held).toBeGreaterThan(0);
   await expect(page.getByRole('button', { name: 'Save failed, Open save details', exact: true })).toBeVisible({ timeout: 18000 });
   expect(Date.now() - started).toBeGreaterThanOrEqual(14500);
   expect(await page.locator('.djai-save__status').getAttribute('title')).toBe(age);
@@ -113,7 +114,7 @@ test('@04-05-02 combined image and document failure retains newer edits until th
   await secondImage(page); await expect.poll(() => failures).toBeGreaterThan(0);
   await expect(page.getByRole('button', { name: 'Save failed, Open save details', exact: true })).toBeVisible();
   const absent = await page.request.get(`/api/boards/${descriptor.summary.id}/blobs/${encodeURIComponent(failedKey)}`, { headers: { 'X-Dali-Account': member.accountId } }); expect(absent.status()).toBe(404);
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Save details' })).toContainText('Board changes and');
   fail = false; await page.getByRole('button', { name: 'Retry now', exact: true }).click();
@@ -125,7 +126,7 @@ test('@04-05-02 late old-board response cannot change the active board save stat
   const { member, descriptor } = await saveBoardFixture(page, baseURL!);
   const created = await page.request.post('/api/boards', { headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': descriptor.recoveryEpoch }, data: { title: 'Synthetic next board', operationId: randomUUID() } });
   expect(created.status()).toBe(201); const next = await created.json();
-  const barrier = await documentResponseBarrier(page, descriptor.summary.id); await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect.poll(barrier.held).toBeGreaterThan(0);
+  const barrier = await documentResponseBarrier(page, descriptor.summary.id); await addStickyNote(page); await expect.poll(barrier.held).toBeGreaterThan(0);
   await page.evaluate(id => { history.pushState(null, '', '/?board=' + id); dispatchEvent(new PopStateEvent('popstate')); }, next.summary.id);
   await expect(page.locator('.djai-app')).toHaveAttribute('data-board-id', next.summary.id);
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible(); const age = await page.locator('.djai-save__status').getAttribute('title');
@@ -135,7 +136,7 @@ test('@04-05-02 late old-board response cannot change the active board save stat
 
 test('@04-05-02 late previous-account acknowledgment cannot restore Saved after identity changes', async ({ page, context, baseURL }) => {
   await saveBoardFixture(page, baseURL!); const barrier = await documentResponseBarrier(page);
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click(); await expect.poll(barrier.held).toBeGreaterThan(0);
+  await addStickyNote(page); await expect.poll(barrier.held).toBeGreaterThan(0);
   await context.clearCookies({ name: 'dali_fixture_identity' }); const other = await context.newPage();
   await other.goto(baseURL! + '/auth/start'); await other.getByRole('link', { name: 'Synthetic Editor', exact: true }).click();
   await expect(other.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();

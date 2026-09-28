@@ -4,9 +4,9 @@ import { canvasInsertionRect, serializeInsertionRect } from './insertion-placeme
  *
  * BlockSuite's bottom toolbar already offers stickies through its note-senior
  * button, which drops you into a template picker. This is the plain version:
- * one click, one yellow square in available viewport space, ready to type into.
+ * one native square in available viewport space using the chosen paper color.
  */
-import { DefaultTheme } from '@blocksuite/affine/model';
+import { DefaultTheme, type Color } from '@blocksuite/affine/model';
 import type { BlockStdScope } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 
@@ -16,8 +16,9 @@ import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
  */
 const STICKY_SIZE = 260;
 
-export function insertSticky(std: BlockStdScope): string {
+export function insertSticky(std: BlockStdScope, background: Color = DefaultTheme.NoteBackgroundColorMap.Yellow!): string {
   const store = std.store;
+  if (store.readonly) throw new Error('This board is read-only.');
   const rootId = store.root?.id;
   if (!rootId) throw new Error('The board has no page block to add a sticky to.');
 
@@ -32,7 +33,7 @@ export function insertSticky(std: BlockStdScope): string {
       index: gfx.layer.generateIndex(),
       // edgeless-only: a canvas object, not part of any page flow.
       displayMode: 'edgeless',
-      background: DefaultTheme.NoteBackgroundColorMap.Yellow,
+      background,
       edgeless: {
         // Without collapse the note auto-sizes to its content, so the height in
         // `xywh` is ignored and a "sticky" opens as a wide 92px strip. Pinning

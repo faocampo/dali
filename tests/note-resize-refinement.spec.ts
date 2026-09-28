@@ -1,8 +1,9 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './fixtures';
 
 test('manual note resizing scales text with its geometry and supports undo', async ({ page }, info) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.locator('affine-edgeless-note').dblclick();
   await page.keyboard.insertText('A note that scales'); await page.keyboard.press('Escape');
   await page.mouse.click(1000, 600); await page.locator('affine-edgeless-note').click();

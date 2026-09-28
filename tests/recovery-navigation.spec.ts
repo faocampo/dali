@@ -1,9 +1,10 @@
+import { addStickyNote } from './sticky-tool';
 import { test, expect } from './browser-fixtures.js';
 import { recoveryBoardFixture, journalRows, failRecoveryStorage } from './recovery-fixtures';
 
 test('@04-09-02 returning to the library after Saved never creates pending recovery records', async ({ page, baseURL }) => {
   const { descriptor } = await recoveryBoardFixture(page, baseURL!, 'Saved library canary');
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await expect.poll(async () => (await journalRows(page)).length).toBe(0);
   await page.getByRole('link', { name: 'Dalí', exact: true }).click();
@@ -25,7 +26,7 @@ test('@04-09-02 returning to the library after Saved never creates pending recov
 test('@04-08-02 Stay and Escape retain pending work; Leave transitions once with destination focus', async ({ page, baseURL }) => {
   await recoveryBoardFixture(page, baseURL!);
   await page.route('**/docs/*/push', route => route.fulfill({ status: 503, json: { code: 'SYNTHETIC_OUTAGE' } }));
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await expect(page.getByRole('button', { name: 'Save failed, Open save details', exact: true })).toBeVisible();
   await expect.poll(async () => (await journalRows(page)).length).toBeGreaterThan(0);
   const open = async () => { await page.getByRole('button', { name: 'Main Menu', exact: true }).click(); await page.getByRole('menuitem', { name: 'File', exact: true }).click(); await page.getByRole('menuitem', { name: 'All boards', exact: true }).click(); };
@@ -101,7 +102,7 @@ test('@04-08-02 ordinary short saving navigates without confirmation', async ({ 
   await recoveryBoardFixture(page, baseURL!);
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.route('**/docs/*/push', async route => { await new Promise(resolve => setTimeout(resolve, 500)); await route.continue().catch(() => {}); });
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.getByRole('link', { name: 'Dalí', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeFocused();
   await expect(page.getByRole('dialog', { name: 'Leave with changes waiting to save?' })).toHaveCount(0);

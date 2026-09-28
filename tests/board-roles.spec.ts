@@ -1,3 +1,4 @@
+import { addStickyNote } from './sticky-tool';
 import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { editBoardTitle, fileAction } from './app-menu';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -321,7 +322,7 @@ test('system Viewer creator retains Owner controls and owns an independent copy'
   await page.getByLabel('Account for Synthetic Owner').click();
   await expect(page.locator('.board-account .board-role')).toHaveText('Owner');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Add sticky note', exact: true }).click();
+  await addStickyNote(page);
   await page.locator('affine-edgeless-note').dblclick(); await page.keyboard.insertText('Owned content'); await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Main Menu', exact: true }).click();
