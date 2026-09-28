@@ -83,6 +83,9 @@ test('label layout retains explicit line breaks and stays stable under zoom', as
 });
 
 for (const timeout of [false, true]) test(`slow bundled fonts preserve connector geometry${timeout ? ' after timeout and retry' : ' on reload'}`, async ({ page }) => {
+  // Install before the editor creates RxJS/native timers so cancellation uses
+  // the same clock that scheduled each action throughout navigation.
+  if (timeout) await page.clock.install();
   await page.goto('/');
   await page.locator('affine-edgeless-root').evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
@@ -99,7 +102,6 @@ for (const timeout of [false, true]) test(`slow bundled fonts preserve connector
     await route.continue();
   });
   try {
-    if (timeout) await page.clock.install();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect.poll(() => requests).toBeGreaterThan(0);
     await expect(page.getByText('Opening board…', { exact: true })).toBeVisible();

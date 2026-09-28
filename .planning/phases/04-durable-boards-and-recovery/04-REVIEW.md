@@ -69,6 +69,12 @@ For UI and evidence boundaries, review covered storage-error propagation, retain
 
 ## Validation and limits
 
+### Plan 04-17 incremental inline review
+
+Reviewed `src/canvas/blocksuite-editor.ts`, `tests/local-recovery.spec.ts`, `tests/connector-labels.spec.ts`, and `tests/fixtures.ts`, including the pinned native cursor/range notification and dispatcher lifecycle. No additional actionable finding was identified. Cursor notification remains synchronous, dispatcher state is restored in `finally`, and editor destruction restores the original method. Actual pointer dispatch remains enabled. The stronger focus oracle first failed against the original application, then passed all eight project/repetition combinations. The clock correction preserves the geometry/timeout oracle, and stack capture leaves the strict error check intact.
+
+Final focused evidence: 32/32 passed, zero skips/retries; 236/236 client tests and both static checks passed. The earlier WebKit session-request error remains causally unresolved and did not reproduce. This review is inline, with full regression still pending; it does not close G-04-38. See [04-17 diagnosis](04-17-DIAGNOSIS.md) (root-cause evidence, rejected broad guard, and remaining uncertainty).
+
 Current continuation: the complete `e93b933` gate failed (2,029/2,036 passed). Test-fixture corrections are committed in `c06600b`; repeated focused validation passes 31/32 and exposes a WebKit recovery-focus failure. Two earlier runtime errors did not reproduce in those repetitions. The historical clean review below does not resolve these runtime findings; G-04-38 and 04-17 retain them. Phase 4 is not accepted.
 
 UAT subsequently found that scope suspension wrote acknowledged full snapshots back into the pending journal. The correction in `0b9f05a` was reviewed through the confirmed-document ledger, synchronous capture and suspension lifecycle: only uncovered state is captured, and existing pending records are retained. A fail-first native regression proves the Saved-to-library transition; three-engine tests also verify quota failure for genuinely unsaved work. The 236 client and 311 server suites and both static checks passed again. The complete regression is running on this corrected revision.

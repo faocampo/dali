@@ -8,6 +8,7 @@ import { fixtureRecoveryEpoch } from './fixtures';
 import { randomUUID } from 'node:crypto';
 import { recoveryBoardFixture, failRecoveryStorage, restoreRecoveryStorage, nativeRecoveryModel, journalRows } from './recovery-fixtures';
 import type { EditorHost } from '@blocksuite/affine/std';
+import type { GfxController } from '@blocksuite/affine/std/gfx';
 import { syntheticCanaries } from './access-fixtures';
 
 declare global { interface Window { RecoveryHarness: typeof Recovery & typeof Capture & { Y: typeof Y }; recoveryJournal?: Recovery.AccountJournal; recoveryBlocker?: IDBDatabase; recoverySignals?: unknown[] } }
@@ -113,6 +114,12 @@ test('@04-04-03 loading respects intervening user focus and opens a valid empty 
   await page.getByRole('button', { name: 'Synthetic focus target', exact: true }).focus();
   await expect(page.getByRole('button', { name: 'Synthetic focus target', exact: true })).toBeFocused();
   release(); await expect(page.locator('editor-host')).toBeVisible();
+  // Hover emits a native cursor selection after mounting. It must not reclaim
+  // focus from the control chosen during recovery, even after its animation frame.
+  const cursor = () => page.locator('affine-edgeless-root').evaluate(el => JSON.stringify((el as HTMLElement & { gfx: GfxController }).gfx.selection.cursorSelection));
+  const beforeCursor = await cursor();
+  await page.mouse.move(640, 400);
+  await expect.poll(cursor).not.toBe(beforeCursor);
   await expect(page.getByRole('button', { name: 'Synthetic focus target', exact: true })).toBeFocused();
   await expect(page.locator('affine-edgeless-note')).toHaveCount(0);
   expect(await page.evaluate(() => sessionStorage.getItem('dali-recovery-focus'))).toBeNull();

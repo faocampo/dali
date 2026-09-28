@@ -71,7 +71,7 @@ export const test = base.extend<{
     async ({ page, expectErrors }, use) => {
       const errors: string[] = [];
       const pendingConsole: Promise<void>[] = [];
-      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+      page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}${e.stack ? '\n' + e.stack : ''}`));
       page.on('console', (m) => {
         if (m.type() !== 'error') return;
         const index = errors.push(`console: ${m.text()}`) - 1;

@@ -150,6 +150,20 @@ export async function mountEdgelessEditor(
       throw new Error('This editor version cannot synchronize canvas pointer coordinates.');
     }
     const gfxViewport = std.get(GfxControllerIdentifier).viewport;
+    const selection = std.get(GfxControllerIdentifier).selection;
+    const setCursor = selection.setCursor;
+    selection.setCursor = cursor => {
+      // Cursor awareness is a selection update, but must not take keyboard
+      // ownership from an outside control. Keep pointer dispatch and presence
+      // updates intact; suppress native range focus only during this update.
+      const active = host.ownerDocument.activeElement;
+      const outside = active && active !== host.ownerDocument.body &&
+        active !== host.ownerDocument.documentElement && !host.contains(active);
+      const wasActive = std.event.active;
+      if (outside) std.event.active = false;
+      try { setCursor.call(selection, cursor); }
+      finally { if (outside) std.event.active = wasActive; }
+    };
     const refreshPointerRect = () => {
       pointer._updateRect!();
       const rect = viewport.getBoundingClientRect();
@@ -158,7 +172,10 @@ export async function mountEdgelessEditor(
     };
     const pointerEvents = ['pointerdown','pointermove','pointerup','wheel'] as const;
     pointerEvents.forEach(name => host.addEventListener(name, refreshPointerRect, true));
-    disposePointer = () => pointerEvents.forEach(name => host.removeEventListener(name, refreshPointerRect, true));
+    disposePointer = () => {
+      pointerEvents.forEach(name => host.removeEventListener(name, refreshPointerRect, true));
+      selection.setCursor = setCursor;
+    };
     return { host, destroy };
   } catch (cause) {
     destroy();
