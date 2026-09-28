@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { unzipSync } from 'fflate';
 import type { Download, Locator, Page, TestInfo } from '@playwright/test';
 import type { EditorHost } from '@blocksuite/affine/std';
-import { test, expect } from './fixtures';
+import { test, expect, fixtureRecoveryEpoch } from './fixtures';
 import { recoveryBoardFixture, nativeRecoveryModel, journalRows, failRecoveryStorage, restoreRecoveryStorage } from './recovery-fixtures';
 import { documentResponseBarrier } from './save-status-fixtures';
 import { addDetailImages, openSaveDetails, saveTrigger, saveDetailsFixtures } from './save-details-fixtures';
@@ -63,6 +63,7 @@ async function group(key: string, body: () => Promise<void>) {
 test.afterEach(async ({}, info) => {
   await info.attach('executed-ui-predicates', { contentType: 'application/json', body: Buffer.from(JSON.stringify({ project: info.project.name, revision: testedRevision, test: info.title, status: info.status, completed: info.status === 'passed' ? completed.get(info) ?? [] : [] })) });
 });
+test.beforeEach(async ({ page }) => { await page.emulateMedia({ reducedMotion: 'reduce' }); });
 test.use({ expectErrors: ['the server responded with a status of 503', 'the server responded with a status of 403', 'the server responded with a status of 404'] });
 const widths = [1440, 900, 600, 490, 320];
 const saved = (page: Page) => page.getByRole('button', { name: 'Saved, Open save details', exact: true });
@@ -137,7 +138,7 @@ async function beginNativePreservationHold(page: Page) {
 }
 async function releaseNativePreservation(page: Page) { await page.evaluate(() => (window as unknown as { releaseRecoveryCompletions(): void }).releaseRecoveryCompletions()); }
 
-test('@04-16 @04-ui-E1 status transitions preserve age and open details deliberately', async ({ page, baseURL }) => {
+test('@04-16 @04-ui-E1 status transitions preserve age and open details deliberately', async ({ page, baseURL, pageErrors, expectErrors }) => {
   await recoveryBoardFixture(page, baseURL!); await addDetailImages(page, 1); await expect(saved(page)).toBeVisible();
   await openSaveDetails(page); const lastSaved = await details(page).locator('.save-details-time').textContent();
   expect(lastSaved).toMatch(/^Last saved to the server: .+/); await page.keyboard.press('Escape');
@@ -153,6 +154,7 @@ test('@04-16 @04-ui-E1 status transitions preserve age and open details delibera
     });
     await barrier.releaseAll(); await expect(saved(page)).toBeVisible();
     await page.unroute('**/docs/*/push'); await outage(page);
+    expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]); expectErrors.push('Error: Board image request failed');
     await page.route('**/blobs/*', route => route.request().method() === 'GET' ? route.fulfill({ status: 503, json: { code: 'SYNTHETIC_IMAGE_FAILURE' } }) : route.continue());
     await page.reload(); await expect(saveTrigger(page)).toContainText('Image not saved');
     await group('E1/error', async () => {
@@ -161,7 +163,7 @@ test('@04-16 @04-ui-E1 status transitions preserve age and open details delibera
       await expect(details(page)).toBeVisible(); await expect(saveTrigger(page)).toHaveAttribute('aria-expanded', 'true');
       await expect(saveTrigger(page)).toHaveAttribute('aria-controls', await details(page).getAttribute('id') ?? '');
       await expect(details(page)).toContainText('Board changes and'); await expect(saved(page)).toHaveCount(0);
-      const before = await nativeRecoveryModel(page); await details(page).getByRole('heading').focus(); await page.keyboard.press('Delete');
+      const before = await nativeRecoveryModel(page); await details(page).getByRole('heading', { name: 'Save details', exact: true }).focus(); await page.keyboard.press('Delete');
       expect(await nativeRecoveryModel(page)).toBe(before); await page.keyboard.press('Escape'); await expect(saveTrigger(page)).toBeFocused();
     });
   } finally { await barrier.releaseAll(); }
@@ -182,11 +184,12 @@ test('@04-16 @04-ui-E2 @04-ui-E3 healthy empty details and decoded zero-image ar
   });
 });
 
-test('@04-16 @04-ui-E2 individual image rows survive preview failure and acknowledged retry', async ({ page, baseURL }) => {
+test('@04-16 @04-ui-E2 individual image rows survive preview failure and acknowledged retry', async ({ page, baseURL, pageErrors, expectErrors }) => {
   await recoveryBoardFixture(page, baseURL!); await addDetailImages(page, 2); await expect(saved(page)).toBeVisible();
   const key = await page.locator('editor-host').evaluate(el => ((el as EditorHost).store.getBlocksByFlavour('affine:image')[0]!.model.props as { sourceId: string }).sourceId);
   let fail = true; let held = 0; let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
-  await page.route('**/blobs/*', async route => {
+  expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]); expectErrors.push('Error: Board image request failed');
+    await page.route('**/blobs/*', async route => {
     if (route.request().method() !== 'GET' || !decodeURIComponent(route.request().url()).endsWith(key)) return route.continue();
     if (fail) return route.fulfill({ status: 503, json: { code: 'SYNTHETIC_IMAGE_FAILURE' } });
     const response = await route.fetch(); held++; await gate; await route.fulfill({ response }).catch(() => undefined);
@@ -227,12 +230,13 @@ test('@04-16 @04-ui-E2 individual image rows survive preview failure and acknowl
   } finally { release(); await restoreDetailsPreview(page); }
 });
 
-test('@04-16 @04-ui-E1 @04-ui-E2 details cardinality full labels and responsive geometry', async ({ page, baseURL }) => {
+test('@04-16 @04-ui-E1 @04-ui-E2 details cardinality full labels and responsive geometry', async ({ page, baseURL, pageErrors, expectErrors }) => {
   await recoveryBoardFixture(page, baseURL!, saveDetailsFixtures.title); await addDetailImages(page, 1, saveDetailsFixtures.name); await expect(saved(page)).toBeVisible();
   await group('E2/zero-one-many', async () => {
     let dialog = await openSaveDetails(page); await expect(dialog.getByRole('heading', { name: '1 image', exact: true })).toBeVisible(); await page.keyboard.press('Escape');
     await page.locator('editor-host').evaluate(el => { const store = (el as EditorHost).store; store.deleteBlock(store.getBlocksByFlavour('affine:image')[0]!.model); }); await expect(saved(page)).toBeVisible();
     await addDetailImages(page, 50, saveDetailsFixtures.name); await expect(saved(page)).toBeVisible();
+    expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]); expectErrors.push('Error: Board image request failed');
     await page.route('**/blobs/*', route => route.request().method() === 'GET' ? route.fulfill({ status: 503, json: {} }) : route.continue());
     await page.reload(); await expect(saveTrigger(page)).toContainText('Image not saved'); dialog = await openSaveDetails(page);
     await expect(dialog.getByRole('heading', { name: '50 images', exact: true })).toBeVisible(); await expect(dialog.getByRole('listitem')).toHaveCount(50);
@@ -254,7 +258,7 @@ test('@04-16 @04-ui-E1 @04-ui-E2 details cardinality full labels and responsive 
   await group('E2/long-text', async () => { await longLabels(page); expect(await details(page).evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true); });
 });
 
-test('@04-16 @04-ui-E3 recovery preparation and missing bytes preserve exact pending content', async ({ page, baseURL }) => {
+test('@04-16 @04-ui-E3 recovery preparation and missing bytes preserve exact pending content', async ({ page, baseURL, pageErrors, expectErrors }) => {
   await recoveryBoardFixture(page, baseURL!, saveDetailsFixtures.title); await addDetailImages(page, 1, saveDetailsFixtures.name); await expect(saved(page)).toBeVisible(); await pendingNote(page); await openSaveDetails(page);
   const barrier = await recoveryAuthorizationBarrier(page);
   const preparationModel = await nativeRecoveryModel(page); const preparationRows = await exactJournal(page);
@@ -270,7 +274,8 @@ test('@04-16 @04-ui-E3 recovery preparation and missing bytes preserve exact pen
   } finally { barrier.release(); }
   const bytes = Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = c.height = 16; c.getContext('2d')!.fillRect(0, 0, 16, 16); return c.toDataURL().split(',')[1]!; }), 'base64');
   const key = createHash('sha256').update(bytes).digest('base64url') + '='; let available = false;
-  await page.route('**/blobs/*', route => decodeURIComponent(route.request().url()).endsWith(key) ? available ? route.fulfill({ status: 200, contentType: 'image/png', body: bytes }) : route.fulfill({ status: 503, json: {} }) : route.continue());
+  expect(pageErrors.filter(error => !expectErrors.some(allowed => error.includes(allowed)))).toEqual([]); expectErrors.push('Error: Board image request failed');
+    await page.route('**/blobs/*', route => decodeURIComponent(route.request().url()).endsWith(key) ? available ? route.fulfill({ status: 200, contentType: 'image/png', body: bytes }) : route.fulfill({ status: 503, json: {} }) : route.continue());
   await page.locator('editor-host').evaluate((el, value) => { const store = (el as EditorHost).store; store.updateBlock(store.getBlocksByFlavour('affine:image')[0]!.model, { sourceId: value }); }, key);
   const before = await nativeRecoveryModel(page); const retained = await exactJournal(page); const downloads: Download[] = []; page.on('download', value => downloads.push(value));
   await group('E3/error', async () => {
@@ -309,7 +314,7 @@ test('@04-16 @04-ui-E3 complete recovery archive imports into an independent pri
 });
 
 test('@04-16 @04-ui-E4 valid empty unavailable and denied boards stay distinct', async ({ page, baseURL }) => {
-  const { descriptor } = await recoveryBoardFixture(page, baseURL!);
+  const { member, descriptor } = await recoveryBoardFixture(page, baseURL!);
   await group('E4/empty', async () => { await expect(page.locator('editor-host')).toBeVisible(); await expect(page.locator('affine-edgeless-note')).toHaveCount(0); });
   await pendingNote(page); const retained = await exactJournal(page); page.on('dialog', dialog => dialog.accept());
   let status = 503; const path = '**/api/boards/' + descriptor.summary.id;
@@ -320,7 +325,10 @@ test('@04-16 @04-ui-E4 valid empty unavailable and denied boards stay distinct',
     await expect(page.locator('affine-edgeless-note')).toHaveCount(1); await expect(saved(page)).toBeVisible();
     status = 404; await page.reload(); await expect(page.getByRole('heading', { name: "You don't have access to this board", exact: true })).toBeVisible(); await expect(page.locator('editor-host')).toHaveCount(0); await group('E4/overflow', () => boardErrorLayout(page, page.getByRole('heading', { name: "You don't have access to this board", exact: true })));
     for (const kind of ['corrupt', 'restore'] as const) {
-      const fixture = await recoveryBoardFixture(page, baseURL!); await pendingNote(page);
+      await page.setViewportSize({ width: 1280, height: 800 });
+      const response = await page.request.post('/api/boards', { headers: { Origin: baseURL!, 'X-Dali-Account': member.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': await fixtureRecoveryEpoch(page.request, member.accountId) }, data: { operationId: crypto.randomUUID(), title: 'Synthetic isolated recovery' } });
+      expect(response.status()).toBe(201); const fixture = { descriptor: await response.json() };
+      await page.goto('/?board=' + fixture.descriptor.summary.id); await expect(saved(page)).toBeVisible(); await pendingNote(page);
       await page.evaluate(({ boardId, kind }) => new Promise<void>((resolve, reject) => {
         const request = indexedDB.open('dali-account-recovery-v1', 2); request.onerror = () => reject(request.error);
         request.onsuccess = () => { const db = request.result; const tx = db.transaction('journal', 'readwrite'); const store = tx.objectStore('journal'); const rows = store.getAll();
@@ -365,7 +373,7 @@ test('@04-16 @04-ui-E4 recovery authorization and acknowledgment progress preced
       await writes.releaseAll(); await expect(page.locator('affine-edgeless-note')).toHaveCount(1); await expect(page.locator('affine-edgeless-image')).toHaveCount(1);
       await expect(saved(page)).toBeVisible(); await expect(page.getByRole('button', { name: 'Keep my focus' })).toBeFocused();
       await expect.poll(() => page.locator('affine-edgeless-image').evaluate(el => [...el.querySelectorAll('img')].some(img => img.complete && img.naturalWidth > 0))).toBe(true);
-      expect(await nativeRecoveryModel(page)).toBe(original);
+      expect(JSON.parse(await nativeRecoveryModel(page))).toEqual(JSON.parse(original));
     });
   } finally { authorization.release(); await writes.releaseAll(); }
 });
@@ -382,7 +390,7 @@ test('@04-16 @04-ui-E4 valid retained editing context restores after acknowledge
       await page.reload(); await expect.poll(barrier.held).toBeGreaterThan(0);
       await barrier.releaseAll(); await expect(saved(page)).toBeVisible();
       await expect(page.getByRole('button', { name: 'Add sticky note', exact: true })).toBeFocused();
-      expect(await nativeRecoveryModel(page)).toBe(original);
+      expect(JSON.parse(await nativeRecoveryModel(page))).toEqual(JSON.parse(original));
       expect(await page.evaluate(() => sessionStorage.getItem('dali-recovery-focus'))).toBeNull();
     });
   } finally { await barrier.releaseAll(); }
@@ -459,13 +467,13 @@ test.describe('@04-16 @04-ui-E6 library matrix', () => {
     const account = await libraryRecoveryMember(page, service.origin); const ids: string[] = [];
     for (let i = 0; i < 50; i++) ids.push((await libraryRecoveryBoard(page, service.origin, account, i === 0 ? saveDetailsFixtures.title : `Synthetic ${i}`)).summary.id);
     await page.getByRole('button', { name: 'Refresh boards' }).click(); await expect(page.locator('[data-board-id]')).toHaveCount(50);
-    const metadata = () => page.locator('[data-board-id]').evaluateAll(cards => cards.map(card => [card.getAttribute('data-board-id'), card.querySelector('small')!.textContent, card.querySelector('.board-card__metadata')!.textContent, card.querySelector('summary')?.getAttribute('aria-label')])); const before = await metadata();
-    await seedLibraryPending(page, account, ids.slice(1)); await expect(page.locator('.board-card__pending')).toHaveCount(49);
+    const metadata = () => page.locator('[data-board-id]').evaluateAll(cards => cards.map(card => [card.getAttribute('data-board-id'), card.querySelector('small')!.textContent, card.querySelector('.board-card__metadata')!.textContent, card.querySelector('summary')?.getAttribute('aria-label')]));
     const editor = await context.newPage(); const clean = watchSecondary(editor);
     try {
-      await editor.goto(service.origin + '/?board=' + ids[0]); await expect(saved(editor)).toBeVisible(); await pendingNote(editor); await page.getByRole('button', { name: 'Refresh boards' }).click(); await expect(page.locator('.board-card__pending')).toHaveCount(50);
+      await editor.goto(service.origin + '/?board=' + ids[0]); await expect(saved(editor)).toBeVisible(); await page.getByRole('button', { name: 'Refresh boards' }).click(); await expect(page.getByText('Loading your boards…', { exact: true })).toHaveCount(0); await expect(page.locator('[data-board-id]')).toHaveCount(50); const before = await metadata();
+      await seedLibraryPending(page, account, ids.slice(1)); await expect(page.locator('.board-card__pending')).toHaveCount(49); await pendingNote(editor); await page.getByRole('button', { name: 'Refresh boards' }).click(); await expect(page.locator('.board-card__pending')).toHaveCount(50);
       const first = page.locator(`[data-board-id="${ids[0]}"]`);
-      await group('E6/populated', async () => { expect(await metadata()).toEqual(before); const marker = first.locator('.board-card__pending'); const metaBox = (await first.locator('.board-card__metadata').boundingBox())!; expect((await marker.boundingBox())!.y).toBeGreaterThanOrEqual(metaBox.y + metaBox.height); await first.locator('summary').click(); await expect(first.getByRole('button', { name: 'Rename board' })).toBeVisible(); await expect(first.getByRole('button', { name: 'Rename board' })).toBeEnabled(); await page.keyboard.press('Escape'); });
+      await group('E6/populated', async () => { await expect.poll(metadata).toEqual(before); const marker = first.locator('.board-card__pending'); const metaBox = (await first.locator('.board-card__metadata').boundingBox())!; expect((await marker.boundingBox())!.y).toBeGreaterThanOrEqual(metaBox.y + metaBox.height); await first.locator('summary').click(); await expect(first.getByRole('button', { name: 'Rename board' })).toBeVisible(); await expect(first.getByRole('button', { name: 'Rename board' })).toBeEnabled(); await page.keyboard.press('Escape'); });
       await group('E6/partial', async () => { const previewless = page.locator(`[data-board-id="${ids[1]}"]`); await expect(previewless.getByText('Preview unavailable')).toBeVisible(); await expect(previewless.locator('.board-card__pending')).toBeVisible(); });
       await group('E6/overflow', async () => { for (const width of widths) {
         await page.setViewportSize({ width, height: width === 320 ? 480 : 800 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

@@ -1,7 +1,7 @@
 // Require the three production projects specified by 04-16; additional projects are recorded.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import type { FullConfig, FullResult, Reporter, TestCase, TestResult } from '@playwright/test/reporter';
 
 const required = ['prod', 'prod-firefox', 'prod-webkit'];
@@ -28,11 +28,13 @@ export default class MatrixReporter implements Reporter {
   private issues: string[] = [];
   private coverage = new Map<string, Set<string>>();
   private counts = new Map<string, number>();
+  private skipped = 0;
   onBegin(config: FullConfig) {
     try { this.identity = sourceIdentity(); } catch (error) { this.issues.push(String(error)); }
     for (const project of required) if (!config.projects.some(value => value.name === project)) this.issues.push(`Missing required project ${project}`);
   }
   onTestEnd(test: TestCase, result: TestResult) {
+    if (result.status === 'skipped') this.skipped++;
     if (!test.location.file.endsWith('recovery-ui-matrix.spec.ts')) return;
     const project = test.parent.project()!.name;
     this.counts.set(project, (this.counts.get(project) ?? 0) + 1);
@@ -53,8 +55,13 @@ export default class MatrixReporter implements Reporter {
       if (this.counts.get(project) !== 13) this.issues.push(`${project}: expected all 13 scenarios without retries; observed ${this.counts.get(project) ?? 0}`);
       for (const key of expected) if (!this.coverage.get(project)?.has(key)) this.issues.push(`${project}: missing passing ${key}`);
     }
+    if (this.skipped) this.issues.push(`${this.skipped} required tests skipped`);
+    mkdirSync('test-results', { recursive: true });
+    const evidence = { status: result.status === 'passed' && this.issues.length === 0 ? 'passed' : 'failed', source: this.identity, projects: Object.fromEntries(required.map(project => [project, { scenarios: this.counts.get(project) ?? 0, predicates: [...(this.coverage.get(project) ?? [])].sort() }])), issues: this.issues };
+    writeFileSync('test-results/recovery-ui-matrix-evidence.json', JSON.stringify(evidence, null, 2) + '\n');
     if (result.status !== 'passed' || this.issues.length) {
       process.stderr.write(`Matrix acceptance unavailable:\n${this.issues.join('\n')}\n`); return { status: 'failed' };
     }
+    process.stdout.write(`RECOVERY_UI_MATRIX_PASS: ${required.length} engines, ${expected.length} predicates each, source ${this.identity?.revision}, digest ${this.identity?.digest}\n`);
   }
 }
