@@ -26,10 +26,15 @@ test('application menu actions have decorative icons', async ({ page }) => {
 
 for (const width of [1456, 390]) test(`sharing controls align with icons at ${width}`, async ({ page }, info) => {
   await page.setViewportSize({ width, height: 998 }); await page.goto('/');
-  await page.route('**/grants', route => route.fulfill({ json: { revision: 1, owner: { email: 'owner@example.org', displayName: 'Synthetic Owner' }, grants: [
+  await page.route('**/grants', async route => {
+    const response = await route.fetch();
+    expect(response.status()).toBe(200);
+    const access = await response.json();
+    await route.fulfill({ response, json: { ...access, grants: [
     { id: 'editor', memberId: 'editor', email: 'editor@example.org', displayName: 'Synthetic Editor', role: 'editor', status: 'active', revision: 1 },
     { id: 'viewer', memberId: 'viewer', email: 'viewer@example.org', displayName: 'Synthetic Viewer', role: 'viewer', status: 'active', revision: 1 },
-  ] } }));
+    ] } });
+  });
   await page.getByRole('button', { name: 'Share board', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Share board' });
   await expect(dialog.locator('.share-row')).toHaveCount(2);

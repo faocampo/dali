@@ -76,13 +76,14 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 
     await page.keyboard.press('Tab'); await expect(page.getByRole('combobox', { name: 'Font weight' })).toBeFocused();
     await page.keyboard.press('Shift+Tab'); await expect(size).toBeFocused();
     if (changed) await size.fill('24');
+    await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     const headerBefore = await page.locator('.djai-header').boundingBox();
     expect(await page.getByRole('button', { name: 'Close mind-map controls', exact: true }).evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
     await page.getByRole('button', { name: 'Close mind-map controls', exact: true }).click();
     await expect(panel).toHaveCount(0);
     await expect(page.locator('editor-host')).toBeFocused();
-    expect(await page.locator('.djai-header').boundingBox()).toEqual(headerBefore);
     await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+    expect(await page.locator('.djai-header').boundingBox()).toEqual(headerBefore);
     expect(await page.locator('affine-edgeless-root').evaluate(el => ((el as HTMLElement & { gfx: GfxController }).gfx.selection.selectedElements[0] as unknown as { fontSize: number }).fontSize)).toBe(changed ? 24 : 20);
     await page.keyboard.press('Escape'); await page.keyboard.press('Tab');
     expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true);
@@ -146,9 +147,10 @@ test('@02-05-03 live counts readonly controls error retry and zoomed-out canvas'
     map.setLayoutMethod(() => { map.setLayoutMethod(delegate); throw new Error('Synthetic layout fault'); });
   });
   await page.getByRole('button', { name: 'Arrange mind map', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveText('The mind map could not be arranged. Try Arrange mind map again.');
+  await expect(page.locator('.mindmap-feedback').getByRole('alert')).toHaveText('The mind map could not be arranged. Try Arrange mind map again.');
   await page.getByRole('button', { name: 'Arrange mind map', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('.mindmap-feedback').getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.locator('affine-edgeless-root').evaluate(el => {
     const gfx = (el as HTMLElement & { gfx: GfxController }).gfx;
     gfx.doc.readonly = true; gfx.selection.set({ elements: [...gfx.selection.selectedElements.map(e => e.id)], editing: false });

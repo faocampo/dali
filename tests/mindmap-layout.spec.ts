@@ -62,6 +62,8 @@ function assertGeometry(state: Awaited<ReturnType<typeof geometry>>, before: Awa
 }
 
 for (const size of [7, 50]) test(`@02-05-01 ${size} topics retain anchor collapse and selection in all directions`, async ({ page }) => {
+  let documentPushes = 0;
+  page.on('request', request => { if (/\/docs\/[^/]+\/push$/.test(request.url())) documentPushes++; });
   const ids = await seedLayout(page, size);
   const initial = await geometry(page);
   await expect(page.getByRole('group', { name: 'Mind-map layout', exact: true }).getByRole('button', { name: 'Left', exact: true })).toBeVisible({ timeout: 2000 });
@@ -78,6 +80,8 @@ for (const size of [7, 50]) test(`@02-05-01 ${size} topics retain anchor collaps
   await page.getByRole('button', { name: /Expand branch:/ }).click();
   assertGeometry(await geometry(page), initial);
   await page.getByRole('button', { name: 'Saved, Open save details', exact: true }).waitFor();
+  // A modest map must settle without replaying thousands of tiny requests.
+  expect(documentPushes).toBeLessThan(100);
   const saved = await geometry(page);
   await page.reload();
   await expect.poll(async () => (await geometry(page)).nodes).toEqual(saved.nodes);
@@ -143,10 +147,10 @@ test('@02-05-01 partial native failure restores geometry and retry retains ident
     });
   });
   await page.getByRole('button', { name: 'Arrange mind map', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveText('The mind map could not be arranged. Try Arrange mind map again.');
+  await expect(page.locator('.mindmap-feedback').getByRole('alert')).toHaveText('The mind map could not be arranged. Try Arrange mind map again.');
   expect((await geometry(page)).nodes).toEqual(before.nodes);
   await page.getByRole('button', { name: 'Arrange mind map', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('.mindmap-feedback').getByRole('alert')).toHaveCount(0);
   expect((await geometry(page)).nodes).toEqual(before.nodes);
 });
 

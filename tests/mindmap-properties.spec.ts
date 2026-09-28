@@ -65,7 +65,7 @@ test('@02-uat-properties Properties opens only from the context menu and stays c
     const map = gfx.surface!.elementModels.find(model => model.type === 'mindmap') as MindmapElementModel;
     map.tree.element.lock(); map.toggleCollapse(map.tree, { layout: true });
   });
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.mindmap-feedback').getByRole('alert')).toBeVisible();
   await expect(panel).toHaveCount(0);
 });
 

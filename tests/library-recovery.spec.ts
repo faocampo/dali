@@ -183,8 +183,6 @@ test('@04-09-02 actual acknowledgment clears one board while another pending mar
     await library.goto(service.origin + '/');
     await expect(library.locator('.board-card__pending')).toHaveCount(50);
     await page.unroute('**/docs/*/push');
-    await page.getByRole('button', { name: 'Save failed, Open save details', exact: true }).click();
-    await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     await expect(library.locator('[data-board-id="' + board.summary.id + '"] .board-card__pending')).toHaveCount(0);
     await expect(library.locator('[data-board-id="' + other.summary.id + '"] .board-card__pending')).toHaveCount(1);

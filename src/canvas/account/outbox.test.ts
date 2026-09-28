@@ -33,7 +33,7 @@ function storage(initial: JournalRecord[] = []) {
         }; },
       };
       function request<T>(result: T) {
-        pending++; const req = { result, onsuccess: null as null | (() => void) };
+        pending++; const req = { result: structuredClone(result), onsuccess: null as null | (() => void) };
         queueMicrotask(() => { if (aborted) return; pending--; req.onsuccess?.(); queueMicrotask(() => {
           if (!aborted && !pending) { for (const [name, values] of draft) { const target = stores.get(name)!; target.clear(); for (const [id, value] of values) target.set(id, value); } tx.oncomplete?.(); }
         }); }); return req;
@@ -48,6 +48,82 @@ function storage(initial: JournalRecord[] = []) {
   return { rows, fail(value: boolean) { fail = value; } };
 }
 afterEach(() => { vi.unstubAllGlobals(); });
+function documentRows(doc: Y.Doc, count: number, resource = 'content'): JournalRecord[] {
+  const rows: JournalRecord[] = [];
+  const capture = (data: Uint8Array) => rows.push({ ...scope, schemaVersion: 2, epoch: scope.recoveryEpoch, tabId: 'batch-tab', coveredIds: [], id: `${resource}-${rows.length}`, sequence: rows.length + 1, kind: 'document', resource, data });
+  doc.on('update', capture);
+  for (let i = 0; i < count; i++) doc.getText('text').insert(doc.getText('text').length, String(i) + ',');
+  doc.off('update', capture);
+  return rows;
+}
+
+it('batches document replay with exact reconstruction and retains records captured after submission', async () => {
+  const content = new Y.Doc(); const root = new Y.Doc();
+  const rows = [...documentRows(content, 520), ...documentRows(root, 2, 'root')];
+  content.once('update', data => rows.push({ ...rows[0]!, id: 'content-delete', sequence: 521, data }));
+  content.getText('text').delete(0, 10);
+  const db = storage(rows); const received = new Map([['content', new Y.Doc()], ['root', new Y.Doc()]]);
+  const late = { ...rows[0]!, id: 'late-capture' }; const observer = vi.fn();
+  const request = vi.fn(async (url: string, init: RequestInit) => {
+    db.rows.set(late.id, late);
+    const id = url.includes('/docs/content/') ? 'content' : 'root';
+    Y.applyUpdate(received.get(id)!, new Uint8Array(await new Response(init.body).arrayBuffer()));
+    return Response.json({ acknowledged: true }, { headers: { 'X-Dali-Recovery-Epoch': scope.recoveryEpoch } });
+  });
+  vi.stubGlobal('fetch', request);
+  await expect(replayJournal(descriptor, scope.accountId, new AbortController().signal, false, false, observer)).resolves.toBe(true);
+  expect(request).toHaveBeenCalledTimes(4);
+  expect(received.get('content')!.getText('text').toString()).toBe(content.getText('text').toString());
+  expect(received.get('root')!.getText('text').toString()).toBe(root.getText('text').toString());
+  expect([...db.rows.keys()]).toEqual([late.id]);
+  for (const row of rows) expect(observer.mock.calls.filter(([record, outcome]) => record.id === row.id && outcome === 'acknowledged')).toHaveLength(1);
+  [content, root, ...received.values()].forEach(doc => doc.destroy());
+});
+
+for (const failure of ['unconfirmed', 'epoch', 'missing-epoch', 'unauthorized', 'abort', 'checkpoint'] as const) it(`retains every batched row when ${failure} prevents a durable acknowledgment`, async () => {
+  const content = new Y.Doc(); const root = new Y.Doc(); const journal = new AccountJournal(scope, vi.fn());
+  const rows = documentRows(content, 4).map(row => ({ ...row, tabId: journal.tabId }));
+  const db = storage(rows);
+  await journal.checkpoint({ root: { docId: 'root', data: Y.encodeStateAsUpdate(root) }, content: { docId: 'content', data: Y.encodeStateAsUpdate(new Y.Doc()) }, title: 'Synthetic batch', assets: {} });
+  const controller = new AbortController(); const observer = vi.fn();
+  vi.stubGlobal('fetch', vi.fn(async () => {
+    if (failure === 'abort') controller.abort();
+    if (failure === 'checkpoint') db.fail(true);
+    return Response.json({ acknowledged: failure !== 'unconfirmed' }, { status: failure === 'unauthorized' ? 401 : 200, headers: failure === 'missing-epoch' ? {} : { 'X-Dali-Recovery-Epoch': failure === 'epoch' ? '22222222-2222-4222-8222-222222222222' : scope.recoveryEpoch } });
+  }));
+  await expect(replayJournal(descriptor, scope.accountId, controller.signal, false, false, observer)).rejects.toThrow();
+  expect([...db.rows.keys()]).toEqual(rows.map(row => row.id));
+  expect(observer.mock.calls.filter(([, outcome]) => outcome === 'acknowledged')).toHaveLength(0);
+  expect(observer.mock.calls.filter(([, outcome]) => outcome === 'failed')).toHaveLength(rows.length);
+  db.fail(false);
+  const checkpoint = await readCheckpoint(scope, journal.tabId); const restored = new Y.Doc(); Y.applyUpdate(restored, checkpoint!.content.data);
+  expect(restored.getText('text').toString()).toBe('');
+  [root, content, restored].forEach(doc => doc.destroy());
+});
+
+it('bounds merged replay bytes, keeps blobs first and advances each tab checkpoint with exact document content', async () => {
+  const content = new Y.Doc(); const root = new Y.Doc(); const updates: Uint8Array[] = [];
+  content.on('update', data => updates.push(data));
+  content.getText('text').insert(0, 'a'.repeat(600000)); content.getText('text').insert(600000, 'b'.repeat(600000));
+  const journal = new AccountJournal(scope, vi.fn());
+  const rows = updates.map((data, index): JournalRecord => ({ ...scope, schemaVersion: 2, epoch: scope.recoveryEpoch, tabId: journal.tabId, coveredIds: [], id: `large-${index}`, sequence: index + 1, kind: 'document', resource: 'content', data }));
+  const blob: JournalRecord = { ...rows[0]!, id: 'image', kind: 'blob', resource: imageKey, data: new Uint8Array([0, 128, 255]), mime: 'image/png' };
+  const db = storage([...rows, blob]);
+  await journal.checkpoint({ root: { docId: 'root', data: Y.encodeStateAsUpdate(root) }, content: { docId: 'content', data: Y.encodeStateAsUpdate(root) }, title: 'Synthetic bytes', assets: {} });
+  const received = new Y.Doc(); const urls: string[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+    urls.push(url);
+    if (url.includes('/docs/')) { const data = new Uint8Array(await new Response(init.body).arrayBuffer()); expect(data.byteLength).toBeLessThanOrEqual(1024 * 1024); Y.applyUpdate(received, data); }
+    return Response.json({ acknowledged: true, key: imageKey }, { headers: { 'X-Dali-Recovery-Epoch': scope.recoveryEpoch } });
+  }));
+  await replayJournal(descriptor, scope.accountId, new AbortController().signal);
+  expect(urls).toHaveLength(3); expect(urls[0]).toContain('/blobs/'); expect(db.rows.size).toBe(0);
+  const checkpoint = await readCheckpoint(scope, journal.tabId); const restored = new Y.Doc(); Y.applyUpdate(restored, checkpoint!.content.data);
+  expect(restored.getText('text').toString()).toBe(content.getText('text').toString());
+  expect(received.getText('text').toString()).toBe(content.getText('text').toString());
+  expect(checkpoint!.assets[imageKey]!.data).toEqual(blob.data);
+  [content, root, received, restored].forEach(doc => doc.destroy());
+});
 const imageKey = createHash('sha256').update(new Uint8Array([0, 128, 255])).digest('base64url') + '=';
 const scope = { accountId: 'member', boardId: 'board', generation: 1, recoveryEpoch: '11111111-1111-4111-8111-111111111111' };
 const descriptor = { summary: { id: 'board', accountId: 'member', role: 'owner' }, rootDocId: 'root', contentDocId: 'content', capabilities: ['write'], recoveryEpoch: scope.recoveryEpoch } as BoardDescriptor;

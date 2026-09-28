@@ -195,12 +195,17 @@ export async function acknowledgeRecords(scope: JournalScope, ids: readonly stri
               if (cp.result) {
                 const value = cp.result as RecoveryCheckpoint; assertCheckpoint(value);
                 if (value.accountId !== scope.accountId || value.boardId !== scope.boardId || value.epoch !== scope.recoveryEpoch || value.tabId !== tab) throw new RecoveryStorageError('CORRUPT');
+                const updates = new Map<string, Uint8Array[]>();
                 for (const record of records.filter(row => row.tabId === tab)) {
                   if (record.kind === 'document') {
                     const doc = [value.root, value.content].find(doc => doc.docId === record.resource);
                     if (!doc || !(record.data instanceof Uint8Array)) throw new RecoveryStorageError('CORRUPT');
-                    doc.data = Y.mergeUpdates([doc.data, record.data]);
+                    const pending = updates.get(doc.docId) ?? [doc.data];
+                    pending.push(record.data); updates.set(doc.docId, pending);
                   } else if (record.data instanceof Uint8Array) value.assets[record.resource] = { data: record.data, mime: record.mime };
+                }
+                for (const doc of [value.root, value.content]) {
+                  const pending = updates.get(doc.docId); if (pending) doc.data = Y.mergeUpdates(pending);
                 }
                 assertCheckpoint(value); checkpoints.put({ ...value, id: checkpointId(scope, tab) });
               }
@@ -393,6 +398,32 @@ export class AccountJournal {
 }
 /** Fresh descriptor and expected identity precede every replay; Yjs/hash keys are idempotent. */
 export type ReplayObserver = (record: JournalRecord, outcome: 'sending' | 'acknowledged' | 'failed', attempt: string) => void;
+// Bound merge work and acknowledgment transactions independently of backlog size.
+// Individual existing updates may use the server's full 8 MiB document limit.
+const REPLAY_BATCH_RECORDS = 256;
+const REPLAY_BATCH_BYTES = 1024 * 1024;
+const REPLAY_DOCUMENT_BYTES = 8 * 1024 * 1024;
+function replayBatches(records: JournalRecord[]): JournalRecord[][] {
+  const batches = records.filter(record => record.kind === 'blob').map(record => [record]);
+  const documents = new Map<string, JournalRecord[]>();
+  for (const record of records.filter(record => record.kind === 'document')) {
+    const key = JSON.stringify([record.accountId, record.boardId, record.epoch, record.resource]);
+    const group = documents.get(key) ?? []; group.push(record); documents.set(key, group);
+  }
+  for (const group of documents.values()) {
+    let batch: JournalRecord[] = []; let bytes = 0;
+    for (const record of group) {
+      const size = (record.data as Uint8Array).byteLength;
+      if (size > REPLAY_DOCUMENT_BYTES) throw new RecoveryStorageError('CORRUPT');
+      if (batch.length && (batch.length >= REPLAY_BATCH_RECORDS || bytes + size > REPLAY_BATCH_BYTES)) {
+        batches.push(batch); batch = []; bytes = 0;
+      }
+      batch.push(record); bytes += size;
+    }
+    if (batch.length) batches.push(batch);
+  }
+  return batches;
+}
 export async function replayJournal(descriptor: BoardDescriptor, accountId: string, signal: AbortSignal, blobsOnly = false, currentEpochOnly = false, observer?: ReplayObserver): Promise<boolean> {
   if (descriptor.summary.accountId !== accountId) throw new SourceAccessError(409);
   const records = (await pendingRecords(accountId, descriptor.summary.id)).filter(record => (!blobsOnly || record.kind === 'blob') && (!currentEpochOnly || record.epoch === descriptor.recoveryEpoch));
@@ -400,19 +431,21 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
   if (descriptor.summary.role === 'viewer' || !descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
   const epoch = descriptor.recoveryEpoch;
   if (!validRecoveryEpoch(epoch) || records.some(record => record.epoch !== epoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
-  if (records.some(record => !validRecord(record))) throw new RecoveryStorageError('CORRUPT');
-  const ordered = [...records.filter(r => r.kind === 'blob'), ...records.filter(r => r.kind === 'document')];
-  for (const record of ordered) {
-    const attempt = crypto.randomUUID();
-    observer?.(record, 'sending', attempt);
+  if (records.some(record => !validRecord(record) || record.accountId !== accountId || record.boardId !== descriptor.summary.id)) throw new RecoveryStorageError('CORRUPT');
+  for (const batch of replayBatches(records)) {
+    const record = batch[0]!;
+    const attempts = batch.map(row => ({ record: row, id: crypto.randomUUID() }));
+    for (const attempt of attempts) observer?.(attempt.record, 'sending', attempt.id);
     try {
     if (signal.aborted) throw new Error('Recovery interrupted');
     if (record.kind === 'document' && ![descriptor.rootDocId, descriptor.contentDocId].includes(record.resource)) throw new Error('Recovery document unavailable');
+    const data = record.kind === 'document' && batch.length > 1 ? Y.mergeUpdates(batch.map(row => row.data as Uint8Array)) : record.data;
+    if (record.kind === 'document' && (data as Uint8Array).byteLength > REPLAY_DOCUMENT_BYTES) throw new RecoveryStorageError('CORRUPT');
     const base = `/api/boards/${encodeURIComponent(descriptor.summary.id)}`;
     const response = await fetch(record.kind === 'blob' ? `${base}/blobs/${encodeURIComponent(record.resource)}` : `${base}/docs/${encodeURIComponent(record.resource)}/push`, {
       method: record.kind === 'blob' ? 'PUT' : 'POST', credentials: 'same-origin', cache: 'no-store', signal,
       headers: { 'X-Dali-Account': accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': epoch, 'Content-Type': record.data instanceof Blob ? record.data.type : record.kind === 'blob' ? record.mime || 'application/octet-stream' : 'application/octet-stream' },
-      body: record.data instanceof Blob ? record.data : new Uint8Array(record.data),
+      body: data instanceof Blob ? data : new Uint8Array(data),
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({})) as { code?: string };
@@ -424,9 +457,9 @@ export async function replayJournal(descriptor: BoardDescriptor, accountId: stri
     if (descriptor.recoveryEpoch !== epoch || response.headers.get('X-Dali-Recovery-Epoch') !== epoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
     if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true ||
       (record.kind === 'blob' && (!('key' in result) || result.key !== record.resource))) throw new Error('Recovery commit unconfirmed');
-    await acknowledgeRecords({ accountId, boardId: descriptor.summary.id, recoveryEpoch: epoch, generation: record.generation }, [record.id]);
-    observer?.(record, 'acknowledged', attempt);
-    } catch (error) { observer?.(record, 'failed', attempt); throw error; }
+    await acknowledgeRecords({ accountId, boardId: descriptor.summary.id, recoveryEpoch: epoch, generation: record.generation }, batch.map(row => row.id));
+    for (const attempt of attempts) observer?.(attempt.record, 'acknowledged', attempt.id);
+    } catch (error) { for (const attempt of attempts) observer?.(attempt.record, 'failed', attempt.id); throw error; }
   }
   return true;
 }

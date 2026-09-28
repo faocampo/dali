@@ -102,7 +102,7 @@ test('@02-03-02 locked descendant rejects collapse visibly with full document in
   }, ids);
   const before = await snapshot(page);
   await page.getByRole('button', { name: 'Collapse branch', exact: true }).click();
-  await expect(page.getByRole('alert')).toHaveText('This change could not be applied. Your previous topic is still available. Try again.');
+  await expect(page.locator('.mindmap-feedback').getByRole('alert')).toHaveText('This change could not be applied. Your previous topic is still available. Try again.');
   expect(await snapshot(page)).toEqual(before);
 });
 
@@ -116,7 +116,7 @@ test('@02-03-02 injected layout failure retains topology text style geometry and
   });
   const before = await snapshot(page);
   await page.getByRole('button', { name: 'Collapse branch', exact: true }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.mindmap-feedback').getByRole('alert')).toBeVisible();
   expect(await snapshot(page)).toEqual(before);
 });
 
@@ -130,7 +130,7 @@ test('@02-03-02 failed child insertion restores omitted defaults and removes par
   });
   const before = await snapshot(page);
   await page.getByRole('button', { name: 'Add child', exact: true }).click();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.mindmap-feedback').getByRole('alert')).toBeVisible();
   expect(await snapshot(page)).toEqual(before);
 });
 
@@ -179,7 +179,7 @@ for (const fault of ['orphan', 'cycle', 'duplicate', 'roots', 'order', 'geometry
       map.children[Symbol.iterator] = function* () { yield* entries; };
     }, { ids, fault });
     await page.getByRole('button', { name: 'Collapse branch', exact: true }).click();
-    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.locator('.mindmap-feedback').getByRole('alert')).toBeVisible();
     expect(await snapshot(page)).toEqual(before);
   });
 }

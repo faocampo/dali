@@ -383,11 +383,20 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     }
     catch (error) { local?.dispose(); workspace.dispose(); throw error; }
     live.set(workspace.doc.guid, workspace.doc); live.set(store.spaceDoc.guid, store.spaceDoc);
+    let preservationQueued = false;
     const changed = (_data: Uint8Array, _origin: unknown, doc: Y.Doc) => {
       if (!isCurrent()) return;
       revisions.set(doc.guid, (revisions.get(doc.guid) ?? 0) + 1); coverage();
-      const version = JSON.stringify([...revisions]);
-      void scopedJournal.preserve().then(() => { if (isCurrent() && JSON.stringify([...revisions]) === version) dispatchSaveEvent({ type: 'preserved', scope: statusScope }); }).catch(() => undefined);
+      // Capture remains synchronous for every update. One status check per
+      // burst avoids repeatedly awaiting the same growing set of local writes.
+      if (preservationQueued) return;
+      preservationQueued = true;
+      queueMicrotask(() => {
+        preservationQueued = false;
+        if (!isCurrent()) return;
+        const version = JSON.stringify([...revisions]);
+        void scopedJournal.preserve().then(() => { if (isCurrent() && JSON.stringify([...revisions]) === version) dispatchSaveEvent({ type: 'preserved', scope: statusScope }); }).catch(() => undefined);
+      });
     };
     workspace.doc.on('update', changed); store.spaceDoc.on('update', changed); coverage();
     const stopStatus = () => { workspace.doc.off('update', changed); store.spaceDoc.off('update', changed); for (const timer of timers.values()) clearTimeout(timer); timers.clear(); for (const doc of confirmed.values()) doc.destroy(); confirmed.clear(); };
