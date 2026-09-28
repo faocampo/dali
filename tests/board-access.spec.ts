@@ -250,8 +250,8 @@ test('@03-03-01 BOARD-01 empty creates server-confirmed default and named cards 
   const firstId = new URL(page.url()).searchParams.get('board');
   await expectAcknowledgedJournal(page); await fileAction(page, 'All boards');
   await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeFocused();
-  const retained = await journalRecords(page); expect(retained).toHaveLength(2);
-  expect(retained.every(row => row.boardId === firstId && row.kind === 'document')).toBe(true);
+  // Navigation after acknowledgment must not fabricate new pending recovery work.
+  const retained = await journalRecords(page); expect(retained).toEqual([]);
   await page.getByRole('textbox', { name: 'Board name', exact: true }).fill('  Named synthetic board  ');
   await page.getByRole('button', { name: 'New board', exact: true }).click();
   await expect(page.getByRole('button', { name: /^Rename board:/ })).toHaveText('Named synthetic board');

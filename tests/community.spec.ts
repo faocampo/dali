@@ -156,7 +156,8 @@ test.describe('account recovery write failures', () => {
     await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toHaveCount(0);
     const pending = await notes(page); expect(pending.notes).toHaveLength(1);
     expect(await read()).toEqual(before);
-    await expect(details).toContainText('This browser cannot preserve more changes. Keep this tab open.');
+    await expect(details).toContainText("This browser's recovery storage is full. Keep this tab open.");
+    await expect(details).toContainText('free space for this site, then retry saving.');
     await page.evaluate(() => (window as unknown as { quotaProbe: { restore(): void } }).quotaProbe.restore());
     await details.getByRole('button', { name: 'Retry saving', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
