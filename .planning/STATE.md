@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 04
-current_phase_name: Durable Boards and Recovery
-current_plan: 17
-status: in_progress
-stopped_at: 04-17 complete gate failed; awaiting autonomous retry/skip/stop choice
-last_updated: "2026-09-29T02:32:31.776506+00:00"
-last_activity: 2026-09-28
-last_activity_desc: Full 3e9d68b gate returned 2051 passes and one WebKit details runtime failure; focused 88 and client 236 pass
+current_phase: 05
+current_phase_name: Real-Time Collaborative Editing
+current_plan: 0
+status: awaiting_confirmation
+stopped_at: Phase 4 validated by user; Phase 5 next steps await confirmation
+last_updated: "2026-09-29T12:29:57.294999+00:00"
+last_activity: 2026-09-29
+last_activity_desc: User validated Phase 4 and deferred remaining WebKit fix to 999.7
 state_head: 3e9d68b
 progress:
   total_phases: 13
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 43
-  completed_plans: 41
-  percent: 23
+  completed_plans: 43
+  percent: 31
 ---
 
 # Project State
@@ -24,22 +24,17 @@ progress:
 See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
-**Current focus:** Phase 04 — Durable Boards and Recovery
+**Current focus:** Phase 05 — Real-Time Collaborative Editing; awaiting confirmation
 
 ## Current Position
 
-Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
+Phase 4 is validated by the user on 2026-09-29 with the remaining WebKit fix deferred to 999.7. All 17 plans are dispositioned; acceptance explicitly retains the 2,051/2,052 full-run result and earlier approved deferrals.
 
-Phase: 04 (Durable Boards and Recovery) — Wave 9 complete within accepted local scope; regression gap G-04-38 open
-Current Plan: 17
-Total Plans in Phase: 17
-Status: in_progress; 15/17 plans complete. Plan 16 awaits final acceptance; plan 17 closes the regression gap. Independent storage/capacity remains deferred to 999.6.
-Next action: Await autonomous retry/skip/stop choice for G-04-38. Full gate at 3e9d68b returned 2,051/2,052 passes with one WebKit blob/session runtime-error case. No regression process remains active. All seven judgments remain accepted.
-Last activity: 2026-09-28 — Completed the 3e9d68b browser gate: 2,051/2,052 passed, one WebKit details-cardinality runtime failure. Focused recovery/lifecycle gate passed 88/88; 236 client tests and both static checks passed. Phase 4 remains open.
+Next phase: 05 — Real-Time Collaborative Editing.
+Status: Awaiting user confirmation of proposed Phase 5 discussion and planning steps. No Phase 5 implementation has started.
+Progress: 4/13 phases accepted (31%); 43/43 currently planned plans dispositioned.
 
-Progress: [██░░░░░░░░] 23% (3/13 phases complete; 41/43 currently planned plans complete; later phases remain unplanned)
-
-## Active verification
+## Historical prerequisite verification
 
 The corrected prerequisite gate is **passed**. The two fixture corrections in `5aefe81` passed 56 focused/repeated browser cases before the complete 1,960-case run. Unchanged application source retains its recorded 233 unit and 311 serialized server passes. The retained Kubernetes image was not redeployed; its operational measurements retain their original revision scope. Current native Viewer evidence uses fresh real restore fixture services with production frontend assets. See [04-PREREQUISITE-REFRESH.md](phases/04-durable-boards-and-recovery/04-PREREQUISITE-REFRESH.md) (failed history, corrections and final passing result) and [04-15-SUMMARY.md](phases/04-durable-boards-and-recovery/04-15-SUMMARY.md) (local acceptance and deferrals).
 
@@ -233,3 +228,7 @@ The passing prerequisite gate superseded the preceding failed/in-progress entrie
 ## Autonomous checkpoint
 
 Phase 4 remains in progress. The complete 3e9d68b gate failed one WebKit Save Details scenario after 2,051 passes. The mandatory blocker choice is pending; Phase 5 has not started. See 04-17-DIAGNOSIS.md and the current verification report.
+
+## Current user disposition — 2026-09-29
+
+User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the remaining WebKit Save Details runtime-error fix to backlog 999.7. The observed full run remains 2,051/2,052 passed, one failed, zero skips/retries; this is acceptance with an explicit exception. Next steps await confirmation; prior retry/skip/stop checkpoints are superseded.

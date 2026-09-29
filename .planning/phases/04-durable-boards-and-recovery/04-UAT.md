@@ -326,33 +326,24 @@ result: skipped
 reason: Deferred follow-up: user postponed independent storage and capacity validation to ROADMAP backlog 999.6 on 2026-09-27. Actual-provider and speech acceptance remain separately deferred to 999.4 and 999.3.
 
 ### 38. Current full regression and source-mapped acceptance
-expected: The complete post-fix gate passes with selected, passed, failed and skipped counts, and all seven prohibition dispositions are reconciled.
-result: issue
-source: execution-gate
-note: Full gate at 3e9d68b: 2,051 passed, one failed, zero skipped and zero retries out of 2,052 selected cases (1.9 hours). Remaining failure is WebKit details-cardinality blob/session page errors. Focus and clock corrections plus pagehide cancellation passed 88 focused cases. G-04-38 remains open; seven user judgments are accepted.
+expected: Complete current-source gate and required matrix evidence.
+result: skipped
+reason: Deferred follow-up: user validated Phase 4 on 2026-09-29 and moved the remaining WebKit Save Details runtime-error fix to backlog 999.7. Full-run evidence remains 2,051/2,052 passed, one failed, zero skips/retries.
 
 ## Summary
 
 total: 38
 passed: 36
-issues: 1
+issues: 0
 pending: 0
-skipped: 1
+skipped: 2
 blocked: 0
 
 ## Gaps
 
-- gap_id: G-04-38
-  truth: Complete stable-source regression passes before Phase 4 closes.
-  status: failed
-  severity: major
-  source: automated full regression and repeated focused tests
-  reason: Complete current-source gate has one WebKit details-cardinality failure from unexpected blob/session fetch errors; 2051/2052 passed.
-  artifacts: [tests/local-recovery.spec.ts, tests/session-recovery.spec.ts, tests/connector-labels.spec.ts, tests/recovery-ui-matrix.spec.ts]
-  missing: [WebKit blob/session runtime-error diagnosis and correction, passing complete matrix]
-  plan: 04-17-PLAN.md
+No active acceptance gaps. G-04-38 is deferred by the user to backlog 999.7; the technical failure remains unresolved.
 
-## Final acceptance checkpoint
+## Historical final acceptance checkpoint
 
 ## Complete gate at 3e9d68b
 
@@ -363,3 +354,7 @@ The remaining failure is `tests/recovery-ui-matrix.spec.ts:233` in production We
 No error allowlist, test retry, skip or weakened oracle was introduced. No complete-gate run remains active. Phase 4 stays open under G-04-38; autonomous continuation awaits the required retry/skip/stop choice. Seven scoped judgments and native acceptance remain accepted.
 
 The native tab-close and zoom checks retain their user-confirmed pass. All seven scoped dispositions remain explicitly accepted.
+
+## User acceptance — 2026-09-29
+
+User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the remaining WebKit Save Details runtime-error fix to backlog 999.7. The observed full run remains 2,051/2,052 passed, one failed, zero skips/retries; this is acceptance with an explicit exception.

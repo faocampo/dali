@@ -1,6 +1,10 @@
 # Recovery acceptance — Phase 4
 
-Status: in progress. Phase 4 remains open until final automated and native acceptance gates are reconciled.
+Status: Phase 4 validated by the user on 2026-09-29 with explicit deferrals. Remaining WebKit fix: backlog 999.7.
+
+## Accepted disposition
+
+User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the remaining WebKit Save Details runtime-error fix to backlog 999.7. The observed full run remains 2,051/2,052 passed, one failed, zero skips/retries; this is acceptance with an explicit exception.
 
 ## Complete gate at 3e9d68b
 

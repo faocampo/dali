@@ -120,3 +120,7 @@ Approval: pending execution and validation; this document defines planned checks
 ## Validation audit — current continuation
 
 Both typechecks and 236 client tests pass after the lifecycle correction. The unchanged server retains its 311 serialized passes. Repeated browser validation: 88/88, zero skips/retries. Complete current-source gate: **2,051 passed, one failed, zero skipped and zero retries out of 2,052 selected cases (1.9 hours)** at `3e9d68b71290988112a51742d227b6fbdf795d9c`. One WebKit details-cardinality runtime-error case blocks five required predicates. G-04-38 remains open; Nyquist compliance remains false. Native checks, seven scoped judgments and approved deferrals are unchanged.
+
+## Superseding acceptance disposition — 2026-09-29
+
+User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the remaining WebKit Save Details runtime-error fix to backlog 999.7. The observed full run remains 2,051/2,052 passed, one failed, zero skips/retries; this is acceptance with an explicit exception. Earlier blocking statements preserve their historical test scope. No further Phase 4 acceptance work is required; the unresolved fix remains tracked in 999.7.

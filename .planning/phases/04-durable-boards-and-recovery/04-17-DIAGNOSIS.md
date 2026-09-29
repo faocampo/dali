@@ -45,3 +45,7 @@ The complete frozen-source run returned **2,051 passed, one failed, zero skipped
 The remaining failure is `tests/recovery-ui-matrix.spec.ts:233` in production WebKit. Its assertions completed, but the strict error collector captured unexpected blob-read and session-read access-control page errors. Blob-read frames lead through the account blob source into canvas rendering; session frames lead through the recovery coordinator's image-failure retry. The exact rejected-promise/lifecycle boundary remains unresolved. The pagehide correction passed its fail-first regression, 88 repeated focused cases and its full-run cases, but does not resolve this remaining error class. The earlier classical-shape and connector-label full-run failures passed in this run.
 
 No error allowlist, test retry, skip or weakened oracle was introduced. No complete-gate run remains active. Phase 4 stays open under G-04-38; autonomous continuation awaits the required retry/skip/stop choice. Seven scoped judgments and native acceptance remain accepted.
+
+## Superseding acceptance disposition — 2026-09-29
+
+User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the remaining WebKit Save Details runtime-error fix to backlog 999.7. The observed full run remains 2,051/2,052 passed, one failed, zero skips/retries; this is acceptance with an explicit exception. Earlier blocking statements preserve their historical test scope. No further Phase 4 acceptance work is required; the unresolved fix remains tracked in 999.7.

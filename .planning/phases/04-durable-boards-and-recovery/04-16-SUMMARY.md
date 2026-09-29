@@ -18,10 +18,10 @@ key-files:
   created: [tests/recovery-ui-matrix.spec.ts, tests/recovery-ui-matrix-support.ts, tests/recovery-ui-matrix-reporter.ts, docs/recovery-acceptance.md]
   modified: [playwright.config.ts, src/App.tsx, src/canvas/runtime.ts, src/canvas/account/outbox.ts, src/canvas/account/recovery.ts, src/canvas/account/title-intent.ts, src/header/SaveDetails.tsx, src/index.css, src/canvas/account/recovery.test.ts, src/header/SaveDetails.test.ts, tests/board-access.spec.ts]
 requirements-covered: [SAVE-01, SAVE-02, OPS-01, OPS-02]
-requirements-completed: []
+requirements-completed: [SAVE-01, SAVE-02, OPS-01, OPS-02]
 candidate_source_head: 0b9f05af88b5459587c5cb808af030acbddc02ba
 candidate_worktree_changes: true
-status: in_progress
+status: complete
 coverage:
   - id: recovery-ui-36
     description: All 36 recovery surface/category predicates in three production browser engines
@@ -110,3 +110,7 @@ Sources: [acceptance report](../../../docs/recovery-acceptance.md) (36 predicate
 Completed result supersedes the running paragraph below: 2,029 passed, seven failed, zero skipped. After correcting loading-stage and replay-setup fixtures, 31/32 repeated focused cases pass; one WebKit focus-retention assertion still fails. Earlier runtime errors did not recur in those repetitions. Plan 04-17 owns G-04-38 and final regression closure. Both static checks pass; requirements remain unaccepted at phase level.
 
 At `e93b933`, stale journal/quota assertions were corrected after reproducing both failures. The two cases pass in all three production browser engines (6/6); both typechecks, 236 client tests and 311 serialized server tests pass. The complete 2,036-case browser run is in progress with the strict recovery UI matrix reporter. User acceptance covers native 200% zoom, tab-close warning and all seven scoped prohibition dispositions; infrastructure/provider/speech deferrals remain unchanged.
+
+## Superseding acceptance disposition — 2026-09-29
+
+User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the remaining WebKit Save Details runtime-error fix to backlog 999.7. The observed full run remains 2,051/2,052 passed, one failed, zero skips/retries; this is acceptance with an explicit exception. Earlier blocking statements preserve their historical test scope. No further Phase 4 acceptance work is required; the unresolved fix remains tracked in 999.7.

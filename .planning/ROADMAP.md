@@ -19,7 +19,7 @@ All 42 v1 requirements are approved; the phase allocation and order below are us
 - [x] **Phase 1: Editable Canvas and Image Portability** - Compose boards, import reference images, and export board content or selected shapes. (completed 2026-09-12)
 - [x] **Phase 2: Daily Mind Maps** - Create styled hierarchical mind maps with keyboard input, branch collapse, and automatic layout. (completed 2026-09-15)
 - [x] **Phase 3: Okta and Board Access** - Sign in, discover authorized boards, and manage owner/editor/viewer access. (completed 2026-09-25)
-- [ ] **Phase 4: Durable Boards and Recovery** - Reopen saved work across browsers and service restarts, and deploy, back up, and restore it.
+- [x] **Phase 4: Durable Boards and Recovery** - Reopen saved work across browsers and service restarts, and deploy, back up, and restore it.
 - [ ] **Phase 5: Real-Time Collaborative Editing** - Coedit with presence, personal undo, safe reconnect, and active access revocation.
 - [ ] **Phase 6: Follow Me** - Follow a presenter's viewport and return to independent navigation.
 - [ ] **Phase 7: Entity Comments** - Keep persistent discussion attached to specific canvas entities.
@@ -195,7 +195,7 @@ Plans:
   3. An operator can follow the documented configuration and startup procedure to deploy Dali and its required services on operator-managed infrastructure, then open an authenticated board. (OPS-01)
   4. An operator can back up and restore board documents and images, and an authorized member can reopen the restored boards with their content and images intact. (OPS-02)
 
-**Plans**: 14/16 plans executed
+**Plans**: 17/17 dispositioned; user-validated 2026-09-29 with the remaining regression fix deferred to 999.7. The full test run remains 2,051/2,052 passed.
 
 Plans:
 **Wave 1**
@@ -242,10 +242,10 @@ Plans:
 
 All three tasks are complete within the accepted local scope. The local Kubernetes API drill covers 50 boards and 50 images; the corrected cold Viewer regression passes six scenarios across three production engines. The full prerequisite browser gate passes 1,960/1,960 at `5aefe81`. Independent storage/capacity remains deferred to 999.6. See [04-15-SUMMARY.md](phases/04-durable-boards-and-recovery/04-15-SUMMARY.md) (scope adjustment, evidence and retained cluster-image limits).
 
-**Wave 10** *(in progress)*
+**Wave 10** *(accepted with regression follow-up deferred to 999.7)*
 
-- [ ] 04-16-PLAN.md — Complete cross-browser recovery and source-mapped acceptance
-- [ ] 04-17-PLAN.md — Close G-04-38: recovery focus, intermittent runtime errors and the complete regression
+- [x] 04-16-PLAN.md — Complete cross-browser recovery and source-mapped acceptance
+- [x] 04-17-PLAN.md — Close G-04-38: recovery focus, intermittent runtime errors and the complete regression
 
 **UI hint**: yes
 
@@ -424,7 +424,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | 1. Editable Canvas and Image Portability | 5/5 | Complete    | 2026-09-12 |
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
 | 3. Okta and Board Access | 12/12 | Complete    | 2026-09-25 |
-| 4. Durable Boards and Recovery | 14/16 | In Progress|  |
+| 4. Durable Boards and Recovery | 17/17 | Validated with approved deferrals | 2026-09-29 |
 | 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
 | 6. Follow Me | 0/TBD | Not started | - |
 | 7. Entity Comments | 0/TBD | Not started | - |
@@ -437,14 +437,14 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 
 ## Coverage and Sources
 
-**Coverage:** 42 of 42 approved v1 requirements assigned exactly once; 0 unmapped; 0 duplicated. 9 requirements complete across Phases 1 and 2; 33 requirements pending. Phase allocation is approved.
+**Coverage:** 42 of 42 approved v1 requirements assigned exactly once; 0 unmapped; 0 duplicated. 18 requirements accepted across Phases 1–4 within their recorded scope and deferrals; 24 requirements pending. Phase allocation is approved.
 
 - [PROJECT.md](PROJECT.md) (core value, user workflows, constraints, and execution preferences).
 - [REQUIREMENTS.md](REQUIREMENTS.md) (42 approved v1 requirements, validation expectations, exclusions, and phase traceability).
 - [config.json](config.json) (fine granularity and enabled research, plan-check, and verification settings).
 - [research/SUMMARY.md](research/SUMMARY.md) (research findings and risks, including the final scope update that supersedes the earlier phase proposal).
 
-*Last updated: 2026-09-25 — Phase 3 accepted within approved scope; next is Phase 4 discussion. Provider and assistive-technology follow-ups remain in the backlog.*
+*Last updated: 2026-09-29 — Phase 4 validated by the user; WebKit follow-up deferred to 999.7. Phase 5 discussion awaits confirmation.*
 
 ## Backlog
 
@@ -523,6 +523,21 @@ Plans:
 **Plans:** 0 plans
 **Captured context:** User postponed this validation on 2026-09-27 after accepting the local Kubernetes results. Separate local PV directories share one Docker host/backing volume. The measured 30-day full-backup forecast at 15-minute cadence with 25% headroom is approximately 500 GiB, versus the synthetic backup claim's nominal 100 GiB. Physical failure-domain independence and retention capacity remain unverified.
 **Resume trigger:** Promote when the target deployment storage topology and capacity are available for validation. Keep operator settings and operational evidence outside the public repository. This follow-up is deferred from active Phase 4 acceptance; preserve the local recovery evidence and the separately resolved native Viewer rendering finding (WINDOWS 22).
+
+Plans:
+
+- [ ] TBD (promote with $gsd-review-backlog when ready)
+
+
+### Phase 999.7: WebKit Save Details request-lifecycle fix (BACKLOG)
+
+**Goal:** Eliminate unexpected image-fetch and session-fetch errors in the 50-image Save Details scenario and restore passing evidence for all recovery UI predicates in WebKit.
+**Requirements:** Deferred regression follow-up for SAVE-02, originating from G-04-38 / plan 04-17.
+**Plans:** 0 plans
+**Captured context:** User explicitly moved the remaining fix to the backlog and validated Phase 4 on 2026-09-29. Complete run at `3e9d68b71290988112a51742d227b6fbdf795d9c`: 2,051/2,052 passed, one WebKit failure, zero skips/retries. The failing case is `tests/recovery-ui-matrix.spec.ts:233`; unexpected blob-read and recovery session-read errors remain unresolved. Chromium and Firefox supply 36/36 predicates; WebKit supplies 31/36 passing predicates.
+**Acceptance:** Diagnose the request/promise lifecycle with retained stacks, add a focused reproducer, correct the responsible boundary, and pass the strict full regression with all 36 recovery predicates in each production engine. Preserve pending work, authorization and acknowledgment semantics. Do not suppress errors, weaken assertions, or claim the earlier run passed.
+**Resume trigger:** Promote explicitly for a stabilization pass. This approved deferral no longer blocks Phase 4 acceptance or Phase 5 planning.
+**Evidence:** [04-17 diagnosis](phases/04-durable-boards-and-recovery/04-17-DIAGNOSIS.md) (observed failures and tested corrections).
 
 Plans:
 

@@ -27,8 +27,8 @@ Initial release includes the capabilities below. Delivery proceeds through small
 
 ### Persistence and collaboration
 
-- [ ] **SAVE-01**: Users can reopen saved boards and their images from another authenticated browser after the service restarts.
-- [ ] **SAVE-02**: Users can distinguish saved changes from pending changes or save failures.
+- [x] **SAVE-01**: Users can reopen saved boards and their images from another authenticated browser after the service restarts.
+- [x] **SAVE-02**: Users can distinguish saved changes from pending changes or save failures.
 - [ ] **COL-01**: Authorized participants can edit the same canvas concurrently and see one another's changes without refreshing, with no product-enforced concurrent-user cap. Validate simultaneous editing with 20 users on one canvas; 20 is the validation target, not an admission limit or a claim of unlimited infrastructure capacity.
 - [ ] **COL-02**: Participants can see who is currently present on their board.
 - [ ] **COL-03**: After a temporary disconnection, participants can reconnect and converge on the same permitted board content without losing acknowledged saved changes.
@@ -71,8 +71,8 @@ Initial release includes the capabilities below. Delivery proceeds through small
 
 ### Deployment
 
-- [ ] **OPS-01**: Deployment operators can deploy Dali and its required services on operator-managed infrastructure using documented configuration and startup procedures.
-- [ ] **OPS-02**: Deployment operators can back up and restore board documents and images and verify that restored boards reopen with their content intact.
+- [x] **OPS-01**: Deployment operators can deploy Dali and its required services on operator-managed infrastructure using documented configuration and startup procedures.
+- [x] **OPS-02**: Deployment operators can back up and restore board documents and images and verify that restored boards reopen with their content intact.
 
 **Approved validation deferral (2026-09-27):** Independent storage failure-domain and retention-capacity validation for OPS-01/OPS-02 is postponed to backlog 999.6. These checks remain unverified and are excluded from active Phase 4 acceptance. Local deployment/recovery validation and native Viewer rendering remain in scope.
 
@@ -137,8 +137,8 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 | IMG-01 | Phase 1 | Complete |
 | IMG-02 | Phase 1 | Complete |
 | IMG-03 | Phase 1 | Complete |
-| SAVE-01 | Phase 4 | Pending |
-| SAVE-02 | Phase 4 | Pending |
+| SAVE-01 | Phase 4 | Accepted with recorded deferrals |
+| SAVE-02 | Phase 4 | Accepted with recorded deferrals |
 | COL-01 | Phase 5 | Pending |
 | COL-02 | Phase 5 | Pending |
 | COL-03 | Phase 5 | Pending |
@@ -166,8 +166,8 @@ The phase allocation below is approved in [ROADMAP.md](ROADMAP.md) (sequential M
 | GANTT-02 | Phase 13 | Pending |
 | GANTT-03 | Phase 13 | Pending |
 | GANTT-04 | Phase 13 | Pending |
-| OPS-01 | Phase 4 | Pending |
-| OPS-02 | Phase 4 | Pending |
+| OPS-01 | Phase 4 | Accepted with recorded deferrals |
+| OPS-02 | Phase 4 | Accepted with recorded deferrals |
 
 **Coverage:**
 
@@ -187,3 +187,5 @@ User scope decisions supersede earlier research proposals, particularly the defe
 
 ---
 *Last updated: 2026-09-25 after Phase 3 acceptance; 14 requirements complete, 28 pending, with actual-provider and spoken assistive-technology acceptance explicitly deferred.*
+
+**Phase 4 acceptance (2026-09-29):** User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the remaining WebKit Save Details runtime-error fix to backlog 999.7. The observed full run remains 2,051/2,052 passed, one failed, zero skips/retries; this is acceptance with an explicit exception. Independent storage/capacity remains deferred to 999.6.

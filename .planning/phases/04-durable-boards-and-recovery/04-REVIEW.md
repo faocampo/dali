@@ -99,3 +99,7 @@ Native 200% zoom and visible tab-close outcomes remain manual acceptance items. 
 The source-history scan from the Phase 4 base through the reviewed head found no match for the inspected private-path, token/private-key and private-domain patterns in added lines. Documentation and fixtures use synthetic examples. This bounded scan supplements review of the changed content; operator-owned configuration and private drill artifacts remain outside the repository.
 
 Sources: [acceptance report](../../../docs/recovery-acceptance.md) (executed predicates and acceptance limits), [04-16 summary](04-16-SUMMARY.md) (implementation changes and test results), [local Kubernetes validation](04-LOCAL-KUBERNETES-VALIDATION.md) (retained operational scope).
+
+## Superseding acceptance disposition — 2026-09-29
+
+User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the remaining WebKit Save Details runtime-error fix to backlog 999.7. The observed full run remains 2,051/2,052 passed, one failed, zero skips/retries; this is acceptance with an explicit exception. Earlier blocking statements preserve their historical test scope. No further Phase 4 acceptance work is required; the unresolved fix remains tracked in 999.7.

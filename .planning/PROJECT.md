@@ -33,6 +33,9 @@ Evidence: [Phase 2 verification](phases/02-daily-mind-maps/02-VERIFICATION.md) (
 
 Evidence: [Phase 1 verification](phases/01-editable-canvas-and-image-portability/01-VERIFICATION.md) (regression results and user acceptance).
 
+- ✓ SAVE-01 / SAVE-02: Durable reopening and acknowledged save-state behavior — Phase 4, user-validated with WebKit follow-up 999.7.
+- ✓ OPS-01 / OPS-02: Deployment, backup and restoration — Phase 4, within accepted local evidence; independent storage/capacity remains 999.6.
+
 ### Active
 
 These are the agreed capabilities to scope into requirements and phases, rather than a commitment to deliver all capabilities in the first development phase.

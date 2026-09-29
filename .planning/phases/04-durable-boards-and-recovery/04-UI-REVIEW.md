@@ -44,3 +44,7 @@ This phase uses the existing local component and token system. No registry compo
 ## Current interaction disposition
 
 The cursor-focus correction in 6296526 resolves the previously observed focus theft; the strengthened oracle passed all focused repetitions and the complete 3e9d68b run. The historical visual sample remains 22/24 with its two minor typography/spacing findings. Overall UI acceptance stays blocked by one WebKit details-cardinality runtime-error case in the complete gate (2,051/2,052 passed). This continuation adds interaction evidence, not a new visual audit.
+
+## Superseding acceptance disposition — 2026-09-29
+
+User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the remaining WebKit Save Details runtime-error fix to backlog 999.7. The observed full run remains 2,051/2,052 passed, one failed, zero skips/retries; this is acceptance with an explicit exception. Earlier blocking statements preserve their historical test scope. No further Phase 4 acceptance work is required; the unresolved fix remains tracked in 999.7.
