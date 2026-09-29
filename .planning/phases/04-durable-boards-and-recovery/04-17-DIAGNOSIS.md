@@ -1,6 +1,6 @@
 # Phase 04-17 regression diagnosis
 
-Status: initial focused verification passed; subsequent complete regression failed; lifecycle correction passed focused verification; complete gate pending.
+Status: complete gate failed; one WebKit runtime-error case remains.
 
 The final focused run passed all 32 selected cases across development Chromium and production Chromium, Firefox, and WebKit (two repetitions each), with zero failures, skips, or retries. Both typechecks and all 236 client tests passed. The complete frozen-source gate is still required.
 
@@ -37,3 +37,11 @@ The seven user-accepted judgments and existing native acceptance remain accepted
 ## Lifecycle correction validation
 
 The repeated cross-engine run passed **88/88** cases, zero skips/retries, in 8.4 minutes. It includes all 32 mandatory focused cases, 32 pagehide cancellation/recovery cases, 16 original reload-error cases and eight persisted-pageshow authorization cases. Both typechecks and 236/236 client tests passed. No unexpected errors occurred. The complete stable-source gate is still required.
+
+## Complete gate at 3e9d68b
+
+The complete frozen-source run returned **2,051 passed, one failed, zero skipped and zero retries out of 2,052 selected cases (1.9 hours)**. Revision: `3e9d68b71290988112a51742d227b6fbdf795d9c`; digest: `bf8e75b776bd8eab87457ad855560f0a8fcd9c19236eb2cfadd27c9793f4fc5d`. The reporter confirmed stable source identity; pre-existing `package.json` changes are included. Chromium and Firefox each supplied all 13 scenarios and 36 predicates. WebKit supplied 12 passing scenarios and 31 predicates; the failed details-cardinality scenario withholds E1/overflow, E1/long-text, E2/overflow, E2/zero-one-many and E2/long-text.
+
+The remaining failure is `tests/recovery-ui-matrix.spec.ts:233` in production WebKit. Its assertions completed, but the strict error collector captured unexpected blob-read and session-read access-control page errors. Blob-read frames lead through the account blob source into canvas rendering; session frames lead through the recovery coordinator's image-failure retry. The exact rejected-promise/lifecycle boundary remains unresolved. The pagehide correction passed its fail-first regression, 88 repeated focused cases and its full-run cases, but does not resolve this remaining error class. The earlier classical-shape and connector-label full-run failures passed in this run.
+
+No error allowlist, test retry, skip or weakened oracle was introduced. No complete-gate run remains active. Phase 4 stays open under G-04-38; autonomous continuation awaits the required retry/skip/stop choice. Seven scoped judgments and native acceptance remain accepted.

@@ -2,13 +2,13 @@
 gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: Durable Boards and Recovery
-current_plan: 16
+current_plan: 17
 status: in_progress
-stopped_at: Verification gaps_found; seven judgments accepted; 04-17 gap closure ready
-last_updated: "2026-09-28T20:30:06.291787+00:00"
+stopped_at: 04-17 complete gate failed; awaiting autonomous retry/skip/stop choice
+last_updated: "2026-09-29T02:32:31.776506+00:00"
 last_activity: 2026-09-28
-last_activity_desc: Seven judgments accepted; full gate 2029/2036 and focused gate 31/32; regression gap G-04-38 planned in 04-17
-state_head: 5aefe81
+last_activity_desc: Full 3e9d68b gate returned 2051 passes and one WebKit details runtime failure; focused 88 and client 236 pass
+state_head: 3e9d68b
 progress:
   total_phases: 13
   completed_phases: 3
@@ -31,11 +31,11 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 Phase 3 is complete within approved scope. Its final source/test commit `63f352b` passed both static checks, 110 unit tests, 116 server tests, the production build, 124 standalone access tests and all 1,658 full-matrix browser cases. UAT records seven passes, three approved skips and zero pending items. See [Phase 3 summary](phases/03-okta-and-board-access/03-12-SUMMARY.md) (outcomes and corrections) and [verification](phases/03-okta-and-board-access/03-VERIFICATION.md) (current requirements, evidence and historical limits).
 
 Phase: 04 (Durable Boards and Recovery) — Wave 9 complete within accepted local scope; regression gap G-04-38 open
-Current Plan: 16
+Current Plan: 17
 Total Plans in Phase: 17
 Status: in_progress; 15/17 plans complete. Plan 16 awaits final acceptance; plan 17 closes the regression gap. Independent storage/capacity remains deferred to 999.6.
-Next action: Execute 04-17 gap closure: diagnose WebKit recovery focus, classify intermittent runtime errors, then pass the complete stable-source regression. User judgments and native checks remain accepted.
-Last activity: 2026-09-28 — Completed quick task `260928-ljp`: visible corner rotation and note-color selection (`0b35555`); 54/54 focused browser tests, 236/236 client unit tests, typecheck and production build passed. Phase 4 final acceptance remains incomplete; the prior broad run was interrupted with seven known assertion failures.
+Next action: Await autonomous retry/skip/stop choice for G-04-38. Full gate at 3e9d68b returned 2,051/2,052 passes with one WebKit blob/session runtime-error case. No regression process remains active. All seven judgments remain accepted.
+Last activity: 2026-09-28 — Completed the 3e9d68b browser gate: 2,051/2,052 passed, one WebKit details-cardinality runtime failure. Focused recovery/lifecycle gate passed 88/88; 236 client tests and both static checks passed. Phase 4 remains open.
 
 Progress: [██░░░░░░░░] 23% (3/13 phases complete; 41/43 currently planned plans complete; later phases remain unplanned)
 
@@ -167,7 +167,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 Last session: 2026-09-28T07:04:29Z
 Stopped at: Prerequisite full-regression retry ceiling; latest fixture corrections validated; needs_human
 Resume file: .planning/phases/04-durable-boards-and-recovery/04-PREREQUISITE-REFRESH.md
-Next action: Review retry history, then `$gsd-autonomous --from 4`
+Next action: Await autonomous retry/skip/stop choice for G-04-38. Full gate at 3e9d68b returned 2,051/2,052 passes with one WebKit blob/session runtime-error case. No regression process remains active. All seven judgments remain accepted.
 
 ## Phase 1 verification outcome
 
@@ -226,6 +226,10 @@ The user explicitly resumed `$gsd-autonomous --from 4` after reviewing the retry
 
 Standalone access passed **126/126**. The resumed full run at `e6466eb` was stopped after Firefox failures: **1,398 passed, two failed, one interrupted, 559 not run**. Development and production Chromium passed completely. Firefox failures concern native image hydration racing the retry fixture and an expected stale-source cancellation during intentional identity replacement. The interrupted WebKit case is not recorded as an observed product failure. Diagnostic image tracing reproduced the race (four passes, one failure); a native-error barrier is under repeated validation. Phase 4 acceptance remains pending.
 
-## Current autonomous continuation
+## Earlier prerequisite continuation
 
-The passing full gate supersedes the preceding failed/in-progress entries. Plan 04-15 is committed complete; 04-16 is executing inline under the GSD skill. No Phase 4 requirement is marked accepted yet. Native zoom/navigation-warning observation and seven individual prohibition judgments retain their final-verification dispositions.
+The passing prerequisite gate superseded the preceding failed/in-progress entries. Plan 04-15 was committed complete and 04-16 began inline. The current regression disposition is recorded in the checkpoint below.
+
+## Autonomous checkpoint
+
+Phase 4 remains in progress. The complete 3e9d68b gate failed one WebKit Save Details scenario after 2,051 passes. The mandatory blocker choice is pending; Phase 5 has not started. See 04-17-DIAGNOSIS.md and the current verification report.

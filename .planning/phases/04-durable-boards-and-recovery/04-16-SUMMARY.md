@@ -41,9 +41,15 @@ coverage:
 
 # Plan 04-16 — Recovery acceptance
 
-Latest complete gate at `e93b933`: **2,029/2,036 passed, seven failed, zero skipped (1.9 hours)**. The matrix reporter rejected acceptance. Four failures concern a superseded loading label; one failed-replay fixture races its outage setup; two browser runtime-error checks require investigation. Plan 04-16 remains in progress. Earlier running/pass statements below retain their historical scope and do not supersede this result.
+## Complete gate at 3e9d68b
 
-All 36 recovery UI predicates pass in Chromium, Firefox and WebKit. Final full regression and native acceptance reconciliation are in progress.
+The complete frozen-source run returned **2,051 passed, one failed, zero skipped and zero retries out of 2,052 selected cases (1.9 hours)**. Revision: `3e9d68b71290988112a51742d227b6fbdf795d9c`; digest: `bf8e75b776bd8eab87457ad855560f0a8fcd9c19236eb2cfadd27c9793f4fc5d`. The reporter confirmed stable source identity; pre-existing `package.json` changes are included. Chromium and Firefox each supplied all 13 scenarios and 36 predicates. WebKit supplied 12 passing scenarios and 31 predicates; the failed details-cardinality scenario withholds E1/overflow, E1/long-text, E2/overflow, E2/zero-one-many and E2/long-text.
+
+The remaining failure is `tests/recovery-ui-matrix.spec.ts:233` in production WebKit. Its assertions completed, but the strict error collector captured unexpected blob-read and session-read access-control page errors. Blob-read frames lead through the account blob source into canvas rendering; session frames lead through the recovery coordinator's image-failure retry. The exact rejected-promise/lifecycle boundary remains unresolved. The pagehide correction passed its fail-first regression, 88 repeated focused cases and its full-run cases, but does not resolve this remaining error class. The earlier classical-shape and connector-label full-run failures passed in this run.
+
+No error allowlist, test retry, skip or weakened oracle was introduced. No complete-gate run remains active. Phase 4 stays open under G-04-38; autonomous continuation awaits the required retry/skip/stop choice. Seven scoped judgments and native acceptance remain accepted.
+
+Earlier validation results below retain their original scope. Plan 04-16 remains in progress.
 
 ## Delivered behavior
 

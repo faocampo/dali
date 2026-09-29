@@ -329,7 +329,7 @@ reason: Deferred follow-up: user postponed independent storage and capacity vali
 expected: The complete post-fix gate passes with selected, passed, failed and skipped counts, and all seven prohibition dispositions are reconciled.
 result: issue
 source: execution-gate
-note: Full gate 2029/2036 passed with seven failures. Corrected-fixture repetitions passed 31/32, exposing WebKit focus loss after recovery. Earlier runtime errors did not recur in these repetitions. G-04-38 remains open; seven user judgments are accepted.
+note: Full gate at 3e9d68b: 2,051 passed, one failed, zero skipped and zero retries out of 2,052 selected cases (1.9 hours). Remaining failure is WebKit details-cardinality blob/session page errors. Focus and clock corrections plus pagehide cancellation passed 88 focused cases. G-04-38 remains open; seven user judgments are accepted.
 
 ## Summary
 
@@ -347,15 +347,19 @@ blocked: 0
   status: failed
   severity: major
   source: automated full regression and repeated focused tests
-  reason: Seven full-run failures; two fixture defects corrected, intermittent runtime errors unresolved, and WebKit intervening-focus loss reproduced once in eight focused loading checks.
+  reason: Complete current-source gate has one WebKit details-cardinality failure from unexpected blob/session fetch errors; 2051/2052 passed.
   artifacts: [tests/local-recovery.spec.ts, tests/session-recovery.spec.ts, tests/connector-labels.spec.ts, tests/recovery-ui-matrix.spec.ts]
-  missing: [WebKit focus diagnosis and correction, runtime-error classification, passing complete matrix]
+  missing: [WebKit blob/session runtime-error diagnosis and correction, passing complete matrix]
   plan: 04-17-PLAN.md
 
 ## Final acceptance checkpoint
 
-The completed `e93b933` full run returned 2,029 passed and seven failed out of 2,036, with zero skips. The matrix reporter withheld acceptance. Four loading-label failures and one failed-replay setup race have fixture corrections in progress; Firefox cancelled-action and WebKit session-request errors are under investigation. The seven user-accepted scoped judgments remain accepted; this automated gate remains pending.
+## Complete gate at 3e9d68b
 
-The tab-close and native zoom checks retain their user-confirmed pass. The eight coverage-schema entries are reconciled with their existing automated evidence. Both TypeScript checks, 236 client tests, 311 isolated serialized server tests, and six corrected cross-browser regressions pass on the current continuation. The complete 2,036-case browser gate is running at `e93b933` with the strict recovery-matrix reporter; its passing outcome is still required.
+The complete frozen-source run returned **2,051 passed, one failed, zero skipped and zero retries out of 2,052 selected cases (1.9 hours)**. Revision: `3e9d68b71290988112a51742d227b6fbdf795d9c`; digest: `bf8e75b776bd8eab87457ad855560f0a8fcd9c19236eb2cfadd27c9793f4fc5d`. The reporter confirmed stable source identity; pre-existing `package.json` changes are included. Chromium and Firefox each supplied all 13 scenarios and 36 predicates. WebKit supplied 12 passing scenarios and 31 predicates; the failed details-cardinality scenario withholds E1/overflow, E1/long-text, E2/overflow, E2/zero-one-many and E2/long-text.
 
-Seven judgment dispositions are presented for explicit user review under the GSD interactive-verification contract: restored-state isolation; cold restart proof; exact save acknowledgment; pending-work retention; repository privacy; operator-selected restoration before traffic reopening; and measured local recovery claims with retained infrastructure deferrals. Their reviewed rationale is recorded in `docs/recovery-acceptance.md`. User response: "Accept all seven scoped dispositions". Each of the seven listed dispositions is accepted within its stated scope; full regression and canonical verification remain required.
+The remaining failure is `tests/recovery-ui-matrix.spec.ts:233` in production WebKit. Its assertions completed, but the strict error collector captured unexpected blob-read and session-read access-control page errors. Blob-read frames lead through the account blob source into canvas rendering; session frames lead through the recovery coordinator's image-failure retry. The exact rejected-promise/lifecycle boundary remains unresolved. The pagehide correction passed its fail-first regression, 88 repeated focused cases and its full-run cases, but does not resolve this remaining error class. The earlier classical-shape and connector-label full-run failures passed in this run.
+
+No error allowlist, test retry, skip or weakened oracle was introduced. No complete-gate run remains active. Phase 4 stays open under G-04-38; autonomous continuation awaits the required retry/skip/stop choice. Seven scoped judgments and native acceptance remain accepted.
+
+The native tab-close and zoom checks retain their user-confirmed pass. All seven scoped dispositions remain explicitly accepted.
