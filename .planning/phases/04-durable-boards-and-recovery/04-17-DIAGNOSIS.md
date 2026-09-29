@@ -1,6 +1,6 @@
 # Phase 04-17 regression diagnosis
 
-Status: focused verification passed; complete regression pending.
+Status: initial focused verification passed; subsequent complete regression failed; lifecycle correction passed focused verification; complete gate pending.
 
 The final focused run passed all 32 selected cases across development Chromium and production Chromium, Firefox, and WebKit (two repetitions each), with zero failures, skips, or retries. Both typechecks and all 236 client tests passed. The complete frozen-source gate is still required.
 
@@ -20,10 +20,20 @@ The earlier Firefox message, `executing a cancelled action`, originates in RxJS 
 
 Source: [Playwright clock documentation](https://github.com/microsoft/playwright/blob/main/docs/src/clock.md) (clock installation ordering and native timer replacement). The observed RxJS message is consistent with the invalid fixture lifecycle; no claim is made that a stack from the original full-run Firefox error was retained.
 
-## Session-request error
+## Reload request errors
 
-The earlier WebKit session-request access-control page error has not yet been causally reproduced. Focused checks retain failure traces, and the shared strict page-error collector now retains stacks alongside messages. No allowlist, retry, skip, or weaker assertion was added. A passing focused run cannot by itself close the complete gate.
+The subsequent full run at `6296526ade32881cf407e39d369812d50537d909` selected 2,036 cases and was stopped after two WebKit failures: **1,604 passed, two failed, one interrupted, 429 unrun**. The classical-shape reload reported an access-control page error for a recovery session read; the connector-label reload reported the same class of error for a document push. Stacks identify the guarded fetch wrapper and the recovery authorization/replay paths. Assertions had passed; the strict unexpected-error collector rejected both cases.
+
+Account-backed runtime lacked a page-hide suspension handler. A fail-first test holds an actual recovery request, dispatches pagehide, and verifies its AbortSignal, read-only state, retained journal, and eventual acknowledged content after reload/restoration. It failed on the original application because the signal remained active. Earlier draft fixtures incorrectly required simultaneous session and push requests; they were corrected to isolate each request kind and are not application-failure evidence.
+
+The correction suspends the active scope synchronously on pagehide, aborting its document and recovery requests, then preserves pending work. Persisted pageshow retains the existing fresh-authorization requirement before editing resumes. Listener cleanup is symmetric; a late preservation failure cannot overwrite a newer session transition. This expands plan scope to the proven account-session lifecycle owner and a dedicated regression file.
+
+All four initial production WebKit checks passed (session/push crossed with reload/synthetic persisted restoration). The missing cancellation is causally demonstrated; attributing every earlier native WebKit access-control message exclusively to that missing handler remains an inference. Repeated original-case coverage and the strict complete gate remain required. No allowlist, retry, skip, or weaker assertion was added. Synthetic page-transition events supplement the previously accepted native BFCache check; they do not replace it.
 
 ## Acceptance limits
 
 The seven user-accepted judgments and existing native acceptance remain accepted. Actual-provider, spoken assistive-technology, and independent storage/capacity acceptance retain their approved backlog dispositions. Full regression must pass at a stable recorded revision and source digest before Phase 4 can close.
+
+## Lifecycle correction validation
+
+The repeated cross-engine run passed **88/88** cases, zero skips/retries, in 8.4 minutes. It includes all 32 mandatory focused cases, 32 pagehide cancellation/recovery cases, 16 original reload-error cases and eight persisted-pageshow authorization cases. Both typechecks and 236/236 client tests passed. No unexpected errors occurred. The complete stable-source gate is still required.

@@ -173,6 +173,14 @@ export function watchSession() {
   try { channel = new BroadcastChannel(signalKey); channel.onmessage = event => receive(event.data); } catch { channel = undefined; }
   const storage = (event: StorageEvent) => { if (event.key === signalKey && event.newValue) { try { receive(JSON.parse(event.newValue)); } catch { /* Ignore malformed untrusted state signals. */ } } };
   const pageshow = (event: PageTransitionEvent) => { if (event.persisted) void revalidateSession(); };
+  const pagehide = () => {
+    const expectedTransition = transition;
+    captureFocus();
+    // Abort board requests while the document is still alive. A cached page must
+    // reauthorize on pageshow before its editor can resume writes.
+    suspendAccessScope('pagehide');
+    void preserveCanvasRuntime().catch(() => { if (expectedTransition === transition) set({ phase: 'preservation-failed' }); });
+  };
   const originalFetch = window.fetch;
   const guardedFetch: typeof fetch = async (input, init) => {
     const response = await originalFetch(input, init);
@@ -191,8 +199,8 @@ export function watchSession() {
     if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || link.target === '_blank' || link.hasAttribute('download') || getActiveAccessScope()?.phase !== 'active' || new URL(link.href).origin !== location.origin) return;
     event.preventDefault(); void preserveBeforeNavigation().then(ok => { if (ok) window.location.assign(link.href); });
   };
-  window.addEventListener('storage', storage); window.addEventListener('pageshow', pageshow); document.addEventListener('click', navigate);
-  return () => { channel?.close(); channel = undefined; window.removeEventListener('storage', storage); window.removeEventListener('pageshow', pageshow); document.removeEventListener('click', navigate); if (window.fetch === guardedFetch) window.fetch = originalFetch; };
+  window.addEventListener('storage', storage); window.addEventListener('pageshow', pageshow); window.addEventListener('pagehide', pagehide); document.addEventListener('click', navigate);
+  return () => { channel?.close(); channel = undefined; window.removeEventListener('storage', storage); window.removeEventListener('pageshow', pageshow); window.removeEventListener('pagehide', pagehide); document.removeEventListener('click', navigate); if (window.fetch === guardedFetch) window.fetch = originalFetch; };
 }
 export async function preserveBeforeNavigation(allowLoss = false) {
   try { rememberRecovery(); } catch { /* The journal remains the durable source. */ }

@@ -2,6 +2,12 @@
 
 Status: in progress. Phase 4 remains open until final automated and native acceptance gates are reconciled.
 
+## Latest regression continuation — 6296526
+
+The next full run selected 2,036 cases and was stopped with **1,604 passed, two failed, one interrupted and 429 unrun**. WebKit reported unexpected fetch errors during classical-shape and connector-label reloads. The source remained fixed throughout the run. Phase 4 remains open.
+
+The preceding focused gate passed 32/32 after the cursor-focus and clock-fixture corrections. A subsequent fail-first test established that account-board requests were not cancelled on pagehide. The lifecycle correction passed 88/88 repeated cross-engine checks, both typechecks and 236 client tests; the complete gate is pending. See [04-17 diagnosis](../.planning/phases/04-durable-boards-and-recovery/04-17-DIAGNOSIS.md) (request evidence, fixture corrections and causal limits). User-accepted native checks and all seven scoped judgments remain accepted.
+
 ## Completed full-run result — e93b933
 
 The complete run selected 2,036 cases: **2,029 passed, 7 failed, zero skipped**, in 1.9 hours. The strict matrix reporter withheld acceptance. Its source digest was `1874cca1f07f7daa2d61ee3336e8a847ea0a21d775f7ace88eacfd9ea7c44d98`; the tracked tree also contained the pre-existing package-script changes.
