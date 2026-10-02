@@ -4,10 +4,10 @@ current_phase: 05
 current_phase_name: Real-Time Collaborative Editing
 current_plan: 0
 status: ready_to_plan
-stopped_at: Phase 5 researched; UI contract required before planning
-last_updated: "2026-10-02T16:54:49.746077+00:00"
+stopped_at: Phase 5 UI-SPEC approved; ready to resume planning
+last_updated: "2026-10-02T17:18:44.528490+00:00"
 last_activity: 2026-10-02
-last_activity_desc: Phase 5 discussion complete; user approved canonical context
+last_activity_desc: Phase 5 UI contract approved with all 28 state considerations resolved
 state_head: 3e9d68b
 progress:
   total_phases: 13
@@ -240,3 +240,7 @@ Phase 5 context approved and written. Next action: `$gsd-plan-phase 5`; UI contr
 ## Planning research handoff — 2026-10-02
 
 Research and draft validation strategy are saved in the Phase 5 directory. The UI planning gate reports frontend=true, hasUiSpec=false, block=true. Next: `$gsd-ui-phase 5`, then resume `$gsd-plan-phase 5` using existing research. Executable plans and independent plan checking have not run. Approved decisions, Phase 4 acceptance and backlog deferrals remain unchanged.
+
+## UI contract handoff — 2026-10-02
+
+User confirmed the six UI surfaces and their state handling. [05-UI-SPEC.md](phases/05-real-time-collaborative-editing/05-UI-SPEC.md) (approved visual and interaction contract) records seven inline design-dimension passes and 28 explicitly resolved state considerations. The prior missing-UI-contract handoff is superseded. Resume `$gsd-plan-phase 5` with the existing context, research and UI contract; runtime UI validation remains pending implementation.
