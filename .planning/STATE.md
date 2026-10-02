@@ -4,7 +4,7 @@ current_phase: 05
 current_phase_name: Real-Time Collaborative Editing
 current_plan: 0
 status: ready_to_plan
-stopped_at: Phase 5 context gathered; ready for planning
+stopped_at: Phase 5 researched; UI contract required before planning
 last_updated: "2026-10-02T16:54:49.746077+00:00"
 last_activity: 2026-10-02
 last_activity_desc: Phase 5 discussion complete; user approved canonical context
@@ -236,3 +236,7 @@ User accepted Phase 4 as validated on 2026-09-29 and explicitly deferred the rem
 ## Current discussion handoff — 2026-10-02
 
 Phase 5 context approved and written. Next action: `$gsd-plan-phase 5`; UI contract can be prepared with `$gsd-ui-phase 5`. Resume from [05-CONTEXT.md](phases/05-real-time-collaborative-editing/05-CONTEXT.md) (presence, reservations, personal undo, fork-based recovery, and access-change decisions). The earlier awaiting-confirmation status is superseded. Phase 4 acceptance and backlog deferrals remain unchanged.
+
+## Planning research handoff — 2026-10-02
+
+Research and draft validation strategy are saved in the Phase 5 directory. The UI planning gate reports frontend=true, hasUiSpec=false, block=true. Next: `$gsd-ui-phase 5`, then resume `$gsd-plan-phase 5` using existing research. Executable plans and independent plan checking have not run. Approved decisions, Phase 4 acceptance and backlog deferrals remain unchanged.
