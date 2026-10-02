@@ -263,7 +263,83 @@ All three tasks are complete within the accepted local scope. The local Kubernet
   4. When an owner revokes access, the affected member's active and reconnected sessions cannot continue unauthorized reads or writes, including direct synchronization and image requests and attempted queued writes. (COL-04)
   5. Participants can concurrently edit a mind map and later save and reopen it with its hierarchy and content intact. (MIND-05)
 
-**Plans**: TBD
+**Plans**: 9 plans in 9 sequential waves
+**Wave 1**
+- [ ] 05-01-PLAN.md — Live native editing tracer
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 05-02-PLAN.md — Complete object reservations
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 05-03-PLAN.md — Presence and participant controls
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 05-04-PLAN.md — Personal undo and redo
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 05-05-PLAN.md — Divergence-aware recovery
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 05-06-PLAN.md — Private recovery copy and latest-version flow
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 05-07-PLAN.md — Active access transitions
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 05-08-PLAN.md — Concurrent mind-map integrity
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [ ] 05-09-PLAN.md — Cross-browser collaboration acceptance
+
+**Cross-cutting constraints:**
+- D-05: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-19: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-06: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-07: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- UI E2/loading: Show the surface-specific progress text and prevent duplicate action submissions while preserving current work.
+- UI E2/error: Use the surface-specific error and retry/back action in Copywriting Contract; retain local candidates on failure.
+- UI E2/overflow: Clamp floating surfaces to the viewport; roster scrolls internally; dialog content reflows with reachable actions.
+- UI E2/long-text: Wrap dialog/status text; truncate compact names with full accessible tooltip; allow button height to expand.
+- D-01: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-02: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-03: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-04: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- UI E1/empty: Use the only-self roster copy; unknown/loading presence must not imply an empty board.
+- UI E1/loading: Show the surface-specific progress text and prevent duplicate action submissions while preserving current work.
+- UI E1/error: Use the surface-specific error and retry/back action in Copywriting Contract; retain local candidates on failure.
+- UI E1/populated: Render named roster rows with role and You/Idle markers using E1 ordering and limits.
+- UI E1/partial: Use Participant for an unavailable name and role-pending indication; do not fabricate identity.
+- UI E1/overflow: Clamp floating surfaces to the viewport; roster scrolls internally; dialog content reflows with reachable actions.
+- UI E1/zero-one-many: Distinguish loading from only-self presence; deduplicate accounts and use avatar overflow plus full roster for many.
+- UI E1/long-text: Wrap dialog/status text; truncate compact names with full accessible tooltip; allow button height to expand.
+- D-08: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-09: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-10: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- UI E3/loading: Show the surface-specific progress text and prevent duplicate action submissions while preserving current work.
+- UI E3/error: Use the surface-specific error and retry/back action in Copywriting Contract; retain local candidates on failure.
+- UI E3/overflow: Clamp floating surfaces to the viewport; roster scrolls internally; dialog content reflows with reachable actions.
+- UI E3/long-text: Wrap dialog/status text; truncate compact names with full accessible tooltip; allow button height to expand.
+- D-11: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-14: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-15: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-16: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-12: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-13: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- UI E4/loading: Show the surface-specific progress text and prevent duplicate action submissions while preserving current work.
+- UI E4/error: Use the surface-specific error and retry/back action in Copywriting Contract; retain local candidates on failure.
+- UI E4/overflow: Clamp floating surfaces to the viewport; roster scrolls internally; dialog content reflows with reachable actions.
+- UI E4/long-text: Wrap dialog/status text; truncate compact names with full accessible tooltip; allow button height to expand.
+- UI E5/loading: Show the surface-specific progress text and prevent duplicate action submissions while preserving current work.
+- UI E5/error: Use the surface-specific error and retry/back action in Copywriting Contract; retain local candidates on failure.
+- UI E5/overflow: Clamp floating surfaces to the viewport; roster scrolls internally; dialog content reflows with reachable actions.
+- UI E5/long-text: Wrap dialog/status text; truncate compact names with full accessible tooltip; allow button height to expand.
+- D-17: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- D-18: Implement the approved decision in 05-CONTEXT.md through this slice and its behavioral tests.
+- UI E6/loading: Show the surface-specific progress text and prevent duplicate action submissions while preserving current work.
+- UI E6/error: Use the surface-specific error and retry/back action in Copywriting Contract; retain local candidates on failure.
+- UI E6/overflow: Clamp floating surfaces to the viewport; roster scrolls internally; dialog content reflows with reachable actions.
+- UI E6/long-text: Wrap dialog/status text; truncate compact names with full accessible tooltip; allow button height to expand.
+
 **UI hint**: yes
 
 ### Phase 6: Follow Me
@@ -444,7 +520,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 - [config.json](config.json) (fine granularity and enabled research, plan-check, and verification settings).
 - [research/SUMMARY.md](research/SUMMARY.md) (research findings and risks, including the final scope update that supersedes the earlier phase proposal).
 
-*Last updated: 2026-09-29 — Phase 4 validated by the user; WebKit follow-up deferred to 999.7. Phase 5 discussion awaits confirmation.*
+*Last updated: 2026-10-02 — Phase 5 planned in nine sequential waves with approved context and UI contract. Phase 4 acceptance and backlog 999.7 remain unchanged.*
 
 ## Backlog
 
@@ -515,7 +591,6 @@ Plans:
 
 - [ ] TBD (promote with $gsd-review-backlog when ready)
 
-
 ### Phase 999.6: Independent storage and capacity validation (BACKLOG)
 
 **Goal:** Validate independent live/backup failure domains and sufficient storage capacity for the configured backup retention policy on operator-managed infrastructure.
@@ -527,7 +602,6 @@ Plans:
 Plans:
 
 - [ ] TBD (promote with $gsd-review-backlog when ready)
-
 
 ### Phase 999.7: WebKit Save Details request-lifecycle fix (BACKLOG)
 

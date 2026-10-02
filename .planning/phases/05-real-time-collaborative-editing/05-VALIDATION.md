@@ -9,7 +9,7 @@ created: "2026-10-02"
 
 # Phase 5 — Validation Strategy
 
-Draft strategy derived from `05-RESEARCH.md`. Executable plans and per-task mapping await the UI contract. No test results are claimed here.
+Strategy derived from research and approved UI contract, mapped to nine executable plans. All execution results remain pending.
 
 ## Test Infrastructure
 
@@ -31,7 +31,7 @@ Draft strategy derived from `05-RESEARCH.md`. Executable plans and per-task mapp
 
 ## Requirement Verification Map
 
-Task IDs, wave assignments and threat IDs remain pending until executable plans exist.
+Requirement-level map below is expanded into the per-task commands that follow.
 
 | Requirement | Required automated evidence | Proposed execution-time suite | Exists |
 |---|---|---|---|
@@ -57,11 +57,38 @@ Review names/avatars and reservation messages for clarity, keyboard/focus behavi
 
 ## Validation Sign-Off
 
-- [ ] Per-task automated commands and threat references assigned by plans.
-- [ ] All new test references have creation prerequisites.
-- [ ] No watch mode and no empty-match successes.
-- [ ] Requirement and D-01 through D-19 coverage verified.
+- [x] Per-task automated commands and threat references assigned by plans.
+- [x] All new test references have creation prerequisites.
+- [x] No watch mode and no empty-match successes.
+- [x] Requirement and D-01 through D-19 coverage verified.
 - [ ] Browser/error and load evidence collected against the implementation revision.
 - [ ] nyquist_compliant set only after validation obligations are satisfied.
 
-**Approval:** Pending executable planning and validation.
+**Planning review:** Complete; executable verification and implementation evidence remain pending.
+
+## Per-Task Verification Map
+
+All listed new suites are created by the owning task before its command runs. Warm unit/server feedback precedes browser verification; browser server startup is measured separately. Each task also runs both typechecks.
+
+| Task | Wave | Requirements | Threat | Automated browser check | Status |
+|---|---|---|---|---|---|
+| 05-01-01 | 1 | COL-01, COL-04 | T-05-01 | `npm exec playwright test -- tests/collaboration.spec.ts --project=prod --grep @05-01-01` | Pending; new suite owned by plan 01 |
+| 05-01-02 | 1 | COL-01, COL-04 | T-05-01 | `npm exec playwright test -- tests/collaboration.spec.ts --project=prod --grep @05-01-02` | Pending; new suite owned by plan 01 |
+| 05-02-01 | 2 | COL-01 | T-05-02 | `npm exec playwright test -- tests/collaboration-reservations.spec.ts --project=prod --grep @05-02-01` | Pending; new suite owned by plan 02 |
+| 05-02-02 | 2 | COL-01 | T-05-02 | `npm exec playwright test -- tests/collaboration-reservations.spec.ts --project=prod --grep @05-02-02` | Pending; new suite owned by plan 02 |
+| 05-03-01 | 3 | COL-02 | T-05-03 | `npm exec playwright test -- tests/collaboration-presence.spec.ts --project=prod --grep @05-03-01` | Pending; new suite owned by plan 03 |
+| 05-03-02 | 3 | COL-02 | T-05-03 | `npm exec playwright test -- tests/collaboration-presence.spec.ts --project=prod --grep @05-03-02` | Pending; new suite owned by plan 03 |
+| 05-04-01 | 4 | CAN-03 | T-05-04 | `npm exec playwright test -- tests/collaboration-history.spec.ts --project=prod --grep @05-04-01` | Pending; new suite owned by plan 04 |
+| 05-04-02 | 4 | CAN-03 | T-05-04 | `npm exec playwright test -- tests/collaboration-history.spec.ts --project=prod --grep @05-04-02` | Pending; new suite owned by plan 04 |
+| 05-05-01 | 5 | COL-03 | T-05-05 | `npm exec playwright test -- tests/collaboration-recovery.spec.ts --project=prod --grep @05-05-01` | Pending; new suite owned by plan 05 |
+| 05-05-02 | 5 | COL-03 | T-05-05 | `npm exec playwright test -- tests/collaboration-recovery.spec.ts --project=prod --grep @05-05-02` | Pending; new suite owned by plan 05 |
+| 05-06-01 | 6 | COL-03 | T-05-06 | `npm exec playwright test -- tests/collaboration-fork.spec.ts --project=prod --grep @05-06-01` | Pending; new suite owned by plan 06 |
+| 05-06-02 | 6 | COL-03 | T-05-06 | `npm exec playwright test -- tests/collaboration-fork.spec.ts --project=prod --grep @05-06-02` | Pending; new suite owned by plan 06 |
+| 05-07-01 | 7 | COL-04, COL-03 | T-05-07 | `npm exec playwright test -- tests/collaboration-access.spec.ts --project=prod --grep @05-07-01` | Pending; new suite owned by plan 07 |
+| 05-07-02 | 7 | COL-04, COL-03 | T-05-07 | `npm exec playwright test -- tests/collaboration-access.spec.ts --project=prod --grep @05-07-02` | Pending; new suite owned by plan 07 |
+| 05-08-01 | 8 | MIND-05, COL-01, CAN-03 | T-05-08 | `npm exec playwright test -- tests/collaboration-mindmap.spec.ts --project=prod --grep @05-08-01` | Pending; new suite owned by plan 08 |
+| 05-08-02 | 8 | MIND-05, COL-01, CAN-03 | T-05-08 | `npm exec playwright test -- tests/collaboration-mindmap.spec.ts --project=prod --grep @05-08-02` | Pending; new suite owned by plan 08 |
+| 05-09-01 | 9 | CAN-03, COL-01, COL-02, COL-03, COL-04, MIND-05 | T-05-09 | `npm exec playwright test -- tests/collaboration-load.spec.ts --project=prod --grep @05-09-01` | Pending; new suite owned by plan 09 |
+| 05-09-02 | 9 | CAN-03, COL-01, COL-02, COL-03, COL-04, MIND-05 | T-05-09 | `npm exec playwright test -- tests/collaboration-load.spec.ts --project=prod --grep @05-09-02` | Pending; new suite owned by plan 09 |
+
+Task 05-09-03 is the explicit human acceptance checkpoint after automated gates. All new native collaboration suites run on prod-firefox and prod-webkit in final acceptance as well as prod. New server/unit commands are specified in each task. No zero-test pass, mandatory skip, retry, or unexpected console/page error is acceptable. Known Phase 4 exception 999.7 is reported separately for disposition; it is not suppressed or counted as passing.
