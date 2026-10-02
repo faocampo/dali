@@ -265,7 +265,7 @@ All three tasks are complete within the accepted local scope. The local Kubernet
 
 **Plans**: 9 plans in 9 sequential waves
 **Wave 1**
-- [ ] 05-01-PLAN.md — Live native editing tracer
+- [x] 05-01-PLAN.md — Live native editing tracer
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 05-02-PLAN.md — Complete object reservations
