@@ -1,0 +1,206 @@
+{
+  "phase": "05",
+  "phase_name": "Real-Time Collaborative Editing",
+  "timestamp": "2026-10-02T16:54:49.745109+00:00",
+  "areas_completed": [
+    "Presence",
+    "Concurrent changes",
+    "Personal undo",
+    "Reconnection and permission changes"
+  ],
+  "areas_remaining": [],
+  "decisions": {
+    "Presence": [
+      {
+        "question": "How should participants appear while working on the board?",
+        "answer": "Participant avatars, named cursors, and colored selection outlines. Cursor names appear on movement or hover to reduce clutter.",
+        "options_presented": [
+          "Participant avatars, named cursors, and colored selection outlines (recommended).",
+          "Participant avatars and named cursors; selections visible only to the selecting person.",
+          "Participant avatars only."
+        ]
+      },
+      {
+        "question": "How should Viewers appear to other participants?",
+        "answer": "Include Viewers in the participant list; hide their cursors and selections.",
+        "options_presented": [
+          "Include Viewers in the participant list; hide their cursors and selections (recommended).",
+          "Show Viewer cursors and selections with a Viewer label.",
+          "Let each Viewer choose whether to share cursor and selections; presence remains visible."
+        ]
+      },
+      {
+        "question": "How should presence appear when the same person opens multiple tabs or devices?",
+        "answer": "One avatar per person, showing only their most recently active cursor.",
+        "options_presented": [
+          "One avatar per person, separate cursors for active tabs/devices with distinguishing labels (recommended).",
+          "One avatar per person, showing only their most recently active cursor.",
+          "Separate avatar and cursor for every tab/device."
+        ]
+      },
+      {
+        "question": "What should happen when someone becomes inactive or loses connection?",
+        "answer": "Inactive: fade idle cursors and avatar. Disconnected: remove disconnected participants immediately upon detection.",
+        "options_presented": [
+          "Fade idle cursors; briefly mark disconnected participants as reconnecting before removing (recommended).",
+          "Keep idle cursors visible; remove disconnected participants immediately.",
+          "Hide idle cursors; keep disconnected participants listed until they reconnect or board closes."
+        ],
+        "notes": "User supplied a custom combination; no reconnecting grace display. User then chose to proceed to concurrent changes."
+      }
+    ],
+    "Concurrent changes": [
+      {
+        "question": "When two people edit text in the same object, how should it behave?",
+        "answer": "One person edits at a time. Reserve text for whoever starts editing and show others who is editing.",
+        "options_presented": [
+          "Both type simultaneously with live merge and text cursors (recommended).",
+          "One person edits at a time with visible reservation.",
+          "Simultaneous editing with live merge and a warning."
+        ]
+      },
+      {
+        "question": "While someone edits text, what can others do to the same object?",
+        "answer": "Select it, but wait to modify it. Reserve text, position, size, formatting, and deletion until text editing ends.",
+        "options_presented": [
+          "Select only; wait to modify (recommended).",
+          "Move, resize, and style; reserve text and deletion.",
+          "Any action except editing text, including deletion."
+        ]
+      },
+      {
+        "question": "When should the editing reservation end?",
+        "answer": "When the editor finishes, leaves the text field, or disconnects. Keep it while connected even when idle.",
+        "options_presented": [
+          "Finish, leave, inactivity with warning, or disconnection (recommended).",
+          "Finish, leave, or disconnection; retain while connected and idle.",
+          "Finish or leave, with Owner override and disconnection release."
+        ]
+      },
+      {
+        "question": "When two people drag or resize the same object, how should it behave?",
+        "answer": "First person reserves the object until the gesture ends. Apply this same approach to all conflicting actions between users.",
+        "options_presented": [
+          "Reserve for first person until gesture ends; show who is manipulating (recommended).",
+          "Allow simultaneous gestures; last accepted position or size wins.",
+          "Allow both previews but give first person priority."
+        ],
+        "notes": "User explicitly generalized first-action reservation to all conflicting concurrent actions. Follow-up summarized text, dragging, resizing, rotating, formatting, deleting, and structural changes; user chose next area. Group and mind-map reservation granularity remains to be specified during planning or further discussion; no global board lock was requested."
+      }
+    ],
+    "Personal undo": [
+      {
+        "question": "If someone changes an object after your edit, how should Undo behave?",
+        "answer": "Preserve their later change, skip the conflicting undo step, and briefly explain why. Independent changes remain undoable.",
+        "options_presented": [
+          "Preserve later changes and skip conflicting steps with explanation (recommended).",
+          "Stop at the conflicting step and offer manual skip.",
+          "Offer earlier version as a separate object."
+        ]
+      },
+      {
+        "question": "How should undo history work across tabs and devices?",
+        "answer": "Separate history for each tab or device; undo affects changes made in that window.",
+        "options_presented": [
+          "Separate history for each tab or device (recommended).",
+          "Shared personal history across tabs and devices."
+        ]
+      },
+      {
+        "question": "How long should undo history remain available?",
+        "answer": "Keep eligible history through temporary disconnections; reset when the board is reloaded or closed.",
+        "options_presented": [
+          "Keep through temporary disconnections; reset on reload or close (recommended).",
+          "Keep across reloads in the same tab, validating content and permissions."
+        ]
+      },
+      {
+        "question": "How should changes be grouped into undo steps?",
+        "answer": "One step per completed editing session. A drag, resize, rotation, or multi-object operation is one step; all text changes before leaving a text field undo together.",
+        "options_presented": [
+          "One step per meaningful action, with typing grouped into short bursts (recommended).",
+          "One step per completed editing session; text changes before leaving the field undo together."
+        ]
+      }
+    ],
+    "Reconnection and permission changes": [
+      {
+        "question": "How should pending edits be handled when the shared canvas changed during disconnection?",
+        "answer": "With current write permission, notify the user that the canvas changed and offer Load latest or Create a private copy containing the entire local version. Do not merge divergent changes or overwrite the shared canvas.",
+        "options_presented": [
+          "Automatically apply independent edits; review conflicts.",
+          "Automatically recover conflicting objects as copies.",
+          "Review all pending edits."
+        ],
+        "notes": "User rejected merging and initially chose full shared-canvas overwrite. Later explicitly revoked that choice in favor of a separate private fork, then confirmed this applies both to ordinary reconnection and restored write permission. Earlier overwrite and overwrite-race decisions are superseded."
+      },
+      {
+        "question": "What should Load latest do with unsaved local work?",
+        "answer": "Offer to download the local version as a recovery copy before loading the updated shared canvas. User can download, continue without downloading, or cancel.",
+        "options_presented": [
+          "Keep a downloadable recovery copy then load latest.",
+          "Discard after explicit confirmation."
+        ],
+        "notes": "User supplied the download offer as a third option."
+      },
+      {
+        "question": "What happens if an Editor becomes a Viewer with pending work?",
+        "answer": "Switch to read-only, explain the permission change, preserve pending work locally for recovery if write permission returns, and load the latest authorized canvas.",
+        "options_presented": [
+          "Switch to read-only and preserve work until write permission returns (recommended).",
+          "Switch to read-only and offer an editable recovery download.",
+          "Pause at permission-change screen with return or retry."
+        ]
+      },
+      {
+        "question": "What happens after full access removal?",
+        "answer": "Hide the canvas and stop synchronization upon detection. Preserve pending work locally until access is restored. Show access-removal message with return-to-library and check-access actions. Recovery requires current write permission.",
+        "options_presented": [
+          "Preserve pending work locally until access returns (recommended).",
+          "Remove local pending work immediately."
+        ]
+      },
+      {
+        "question": "How should preserved work be recovered after write permission returns?",
+        "answer": "Ask before recovering it. If the shared canvas is unchanged, offer to restore pending edits. If changed, offer Load latest or Create a private copy.",
+        "options_presented": [
+          "Ask before recovering (recommended).",
+          "Automatically recover if unchanged."
+        ],
+        "notes": "Final divergent-version choices reflect the later explicit rollback of shared-canvas overwrite."
+      },
+      {
+        "question": "What should other participants experience after Keep my version replaces the canvas?",
+        "answer": "User revoked the shared-canvas replacement capability entirely. Fork local work into a separate private board owned by the recovering user, or load latest after offering a recovery download.",
+        "options_presented": [
+          "Reload replacement with notice and preserve others pending work.",
+          "Pause on Canvas replaced notice."
+        ],
+        "notes": "Neither proposed replacement behavior is authorized; the user supplied a revised recovery design."
+      },
+      {
+        "question": "Use Load latest or Create a private copy for ordinary disconnection as well as restored write permission?",
+        "answer": "Yes. Apply the same choice in both situations, gated by current write permission.",
+        "options_presented": [
+          "Yes, use both choices in both situations (recommended).",
+          "Only offer a fork after permission restoration."
+        ]
+      }
+    ]
+  },
+  "deferred_ideas": [],
+  "canonical_refs": [
+    "AGENTS.md",
+    ".planning/PROJECT.md",
+    ".planning/REQUIREMENTS.md",
+    ".planning/ROADMAP.md",
+    ".planning/config.json",
+    ".planning/phases/04-durable-boards-and-recovery/04-CONTEXT.md",
+    ".planning/phases/03-okta-and-board-access/03-CONTEXT.md",
+    ".planning/phases/01-editable-canvas-and-image-portability/01-CONTEXT.md",
+    "src/canvas/account/board-workspace.ts",
+    "src/canvas/account/doc-source.ts",
+    "server/boards/documents.ts"
+  ],
+  "discussion_stage": "Complete; superseded by 05-CONTEXT.md. Retained to respect the user instruction requiring confirmation before deleting files."
+}
