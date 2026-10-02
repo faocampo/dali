@@ -1,3 +1,4 @@
+import type { BoardLiveSource } from './live-source';
 import * as Y from 'yjs';
 import type { Store } from '@blocksuite/affine/store';
 import { getActiveAccessScope, subscribeAccessScope, type AccessScope } from '../runtime';
@@ -20,13 +21,14 @@ export function accessScopeCurrent(expected: AccessScope, write = false): boolea
  * Applying authorized remote Yjs updates uses integration internals, so hydration
  * remains possible. No rollback transaction or global prototype changes occur.
  */
-export function installMutationGuard(store: Store, scope: AccessScope): () => void {
+export function installMutationGuard(store: Store, scope: AccessScope, live?: BoardLiveSource): () => void {
   const existing = guards.get(store);
   if (existing) { existing.references++; return existing.release; }
   let active = true;
   const writable = () => active && !store.readonly && accessScopeCurrent(scope, true);
   const restores: (() => void)[] = [];
   const visited = new WeakSet<object>();
+  const nativeIds = new WeakMap<object, string>();
   const wrap = (target: object, name: string, denied: () => unknown = () => undefined) => {
     const object = target as Record<string, unknown>;
     const original = object[name];
@@ -34,6 +36,12 @@ export function installMutationGuard(store: Store, scope: AccessScope): () => vo
     const own = Object.getOwnPropertyDescriptor(target, name);
     const guarded = function(this: unknown, ...args: unknown[]) {
       if (!writable()) return denied();
+      if (live) {
+        if (target instanceof Y.AbstractType) {
+          const id = nativeIds.get(target);
+          if (!id || !live.allowsObject(id) || name !== 'set' || args[0] !== 'xywh') return denied();
+        } else if (!live.editing) return denied();
+      }
       const result: unknown = Reflect.apply(original, this, args);
       scan();
       return result;
@@ -48,7 +56,7 @@ export function installMutationGuard(store: Store, scope: AccessScope): () => vo
       for (const name of ['set', 'delete', 'clear', 'insert', 'insertEmbed', 'format', 'applyDelta', 'push', 'unshift', 'setAttribute', 'removeAttribute'])
         wrap(value, name, () => name === 'set' ? value : name === 'delete' ? false : undefined);
     }
-    if (value instanceof Y.Map) for (const child of value.values()) visit(child);
+    if (value instanceof Y.Map) for (const [key, child] of value.entries()) { if (child instanceof Y.Map && child.get('type') === 'shape') nativeIds.set(child, key); visit(child); }
     else if (value instanceof Y.Array || value instanceof Y.XmlFragment) for (const child of value.toArray()) visit(child);
     else if (value instanceof Y.Text) for (const delta of value.toDelta()) if (typeof delta.insert !== 'string') visit(delta.insert);
   };

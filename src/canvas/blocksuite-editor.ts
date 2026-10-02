@@ -49,7 +49,7 @@ export async function mountEdgelessEditor(
   installFormattingTheme();
   installCanvasColorPicker();
   const { store, scope } = runtime;
-  const disposeGuard = installMutationGuard(store, scope);
+  const disposeGuard = installMutationGuard(store, scope, runtime.workspace.live);
 
   const viewManager = new ViewExtensionManager(viewExtensions);
   // 'edgeless' scope is what swaps affine-page-root for affine-edgeless-root
@@ -118,6 +118,7 @@ export async function mountEdgelessEditor(
   let disposeEditing = () => {};
   let disposeTextFormatting = () => {};
   let disposePointer = () => {};
+  let disposeLiveGesture = () => {};
   const destroy = () => {
     if (destroyed) return;
     destroyed = true;
@@ -125,6 +126,7 @@ export async function mountEdgelessEditor(
     disposeEditing();
     disposeTextFormatting();
     disposePointer();
+    disposeLiveGesture();
     viewport.removeEventListener('mousedown', preventMiddleMouseDefault, true);
     viewport.removeEventListener('auxclick', preventMiddleMouseDefault, true);
     // Removing the viewport disconnects the host and unmounts its scope once.
@@ -170,6 +172,8 @@ export async function mountEdgelessEditor(
       if (gfxViewport.left !== rect.left || gfxViewport.top !== rect.top)
         gfxViewport.setRect(rect.left, rect.top, rect.width, rect.height);
     };
+    refreshPointerRect();
+    disposeLiveGesture = installLiveShapeGesture(host, runtime);
     const pointerEvents = ['pointerdown','pointermove','pointerup','wheel'] as const;
     pointerEvents.forEach(name => host.addEventListener(name, refreshPointerRect, true));
     disposePointer = () => {
@@ -181,4 +185,60 @@ export async function mountEdgelessEditor(
     destroy();
     throw cause;
   }
+}
+
+
+/** Reserve before forwarding native pointer input; denied gestures never queue. */
+function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime) {
+  const live = runtime.workspace.live;
+  if (!live || host.store.readonly) return () => {};
+  const gfx = host.std.get(GfxControllerIdentifier);
+  let down: PointerEvent | undefined; let latest: PointerEvent | undefined;
+  let token: string | undefined; let replay = false; let disposed = false; let finishing = false;
+  const status = document.createElement('div'); status.setAttribute('role', 'status');
+  status.style.cssText = 'position:absolute;bottom:16px;right:16px;z-index:10;background:var(--color-surface,#fff);color:var(--color-text,#211830);padding:8px 12px;border-radius:8px;max-width:280px;';
+  status.hidden = true; host.parentElement?.append(status);
+  const send = (event: PointerEvent) => {
+    replay = true;
+    try { host.dispatchEvent(new PointerEvent(event.type, { bubbles: true, composed: true, cancelable: true,
+      pointerId: event.pointerId, pointerType: event.pointerType, isPrimary: event.isPrimary, button: event.button, buttons: event.buttons,
+      clientX: event.clientX, clientY: event.clientY, shiftKey: event.shiftKey, altKey: event.altKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey })); }
+    finally { replay = false; }
+  };
+  const stop = (event: Event) => { event.preventDefault(); event.stopImmediatePropagation(); };
+  const start = (event: PointerEvent) => {
+    if (replay || event.button !== 0 || host.store.readonly || gfx.tool.currentToolName$.peek() !== 'default') return;
+    if (event.composedPath().some(node => node instanceof Element && node.matches('editor-toolbar,editor-menu-content,input,textarea,button'))) return;
+    if (down || finishing) { stop(event); return; }
+    const point = gfx.viewport.toModelCoord(...gfx.viewport.toViewCoordFromClientCoord([event.clientX, event.clientY]));
+    const hit = gfx.getElementByPoint(...point);
+    if (!hit || !('type' in hit) || hit.type !== 'shape') return;
+    const selected = gfx.selection.selectedElements;
+    const models = selected.some(model => model.id === hit.id) ? selected : [hit];
+    if (models.some(model => !('type' in model) || model.type !== 'shape')) return;
+    stop(event); down = event; latest = undefined; status.hidden = true;
+    void live.acquire(models.map(model => model.id)).then(async acquired => {
+      if (disposed || down !== event) { await live.release(acquired); return; }
+      token = acquired; send(event); if (latest) send(latest);
+    }).catch(() => { if (!disposed && down === event) { down = undefined; status.textContent = 'This object is unavailable for editing. Try again after it is released.'; status.hidden = false; } });
+  };
+  const move = (event: PointerEvent) => { if (!replay && down && !token) { latest = event; stop(event); } };
+  const end = (event: PointerEvent) => {
+    if (replay || !down || event.pointerId !== down.pointerId) return;
+    down = undefined; latest = undefined;
+    if (!token) { stop(event); return; }
+    const released = token; token = undefined; finishing = true;
+    // Observe the bubbling event after native document handlers finish. A
+    // microtask from capture would run before their final model transaction.
+    queueMicrotask(() => { void runtime.workspace.waitForSynced().then(() => live.release(released)).catch(() => {
+      if (!disposed) { status.textContent = 'Changes are waiting to save. Keep this board open.'; status.hidden = false; }
+    }).finally(() => { finishing = false; }); });
+  };
+  host.addEventListener('pointerdown', start, true); host.addEventListener('pointermove', move, true);
+  window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+  return () => { disposed = true; down = undefined; status.remove();
+    host.removeEventListener('pointerdown', start, true); host.removeEventListener('pointermove', move, true);
+    window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end);
+    if (token) void live.release(token).catch(() => {});
+  };
 }

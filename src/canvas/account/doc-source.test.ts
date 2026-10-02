@@ -1,9 +1,28 @@
+import { BoardLiveSource } from './live-source';
+import * as Y from 'yjs';
 import { describe, expect, it, vi } from 'vitest';
 import { BoardDocSource, RecoveryEpochError, type SourceOptions } from './doc-source';
 
 const epoch = '11111111-1111-4111-8111-111111111111';
 const options = (): SourceOptions => ({ boardId: 'board', rootDocId: 'root', contentDocId: 'content', accountId: 'member', generation: 1, isCurrent: () => true, getRecoveryEpoch: () => epoch });
 describe('BoardDocSource', () => {
+  it('@05-01-02 retries a lost response once with identical operation and payload', async () => {
+    const update = btoa(String.fromCharCode(...Y.encodeStateAsUpdate(new Y.Doc())));
+    const live = new BoardLiveSource({ ...options(), fetch: vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+      if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'connection', epoch, revision: 1, root: update, content: update });
+      return new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new Error('disposed')), { once: true }));
+    }) });
+    await live.start(() => {}, () => {});
+    const ack = vi.fn();
+    const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(new TypeError('response lost')).mockResolvedValue(Response.json({ acknowledged: true, previousRevision: 1, revision: 2 }, { headers: { 'X-Dali-Recovery-Epoch': epoch } }));
+    const source = new BoardDocSource({ ...options(), live, fetch: fetcher, onAcknowledged: ack });
+    try {
+      await source.push('content', new Uint8Array([1, 2]));
+      expect(fetcher).toHaveBeenCalledTimes(2); expect(ack).toHaveBeenCalledOnce();
+      expect(fetcher.mock.calls[1]![1]?.headers).toEqual(fetcher.mock.calls[0]![1]?.headers);
+      expect(fetcher.mock.calls[1]![1]?.body).toEqual(fetcher.mock.calls[0]![1]?.body);
+    } finally { live.dispose(); }
+  });
   it.each(['missing-header', 'wrong-header', 'late-epoch', 'recovery-conflict', 'other-conflict'])('@04-02-02 %s cannot acknowledge or impersonate access loss', async fault => {
     let currentEpoch = epoch; const ack = vi.fn(); const lost = vi.fn();
     const fetcher = vi.fn<typeof fetch>(async (_input, init) => {

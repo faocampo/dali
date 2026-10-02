@@ -1,0 +1,95 @@
+import * as Y from 'yjs';
+import { RecoveryEpochError, SourceAccessError, type SourceOptions } from './doc-source';
+export type LiveSnapshot = { connectionId?: string; revision: number; epoch: string; root?: string; content?: string };
+const decode = (value: string) => Uint8Array.from(atob(value), character => character.charCodeAt(0));
+/** A connection belongs to exactly one runtime; recovery creates a fresh one. */
+export class BoardLiveSource {
+  private controller = new AbortController();
+  private connectionId?: string;
+  private revision = 0;
+  private reservation?: string;
+  private reservedObjects = new Set<string>();
+  allowsObject(id: string) { return this.connected && this.reservedObjects.has(id); }
+  get editing() { return this.connected && this.reservedObjects.size > 0; }
+  private interrupted = false;
+  private started = false;
+  private readonly tabId = crypto.randomUUID();
+  private epoch?: string;
+  private readonly abort = () => this.dispose();
+  constructor(private options: SourceOptions) { options.signal?.addEventListener('abort', this.abort, { once: true }); }
+  private current() {
+    if (this.controller.signal.aborted || this.options.signal?.aborted || this.options.isCurrent?.(this.options.generation) === false) throw new Error('Live source is stale');
+  }
+  private async request(action: string, body: Record<string, unknown>) {
+    this.current();
+    const response = await (this.options.fetch ?? fetch)(`/api/boards/${encodeURIComponent(this.options.boardId)}/live/${action}`, {
+      method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: this.controller.signal,
+      headers: { 'Content-Type': 'application/json', 'X-Dali-Account': this.options.accountId, 'X-Dali-Request': '1',
+        ...(this.options.getRecoveryEpoch ? { 'X-Dali-Recovery-Epoch': this.options.getRecoveryEpoch() } : {}) },
+      body: JSON.stringify(body),
+    });
+    this.current();
+    const result = await response.json() as Record<string, unknown>;
+    if (!response.ok) {
+      if (result.code === 'RECOVERY_EPOCH_MISMATCH') throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+      if ([401, 403, 404].includes(response.status) || result.code === 'IDENTITY_CHANGED') {
+        const error = new SourceAccessError(response.status); this.options.onAuthorizationLost?.(error); throw error;
+      }
+      throw Object.assign(new Error('Live request failed'), { code: result.code });
+    }
+    return result;
+  }
+  private apply(snapshot: LiveSnapshot, receive: (docId: string, bytes: Uint8Array) => void) {
+    this.current();
+    if (!Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0 || snapshot.epoch !== this.options.getRecoveryEpoch?.() || (this.epoch && snapshot.epoch !== this.epoch)) throw new Error('Invalid live snapshot');
+    if (this.epoch && snapshot.revision <= this.revision) return;
+    if (!!snapshot.root !== !!snapshot.content) throw new Error('Incomplete live snapshot');
+    // Decode the pair before delivering either document.
+    const root = snapshot.root ? decode(snapshot.root) : undefined;
+    const content = snapshot.content ? decode(snapshot.content) : undefined;
+    if (root && content) { Y.decodeUpdate(root); Y.decodeUpdate(content); receive(this.options.rootDocId, root); this.current(); receive(this.options.contentDocId, content); }
+    this.revision = snapshot.revision; this.epoch = snapshot.epoch;
+  }
+  async start(receive: (docId: string, bytes: Uint8Array) => void, disconnect: (reason: string) => void) {
+    if (this.started) throw new Error('Live source already started');
+    this.started = true;
+    try {
+      const snapshot = await this.request('connect', { tabId: this.tabId, activate: !this.options.readonly }) as LiveSnapshot;
+      if (typeof snapshot.connectionId !== 'string' || !snapshot.connectionId) throw new Error('Missing connection');
+      this.connectionId = snapshot.connectionId;
+      this.apply(snapshot, receive);
+      void this.poll(receive, disconnect);
+    } catch (error) { this.interrupted = true; throw error; }
+  }
+  private async poll(receive: (docId: string, bytes: Uint8Array) => void, disconnect: (reason: string) => void) {
+    try {
+      while (!this.controller.signal.aborted) {
+        const next = await this.request('poll', { connectionId: this.connectionId, revision: this.revision, epoch: this.epoch }) as LiveSnapshot;
+        this.apply(next, receive);
+      }
+    } catch {
+      if (!this.controller.signal.aborted) { this.interrupted = true; disconnect('live-connection-interrupted'); }
+    }
+  }
+  get connected() { return !!this.connectionId && !this.interrupted && !this.controller.signal.aborted; }
+  writeHeaders(operationId: string, reservation = this.reservation) {
+    this.current();
+    if (!this.connected) throw new Error('Live recovery requires reconciliation');
+    return { 'X-Dali-Connection': this.connectionId!, 'X-Dali-Operation': operationId, ...(reservation ? { 'X-Dali-Reservation': reservation } : {}) };
+  }
+  async acquire(objectIds: string[]) {
+    if (!this.connected) throw new Error('Live source unavailable');
+    const result = await this.request('reserve', { connectionId: this.connectionId, objectIds });
+    if (typeof result.token !== 'string') throw new Error('Invalid reservation');
+    this.reservation = result.token; this.reservedObjects = new Set(objectIds);
+    return result.token;
+  }
+  async release(token: string) {
+    if (this.connected) await this.request('release', { connectionId: this.connectionId, token });
+    if (this.reservation === token) { this.reservation = undefined; this.reservedObjects.clear(); }
+  }
+  dispose() {
+    if (this.controller.signal.aborted) return;
+    this.controller.abort(); this.options.signal?.removeEventListener('abort', this.abort);
+  }
+}

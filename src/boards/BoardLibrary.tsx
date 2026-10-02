@@ -12,7 +12,7 @@ import { inspectAuthorizedPendingBoards, subscribePendingBoardInvalidation, type
 import './pending-recovery.css';
 
 export type BoardSummary = { id: string; title: string; updatedAt: number; role: 'owner' | 'editor' | 'viewer'; access: 'private' | 'shared'; pendingCount: number; accountId: string; thumbnailUrl?: string };
-export type BoardDescriptor = { summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number; recoveryEpoch: string };
+export type BoardDescriptor = { liveSupported?: boolean; liveEnabled?: boolean; summary: BoardSummary; rootDocId: string; contentDocId: string; capabilities: string[]; revision: number; recoveryEpoch: string };
 export function validDescriptor(value: BoardDescriptor, accountId: string) {
   return value && validSummary(value.summary, accountId) && typeof value.rootDocId === 'string' && !!value.rootDocId &&
     typeof value.contentDocId === 'string' && !!value.contentDocId && value.rootDocId !== value.contentDocId &&

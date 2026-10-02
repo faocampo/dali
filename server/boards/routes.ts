@@ -1,3 +1,4 @@
+import { registerCollaborationRoutes } from './collaboration.js';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as Y from 'yjs';
@@ -45,7 +46,7 @@ function summary(database: AccountDatabase, board: BoardRow, accountId: string):
 }
 export function descriptor(database: AccountDatabase, board: BoardRow, accountId: string) {
   return { summary: summary(database, board, accountId), rootDocId: board.root_doc_id, contentDocId: board.content_doc_id,
-    capabilities: boardCapabilities.filter(capability => canBoard(board.role, capability)), revision: board.revision, recoveryEpoch: readRecoveryEpoch(database) };
+    liveSupported: (board as BoardRow & { live_enabled?: number }).live_enabled === 1, liveEnabled: (board as BoardRow & { live_enabled?: number }).live_enabled === 1, capabilities: boardCapabilities.filter(capability => canBoard(board.role, capability)), revision: board.revision, recoveryEpoch: readRecoveryEpoch(database) };
 }
 /** Receipts acknowledge an actor's operation; their resource data uses current authority. */
 export function operationReceipt(database: AccountDatabase, request: FastifyRequest, reply: FastifyReply, operationId: string, now: () => number, importsOnly = false) {
@@ -120,7 +121,8 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
     CREATE TABLE operations (member_id TEXT NOT NULL REFERENCES members(id), operation_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
       board_id TEXT, result TEXT NOT NULL, PRIMARY KEY(member_id,operation_id));
   ` }, { version: 3, sql: `CREATE TABLE board_thumbnails (board_id TEXT PRIMARY KEY REFERENCES boards(id) ON DELETE CASCADE, bytes BLOB NOT NULL, mime TEXT NOT NULL CHECK(mime='image/png'));` }]);
-  registerDocumentRoutes(app, config, database, now, beforeCommit);
+  const collaboration = registerCollaborationRoutes(app, config, database, now);
+  registerDocumentRoutes(app, config, database, now, beforeCommit, collaboration);
   registerBlobRoutes(app, config, database, now, beforeCommit);
   registerGrantRoutes(app, config, database, now, beforeCommit);
   registerActionRoutes(app, config, database, now, beforeCommit);

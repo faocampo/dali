@@ -1,3 +1,4 @@
+import { BoardLiveSource } from './live-source';
 import { AwarenessStore, Transformer } from '@blocksuite/affine/store';
 import type { Doc, ExtensionType, Schema, Workspace } from '@blocksuite/affine/store';
 import { StoreExtensionManager } from '@blocksuite/affine/ext-loader';
@@ -41,6 +42,7 @@ export class BoardWorkspace implements Workspace {
   private memoryBlobs = new Map<string, Blob>();
   readonlyMutations = 0;
   private readonly abort = new AbortController();
+  readonly live?: BoardLiveSource;
   private readonly source: BoardDocSource;
   private readonly blobs: BoardBlobSource;
   get id() { return this.doc.guid; }
@@ -63,7 +65,8 @@ export class BoardWorkspace implements Workspace {
         if (options.onAuthorizationLost) options.onAuthorizationLost(error);
         else this.dispose();
       } };
-    this.source = new BoardDocSource(sourceOptions);
+    if (mode === 'account' && d.liveSupported && !options.recoveryBaseline) this.live = new BoardLiveSource(sourceOptions);
+    this.source = new BoardDocSource({ ...sourceOptions, live: this.live });
     this.blobs = new BoardBlobSource(sourceOptions);
     this.docSync = new DocEngine(this.doc, mode === 'staging' ? new NoopDocSource() : this.source, [], new NoopLogger());
     const memory: BlobSource = { name: 'isolated-board-staging', readonly: false,
@@ -99,7 +102,8 @@ export class BoardWorkspace implements Workspace {
   private contentChanged = () => {
     if (this.content?.getSubdocs().size) this.dispose();
   };
-  private readonlyChanged = () => {
+  private readonlyChanged = (_data: Uint8Array, origin: unknown) => {
+    if (origin === this.source.name) return;
     this.readonlyMutations++;
     const error = new Error('Read-only hydration generated a mutation');
     this.dispose(); this.options.onReadonlyMutation?.(error);
@@ -130,6 +134,13 @@ export class BoardWorkspace implements Workspace {
       const store = doc.getStore();
       store.load(); store.resetHistory();
       if (!store.root || store.getBlocksByFlavour('affine:surface').length !== 1) throw new Error('Invalid board content');
+      if (this.live) await this.live.start((id, bytes) => {
+        this.assertCurrent();
+        const target = id === this.doc.guid ? this.doc : id === content.guid ? content : undefined;
+        if (!target) throw new Error('Unexpected live document');
+        Y.applyUpdate(target, bytes, this.source.name);
+        this.options.onDocumentOutcome?.(id, bytes, 'loaded', crypto.randomUUID());
+      }, () => { this.docSync.forceStop(); });
       if (!this.readonly) { this.docSync.start(); if (!baseline) await this.waitForSynced(); }
       this.assertCurrent();
       return this;
@@ -172,7 +183,7 @@ export class BoardWorkspace implements Workspace {
   dispose = () => {
     if (this.disposed) return;
     this.disposed = true;
-    this.abort.abort(); this.docSync.forceStop(); this.blobSync.stop();
+    this.live?.dispose(); this.abort.abort(); this.docSync.forceStop(); this.blobSync.stop();
     this.docSync.onStatusChange.complete();
     this.options.signal?.removeEventListener('abort', this.dispose);
     this.doc.off('update', this.rootChanged);

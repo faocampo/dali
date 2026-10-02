@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { movedShapeIds, type CollaborationBroker } from './collaboration.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as Y from 'yjs';
 import type { AuthConfig } from '../app.js';
@@ -51,7 +53,7 @@ export function validateStoredDocument(bytes: Buffer, board: BoardRow, docId: st
   try { Y.applyUpdate(doc, bytes); validateDocument(doc, board, docId); return referencedImageKeys(doc); }
   finally { doc.destroy(); }
 }
-export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig, database: AccountDatabase, now: () => number, beforeCommit?: BeforeCommit) {
+export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig, database: AccountDatabase, now: () => number, beforeCommit?: BeforeCommit, collaboration?: CollaborationBroker) {
   app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_request, body, done) => done(null, body));
   type Params = { boardId: string; docId: string };
   const guard = (request: FastifyRequest, reply: FastifyReply) => { requireMutation(request, reply, config, ['application/octet-stream']); };
@@ -81,14 +83,35 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
     return database.transaction(() => {
       const latest = requireBoardCapability(database, request, reply, boardId, 'write', now); if (!latest) return;
       const stored = documentBytes(database, latest, docId); if (!stored) return reply.code(404).send({ code: 'BOARD_UNAVAILABLE' });
-      const doc = new Y.Doc({ guid: docId }); let merged: Buffer;
+      const live = (latest as BoardRow & { live_enabled?: number }).live_enabled === 1;
+      const connectionId = request.headers['x-dali-connection'];
+      const operationId = request.headers['x-dali-operation'];
+      const reservation = request.headers['x-dali-reservation'];
+      const connection = typeof connectionId === 'string' ? collaboration?.find(connectionId, boardId, request.headers['x-dali-account'] as string) : undefined;
+      const digest = createHash('sha256').update(request.body).digest('hex');
+      if (live && (!connection || typeof operationId !== 'string' || !/^[a-zA-Z0-9-]{1,128}$/.test(operationId))) return reply.code(409).send({ code: 'LIVE_CONNECTION_REQUIRED' });
+      if (live && connection) {
+        const receipt = database.prepare('SELECT doc_id,digest,previous_revision,revision FROM document_receipts WHERE board_id=? AND account_id=? AND tab_id=? AND operation_id=?')
+          .get(boardId, connection.accountId, connection.tabId, operationId) as { doc_id: string; digest: string; previous_revision: number; revision: number } | undefined;
+        if (receipt) {
+          if (receipt.doc_id !== docId || receipt.digest !== digest) return reply.code(409).send({ code: 'OPERATION_CONFLICT' });
+          return { acknowledged: true, previousRevision: receipt.previous_revision, revision: receipt.revision };
+        }
+      }
+      const doc = new Y.Doc({ guid: docId }); const before = new Y.Doc({ guid: docId }); let merged: Buffer;
       try {
-        Y.applyUpdate(doc, stored); Y.applyUpdate(doc, request.body); validateDocument(doc, latest, docId);
+        Y.applyUpdate(before, stored); Y.applyUpdate(doc, stored); Y.applyUpdate(doc, request.body); validateDocument(doc, latest, docId);
+        if (live && connection) {
+          const ids = docId === latest.content_doc_id ? movedShapeIds(before, doc) :
+            Buffer.from(Y.encodeStateAsUpdate(before)).equals(Buffer.from(Y.encodeStateAsUpdate(doc))) ? [] : null;
+          if (ids === null) return reply.code(409).send({ code: 'UNSUPPORTED_LIVE_ACTION' });
+          if (ids.length && (typeof reservation !== 'string' || !collaboration!.owns(connection, reservation, ids))) return reply.code(409).send({ code: 'RESERVATION_REQUIRED' });
+        }
         if (docId === latest.content_doc_id) for (const key of referencedImageKeys(doc)) if (!database.prepare('SELECT 1 FROM board_blobs WHERE board_id=? AND blob_key=?').get(boardId, key)) throw new Error('Unbound image');
         merged = Buffer.from(Y.encodeStateAsUpdate(doc));
         if (merged.length > DOCUMENT_LIMITS.update) return reply.code(413).send({ code: 'PAYLOAD_REJECTED' });
       } catch { return reply.code(400).send({ code: 'INVALID_DOCUMENT' }); }
-      finally { doc.destroy(); }
+      finally { doc.destroy(); before.destroy(); }
       const previousRevision = latest.revision;
       let revision = previousRevision;
       if (!merged.equals(stored)) {
@@ -97,6 +120,8 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
         revision = previousRevision + 1;
         database.prepare('DELETE FROM board_thumbnails WHERE board_id=?').run(boardId);
       }
+      if (live && connection) database.prepare('INSERT INTO document_receipts(board_id,account_id,tab_id,operation_id,doc_id,digest,previous_revision,revision) VALUES(?,?,?,?,?,?,?,?)')
+        .run(boardId, connection.accountId, connection.tabId, operationId, docId, digest, previousRevision, revision);
       return { acknowledged: true, previousRevision, revision };
     })();
   });

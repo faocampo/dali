@@ -4,7 +4,7 @@ import { IMAGE_LIMITS, validateStoredImage, validateImageBytes, validBlobKey } f
 import type { BoardRow } from '../boards/routes.js';
 import { readRecoveryEpoch } from './recovery-state.js';
 
-export const BACKUP_DATABASE_VERSION = 9;
+export const BACKUP_DATABASE_VERSION = 10;
 const tables = ['schema_migrations', 'members', 'sessions', 'login_transactions', 'boards', 'board_grants', 'pending_grants', 'board_documents', 'operations', 'board_thumbnails', 'board_blobs', 'import_staging', 'import_staging_blobs', 'recovery_state'];
 const bounded = (value: unknown, maximum = 4000): value is string => typeof value === 'string' && value.length > 0 && value.length <= maximum;
 function json(value: string): any {
@@ -18,10 +18,17 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
     database = new Database(path, { readonly: true, fileMustExist: true }); database.pragma('query_only=ON');
     if (JSON.stringify(database.pragma('integrity_check')) !== '[{"integrity_check":"ok"}]' || (database.pragma('foreign_key_check') as unknown[]).length) throw new Error('Invalid database');
     const schema = (database.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[]).map(row => row.name);
-    if (JSON.stringify(schema) !== JSON.stringify([...tables].sort())) throw new Error('Unsupported schema');
+
     const migrations = (database.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as { version: number }[]).map(row => row.version);
     const databaseVersion = migrations.at(-1)!;
-    if (![8, BACKUP_DATABASE_VERSION].includes(databaseVersion) || JSON.stringify(migrations) !== JSON.stringify(Array.from({ length: databaseVersion }, (_, index) => index + 1))) throw new Error('Unsupported database version');
+    if (![8, 9, BACKUP_DATABASE_VERSION].includes(databaseVersion) || JSON.stringify(migrations) !== JSON.stringify(Array.from({ length: databaseVersion }, (_, index) => index + 1))) throw new Error('Unsupported database version');
+    const expectedTables = databaseVersion >= 10 ? [...tables, 'document_receipts'] : tables;
+    if (JSON.stringify(schema) !== JSON.stringify([...expectedTables].sort())) throw new Error('Unsupported schema');
+    if (databaseVersion >= 10) for (const receipt of database.prepare('SELECT * FROM document_receipts').iterate() as Iterable<{ board_id: string; account_id: string; tab_id: string; operation_id: string; doc_id: string; digest: string; previous_revision: number; revision: number }>) {
+      if (![receipt.board_id, receipt.account_id, receipt.tab_id, receipt.operation_id, receipt.doc_id].every(value => bounded(value, 256)) || !/^[a-f0-9]{64}$/.test(receipt.digest) || !Number.isSafeInteger(receipt.previous_revision) || receipt.previous_revision < 1 || !Number.isSafeInteger(receipt.revision) || receipt.revision < receipt.previous_revision || receipt.revision > receipt.previous_revision + 1) throw new Error('Invalid document receipt');
+      const board = database.prepare('SELECT root_doc_id,content_doc_id,revision FROM boards WHERE id=?').get(receipt.board_id) as { root_doc_id: string; content_doc_id: string; revision: number } | undefined;
+      if (!board || ![board.root_doc_id, board.content_doc_id].includes(receipt.doc_id) || receipt.revision > board.revision) throw new Error('Invalid receipt binding');
+    }
     const epoch = readRecoveryEpoch(database);
     if ((database.prepare('SELECT count(*) AS n FROM recovery_state').get() as { n: number }).n !== 1) throw new Error('Invalid recovery state');
     const exists = (table: string, id: string) => !!database!.prepare(`SELECT 1 FROM ${table} WHERE id=?`).get(id);
@@ -30,6 +37,7 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
     }
     let documents = 0;
     for (const board of database.prepare('SELECT * FROM boards').iterate() as Iterable<BoardRow>) {
+      if (databaseVersion >= 10 && ![0, 1].includes((board as BoardRow & { live_enabled: number }).live_enabled)) throw new Error('Invalid collaboration state');
       if (![board.id, board.root_doc_id, board.content_doc_id, board.title].every(value => bounded(value)) || board.root_doc_id === board.content_doc_id || !exists('members', board.owner_id) || !Number.isSafeInteger(board.revision) || board.revision < 1) throw new Error('Invalid board');
       const rows = database.prepare('SELECT doc_id,update_bytes FROM board_documents WHERE board_id=?').all(board.id) as { doc_id: string; update_bytes: Buffer }[];
       if (rows.length !== 2 || !rows.some(row => row.doc_id === board.root_doc_id) || !rows.some(row => row.doc_id === board.content_doc_id)) throw new Error('Invalid document bindings');
@@ -77,7 +85,7 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
     }
     const count = (table: string) => (database!.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n;
     if (count('board_documents') !== documents) throw new Error('Unbound document');
-    return { databaseVersion, epoch, counts: { boards: count('boards'), documents, images: count('board_blobs'), grants: count('board_grants'), pendingGrants: count('pending_grants'), members: count('members'), receipts: count('operations'), stagedImports: count('import_staging'), stagedImages: count('import_staging_blobs'), thumbnails: count('board_thumbnails') } };
+    return { databaseVersion, epoch, counts: { boards: count('boards'), documents, images: count('board_blobs'), grants: count('board_grants'), pendingGrants: count('pending_grants'), members: count('members'), receipts: count('operations'), stagedImports: count('import_staging'), stagedImages: count('import_staging_blobs'), thumbnails: count('board_thumbnails'), ...(databaseVersion >= 10 ? { documentReceipts: count('document_receipts') } : {}) } };
   } catch { throw new Error('Backup database validation failed'); }
   finally { database?.close(); }
 }

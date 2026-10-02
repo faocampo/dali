@@ -19,7 +19,7 @@ export async function renameActiveBoard(title: string) { if (!captureTitle) thro
 
 export type BoardRole = BoardSummary['role'];
 export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; storageFailure?: RecoveryStorageFailure; retainedPending?: boolean | 'unavailable'; stalled?: boolean; title?: string }>;
-export type CanvasRuntime = { workspace: Workspace & Pick<BoardWorkspace, 'docSync' | 'waitForSynced'>; store: Store; descriptor: BoardDescriptor; scope: AccessScope; captureUnacknowledged: () => Promise<unknown>[]; stopSaveStatus: () => void; dispose: () => void };
+export type CanvasRuntime = { workspace: Workspace & Pick<BoardWorkspace, 'docSync' | 'waitForSynced' | 'live'>; store: Store; descriptor: BoardDescriptor; scope: AccessScope; captureUnacknowledged: () => Promise<unknown>[]; stopSaveStatus: () => void; dispose: () => void };
 let scope: AccessScope | null = null;
 let current: CanvasRuntime | null = null;
 let pending: { key: string; promise: Promise<CanvasRuntime> } | null = null;
@@ -224,6 +224,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   const coordinator = recovery = new RecoveryCoordinator({
     current: isCurrent,
     title: async (authority, signal) => {
+      if (authority.descriptor.liveEnabled && (await pendingRecords(initial.accountId, initial.boardId)).length) throw new Error('Live recovery requires version reconciliation');
       const titleScopes = await inspectPendingScopes(initial.accountId);
       if (!isCurrent() || signal.aborted) throw new Error('Stale title recovery');
       if (!options.openRestored && titleScopes.some(row => row.boardId === initial.boardId && row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
@@ -367,7 +368,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       const url = new URL(String(input), location.href); const key = decodeURIComponent(url.pathname.split('/blobs/')[1] ?? '');
       const local = baseline?.assets.get(key);
       if (isCurrent() && init?.method === 'GET' && local) return Promise.resolve(new Response(local, { headers: { 'Content-Type': local.type } }));
-      return (options.fetch ?? fetch)(input, { ...init, signal: requestAbort.signal });
+      return (options.fetch ?? fetch)(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, requestAbort.signal]) : requestAbort.signal });
     },
     onPendingDocument: (id, data) => scopedJournal.captureSubmission(id, data),
     onPendingBlob: (key, value) => { retainedAssets.set(key, value); return scopedJournal.capture('blob', key, value); },
@@ -386,7 +387,13 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (receipt?.scope !== scopedJournal.scope || !Array.isArray(receipt.ids)) return Promise.reject(new Error('Recovery acknowledgment scope changed'));
       return scopedJournal.acknowledge(receipt.ids);
     },
-    beforeDocumentWrite: async (docId, data) => {
+    beforeDocumentWrite: async (docId, data, live) => {
+      if (live) {
+        const authority = await authorize(requestAbort.signal);
+        if (!isCurrent() || authority.descriptor.summary.role === 'viewer' || !authority.descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
+        if (authority.descriptor.recoveryEpoch !== authorizedDescriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+        return;
+      }
       const epoch = authorizedDescriptor.recoveryEpoch;
       // A delayed native callback can arrive after replay has already committed
       // its exact bytes. Complete that no-op before starting another request.
