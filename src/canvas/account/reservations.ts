@@ -112,8 +112,14 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
       message(`${name} is editing this object. You can edit it when they finish.`, models.map(model => model.id));
     });
   };
+  const cancelPendingGesture = () => {
+    if (!pending) return;
+    pending = undefined; pointerId = undefined; message('');
+    // The acquire callback still owns its response and releases a late token.
+  };
+  const cancelKey = (event: KeyboardEvent) => { if (event.key === 'Escape') cancelPendingGesture(); };
   const move = (event: PointerEvent) => { if (!replay && pending) buffer(event); };
-  const captureEnd = (event: PointerEvent) => { if (!replay && pending && event.pointerId === pointerId) buffer(event); };
+  const captureEnd = (event: PointerEvent) => { if (!replay && pending && event.pointerId === pointerId) { if (event.type === 'pointercancel') { stop(event); cancelPendingGesture(); } else buffer(event); } };
   const end = (event: PointerEvent) => { if (!replay && token && event.pointerId === pointerId) finished(); };
   const selection = gfx.selection.slots.updated.subscribe(() => { if (textSession && !gfx.selection.editing) release(); });
   const blur = () => {
@@ -189,7 +195,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
         !path.some(node => node instanceof Element && node.matches('editor-menu-content'))) return;
     const models = gfx.selection.selectedElements;
     if (!models.length) return;
-    const ids = nativeReservationTargets(host.store.spaceDoc, models.map(model => model.id), keyboard && ['Backspace', 'Delete'].includes(event.key));
+    const ids = nativeReservationTargets(host.store.spaceDoc, models.map(model => model.id), (keyboard && ['Backspace', 'Delete'].includes(event.key)) || nativeAction === 'release-from-group');
     if (!ids) { stop(event); message('This action is not yet available during live editing.'); return; }
     if (finishing && releaseWork) {
       stop(event);
@@ -322,6 +328,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   });
   actionEvents.forEach(name => host.addEventListener(name, action, true));
   document.addEventListener('keydown', action, true);
+  document.addEventListener('keydown', cancelKey, true);
   host.addEventListener('pointerdown', start, true); host.addEventListener('pointermove', move, true);
   window.addEventListener('pointerup', captureEnd, true); window.addEventListener('pointercancel', captureEnd, true);
   window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end); host.addEventListener('focusout', blur);
@@ -332,6 +339,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     if (clipboard && nativePaste) clipboard._onPaste = nativePaste;
     if (clipboard && nativeCut) clipboard._onCut = nativeCut;
     actionEvents.forEach(name => host.removeEventListener(name, action, true)); document.removeEventListener('keydown', action, true);
+    document.removeEventListener('keydown', cancelKey, true);
     host.removeEventListener('pointerdown', start, true); host.removeEventListener('pointermove', move, true);
     window.removeEventListener('pointerup', captureEnd, true); window.removeEventListener('pointercancel', captureEnd, true);
     window.removeEventListener('pointerup', end); window.removeEventListener('pointercancel', end); host.removeEventListener('focusout', blur);

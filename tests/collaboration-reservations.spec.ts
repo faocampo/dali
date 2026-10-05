@@ -7,7 +7,7 @@ import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { openObjectActions } from './object-actions';
 import { editBoardTitle } from './app-menu';
 
-for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'formatting', 'resize', 'rotate', 'duplicate', 'group', 'align', 'paste', 'frame', 'freehand', 'text', 'history', 'connector', 'populated-frame', 'layer', 'lock', 'rename', 'thickness', 'typography', 'cut', 'rename-race', 'native-duplicate', 'native-frame', 'eraser', 'note-size', 'image-edit', 'connector-retarget', 'connector-quick-add', 'native-group', 'native-group-lock'] as const) test(`${action !== 'text-session' ? '@05-02-02' : '@05-02-01'} a native text session fences ${action === 'text-session' ? 'competing movement' : `${action} after release`}`, async ({ browser, baseURL }) => {
+for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'formatting', 'resize', 'rotate', 'duplicate', 'group', 'align', 'paste', 'frame', 'freehand', 'text', 'history', 'connector', 'populated-frame', 'layer', 'lock', 'rename', 'thickness', 'typography', 'cut', 'rename-race', 'native-duplicate', 'native-frame', 'eraser', 'note-size', 'image-edit', 'connector-retarget', 'connector-quick-add', 'native-group', 'native-group-lock', 'cancel-acquisition', 'frame-transform', 'disconnect-release', 'frame-resize', 'release-from-group', 'footprint-revalidation'] as const) test(`${action !== 'text-session' ? '@05-02-02' : '@05-02-01'} a native text session fences ${action === 'text-session' ? 'competing movement' : `${action} after release`}`, async ({ browser, baseURL }) => {
   const service = await acceptanceService(baseURL!); const identities = await createIdentityContexts(browser, service.origin);
   let failure: unknown;
   let releaseGesture = () => {};
@@ -18,7 +18,7 @@ for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'for
     expect(created.status()).toBe(201); const board = await created.json();
     service.database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, editorAccount, 'editor');
     const owner = identities.contexts.owner.pages()[0]!; const editor = identities.contexts.editor.pages()[0]!;
-    const [shape, independent, third] = await seedCollaborationShapes(owner, service.database, board.summary.id, action === 'connector-retarget' ? [0, 400, 800] : undefined);
+    const [shape, independent, third] = await seedCollaborationShapes(owner, service.database, board.summary.id, action === 'connector-retarget' || action === 'frame-resize' || action === 'footprint-revalidation' ? [0, 400, 800] : undefined);
     for (const page of [owner, editor]) { await page.goto(`/?board=${board.summary.id}`); await expect(page.locator('affine-edgeless-root')).toBeVisible(); }
     const point = async (page: typeof owner, objectId = shape) => page.locator('affine-edgeless-root').evaluate((element, id) => {
       const gfx = (element as HTMLElement & { gfx: GfxController }).gfx; const model = gfx.getElementById(id!)!;
@@ -69,6 +69,19 @@ for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'for
       for (const page of [owner, editor]) expect(await page.locator('affine-edgeless-root').evaluate(element => (element as HTMLElement & { gfx: GfxController }).gfx.gfxElements.map(model => 'opacity' in model ? model.opacity : undefined))).toEqual([1, 1]);
       await editor.getByRole('button', { name: 'Select', exact: true }).click();
     }
+    if (action === 'disconnect-release') {
+      await owner.goto('/');
+      await expect(owner.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
+      await moveNativeShape(editor, shape!, 50);
+      await expect.poll(() => shapeBounds(editor, shape!)).not.toBe(before);
+      const moved = await shapeBounds(editor, shape!);
+      await expect(editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+      await owner.goto(`/?board=${board.summary.id}`);
+      await expect.poll(() => shapeBounds(owner, shape!)).toBe(moved);
+      expect(identities.runtimeErrors).toEqual(['editor: Failed to load resource: the server responded with a status of 409 (Conflict)']);
+      identities.runtimeErrors.length = 0;
+      return;
+    }
     const released = owner.waitForResponse(response => response.url().endsWith('/live/release') && response.ok(), { timeout: 10000 });
     await owner.keyboard.press('Escape'); await released;
     let releaseStarted: Promise<void> | undefined;
@@ -80,6 +93,32 @@ for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'for
     }
     await moveNativeShape(editor, shape!, 50);
     await expect.poll(() => shapeBounds(editor, shape!)).not.toBe(before);
+    if (action === 'cancel-acquisition') {
+      await expect(editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+      const unchanged = await shapeBounds(editor, shape!);
+      await expect.poll(() => shapeBounds(owner, shape!)).toBe(unchanged);
+      let admitted!: () => void;
+      const acquired = new Promise<void>(resolve => { admitted = resolve; });
+      const gate = new Promise<void>(resolve => { releaseGesture = resolve; });
+      await editor.route('**/live/reserve', async route => {
+        const response = await route.fetch();
+        expect(response.status()).toBe(200); admitted();
+        await gate; await route.fulfill({ response });
+      });
+      const at = await point(editor);
+      await editor.locator('editor-host').focus();
+      await editor.mouse.move(at.x, at.y); await editor.mouse.down(); await acquired;
+      await editor.mouse.move(at.x + 100, at.y + 30, { steps: 8 });
+      await editor.keyboard.press('Escape'); await editor.mouse.up();
+      const releasedCancelled = editor.waitForResponse(response => response.url().endsWith('/live/release') && response.ok());
+      releaseGesture(); await releasedCancelled;
+      for (const page of [owner, editor]) expect(await shapeBounds(page, shape!)).toBe(unchanged);
+      await editor.unroute('**/live/reserve');
+      await moveNativeShape(owner, shape!, 35);
+      await expect.poll(() => shapeBounds(owner, shape!)).not.toBe(unchanged);
+      const moved = await shapeBounds(owner, shape!);
+      await expect.poll(() => shapeBounds(editor, shape!)).toBe(moved);
+    }
     if (action === 'delete') {
       await releaseStarted;
       await editor.keyboard.press('Delete');
@@ -105,24 +144,36 @@ for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'for
       const expected = await objects(editor); await expect.poll(() => objects(owner)).toEqual(expected);
     }
 
-    if (action === 'native-group' || action === 'native-group-lock') {
+    if (action === 'native-group' || action === 'native-group-lock' || action === 'release-from-group') {
       const objects = (page: typeof editor) => page.locator('affine-edgeless-root').evaluate(element =>
         (element as HTMLElement & { gfx: GfxController }).gfx.gfxElements.map(model => ({
           id: model.id, type: 'type' in model ? model.type : model.flavour, locked: model.isLocked(),
         })).sort((a, b) => a.id.localeCompare(b.id)));
       await expect(editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
       await editor.locator('editor-host').focus(); await editor.keyboard.press('ControlOrMeta+a');
-      await editor.getByRole('button', { name: action === 'native-group' ? 'Group' : 'Lock', exact: true }).click();
+      await editor.getByRole('button', { name: action === 'native-group-lock' ? 'Lock' : 'Group', exact: true }).click();
       await expect.poll(() => objects(editor)).toHaveLength(3);
       const expected = await objects(editor);
       expect(expected.filter(model => model.type === 'group')).toHaveLength(1);
       expect(expected.find(model => model.type === 'group')!.locked).toBe(action === 'native-group-lock');
       await expect.poll(() => objects(owner)).toEqual(expected);
       await expect(editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+      if (action === 'release-from-group') {
+        await editor.locator('affine-edgeless-root').evaluate((element, id) => {
+          (element as HTMLElement & { gfx: GfxController }).gfx.selection.set({ elements: [id!], editing: false });
+        }, shape);
+        await editor.getByRole('button', { name: 'Release from group', exact: true }).click();
+        const membership = (page: typeof editor) => page.locator('affine-edgeless-root').evaluate((element, id) => {
+          const model = (element as HTMLElement & { gfx: GfxController }).gfx.getElementById(id!) as import('@blocksuite/affine/model').ShapeElementModel;
+          return model.group?.id ?? null;
+        }, shape);
+        for (const page of [editor, owner]) await expect.poll(() => membership(page)).toBeNull();
+      } else {
       // Native multi-object locking creates a temporary group; unlocking releases it.
       await editor.getByRole('button', { name: action === 'native-group-lock' ? 'Click to unlock' : 'Ungroup', exact: true }).click();
       await expect.poll(() => objects(editor)).toHaveLength(2);
       const ungrouped = await objects(editor); await expect.poll(() => objects(owner)).toEqual(ungrouped);
+      }
     }
 
     if (action === 'thickness' || action === 'typography') {
@@ -189,8 +240,8 @@ for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'for
       }
     }
 
-    if (action === 'connector' || action === 'connector-retarget' || action === 'connector-quick-add' || action === 'populated-frame') {
-      const isConnector = action !== 'populated-frame';
+    if (action === 'connector' || action === 'connector-retarget' || action === 'connector-quick-add' || action === 'populated-frame' || action === 'frame-transform' || action === 'frame-resize' || action === 'footprint-revalidation') {
+      const isConnector = action !== 'populated-frame' && action !== 'frame-transform' && action !== 'frame-resize' && action !== 'footprint-revalidation';
       const bounds = [JSON.parse(await shapeBounds(editor, shape!)), JSON.parse(await shapeBounds(editor, independent!))] as number[][];
       const positions = await editor.locator('affine-edgeless-root').evaluate((element, boxes) => {
         const gfx = (element as HTMLElement & { gfx: GfxController }).gfx; const rect = element.getBoundingClientRect();
@@ -201,8 +252,35 @@ for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'for
       } else await editor.getByRole('button', { name: 'Frame', exact: true }).click();
       const from = isConnector ? { x: (positions[0]!.x + positions[0]!.right) / 2, y: (positions[0]!.y + positions[0]!.bottom) / 2 } : { x: Math.min(...positions.map(p => p.x)), y: Math.min(...positions.map(p => p.y)) };
       const to = isConnector ? { x: (positions[1]!.x + positions[1]!.right) / 2, y: (positions[1]!.y + positions[1]!.bottom) / 2 } : { x: Math.max(...positions.map(p => p.right)), y: Math.max(...positions.map(p => p.bottom)) };
+      if (action === 'frame-resize') from.y -= 60;
       if (action === 'connector-quick-add') to.y += 220;
+      let admitted: Promise<void> | undefined;
+      if (action === 'footprint-revalidation') {
+        let signal = () => {};
+        admitted = new Promise<void>(resolve => { signal = resolve; });
+        const gate = new Promise<void>(resolve => { releaseGesture = resolve; });
+        await editor.route('**/live/reserve', async route => {
+          const response = await route.fetch(); expect(response.status()).toBe(200);
+          signal(); await gate; await route.fulfill({ response });
+        });
+      }
       await editor.mouse.move(from.x, from.y); await editor.mouse.down(); await editor.mouse.move(to.x, to.y, { steps: 8 }); await editor.mouse.up();
+      if (action === 'footprint-revalidation') {
+        await admitted;
+        await owner.getByRole('button', { name: 'Fit to screen', exact: true }).click();
+        const dx = await owner.locator('affine-edgeless-root').evaluate(element =>
+          -550 * (element as HTMLElement & { gfx: GfxController }).gfx.viewport.zoom);
+        await moveNativeShape(owner, third!, dx);
+        await expect(owner.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+        await expect.poll(() => shapeBounds(editor, third!)).toBe(await shapeBounds(owner, third!));
+        releaseGesture();
+        await expect(editor.getByRole('status').filter({ hasText: 'Objects changed while waiting. Draw again.' })).toBeVisible();
+        for (const page of [editor, owner]) expect(await page.locator('affine-frame').count()).toBe(0);
+        expect(identities.runtimeErrors).toEqual(['editor: Failed to load resource: the server responded with a status of 409 (Conflict)']);
+        identities.runtimeErrors.length = 0;
+        return;
+      }
+
       const result = (page: typeof editor) => page.locator('affine-edgeless-root').evaluate((element, type) => {
         const gfx = (element as HTMLElement & { gfx: GfxController }).gfx;
         const model = gfx.gfxElements.find(model => 'type' in model ? model.type === type : model.flavour === type);
@@ -212,6 +290,40 @@ for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'for
       }, isConnector ? 'connector' : 'affine:frame');
       await expect.poll(async () => (await result(editor))?.ids).toEqual(action === 'connector-quick-add' ? [shape] : [shape, independent].sort());
       const expected = await result(editor); await expect.poll(() => result(owner)).toEqual(expected);
+      if (action === 'frame-resize') {
+        await editor.getByRole('button', { name: 'Fit to screen', exact: true }).click();
+        await expect(editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+        const handle = await editor.locator('.handle[aria-label="bottom-right"] .resize').first().boundingBox(); expect(handle).not.toBeNull();
+        const target = await point(editor, third);
+        await editor.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2); await editor.mouse.down();
+        expect(target.x + 100).toBeLessThan(editor.viewportSize()!.width);
+        await editor.mouse.move(target.x + 100, target.y + 100, { steps: 12 });
+        await expect(editor.locator('.live-creation-preview')).toBeVisible();
+        await editor.mouse.up();
+        for (const page of [editor, owner]) await expect.poll(async () => (await result(page))?.ids).toEqual([shape, independent, third].sort());
+      }
+      if (action === 'frame-transform') {
+        await expect(editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+        const frameId = expected!.id;
+        const frameState = (page: typeof editor) => page.locator('affine-edgeless-root').evaluate((element, id) => {
+          const gfx = (element as HTMLElement & { gfx: GfxController }).gfx;
+          const frame = gfx.getElementById(id) as import('@blocksuite/affine/model').FrameBlockModel | undefined;
+          return frame ? { bounds: frame.xywh, children: frame.childElements.map(m => ({ id: m.id, xywh: m.xywh })).sort((a,b) => a.id.localeCompare(b.id)) } : null;
+        }, frameId);
+        const original = await frameState(editor);
+        // Native frame titles drag the frame together with its children.
+        const titleBox = await editor.locator('affine-frame-title').boundingBox(); expect(titleBox).not.toBeNull();
+        const edge = { x: titleBox!.x + titleBox!.width / 2, y: titleBox!.y + titleBox!.height / 2 };
+        const admitted = editor.waitForResponse(r => r.url().endsWith('/live/reserve') && r.ok());
+        await editor.mouse.move(edge.x, edge.y); await editor.mouse.down(); await admitted;
+        await editor.mouse.move(edge.x + 40, edge.y + 60, { steps: 8 }); await editor.mouse.up();
+        await expect.poll(() => frameState(editor)).not.toEqual(original);
+        const moved = await frameState(editor); expect(moved!.children).not.toEqual(original!.children);
+        await expect.poll(() => frameState(owner)).toEqual(moved);
+        await expect(editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+        await editor.keyboard.press('Delete');
+        for (const page of [owner, editor]) await expect.poll(() => frameState(page)).toBeNull();
+      }
       if (action === 'connector-quick-add') {
         await editor.getByRole('button', { name: 'Add shape at connector end', exact: true }).click();
         await expect.poll(async () => (await result(editor))?.ids.length).toBe(2);
@@ -399,6 +511,30 @@ for (const action of ['text-session', 'delete', 'note', 'image', 'drawing', 'for
         await editor.locator('.image-slider').filter({ hasText: 'Brightness' }).locator('input').fill('20');
         await expect.poll(() => imageState(editor)).toMatchObject({ brightness: [20] });
         const expected = await imageState(editor); await expect.poll(() => imageState(owner)).toEqual(expected);
+        await editor.locator('.selection-inspector').getByRole('button', { name: 'Crop', exact: true }).click();
+        await editor.getByRole('button', { name: 'Crop left', exact: true }).press('Shift+ArrowRight');
+        await editor.getByRole('button', { name: 'Apply crop', exact: true }).click();
+        await expect.poll(async () => (await imageState(editor)).width).toBeCloseTo(162);
+        await expect.poll(() => imageState(owner)).toEqual(await imageState(editor));
+        await editor.getByRole('button', { name: 'Reset edits', exact: true }).click();
+        await expect.poll(() => imageState(editor)).toMatchObject({ width: 180, brightness: [] });
+        await expect.poll(() => imageState(owner)).toEqual(await imageState(editor));
+        const replacement = Buffer.from(await editor.evaluate(() => {
+          const canvas = document.createElement('canvas'); canvas.width = 80; canvas.height = 160;
+          const context = canvas.getContext('2d')!; context.fillStyle = '#506090'; context.fillRect(0, 0, 80, 160);
+          return canvas.toDataURL().split(',')[1]!;
+        }), 'base64');
+        const oldSource = await editor.locator('affine-edgeless-root').evaluate(element =>
+          ((element as HTMLElement & { gfx: GfxController }).gfx.doc.getBlocksByFlavour('affine:image')[0]!.model as import('@blocksuite/affine/model').ImageBlockModel).props.sourceId);
+        await editor.locator('.selection-inspector input[type=file]').setInputFiles({ name: 'synthetic-replacement.png', mimeType: 'image/png', buffer: replacement });
+        const imageSource = (page: typeof editor) => page.locator('affine-edgeless-root').evaluate(element => {
+          const model = (element as HTMLElement & { gfx: GfxController }).gfx.doc.getBlocksByFlavour('affine:image')[0]!.model as import('@blocksuite/affine/model').ImageBlockModel;
+          return { source: model.props.sourceId, bounds: model.xywh };
+        });
+        await expect.poll(async () => (await imageSource(editor)).source).not.toBe(oldSource);
+        const replaced = await imageSource(editor); expect(JSON.parse(replaced.bounds)[3]).toBe(360);
+        await expect.poll(() => imageSource(owner)).toEqual(replaced);
+
       }
 
       await expect(editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();

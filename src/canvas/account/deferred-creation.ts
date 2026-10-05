@@ -3,11 +3,12 @@ import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { Bound, linePolygonIntersects } from '@blocksuite/global/gfx';
 import { isTopLevelBlock } from '@blocksuite/affine/shared/utils';
 import { EdgelessCRUDIdentifier, OverlayIdentifier } from '@blocksuite/affine/blocks/surface';
-import { ConnectorElementModel } from '@blocksuite/affine/model';
+import { ConnectorElementModel, FrameBlockModel } from '@blocksuite/affine/model';
 import type { ConnectionOverlay } from '@blocksuite/affine/gfx/connector';
 
 type Input = { event: PointerEvent; target: EventTarget | undefined };
 type Retarget = { model: ConnectorElementModel; end: 'source' | 'target'; snapshot: string; anchor: { clientX: number; clientY: number } };
+type FrameResize = { model: FrameBlockModel; snapshot: string; bounds: Bound; corner: string };
 type Hooks = {
   replaying: () => boolean;
   busy: () => boolean;
@@ -19,12 +20,22 @@ type Hooks = {
 /** Preview dependent gestures privately until their complete affected set is known. */
 export function installDeferredCreation(host: EditorHost, hooks: Hooks) {
   const gfx = host.std.get(GfxControllerIdentifier);
-  let active: { tool: string; start: Input; move?: Input; points: Input[]; connector?: Retarget } | undefined;
+  let active: { tool: string; start: Input; move?: Input; points: Input[]; connector?: Retarget; frame?: FrameResize } | undefined;
   let preview: SVGSVGElement | undefined;
   let generation = 0;
   const stop = (event: Event) => { event.preventDefault(); event.stopImmediatePropagation(); };
   const input = (event: PointerEvent): Input => ({ event, target: event.composedPath()[0] });
   const clear = () => { active = undefined; preview?.remove(); preview = undefined; };
+  const resizedBound = (frame: FrameResize, start: PointerEvent, end: PointerEvent) => {
+    const a = gfx.viewport.toModelCoordFromClientCoord([start.clientX, start.clientY]);
+    const b = gfx.viewport.toModelCoordFromClientCoord([end.clientX, end.clientY]);
+    const dx = b[0] - a[0], dy = b[1] - a[1]; const original = frame.bounds;
+    const left = original.x + (frame.corner.includes('left') ? dx : 0);
+    const right = original.maxX + (frame.corner.includes('right') ? dx : 0);
+    const top = original.y + (frame.corner.includes('top') ? dy : 0);
+    const bottom = original.maxY + (frame.corner.includes('bottom') ? dy : 0);
+    return new Bound(Math.min(left, right), Math.min(top, bottom), Math.abs(right - left), Math.abs(bottom - top));
+  };
   const render = (end: PointerEvent) => {
     if (!active) return;
     if (!preview) {
@@ -34,10 +45,15 @@ export function installDeferredCreation(host: EditorHost, hooks: Hooks) {
       document.body.append(preview);
     }
     const start = active.connector?.anchor ?? active.start.event;
-    const shape = document.createElementNS('http://www.w3.org/2000/svg', active.tool === 'frame' ? 'rect' : active.tool === 'eraser' ? 'polyline' : 'line');
+    const shape = document.createElementNS('http://www.w3.org/2000/svg', active.tool === 'frame' || active.frame ? 'rect' : active.tool === 'eraser' ? 'polyline' : 'line');
     const values = active.tool === 'frame'
       ? { x: Math.min(start.clientX, end.clientX), y: Math.min(start.clientY, end.clientY), width: Math.abs(end.clientX - start.clientX), height: Math.abs(end.clientY - start.clientY) }
       : { x1: start.clientX, y1: start.clientY, x2: end.clientX, y2: end.clientY };
+    if (active.frame) {
+      const bound = resizedBound(active.frame, active.start.event, end);
+      const [x, y] = gfx.viewport.toViewCoord(bound.x, bound.y); const rect = host.getBoundingClientRect();
+      Object.assign(values, { x: x + rect.x, y: y + rect.y, width: bound.w * gfx.viewport.zoom, height: bound.h * gfx.viewport.zoom });
+    }
     for (const [name, value] of Object.entries(values)) shape.setAttribute(name, String(value));
     if (active.tool === 'eraser') shape.setAttribute('points', active.points.map(({ event }) => `${event.clientX},${event.clientY}`).join(' '));
     shape.setAttribute('fill', 'none'); shape.setAttribute('stroke', 'var(--affine-primary-color,#643df2)');
@@ -46,9 +62,14 @@ export function installDeferredCreation(host: EditorHost, hooks: Hooks) {
     else shape.setAttribute('stroke-dasharray', '5 4');
     preview.replaceChildren(shape);
   };
-  const targets = (tool: string, start: PointerEvent, end: PointerEvent, inputs: Input[] = [], connector?: Retarget) => {
+  const targets = (tool: string, start: PointerEvent, end: PointerEvent, inputs: Input[] = [], connector?: Retarget, frame?: FrameResize) => {
     const from = gfx.viewport.toModelCoordFromClientCoord([start.clientX, start.clientY]);
     const to = gfx.viewport.toModelCoordFromClientCoord([end.clientX, end.clientY]);
+    if (frame) {
+      const bound = resizedBound(frame, start, end);
+      return [...new Set([frame.model.id, ...frame.model.childElements.map(model => model.id),
+        ...gfx.gfxElements.filter(model => bound.contains(model.elementBound)).map(model => model.id)])].sort();
+    }
     if (connector) {
       const overlay = host.std.get(OverlayIdentifier('connection')) as ConnectionOverlay;
       const model = connector.model; const other = model[connector.end === 'source' ? 'target' : 'source'].id;
@@ -88,12 +109,17 @@ export function installDeferredCreation(host: EditorHost, hooks: Hooks) {
       const opposite = handle.shadowRoot?.querySelector(end === 'source' ? '.line-end' : '.line-start')?.getBoundingClientRect();
       if (opposite && !handle.connector.isLocked()) connector = { model: handle.connector, end, snapshot: JSON.stringify([handle.connector.source, handle.connector.target]), anchor: { clientX: opposite.x + opposite.width / 2, clientY: opposite.y + opposite.height / 2 } };
     }
-    if (!connector && !['frame', 'connector', 'eraser'].includes(tool)) return;
+    const selected = gfx.selection.selectedElements;
+    const resizeHandle = path.find(node => node instanceof HTMLElement && node.matches('.handle')) as HTMLElement | undefined;
+    const frameModel = selected.length === 1 && selected[0] instanceof FrameBlockModel ? selected[0] : undefined;
+    const frame = tool === 'default' && frameModel && !frameModel.isLocked() && resizeHandle && path.some(node => node instanceof Element && node.matches('.resize'))
+      ? { model: frameModel, snapshot: frameModel.xywh, bounds: Bound.deserialize(frameModel.xywh), corner: resizeHandle.getAttribute('aria-label') ?? '' } : undefined;
+    if (!connector && !frame && !['frame', 'connector', 'eraser'].includes(tool)) return;
     if (event.composedPath().some(node => node instanceof Element && node.matches('editor-toolbar,editor-menu-content,input,textarea,button'))) return;
     stop(event);
     if (hooks.busy()) { hooks.message('Finish the current action, then draw again.'); return; }
     host.focus();
-    generation++; active = { tool, start: input(event), points: [input(event)], connector }; render(event);
+    generation++; active = { tool, start: input(event), points: [input(event)], connector, frame }; render(event);
   };
   const move = (event: PointerEvent) => {
     if (hooks.replaying() || !active || event.pointerId !== active.start.event.pointerId) return;
@@ -106,11 +132,12 @@ export function installDeferredCreation(host: EditorHost, hooks: Hooks) {
     stop(event); const gesture = active; const version = generation; const last = input(event); clear();
     if (event.type === 'pointercancel' || !gesture.move) return;
     const points = [...gesture.points, last];
-    const ids = targets(gesture.tool, gesture.start.event, event, points, gesture.connector);
+    const ids = targets(gesture.tool, gesture.start.event, event, points, gesture.connector, gesture.frame);
     if (gesture.tool === 'eraser' && !ids.length) return;
-    void hooks.run(ids, gesture.tool !== 'eraser' && !gesture.connector, () => {
+    void hooks.run(ids, gesture.tool !== 'eraser' && !gesture.connector && !gesture.frame, () => {
       if (generation !== version || gfx.tool.currentToolName$.peek() !== gesture.tool) throw new Error('Drawing cancelled.');
-      if (ids.join('\0') !== targets(gesture.tool, gesture.start.event, event, points, gesture.connector).join('\0')) throw new Error('Objects changed while waiting. Draw again.');
+      if (ids.join('\0') !== targets(gesture.tool, gesture.start.event, event, points, gesture.connector, gesture.frame).join('\0')) throw new Error('Objects changed while waiting. Draw again.');
+      if (gesture.frame && (gfx.getElementById(gesture.frame.model.id) !== gesture.frame.model || gesture.frame.model.xywh !== gesture.frame.snapshot || gesture.frame.model.isLocked())) throw new Error('The frame changed while waiting. Resize it again.');
       if (gesture.connector) {
         const { model, end, snapshot } = gesture.connector;
         if (gfx.getElementById(model.id) !== model || JSON.stringify([model.source, model.target]) !== snapshot || model.isLocked()) throw new Error('The line changed while waiting. Connect it again.');
