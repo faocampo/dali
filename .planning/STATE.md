@@ -173,7 +173,7 @@ Complete: nine plans, four requirements (MIND-01 through MIND-04), five accepted
 
 ### Quick Tasks Completed
 
-Last activity: 2026-10-05 - Completed quick task 261005-mdx: Freehand pen width selection.
+Last activity: 2026-10-05 - Completed quick task 261005-pqq: Connector text orientation.
 
 | # | Description | Date | Commit | Status | Directory |
 | --- | ------------- | ------ | -------- | -------- | ----------- |
@@ -204,6 +204,7 @@ Last activity: 2026-10-05 - Completed quick task 261005-mdx: Freehand pen width 
 | 260928-save-fonts | Reconcile save confirmation, simplify image details and restore font/style choices | 2026-09-28 | 9d4976b | Complete | [Quick task](quick/260928-save-status-and-font-controls/SUMMARY.md) |
 | 260928-local-lifecycle | Restore local board writes and verify create/save/reopen/delete flows | 2026-09-28 | 6c5ec19 | Complete | [Quick task](quick/260928-local-board-lifecycle/SUMMARY.md) |
 | 261005-mdx | Freehand pen width presets, slider and preview | 2026-10-05 | 6819a99 | complete | [261005-mdx-add-freehand-stroke-width-selection](./quick/261005-mdx-add-freehand-stroke-width-selection/) |
+| 261005-pqq | Connector label orientation: Follow line or Stay horizontal | 2026-10-05 | ce28c5a | complete | [261005-pqq-add-connector-text-orientation](./quick/261005-pqq-add-connector-text-orientation/) |
 
 Phase 2 was tested and approved on 2026-09-15. Canonical phase verification records the acceptance revision; subsequent quick tasks retain separate validation provenance. Quick task 260915-s9s passed 79 unit tests and 51 distinct browser/project cases across focused runs, with TypeScript checks and production build passing.
 
