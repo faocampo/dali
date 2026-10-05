@@ -125,7 +125,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
   registerDocumentRoutes(app, config, database, now, beforeCommit, collaboration);
   registerBlobRoutes(app, config, database, now, beforeCommit);
   registerGrantRoutes(app, config, database, now, beforeCommit);
-  registerActionRoutes(app, config, database, now, beforeCommit);
+  registerActionRoutes(app, config, database, now, beforeCommit, collaboration);
   app.get<{ Querystring: { filter?: string } }>('/api/boards', async (request, reply) => {
     const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
     const filter = request.query.filter ?? 'all';

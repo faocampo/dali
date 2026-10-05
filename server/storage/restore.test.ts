@@ -88,7 +88,9 @@ it('@04-12-01 selected restore preserves content and access while invalidating s
     expect(stale.statusCode).toBe(identity === 'viewer' ? 403 : 409);
   }
 });
-for (const defect of ['digest', 'corrupt', 'incomplete', 'maintenance', 'fencing', 'nonempty', 'symlink', 'source'] as const) it(`@04-12-01 ${defect} refuses restore without changing source or destination`, async () => {
+// These rejection checks publish and fsync a real backup before validating it.
+// Allow bounded disk contention while retaining all source/destination assertions.
+for (const defect of ['digest', 'corrupt', 'incomplete', 'maintenance', 'fencing', 'nonempty', 'symlink', 'source'] as const) it(`@04-12-01 ${defect} refuses restore without changing source or destination`, { timeout: 15_000 }, async () => {
   const input = await selected(); const oldBytes = await readFile(input.sourceDatabase);
   if (defect === 'digest') input.expectedManifestDigest = '0'.repeat(64);
   if (defect === 'corrupt') await writeFile(join(input.backup, 'database.sqlite'), 'invalid');

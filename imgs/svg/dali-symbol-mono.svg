@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="-2 18 364 282">
+  <title id="title">Símbolo de Dalí</title>
+  <g aria-label="Dalí eye symbol">
+    <path d="M180 18C284 18 362 79 362 162C362 247 286 300 180 300C74 300-2 247-2 162C-2 79 76 18 180 18Z" fill="#050505"/>
+    <path d="M180 70C247 70 299 107 299 162C299 218 248 250 180 250C112 250 61 218 61 162C61 107 113 70 180 70Z" fill="#FFFFFF"/>
+    <ellipse cx="150" cy="134" rx="51" ry="32" fill="#050505" transform="rotate(-18 150 134)"/>
+    <circle cx="279" cy="88" r="12" fill="#FFFFFF" stroke="#050505" stroke-width="7"/>
+    <circle cx="47" cy="229" r="8" fill="#050505"/>
+  </g>
+</svg>

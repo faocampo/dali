@@ -4,12 +4,12 @@ import type { EditorHost } from '@blocksuite/affine/std';
 import type { AccountDatabase } from '../server/storage/database';
 import { expect } from './fixtures';
 /** Seed through the native model before enabling collaboration on the fixture. */
-export async function seedCollaborationShapes(page: Page, database: AccountDatabase, boardId: string) {
+export async function seedCollaborationShapes(page: Page, database: AccountDatabase, boardId: string, positions = [0, 400]) {
   await page.goto(`/?board=${boardId}`); await expect(page.locator('affine-edgeless-root')).toBeVisible();
-  const ids = await page.locator('affine-edgeless-root').evaluate(element => {
+  const ids = await page.locator('affine-edgeless-root').evaluate((element, positions) => {
     const gfx = (element as HTMLElement & { gfx: GfxController }).gfx;
-    return [0, 400].map(x => gfx.surface!.addElement({ type: 'shape', shapeType: 'rect', xywh: `[${x},0,160,120]`, shapeStyle: 'General', filled: true, fillColor: '#f5cf67', strokeColor: '#211830', strokeWidth: 2 }));
-  });
+    return positions.map(x => gfx.surface!.addElement({ type: 'shape', shapeType: 'rect', xywh: `[${x},0,160,120]`, shapeStyle: 'General', filled: true, fillColor: '#f5cf67', strokeColor: '#211830', strokeWidth: 2 }));
+  }, positions);
   await expect(page.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
   await page.goto('/'); await expect(page.getByRole('heading', { name: 'Your boards', exact: true })).toBeVisible();
   database.prepare('UPDATE boards SET live_enabled=1 WHERE id=?').run(boardId);

@@ -3,6 +3,7 @@ import type { ImageBlockModel } from '@blocksuite/affine/model';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import { Bound } from '@blocksuite/global/gfx';
+import { withCanvasReservation } from './account/reservations';
 import { ImageCropOverlay } from './ImageCropOverlay';
 import {
   summarizeCanvasSelection,
@@ -120,7 +121,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     setEditingImage(true);
     setActionError(null);
     try {
-      await replaceImageSource(host, selection.key, file);
+      await withCanvasReservation(host, [selection.key], true, () => replaceImageSource(host, selection.key, file));
       setImageRevision(value => value + 1);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : String(cause));
@@ -142,7 +143,7 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     setEditingImage(true);
     setActionError(null);
     try {
-      await applyImageVisualEdit(host.std.store, selection.key, next, current);
+      await withCanvasReservation(host, [selection.key], true, () => { if (current()) return applyImageVisualEdit(host.std.store, selection.key, next, current); });
       if (current()) setCropOpen(false);
     } catch (cause) {
       if (current()) setActionError(cause instanceof Error ? cause.message : String(cause));
@@ -164,13 +165,14 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     visualTimer.current = setTimeout(() => void applyVisual(next, generation), 60);
   };
 
-  const resetVisual = () => {
-    if (!selection || selection.kind !== 'image') return;
-    visualGeneration.current++; visualPending.current = false; clearTimeout(visualTimer.current); setEditingImage(false);
-    resetImageVisualEdit(host.std.store, selection.key);
-    setImageRevision(value => value + 1);
-    setActionError(null);
-    setCropOpen(false);
+  const resetVisual = async () => {
+    if (!selection || selection.kind !== 'image' || editingImage) return;
+    visualGeneration.current++; visualPending.current = false; clearTimeout(visualTimer.current); setEditingImage(true);
+    try {
+      await withCanvasReservation(host, [selection.key], true, () => resetImageVisualEdit(host.std.store, selection.key));
+      setImageRevision(value => value + 1); setActionError(null); setCropOpen(false);
+    } catch (cause) { setActionError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setEditingImage(false); }
   };
 
   const changeGeometry = (field: keyof typeof geometry, value: string) => {
@@ -187,25 +189,27 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
     });
   };
 
-  const applyGeometry = () => {
-    if (!selection || selection.kind !== 'image') return;
+  const applyGeometry = async () => {
+    if (!selection || selection.kind !== 'image' || editingImage) return;
+    setEditingImage(true);
     try {
-      updateImageGeometry(host.std.store, selection.key, {
+      await withCanvasReservation(host, [selection.key], false, () => updateImageGeometry(host.std.store, selection.key, {
         x: Number(geometry.x),
         y: Number(geometry.y),
         width: Number(geometry.width),
         height: Number(geometry.height),
-      });
+      }));
       setRatio(Number(geometry.width) / Number(geometry.height));
       setImageRevision(value => value + 1);
       setActionError(null);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : String(cause));
-    }
+    } finally { setEditingImage(false); }
   };
 
-  const restoreOriginalSize = () => {
+  const restoreOriginalSize = async () => {
     if (selection?.kind !== 'image' || editingImage) return;
+    setEditingImage(true);
     try {
       const block = host.view.getBlock(selection.key);
       const image = block?.querySelector<HTMLImageElement>('img.drag-target');
@@ -215,17 +219,17 @@ export function SelectionInspector({ host }: { host: EditorHost }) {
       const model = host.std.store.getBlock(selection.key)?.model as ImageBlockModel | undefined;
       if (!model) return;
       const bound = Bound.deserialize(model.xywh);
-      updateImageGeometry(host.std.store, selection.key, {
+      await withCanvasReservation(host, [selection.key], false, () => updateImageGeometry(host.std.store, selection.key, {
         x: bound.x + (bound.w - image.naturalWidth) / 2,
         y: bound.y + (bound.h - image.naturalHeight) / 2,
         width: image.naturalWidth,
         height: image.naturalHeight,
-      });
+      }));
       setImageRevision(value => value + 1);
       setActionError(null);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : String(cause));
-    }
+    } finally { setEditingImage(false); }
   };
 
   const open = selection?.kind === 'image' && closedForSelection !== selection.key;

@@ -1,5 +1,7 @@
+import { changedNativeObjects, nativeObjectIds } from './change-footprint.js';
 import { createHash } from 'node:crypto';
-import { movedShapeIds, type CollaborationBroker } from './collaboration.js';
+import type { LiveConnection } from './reservations.js';
+import { type CollaborationBroker } from './collaboration.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as Y from 'yjs';
 import type { AuthConfig } from '../app.js';
@@ -80,7 +82,8 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
       Y.decodeUpdate(request.body);
     } catch { return reply.code(400).send({ code: 'INVALID_DOCUMENT' }); }
     await beforeCommit?.();
-    return database.transaction(() => {
+    let expansion: { connection: LiveConnection; token: string; ids: string[] } | undefined;
+    const commit = database.transaction(() => {
       const latest = requireBoardCapability(database, request, reply, boardId, 'write', now); if (!latest) return;
       const stored = documentBytes(database, latest, docId); if (!stored) return reply.code(404).send({ code: 'BOARD_UNAVAILABLE' });
       const live = (latest as BoardRow & { live_enabled?: number }).live_enabled === 1;
@@ -98,20 +101,28 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
           return { acknowledged: true, previousRevision: receipt.previous_revision, revision: receipt.revision };
         }
       }
-      const doc = new Y.Doc({ guid: docId }); const before = new Y.Doc({ guid: docId }); let merged: Buffer;
+      const doc = new Y.Doc({ guid: docId }); const before = new Y.Doc({ guid: docId }); let merged: Buffer; let created: string[] = [];
       try {
         Y.applyUpdate(before, stored); Y.applyUpdate(doc, stored); Y.applyUpdate(doc, request.body); validateDocument(doc, latest, docId);
         if (live && connection) {
-          const ids = docId === latest.content_doc_id ? movedShapeIds(before, doc) :
+          const ids = docId === latest.content_doc_id ? changedNativeObjects(before, doc) :
             Buffer.from(Y.encodeStateAsUpdate(before)).equals(Buffer.from(Y.encodeStateAsUpdate(doc))) ? [] : null;
           if (ids === null) return reply.code(409).send({ code: 'UNSUPPORTED_LIVE_ACTION' });
-          if (ids.length && (typeof reservation !== 'string' || !collaboration!.owns(connection, reservation, ids))) return reply.code(409).send({ code: 'RESERVATION_REQUIRED' });
+          const existing = docId === latest.content_doc_id ? nativeObjectIds(before) : new Set<string>();
+          created = ids.filter(id => id !== '$dali:metadata' && !existing.has(id));
+          const required = ids.filter(id => !created.includes(id));
+          if (created.length) required.push(`$dali:create:${connection.id}`);
+          if (required.length && (typeof reservation !== 'string' || !collaboration!.owns(connection, reservation, required))) return reply.code(409).send({ code: 'RESERVATION_REQUIRED' });
         }
         if (docId === latest.content_doc_id) for (const key of referencedImageKeys(doc)) if (!database.prepare('SELECT 1 FROM board_blobs WHERE board_id=? AND blob_key=?').get(boardId, key)) throw new Error('Unbound image');
         merged = Buffer.from(Y.encodeStateAsUpdate(doc));
         if (merged.length > DOCUMENT_LIMITS.update) return reply.code(413).send({ code: 'PAYLOAD_REJECTED' });
       } catch { return reply.code(400).send({ code: 'INVALID_DOCUMENT' }); }
       finally { doc.destroy(); before.destroy(); }
+      if (created.length && connection && typeof reservation === 'string') {
+        if (!collaboration!.extend(connection, reservation, created)) return reply.code(409).send({ code: 'RESERVATION_REQUIRED' });
+        expansion = { connection, token: reservation, ids: created };
+      }
       const previousRevision = latest.revision;
       let revision = previousRevision;
       if (!merged.equals(stored)) {
@@ -123,6 +134,11 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
       if (live && connection) database.prepare('INSERT INTO document_receipts(board_id,account_id,tab_id,operation_id,doc_id,digest,previous_revision,revision) VALUES(?,?,?,?,?,?,?,?)')
         .run(boardId, connection.accountId, connection.tabId, operationId, docId, digest, previousRevision, revision);
       return { acknowledged: true, previousRevision, revision };
-    })();
+    });
+    try { return commit(); }
+    catch (error) {
+      if (expansion) collaboration!.releaseObjects(expansion.connection, expansion.token, expansion.ids);
+      throw error;
+    }
   });
 }

@@ -1,6 +1,6 @@
 import * as Y from 'yjs';
 import { RecoveryEpochError, SourceAccessError, type SourceOptions } from './doc-source';
-export type LiveSnapshot = { connectionId?: string; revision: number; epoch: string; root?: string; content?: string };
+export type LiveSnapshot = { connectionId?: string; revision: number; epoch: string; root?: string; content?: string; title?: string };
 const decode = (value: string) => Uint8Array.from(atob(value), character => character.charCodeAt(0));
 /** A connection belongs to exactly one runtime; recovery creates a fresh one. */
 export class BoardLiveSource {
@@ -9,7 +9,11 @@ export class BoardLiveSource {
   private revision = 0;
   private reservation?: string;
   private reservedObjects = new Set<string>();
-  allowsObject(id: string) { return this.connected && this.reservedObjects.has(id); }
+  private createdObjects = new Set<string>();
+  get creationScope() { if (!this.connectionId) throw new Error('No live connection'); return `$dali:create:${this.connectionId}`; }
+  get creating() { return this.connected && this.reservedObjects.has(this.creationScope); }
+  registerCreated(id: string) { if (this.creating) this.createdObjects.add(id); }
+  allowsObject(id: string) { return this.connected && (this.reservedObjects.has(id) || this.createdObjects.has(id)); }
   get editing() { return this.connected && this.reservedObjects.size > 0; }
   private interrupted = false;
   private started = false;
@@ -35,7 +39,7 @@ export class BoardLiveSource {
       if ([401, 403, 404].includes(response.status) || result.code === 'IDENTITY_CHANGED') {
         const error = new SourceAccessError(response.status); this.options.onAuthorizationLost?.(error); throw error;
       }
-      throw Object.assign(new Error('Live request failed'), { code: result.code });
+      throw Object.assign(new Error('Live request failed'), { code: result.code, editor: typeof result.editor === 'string' ? result.editor : undefined });
     }
     return result;
   }
@@ -43,12 +47,14 @@ export class BoardLiveSource {
     this.current();
     if (!Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0 || snapshot.epoch !== this.options.getRecoveryEpoch?.() || (this.epoch && snapshot.epoch !== this.epoch)) throw new Error('Invalid live snapshot');
     if (this.epoch && snapshot.revision <= this.revision) return;
+    if (snapshot.title !== undefined && (typeof snapshot.title !== 'string' || snapshot.title.length > 4000)) throw new Error('Invalid live title');
     if (!!snapshot.root !== !!snapshot.content) throw new Error('Incomplete live snapshot');
     // Decode the pair before delivering either document.
     const root = snapshot.root ? decode(snapshot.root) : undefined;
     const content = snapshot.content ? decode(snapshot.content) : undefined;
     if (root && content) { Y.decodeUpdate(root); Y.decodeUpdate(content); receive(this.options.rootDocId, root); this.current(); receive(this.options.contentDocId, content); }
     this.revision = snapshot.revision; this.epoch = snapshot.epoch;
+    if (snapshot.title !== undefined) this.options.onLiveMetadata?.({ title: snapshot.title, revision: snapshot.revision });
   }
   async start(receive: (docId: string, bytes: Uint8Array) => void, disconnect: (reason: string) => void) {
     if (this.started) throw new Error('Live source already started');
@@ -86,7 +92,7 @@ export class BoardLiveSource {
   }
   async release(token: string) {
     if (this.connected) await this.request('release', { connectionId: this.connectionId, token });
-    if (this.reservation === token) { this.reservation = undefined; this.reservedObjects.clear(); }
+    if (this.reservation === token) { this.reservation = undefined; this.reservedObjects.clear(); this.createdObjects.clear(); }
   }
   dispose() {
     if (this.controller.signal.aborted) return;

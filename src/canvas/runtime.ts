@@ -152,19 +152,70 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   replayDocumentCommit = documentCommit;
   let titleQueue = Promise.resolve();
   let attemptedTitle: string | undefined;
+  let titlesInFlight = 0;
+  let liveMetadataVersion = 0;
+  let latestLiveMetadata: { title: string; revision: number } | undefined;
+  let acknowledgedTitleRevision = 0;
+  const projectLiveMetadata = () => {
+    const metadata = latestLiveMetadata;
+    if (!metadata || titlesInFlight) return;
+    const version = liveMetadataVersion;
+    void titles.read().then(intent => {
+      if (!isCurrent() || version !== liveMetadataVersion || intent || titlesInFlight || metadata.revision < acknowledgedTitleRevision) return;
+      authorizedDescriptor = { ...authorizedDescriptor, revision: Math.max(authorizedDescriptor.revision, metadata.revision), summary: { ...authorizedDescriptor.summary, title: metadata.title } };
+      if (current) current.descriptor = structuredClone(authorizedDescriptor);
+      publish({ ...scope!, title: metadata.title });
+    }).catch(error => { if (isCurrent()) pauseRecoveryStorage(error); });
+  };
   captureTitle = title => {
+    titlesInFlight++;
     const work = titleQueue.then(async () => {
       if (!isCurrent() || !scope?.canWrite || storagePaused) throw new Error('Editing is paused. Retry saving before renaming.');
+      const liveRuntime = current?.workspace.live?.connected ? current : undefined;
+      const originalTitle = authorizedDescriptor.summary.title;
+      const previous = liveRuntime ? await titles.read() : undefined;
       publish({ ...scope, title });
       dispatchSaveEvent({ type: 'title', scope: statusScope, id: crypto.randomUUID(), outcome: 'pending', at: Date.now() });
       const intent = await captureTitleIntent(titles, authorizedDescriptor, title, true);
       if (!isCurrent()) return;
       dispatchSaveEvent({ type: 'title', scope: statusScope, id: intent.operationId, outcome: 'pending', at: Date.now() });
       dispatchSaveEvent({ type: 'preserved', scope: statusScope });
+      if (liveRuntime) {
+        try {
+          await liveRuntime.workspace.waitForSynced();
+          const authority = await authorize(requestAbort.signal);
+          if (!isCurrent() || !liveRuntime.workspace.live?.connected) throw new Error('Live editing is paused. Your pending name is preserved.');
+          if (authority.descriptor.summary.title !== originalTitle && authority.descriptor.summary.title !== title)
+            throw new Error('The board name changed. Your pending name is preserved; review the current name before retrying.');
+          // A newly captured, never-submitted rename may use freshly checked
+          // authority after preceding canvas saves. Existing uncertain attempts
+          // keep their original identity and revision for receipt reconciliation.
+          if (previous?.operationId !== intent.operationId && authority.descriptor.revision !== intent.baseRevision)
+            await titles.advance?.(intent.operationId, intent.baseRevision, authority.descriptor.revision);
+          const result = await replayTitleIntent(titles, authority, async (path, init) => {
+            const response = await fetch(path, { ...init, signal: requestAbort.signal, cache: 'no-store', headers: { 'X-Dali-Account': initial.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': authority.descriptor.recoveryEpoch, 'Content-Type': 'application/json' } });
+            if (!isCurrent()) throw new Error('Stale title update');
+            if (!response.ok) {
+              const body = await response.json().catch(() => ({})) as { editor?: unknown };
+              if ([401,403,404].includes(response.status)) throw new SourceAccessError(response.status);
+              throw new Error(typeof body.editor === 'string' ? `${body.editor} is editing the board name. Try again when they finish.` : 'The board changed. Your pending name is preserved; review the current board before retrying.');
+            }
+            if (init?.method === 'PATCH' && response.headers.get('X-Dali-Recovery-Epoch') !== authority.descriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+            return response.json();
+          });
+          if (result) { acknowledgedTitleRevision = result.revision; authorizedDescriptor = result; if (current === liveRuntime) current.descriptor = result; }
+          dispatchSaveEvent({ type: 'title', scope: statusScope, id: intent.operationId, outcome: 'acknowledged', at: Date.now() });
+        } catch (error) {
+          if (isCurrent()) dispatchSaveEvent({ type: 'title', scope: statusScope, id: intent.operationId, outcome: 'failed', at: Date.now(), message: error instanceof Error ? error.message : 'Your pending name could not be saved.' });
+          if (error instanceof SourceAccessError || error instanceof RecoveryEpochError) suspendAccessScope('authorization');
+          throw error;
+        }
+        return;
+      }
       await coordinator.retryRecovery();
       // A recovery already in flight may have inspected before this capture.
       if (isCurrent() && attemptedTitle !== intent.operationId) await coordinator.retryRecovery();
-    });
+    }).finally(() => { titlesInFlight--; projectLiveMetadata(); });
     titleQueue = work.catch(() => {}); capture.push(work.catch(() => {})); return work;
   };
   const confirmed = new Map<string, Y.Doc>();
@@ -363,6 +414,10 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     durableLocalBlobs: true,
     onDocumentOutcome: documentOutcome,
     onDocumentCommit: documentCommit,
+    onLiveMetadata: metadata => {
+      ++liveMetadataVersion; latestLiveMetadata = metadata;
+      projectLiveMetadata();
+    },
     onImageOutcome: imageOutcome,
     fetch: (input, init) => {
       const url = new URL(String(input), location.href); const key = decodeURIComponent(url.pathname.split('/blobs/')[1] ?? '');

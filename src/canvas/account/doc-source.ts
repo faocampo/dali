@@ -9,6 +9,7 @@ export type SourceOptions = {
   onAuthorizationLost?: (error: SourceAccessError) => void;
   onPendingDocument?: (docId: string, data: Uint8Array) => unknown | Promise<unknown>;
   onDocumentCommit?: (receipt: DocumentRevisionReceipt) => Promise<void>;
+  onLiveMetadata?: (metadata: { title: string; revision: number }) => void;
   onAcknowledged?: (token: unknown) => void | Promise<void>;
   durableLocalBlobs?: boolean;
   beforeDocumentWrite?: (docId: string, data: Uint8Array, live?: boolean) => Promise<'acknowledged' | void>;

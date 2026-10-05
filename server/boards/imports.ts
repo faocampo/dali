@@ -40,7 +40,7 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
       if (![...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length || [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(title)].length > 200) return reply.code(400).send({ code: 'INVALID_TITLE' });
       const old = previous(member!.accountId, operationId);
       if (old) return old.kind === 'import' ? { status: old.status, result: JSON.parse(old.result) } : reply.code(409).send({ code: 'OPERATION_CONFLICT' });
-      const result = { recoveryEpoch: readRecoveryEpoch(database), summary: { id: randomUUID(), accountId: member!.accountId, title, updatedAt: now(), role: 'owner', access: 'private', pendingCount: 0 }, rootDocId: randomUUID(), contentDocId: randomUUID(), revision: 1, capabilities: ['read', 'write', 'duplicate', 'rename', 'delete', 'grants', 'editable-export', 'image', 'presentation-export'] };
+      const result = { liveEnabled: false, liveSupported: false, recoveryEpoch: readRecoveryEpoch(database), summary: { id: randomUUID(), accountId: member!.accountId, title, updatedAt: now(), role: 'owner', access: 'private', pendingCount: 0 }, rootDocId: randomUUID(), contentDocId: randomUUID(), revision: 1, capabilities: ['read', 'write', 'duplicate', 'rename', 'delete', 'grants', 'editable-export', 'image', 'presentation-export'] };
       database.prepare('INSERT INTO import_staging(member_id,operation_id,descriptor,manifest) VALUES(?,?,?,?)').run(member!.accountId, operationId, JSON.stringify(result), JSON.stringify(manifest));
       record(member!.accountId, operationId, 'import', result.summary.id, result, 'staging');
       return { status: 'staging', result };

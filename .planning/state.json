@@ -21,7 +21,7 @@
     {
       "number": "4",
       "name": "Durable Boards and Recovery",
-      "status": "in_progress"
+      "status": "pending"
     },
     {
       "number": "5",
@@ -70,9 +70,9 @@
     }
   ],
   "next": {
-    "command": "/gsd:progress --next",
-    "label": "Advance to the next step",
-    "reason": "Phase 04 of 13 · 23% · executing"
+    "command": "/gsd:progress",
+    "label": "Show progress",
+    "reason": "Unsure of state — showing progress"
   },
-  "updated_at": "2026-09-26T20:10:06.667Z"
+  "updated_at": "2026-10-02T17:29:44.089Z"
 }

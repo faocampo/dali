@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="-2 18 364 282">
+  <title id="title">Símbolo de Dalí</title>
+  <defs>
+    <linearGradient id="rim" x1="20" y1="25" x2="360" y2="275" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB74B"/>
+      <stop offset="0.5" stop-color="#FF4FB8"/>
+      <stop offset="1" stop-color="#7248FF"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="38%" cy="30%" r="75%">
+      <stop stop-color="#FFE56D"/>
+      <stop offset="0.42" stop-color="#FF6B9E"/>
+      <stop offset="1" stop-color="#6D3CFF"/>
+    </radialGradient>
+  </defs>
+  <!-- inner: #050509 -->  <g aria-label="Dalí eye symbol">
+    <path d="M180 18C284 18 362 79 362 162C362 247 286 300 180 300C74 300-2 247-2 162C-2 79 76 18 180 18Z" fill="url(#rim)"/>
+    <path d="M180 70C247 70 299 107 299 162C299 218 248 250 180 250C112 250 61 218 61 162C61 107 113 70 180 70Z" fill="#050509"/>
+    <ellipse cx="150" cy="134" rx="51" ry="32" fill="url(#orb)" transform="rotate(-18 150 134)"/>
+    <circle cx="279" cy="88" r="12" fill="#FFF1A8"/>
+    <circle cx="47" cy="229" r="8" fill="#FFA9D5"/>
+  </g>
+</svg>

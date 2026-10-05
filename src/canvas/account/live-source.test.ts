@@ -8,6 +8,18 @@ function pending(signal?: AbortSignal | null) {
   return new Promise<Response>((_resolve, reject) => signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
 }
 describe('generation-scoped live snapshots', () => {
+  it('delivers server titles in revision order and ignores duplicate metadata', async () => {
+    const metadata = vi.fn(); let calls = 0;
+    const live = new BoardLiveSource({ ...scope, onLiveMetadata: metadata, fetch: vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
+      calls++;
+      if (calls <= 3) return Response.json({ connectionId: 'connection', revision: calls === 1 ? 3 : 4, title: calls === 1 ? 'Original' : calls === 2 ? 'Renamed' : 'Stale duplicate', epoch, root: update, content: update });
+      return pending(init?.signal);
+    }) });
+    await live.start(() => {}, () => {});
+    await vi.waitFor(() => expect(calls).toBe(4));
+    expect(metadata.mock.calls).toEqual([[{ title: 'Original', revision: 3 }], [{ title: 'Renamed', revision: 4 }]]);
+    live.dispose();
+  });
   it('delivers one complete pair and aborts the held poll on disposal', async () => {
     let pollSignal: AbortSignal | null | undefined;
     const receive = vi.fn(); const disconnect = vi.fn();

@@ -89,20 +89,22 @@ export function ObjectContextMenu({host}: {host:EditorHost}) {
               <button role="menuitem" disabled={!canvasSelectionEditable(host)} title="Duplicate (⌘/Ctrl+D)"
                 onClick={() => void duplicateCanvasSelection(host).catch(cause => setActionError(String(cause)))}><MenuIcon name="duplicate" />Duplicate</button>
               <button role="menuitem" disabled={!selectedLayerCanGroup(host)} title="Group (⌘/Ctrl+G)"
-                onClick={() => groupCanvasSelection(host)}><MenuIcon name="group" />Group</button>
+                onClick={() => void groupCanvasSelection(host).catch(cause => setActionError(String(cause)))}><MenuIcon name="group" />Group</button>
               <button role="menuitem" disabled={!selectedLayerCanUngroup(host)} title="Ungroup (⌘/Ctrl+Shift+G)"
-                onClick={() => ungroupCanvasSelection(host)}><MenuIcon name="ungroup" />Ungroup</button>
+                onClick={() => void ungroupCanvasSelection(host).catch(cause => setActionError(String(cause)))}><MenuIcon name="ungroup" />Ungroup</button>
               {selection.count>1&&(['left', 'center-x', 'right', 'top', 'center-y', 'bottom', 'distribute-x', 'distribute-y'] as AlignmentAction[]).map(action =>
                 <button role="menuitem" key={action} disabled={!canvasSelectionEditable(host) || selection.count < (action.startsWith('distribute') ? 3 : 2)}
-                  onClick={() => alignCanvasSelection(host, action)}><MenuIcon name={action} />{`Align ${action}`}</button>)}
+                  onClick={() => void alignCanvasSelection(host, action).catch(cause => setActionError(String(cause)))}><MenuIcon name={action} />{`Align ${action}`}</button>)}
               {(['front', 'back'] as const).map(direction => <button role="menuitem" key={direction}
                 disabled={selection.count !== 1 || !canvasSelectionEditable(host)}
-                onClick={() => reorderCanvasLayer(host, selection.key, direction)}><MenuIcon name={direction} />{`To ${direction}`}</button>)}
+                onClick={() => void reorderCanvasLayer(host, selection.key, direction).catch(cause => setActionError(String(cause)))}><MenuIcon name={direction} />{`To ${direction}`}</button>)}
               {selection.count === 1 && <button role="menuitem" disabled={host.store.readonly} onClick={() => {
                 if (!host.isConnected || currentSelection() !== openedSelection.current) return;
                 const model = host.std.get(GfxControllerIdentifier).getElementById<GfxModel>(selection.key);
-                if (model && canvasModelVisible(model)) { const target = canvasLayerLockTarget(host, model.id); setCanvasLayerLocked(host, target.id, !target.isLockedBySelf()); }
-                setImageRevision(value => value + 1);
+                if (model && canvasModelVisible(model)) {
+                  const target = canvasLayerLockTarget(host, model.id);
+                  void setCanvasLayerLocked(host, target.id, !target.isLockedBySelf()).then(() => setImageRevision(value => value + 1)).catch(cause => setActionError(String(cause)));
+                }
               }}><MenuIcon name="lock" />{host.std.get(GfxControllerIdentifier).getElementById<GfxModel>(selection.key)?.isLocked() ? 'Unlock object' : 'Lock object'}</button>}
             </div>
           </section>

@@ -1,3 +1,4 @@
+import { withCanvasReservation } from './account/reservations';
 import { canvasInsertionRect, serializeInsertionRect } from './insertion-placement';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, type GfxController } from '@blocksuite/affine/std/gfx';
@@ -122,8 +123,8 @@ export async function importLocalImages(host: EditorHost, request: ImageImportRe
   for(const [index,file] of request.files.entries()) {
     try {
       assertCurrent(); await validateImage(file,request.signal); assertCurrent();
-      const ids=await addImages(std,[file],{maxWidth:MAX_IMAGE_WIDTH,
-        point:[request.target[0]+index*32,request.target[1]+index*32],shouldTransformPoint:false});
+      const ids=await withCanvasReservation(host, [], true, () => addImages(std,[file],{maxWidth:MAX_IMAGE_WIDTH,
+        point:[request.target[0]+index*32,request.target[1]+index*32],shouldTransformPoint:false}));
       if(!ids.length) throw new ImageImportError('The image could not be inserted. Choose a smaller PNG or JPEG and try again.');
       result.ids.push(...ids);
     } catch(cause) {

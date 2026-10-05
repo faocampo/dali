@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="32%" cy="25%" r="90%"><stop stop-color="#2D1638"/><stop offset="0.55" stop-color="#0B0911"/><stop offset="1" stop-color="#030305"/></radialGradient>
+    <linearGradient id="rim" x1="180" y1="230" x2="840" y2="800" gradientUnits="userSpaceOnUse"><stop stop-color="#FFD15C"/><stop offset="0.48" stop-color="#FF3EAC"/><stop offset="1" stop-color="#7955FF"/></linearGradient>
+    <radialGradient id="orb" cx="35%" cy="28%" r="78%"><stop stop-color="#FFF3A2"/><stop offset="0.38" stop-color="#FF6EAD"/><stop offset="1" stop-color="#7446FF"/></radialGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <path d="M512 257C710 257 856 373 856 531C856 693 712 794 512 794C312 794 168 693 168 531C168 373 314 257 512 257Z" fill="url(#rim)"/>
+  <path d="M512 355C638 355 736 426 736 531C736 636 640 698 512 698C384 698 288 636 288 531C288 426 386 355 512 355Z" fill="#07060A"/>
+  <ellipse cx="455" cy="477" rx="96" ry="61" fill="url(#orb)" transform="rotate(-18 455 477)"/>
+  <circle cx="698" cy="389" r="23" fill="#FFF1A8"/>
+  <circle cx="261" cy="658" r="14" fill="#FF9DCE"/>
+</svg>

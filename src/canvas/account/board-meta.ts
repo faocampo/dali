@@ -23,6 +23,11 @@ export class BoardMeta implements WorkspaceMeta {
   get docs() { return this.docMetas; }
   get properties(): DocsPropertiesMeta { this.readable(); return {}; }
   initialize() { void this.docMetas; }
+  receiveTitle(title: string) {
+    this.readable();
+    if (this.title === title) return;
+    this.title = title; this.docMetaUpdated.next();
+  }
   getDocMeta(id: string) { return this.docMetas.find(meta => meta.id === id); }
   addDocMeta(_props: DocMeta) { throw new Error('Board metadata is already bound'); }
   removeDocMeta(_id: string) { throw new Error('Board deletion requires the board service'); }

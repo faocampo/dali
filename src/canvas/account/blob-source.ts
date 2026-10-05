@@ -12,6 +12,7 @@ export class BoardBlobSource implements BlobSource {
   private disposed = false;
   private urls = new Set<string>();
   private pending = new Map<string, Blob>();
+  private uploads = new Map<string, Promise<void>>();
   constructor(private options: BlobSourceOptions) {
     this.readonly = options.readonly ?? false;
     options.signal?.addEventListener('abort', this.dispose, { once: true });
@@ -71,9 +72,17 @@ export class BoardBlobSource implements BlobSource {
     };
     if (this.options.durableLocalBlobs && token) {
       this.assertCurrent(true); this.pending.set(key, value);
-      void upload().catch(() => undefined);
+      const submission = upload();
+      this.uploads.set(key, submission);
+      void submission.then(() => { if (this.uploads.get(key) === submission) this.uploads.delete(key); }).catch(() => undefined);
     } else await upload();
     return key;
+  }
+  /** Live documents must not publish references before their images are durable. */
+  async waitForPendingUploads(): Promise<void> {
+    this.assertCurrent();
+    await Promise.all(this.uploads.values());
+    this.assertCurrent();
   }
   async delete(key: string) {
     this.assertCurrent(true); const epoch = sourceRecoveryEpoch(this.options);
@@ -91,5 +100,5 @@ export class BoardBlobSource implements BlobSource {
   }
   revokeURL(url: string) { if (this.urls.delete(url)) URL.revokeObjectURL(url); }
   private revokeURLs() { for (const url of this.urls) URL.revokeObjectURL(url); this.urls.clear(); }
-  dispose = () => { this.disposed = true; this.revokeURLs(); this.pending.clear(); this.options.signal?.removeEventListener('abort', this.dispose); };
+  dispose = () => { this.disposed = true; this.revokeURLs(); this.pending.clear(); this.uploads.clear(); this.options.signal?.removeEventListener('abort', this.dispose); };
 }

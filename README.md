@@ -7,15 +7,25 @@ Dali extends [DJAI Academy's Open Canvas](https://github.com/DJAI-Academy/djai-o
 From the repository root:
 
 ```sh
-npm ci
-npm run dev
+./scripts/install.sh
+./scripts/start.sh
 ```
 
-Open **http://127.0.0.1:5173** after the launcher prints **Dali local development ready**. Choose **Synthetic Owner** on the explicitly labeled synthetic sign-in page, then create a board from the library. This local flow uses signed OIDC and the application's session and board-permission checks. The synthetic accounts are for development; actual-provider acceptance remains a separate operator check.
+Open **http://127.0.0.1:5173** after the launcher writes **Dali local development ready** to `.gsd/local-dev/dali-dev.log`. Choose **Synthetic Owner** on the explicitly labeled synthetic sign-in page, then create a board from the library. This local flow uses signed OIDC and the application's session and board-permission checks. The synthetic accounts are for development; actual-provider acceptance remains a separate operator check.
 
-The launcher compiles the backend and starts Vite, the application API on port **5174**, and the synthetic identity provider on port **5175**, all bound to `127.0.0.1`. **Ctrl+C** stops the services together. Running `npm run dev` again retains local account boards and valid sessions: the SQLite database and generated session secret live in the ignored, private `.gsd/local-dev/` directory. Keep that directory and the same UI/provider ports when restarting. Back up the whole directory while stopped if you need to preserve this local development data. Browser IndexedDB is left intact.
+The launcher compiles the backend and starts Vite, the application API on port **5174**, and the synthetic identity provider on port **5175**, all bound to `127.0.0.1`. Run `./scripts/stop.sh` to stop the services together. Running `./scripts/start.sh` again retains local account boards and valid sessions: the SQLite database, generated session secret, launcher PID and log live in the ignored, private `.gsd/local-dev/` directory. Keep that directory and the same UI/provider ports when restarting. Back up the whole directory while stopped if you need to preserve this local development data. Browser IndexedDB is left intact.
+
+The same commands are available through npm:
+
+```sh
+npm run install:local
+npm run start:local
+npm run stop:local
+```
 
 Ports fail explicitly when occupied. `--port <port>` (or `DALI_DEV_UI_PORT`), `DALI_DEV_API_PORT`, and `DALI_DEV_OIDC_PORT` select alternate loopback ports. Use a separate `DALI_DEV_STATE_DIR` for an independent local environment; changing the saved UI/provider origins in an existing directory is rejected to preserve account identity. Keep custom runtime storage outside publishable source. The launcher refuses `NODE_ENV=production`.
+
+When `DALI_DEV_STATE_DIR` is set, the start and stop scripts store their PID and log in that same directory.
 
 For frontend work against an independently configured backend, use:
 

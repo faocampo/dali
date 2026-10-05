@@ -60,14 +60,23 @@ export class BoardWorkspace implements Workspace {
     this.awarenessStore = new AwarenessStore(new Awareness(this.doc));
     this.storeExtensions = new StoreExtensionManager(storeExtensions).get('store');
     const sourceOptions = { ...options, getRecoveryEpoch: options.getRecoveryEpoch ?? (() => d.recoveryEpoch), boardId: d.summary.id, rootDocId: d.rootDocId, contentDocId: d.contentDocId,
-      readonly: this.readonly, signal: this.abort.signal, onAuthorizationLost: (error: Parameters<NonNullable<SourceOptions['onAuthorizationLost']>>[0]) => {
+      readonly: this.readonly, signal: this.abort.signal,
+      onLiveMetadata: (metadata: { title: string; revision: number }) => {
+        this.assertCurrent(); this.meta.receiveTitle(metadata.title);
+        options.onLiveMetadata?.(metadata);
+      },
+      onAuthorizationLost: (error: Parameters<NonNullable<SourceOptions['onAuthorizationLost']>>[0]) => {
         // Runtime must freeze/capture buffered updates before destroying native documents.
         if (options.onAuthorizationLost) options.onAuthorizationLost(error);
         else this.dispose();
       } };
     if (mode === 'account' && d.liveSupported && !options.recoveryBaseline) this.live = new BoardLiveSource(sourceOptions);
-    this.source = new BoardDocSource({ ...sourceOptions, live: this.live });
     this.blobs = new BoardBlobSource(sourceOptions);
+    this.source = new BoardDocSource({ ...sourceOptions, live: this.live,
+      beforeDocumentWrite: async (id, data, live) => {
+        if (live) await this.blobs.waitForPendingUploads();
+        return sourceOptions.beforeDocumentWrite?.(id, data, live);
+      } });
     this.docSync = new DocEngine(this.doc, mode === 'staging' ? new NoopDocSource() : this.source, [], new NoopLogger());
     const memory: BlobSource = { name: 'isolated-board-staging', readonly: false,
       get: async key => { this.assertCurrent(); return this.memoryBlobs.get(key) ?? null; },

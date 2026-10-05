@@ -3,6 +3,7 @@ import { BlockFlavourIdentifier } from '@blocksuite/affine/std';
 import type { GfxViewInteractionConfig } from '@blocksuite/affine/std/gfx';
 import { createIdentifier } from '@blocksuite/global/di';
 import { canvasFonts, canvasFontFamilies } from './canvas-fonts';
+import { withCanvasReservation } from './account/reservations';
 import { MindmapElementModel, FontWeight, FontStyle } from '@blocksuite/affine/model';
 import { ViewExtensionProvider, type ViewExtensionContext } from '@blocksuite/affine/ext-loader';
 import { ToolbarModuleIdentifier, type ToolbarModule, type ToolbarContext, type ToolbarGenericAction } from '@blocksuite/affine/shared/services';
@@ -33,9 +34,14 @@ function typographyActions(kind: 'shape' | 'text'): ToolbarGenericAction[] {
   };
   const apply = (ctx: ToolbarContext, props: Record<string, unknown>) => {
     if (ctx.store.readonly) return;
-    ctx.store.captureSync();
-    ctx.store.transact(() => models(ctx).filter(model => !model.isLocked()).forEach(model => ctx.std.get(EdgelessCRUDIdentifier).updateElement(model.id, props)));
-    ctx.store.captureSync();
+    const ids = models(ctx).map(model => model.id).sort();
+    void withCanvasReservation(ctx.std.host, ids, false, () => {
+      const selected = models(ctx);
+      if (JSON.stringify(selected.map(model => model.id).sort()) !== JSON.stringify(ids)) throw new Error('Selection changed. Apply the format again.');
+      ctx.store.captureSync();
+      ctx.store.transact(() => selected.filter(model => !model.isLocked()).forEach(model => ctx.std.get(EdgelessCRUDIdentifier).updateElement(model.id, props)));
+      ctx.store.captureSync();
+    }).catch(() => { /* The reservation helper presents unavailable editing access. */ });
   };
   const prefix = kind === 'shape' ? 'g.text-' : '';
   const actions: ToolbarGenericAction[] = kind === 'shape' ? createTextActions(ShapeElementModel, 'shape', (ctx, model, props) => {
@@ -99,14 +105,18 @@ export class FormattingControlsExtension extends ViewExtensionProvider {
           if (ctx.store.readonly) return;
           const next = Number((event.target as HTMLSelectElement).value);
           if (!noteSizes.some(size => size.scale === next)) return;
-          ctx.store.captureSync();
-          ctx.store.transact(() => models.forEach(model => {
-            if (model.isLocked()) return;
-            const bounds = Bound.deserialize(model.xywh); const ratio = next / (model.props.edgeless.scale ?? 1);
-            bounds.w *= ratio; bounds.h *= ratio;
-            ctx.store.updateBlock(model, () => { model.xywh = bounds.serialize(); model.props.edgeless.scale = next; });
-          }));
-          ctx.store.captureSync();
+          const ids = models.map(model => model.id).sort();
+          void withCanvasReservation(ctx.std.host, ids, false, () => {
+            if (JSON.stringify(ctx.getSurfaceModelsByType(NoteBlockModel).map(model => model.id).sort()) !== JSON.stringify(ids)) throw new Error('Selection changed. Apply the size again.');
+            ctx.store.captureSync();
+            ctx.store.transact(() => models.forEach(model => {
+              if (model.isLocked()) return;
+              const bounds = Bound.deserialize(model.xywh); const ratio = next / (model.props.edgeless.scale ?? 1);
+              bounds.w *= ratio; bounds.h *= ratio;
+              ctx.store.updateBlock(model, () => { model.xywh = bounds.serialize(); model.props.edgeless.scale = next; });
+            }));
+            ctx.store.captureSync();
+          }).catch(() => { /* The reservation helper presents unavailable editing access. */ });
         }}>${noteSizes.map(size => html`<option value=${size.scale} ?selected=${closest === size}>${size.label}</option>`)}</select>`;
       } },
     ] } }));

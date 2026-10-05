@@ -13,6 +13,7 @@ import { Bound } from '@blocksuite/global/gfx';
 import { canvasModelKind, canvasModelVisible, mindmapArrangementReason, mindmapOwner, nativeMindmapState, type CanvasItemKind } from './selection-summary';
 import { reconcileImageVisualEdits } from './image-visual-edits';
 import { nativeCopySourcesValid, withNativeCopySources } from './mindmap-compatibility';
+import { withCanvasReservation } from './account/reservations';
 
 export type LayerEntry = {
   id: string;
@@ -52,10 +53,13 @@ export function duplicateCanvasSelection(host: EditorHost): Promise<void> {
     if (!nativeCopySourcesValid(host, source, store)) return;
     const root = host.std.view.getBlock(host.std.store.root!.id);
     if (!root) return;
-    host.std.store.captureSync();
-    await withNativeCopySources(host, source, () => duplicate(root, source));
-    reconcileImageVisualEdits(host.std.store);
-    host.std.store.captureSync();
+    await withCanvasReservation(host, source.map(model => model.id), true, async () => {
+      if (!nativeCopySourcesValid(host, source, store)) return;
+      host.std.store.captureSync();
+      await withNativeCopySources(host, source, () => duplicate(root, source));
+      reconcileImageVisualEdits(host.std.store);
+      host.std.store.captureSync();
+    });
   });
   duplicates.set(host, operation.catch(() => undefined));
   return operation;
@@ -100,8 +104,8 @@ export function installArrangementShortcuts(host: EditorHost, onError: (error: u
     event.stopImmediatePropagation();
     try {
       if (key === 'd') void duplicateCanvasSelection(host).catch(onError);
-      else if (event.shiftKey) ungroupCanvasSelection(host);
-      else groupCanvasSelection(host);
+      else if (event.shiftKey) void ungroupCanvasSelection(host).catch(onError);
+      else void groupCanvasSelection(host).catch(onError);
     } catch (error) { onError(error); }
   };
   document.addEventListener('keydown', onKey, true);
@@ -173,21 +177,22 @@ export function selectCanvasLayer(host: EditorHost, id: string): void {
   host.std.get(GfxControllerIdentifier).selection.set({ elements: [id], editing: false });
 }
 
-export function reorderCanvasLayer(
+export async function reorderCanvasLayer(
   host: EditorHost,
   id: string,
   direction: ReorderingDirection
-): void {
+): Promise<void> {
   const gfx = host.std.get(GfxControllerIdentifier);
   const model = modelById(host, id);
   if (!host.isConnected || host.std.store.readonly || protectedModel(model)) return;
-  const index = gfx.layer.getReorderedIndex(model, direction);
-  if (index === model.index) return;
-  host.std.store.captureSync();
-  host.std.store.transact(() => {
-    model.index = index;
+  await withCanvasReservation(host, [id], false, () => {
+    if (!host.isConnected || host.std.store.readonly || protectedModel(model) || gfx.getElementById(id) !== model) return;
+    const index = gfx.layer.getReorderedIndex(model, direction);
+    if (index === model.index) return;
+    host.std.store.captureSync();
+    host.std.store.transact(() => { model.index = index; });
+    host.std.store.captureSync();
   });
-  host.std.store.captureSync();
 }
 
 /** Resolve the actual lock owner, including a containing mind map. */
@@ -197,29 +202,40 @@ export function canvasLayerLockTarget(host: EditorHost, id: string): GfxModel {
   return model;
 }
 
-export function setCanvasLayerLocked(host: EditorHost, id: string, locked: boolean): void {
+export async function setCanvasLayerLocked(host: EditorHost, id: string, locked: boolean): Promise<void> {
   if (!host.isConnected || host.std.store.readonly) return;
   const model = modelById(host, id);
-  host.std.store.captureSync();
-  if (locked) model.lock();
-  else model.unlock();
-  host.std.store.captureSync();
+  await withCanvasReservation(host, [id], false, () => {
+    if (!host.isConnected || host.std.store.readonly || host.std.get(GfxControllerIdentifier).getElementById(id) !== model) return;
+    host.std.store.captureSync();
+    if (locked) model.lock();
+    else model.unlock();
+    host.std.store.captureSync();
+  });
 }
 
-export function groupCanvasSelection(host: EditorHost): void {
+export async function groupCanvasSelection(host: EditorHost): Promise<void> {
   if (!selectedLayerCanGroup(host)) return;
-  host.std.store.captureSync();
-  const [, result] = host.std.command.exec(createGroupFromSelectedCommand);
-  host.std.store.captureSync();
-  if (!result.groupId) throw new Error('These objects cannot be grouped together.');
+  const ids = selectedLayerIds(host);
+  await withCanvasReservation(host, ids, true, () => {
+    if (!selectedLayerCanGroup(host) || ids.join('\0') !== selectedLayerIds(host).join('\0')) throw new Error('The selection changed. Select the objects and try again.');
+    host.std.store.captureSync();
+    const [, result] = host.std.command.exec(createGroupFromSelectedCommand);
+    host.std.store.captureSync();
+    if (!result.groupId) throw new Error('These objects cannot be grouped together.');
+  });
 }
 
-export function ungroupCanvasSelection(host: EditorHost): void {
+export async function ungroupCanvasSelection(host: EditorHost): Promise<void> {
   const selected = host.std.get(GfxControllerIdentifier).selection.selectedElements;
   if (!selectedLayerCanUngroup(host) || !(selected[0] instanceof GroupElementModel)) return;
-  host.std.store.captureSync();
-  host.std.command.exec(ungroupCommand, { group: selected[0] });
-  host.std.store.captureSync();
+  const group = selected[0];
+  await withCanvasReservation(host, [group.id], false, () => {
+    if (!selectedLayerCanUngroup(host) || selectedLayerIds(host)[0] !== group.id) throw new Error('The selection changed. Select the group and try again.');
+    host.std.store.captureSync();
+    host.std.command.exec(ungroupCommand, { group });
+    host.std.store.captureSync();
+  });
 }
 
 export type AlignmentAction =
@@ -237,7 +253,16 @@ function writeBound(host: EditorHost, model: GfxModel, bound: Bound): void {
   updateXYWH(model, bound, crud.updateElement, host.std.store.updateBlock);
 }
 
-export function alignCanvasSelection(host: EditorHost, action: AlignmentAction): void {
+export async function alignCanvasSelection(host: EditorHost, action: AlignmentAction): Promise<void> {
+  if (!canvasSelectionEditable(host)) return;
+  const ids = selectedLayerIds(host);
+  await withCanvasReservation(host, ids, false, () => {
+    if (ids.join('\0') !== selectedLayerIds(host).join('\0')) throw new Error('The selection changed. Select the objects and try again.');
+    applyAlignment(host, action);
+  });
+}
+
+function applyAlignment(host: EditorHost, action: AlignmentAction): void {
   if (!canvasSelectionEditable(host)) return;
   const gfx = host.std.get(GfxControllerIdentifier);
   if (mindmapArrangementReason(gfx.selection.selectedElements)) return;

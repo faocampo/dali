@@ -29,6 +29,7 @@ export function installMutationGuard(store: Store, scope: AccessScope, live?: Bo
   const restores: (() => void)[] = [];
   const visited = new WeakSet<object>();
   const nativeIds = new WeakMap<object, string>();
+  const containers = new WeakSet<object>([store.spaceDoc.getMap('blocks')]);
   const wrap = (target: object, name: string, denied: () => unknown = () => undefined) => {
     const object = target as Record<string, unknown>;
     const original = object[name];
@@ -39,7 +40,13 @@ export function installMutationGuard(store: Store, scope: AccessScope, live?: Bo
       if (live) {
         if (target instanceof Y.AbstractType) {
           const id = nativeIds.get(target);
-          if (!id || !live.allowsObject(id) || name !== 'set' || args[0] !== 'xywh') return denied();
+          const removed = target instanceof Y.Map && name === 'delete' && typeof args[0] === 'string' ? nativeIds.get(target.get(args[0]) as object) : undefined;
+          const creating = target instanceof Y.Map && containers.has(target) && name === 'set' && typeof args[0] === 'string' && !target.has(args[0]) && live.creating;
+          const inserted = name === 'insert' ? args[1] : ['push', 'unshift'].includes(name) ? args[0] : undefined;
+          const childList = target instanceof Y.Array && Array.isArray(inserted) && inserted.every(item => typeof item === 'string' && live.allowsObject(item));
+          const childRemoval = target instanceof Y.Array && name === 'delete' && typeof args[0] === 'number' && target.toArray().slice(args[0], args[0] + (typeof args[1] === 'number' ? args[1] : 1)).every(item => typeof item === 'string' && live.allowsObject(item));
+          if ((!id || !live.allowsObject(id)) && (!removed || !live.allowsObject(removed)) && !creating && !childList && !childRemoval) return denied();
+          if (creating) live.registerCreated(args[0] as string);
         } else if (!live.editing) return denied();
       }
       const result: unknown = Reflect.apply(original, this, args);
@@ -49,16 +56,17 @@ export function installMutationGuard(store: Store, scope: AccessScope, live?: Bo
     Object.defineProperty(target, name, { value: guarded, configurable: true, writable: true });
     restores.push(() => { if (object[name] !== guarded) return; if (own) Object.defineProperty(target, name, own); else delete object[name]; });
   };
-  const visit = (value: unknown): void => {
+  const visit = (value: unknown, owner?: string): void => {
     if (!(value instanceof Y.AbstractType)) return;
+    if (owner) nativeIds.set(value, owner);
     if (!visited.has(value)) {
       visited.add(value);
       for (const name of ['set', 'delete', 'clear', 'insert', 'insertEmbed', 'format', 'applyDelta', 'push', 'unshift', 'setAttribute', 'removeAttribute'])
         wrap(value, name, () => name === 'set' ? value : name === 'delete' ? false : undefined);
     }
-    if (value instanceof Y.Map) for (const [key, child] of value.entries()) { if (child instanceof Y.Map && child.get('type') === 'shape') nativeIds.set(child, key); visit(child); }
-    else if (value instanceof Y.Array || value instanceof Y.XmlFragment) for (const child of value.toArray()) visit(child);
-    else if (value instanceof Y.Text) for (const delta of value.toDelta()) if (typeof delta.insert !== 'string') visit(delta.insert);
+    if (value instanceof Y.Map) for (const [key, child] of value.entries()) { if (value.get('type') === '$blocksuite:internal:native$' && key === 'value' && child instanceof Y.Map) containers.add(child); visit(child, child instanceof Y.Map && (containers.has(value) || ['shape', 'text', 'connector', 'brush', 'group'].includes(child.get('type') as string) || ['affine:note', 'affine:frame', 'affine:image', 'affine:edgeless-text', 'affine:paragraph', 'affine:list', 'djai:image-visual-edit'].includes(child.get('sys:flavour') as string)) ? key : owner); }
+    else if (value instanceof Y.Array || value instanceof Y.XmlFragment) for (const child of value.toArray()) visit(child, owner);
+    else if (value instanceof Y.Text) for (const delta of value.toDelta()) if (typeof delta.insert !== 'string') visit(delta.insert, owner);
   };
   const scan = () => { for (const type of store.spaceDoc.share.values()) visit(type); };
   scan();

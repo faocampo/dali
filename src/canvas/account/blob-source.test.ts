@@ -7,6 +7,25 @@ const epoch = '11111111-1111-4111-8111-111111111111';
 const options = () => ({ boardId: 'board', rootDocId: 'root', contentDocId: 'content', accountId: 'member', generation: 1, isCurrent: () => true, getRecoveryEpoch: () => epoch });
 const image = () => new Blob(['synthetic-raster'], { type: 'image/png' });
 describe('BoardBlobSource', () => {
+  it('@05-02-02 live document publication waits for retained image acknowledgment', async () => {
+    let resolve!: (response: Response) => void;
+    const source = new BoardBlobSource({ ...options(), durableLocalBlobs: true,
+      onPendingBlob: () => 'retained-image', fetch: vi.fn<typeof fetch>(() => new Promise(done => { resolve = done; })) });
+    await source.set(key, image());
+    let complete = false;
+    const publication = source.waitForPendingUploads().then(() => { complete = true; });
+    await Promise.resolve(); expect(complete).toBe(false);
+    resolve(Response.json({ acknowledged: true, key }, { headers: { 'X-Dali-Recovery-Epoch': epoch } }));
+    await publication; expect(complete).toBe(true);
+  });
+  it('@05-02-02 failed retained image blocks publication and preserves recovery bytes', async () => {
+    const bytes = image();
+    const source = new BoardBlobSource({ ...options(), durableLocalBlobs: true,
+      onPendingBlob: () => 'retained-image', fetch: vi.fn<typeof fetch>(async () => { throw new Error('Synthetic disconnect'); }) });
+    await source.set(key, bytes);
+    await expect(source.waitForPendingUploads()).rejects.toThrow('Synthetic disconnect');
+    expect(await source.get(key)).toBe(bytes);
+  });
   it('@04-03-02 failed local admission retains the latest image bytes in memory', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => Response.json({ code: 'IMAGE_UNAVAILABLE' }, { status: 404 }));
     const source = new BoardBlobSource({ ...options(), fetch: fetcher, durableLocalBlobs: true, onPendingBlob: () => { throw new DOMException('Synthetic quota', 'QuotaExceededError'); } });

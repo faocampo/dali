@@ -9,6 +9,12 @@ function fixture(readonly: boolean) {
   return { root, meta };
 }
 describe('server-owned board titles', () => {
+  it.each([true, false])('projects a received server title without a document write when readonly=%s', readonly => {
+    const { root, meta } = fixture(readonly); const before = Y.encodeStateAsUpdate(root);
+    meta.receiveTitle('Live server title');
+    expect(meta.getDocMeta('content')!.title).toBe('Live server title');
+    expect(Y.encodeStateAsUpdate(root)).toEqual(before); root.destroy();
+  });
   it.each([true, false])('ignores native title synchronization without changing Yjs when readonly=%s', readonly => {
     const { root, meta } = fixture(readonly); const before = Y.encodeStateAsUpdate(root);
     expect(() => meta.setDocMeta('content', { title: 'Old canvas title' })).not.toThrow();

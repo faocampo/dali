@@ -196,10 +196,10 @@ describe('authenticated live collaboration', () => {
     expect((await requestDoc('push', update, 'editor', board.contentDocId, board, metadata)).json()).toEqual(response.json());
     expect((database.prepare('SELECT count(*) AS n FROM document_receipts').get() as { n: number }).n).toBe(1);
     const persisted = Buffer.from(bytes());
-    shape.set('fillColor', '#ff0000');
+    shape.set('type', 'foreign');
     const hidden = await requestDoc('push', Y.encodeStateAsUpdate(native, vector), 'editor', board.contentDocId, board, { ...metadata, 'x-dali-operation': randomUUID() });
     expect(hidden.statusCode).toBe(409); expect(bytes()).toEqual(persisted);
-    shape.delete('fillColor');
+    shape.set('type', 'shape');
     database.exec("CREATE TEMP TRIGGER fail_receipt BEFORE INSERT ON document_receipts BEGIN SELECT RAISE(ABORT,'synthetic write failure'); END");
     shape.set('xywh', '[23,30,100,100]');
     const failed = await requestDoc('push', Y.encodeStateAsUpdate(native, vector), 'editor', board.contentDocId, board, { ...metadata, 'x-dali-operation': randomUUID() });
@@ -242,6 +242,56 @@ describe('authenticated live collaboration', () => {
     expect(first.connectionId).not.toBe(second.connectionId);
     const denied = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/reserve`, headers: headers('editor'), payload: { connectionId: first.connectionId, objectIds: ['shape'] } });
     expect(denied.statusCode).toBe(409);
+  });
+
+  it('@05-02-02 creation scopes adopt only their new objects and cannot edit other existing objects', async () => {
+    database.prepare('UPDATE boards SET live_enabled=1 WHERE id=?').run(board.summary.id);
+    const connections: Record<string, { id: string; token: string }> = {};
+    for (const actor of ['owner', 'editor']) {
+      const opened = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/connect`, headers: headers(actor), payload: { tabId: actor } });
+      const id = opened.json().connectionId;
+      const held = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/reserve`, headers: headers(actor), payload: { connectionId: id, objectIds: [`$dali:create:${id}`] } });
+      expect(held.statusCode).toBe(200); connections[actor] = { id, token: held.json().token };
+    }
+    for (const actor of ['owner', 'editor']) {
+      const native = new Y.Doc(); Y.applyUpdate(native, bytes()); const vector = Y.encodeStateVector(native);
+      const surface = [...native.getMap<Y.Map<unknown>>('blocks').values()].find(block => block.get('sys:flavour') === 'affine:surface')!;
+      const elements = (surface.get('prop:elements') as Y.Map<unknown>).get('value') as Y.Map<unknown>;
+      const shape = new Y.Map<unknown>(); shape.set('type', 'shape'); shape.set('xywh', '[0,0,100,100]'); elements.set(actor, shape);
+      const connection = connections[actor]!;
+      const extra = { 'x-dali-connection': connection.id, 'x-dali-reservation': connection.token, 'x-dali-operation': randomUUID() };
+      if (actor === 'owner') {
+        const original = Buffer.from(bytes());
+        database.exec("CREATE TEMP TRIGGER fail_creation_receipt BEFORE INSERT ON document_receipts BEGIN SELECT RAISE(ABORT,'synthetic creation failure'); END");
+        expect((await requestDoc('push', Y.encodeStateAsUpdate(native, vector), actor, board.contentDocId, board, extra)).statusCode).toBe(500);
+        expect(bytes()).toEqual(original);
+        database.exec('DROP TRIGGER fail_creation_receipt');
+      }
+      expect((await requestDoc('push', Y.encodeStateAsUpdate(native, vector), actor, board.contentDocId, board, extra)).statusCode).toBe(200);
+      shape.set('xywh', '[5,0,100,100]');
+      expect((await requestDoc('push', Y.encodeStateAsUpdate(native, vector), actor, board.contentDocId, board, { ...extra, 'x-dali-operation': randomUUID() })).statusCode).toBe(200);
+      if (actor === 'editor') {
+        const existing = elements.get('owner') as Y.Map<unknown>;
+        existing.set('xywh', '[9,0,100,100]');
+        expect((await requestDoc('push', Y.encodeStateAsUpdate(native, vector), actor, board.contentDocId, board, { ...extra, 'x-dali-operation': randomUUID() })).statusCode).toBe(409);
+      }
+      native.destroy();
+    }
+    const forged = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/reserve`, headers: headers('editor'), payload: { connectionId: connections.editor!.id, objectIds: [`$dali:create:${connections.owner!.id}`] } });
+    expect(forged.statusCode).toBe(400);
+  });
+
+  it('@05-02-02 board renaming honors the explicit metadata reservation', async () => {
+    database.prepare('UPDATE boards SET live_enabled=1 WHERE id=?').run(board.summary.id);
+    const opened = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/connect`, headers: headers(), payload: { tabId: 'metadata-editor' } });
+    const connectionId = opened.json().connectionId;
+    const held = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/reserve`, headers: headers(), payload: { connectionId, objectIds: ['$dali:metadata'] } });
+    expect(held.statusCode).toBe(200);
+    const revision = (database.prepare('SELECT revision FROM boards WHERE id=?').get(board.summary.id) as { revision: number }).revision;
+    const rename = () => app.inject({ method: 'PATCH', url: `/api/boards/${board.summary.id}`, headers: headers(), payload: { operationId: randomUUID(), revision, title: 'Synthetic renamed board' } });
+    const denied = await rename(); expect(denied.statusCode).toBe(409); expect(denied.json().code).toBe('OBJECT_RESERVED');
+    await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/release`, headers: headers(), payload: { connectionId, token: held.json().token } });
+    const accepted = await rename(); expect(accepted.statusCode).toBe(200); expect(accepted.json().summary.title).toBe('Synthetic renamed board');
   });
 
 });

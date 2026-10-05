@@ -34,7 +34,7 @@ const mindmapUnlockToolbarModule = ToolbarModuleExtension({
         const model = context.gfx.selection.selectedElements[0];
         if (!model || !context.host.isConnected || context.store.readonly || !mindmapOwner(model)) return;
         const target = canvasLayerLockTarget(context.host, model.id);
-        setCanvasLayerLocked(context.host, target.id, false);
+        void setCanvasLayerLocked(context.host, target.id, false).catch(() => {});
       },
     }],
   },

@@ -54,9 +54,9 @@ export function LayersInspector({ host, onClose }: { host: EditorHost; onClose: 
     return () => document.removeEventListener('keydown', closeOnEscape, true);
   }, [onClose]);
 
-  const run = (operation: () => void) => {
+  const run = async (operation: () => void | Promise<void>) => {
     try {
-      operation();
+      await operation();
       setError(null);
       setRevision(value => value + 1);
       queueMicrotask(sync);

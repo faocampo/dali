@@ -133,14 +133,14 @@ export function getImageVisualEdit(store: Store, imageId: string): ImageVisualEd
 /** Native duplication and legacy snapshot imports can share pixels while
  * assigning new image IDs. Copy their history before any owner's record changes.
  * Lookup itself remains read-only; mutations always use an exact owner. */
-export function reconcileImageVisualEdits(store: Store): void {
+export function reconcileImageVisualEdits(store: Store, imageId?: string): void {
   if (store.readonly) return;
   const states = store.getBlocksByFlavour(IMAGE_VISUAL_EDIT_FLAVOUR)
     .map(block => block.model as ImageVisualEditModel);
   const owned = new Set(states.map(state => state.props.imageId));
   store.transact(() => {
     for (const { model } of store.getBlocksByFlavour('affine:image')) {
-      if (owned.has(model.id)) continue;
+      if ((imageId && model.id !== imageId) || owned.has(model.id)) continue;
       const image = model as ImageBlockModel;
       const template = states.find(state => state.props.processedSourceId === image.props.sourceId);
       if (!template) continue;
@@ -167,7 +167,7 @@ export function reconcileImageVisualEdits(store: Store): void {
 }
 
 export function discardImageVisualEdit(store: Store, imageId: string): void {
-  reconcileImageVisualEdits(store);
+  reconcileImageVisualEdits(store, imageId);
   const state = getImageVisualEdit(store, imageId);
   if (state) store.deleteBlock(state);
 }
@@ -226,8 +226,9 @@ export function imageVisualSettings(
   store: Store,
   imageId: string
 ): ImageVisualSettings {
-  reconcileImageVisualEdits(store);
-  const state = getImageVisualEdit(store, imageId);
+  const image = store.getBlock(imageId)?.model as ImageBlockModel | undefined;
+  const state = getImageVisualEdit(store, imageId) ?? store.getBlocksByFlavour(IMAGE_VISUAL_EDIT_FLAVOUR)
+    .map(block => block.model as ImageVisualEditModel).find(state => image?.props.sourceId && state.props.processedSourceId === image.props.sourceId);
   return state
     ? {
         brightness: state.props.brightness,
@@ -247,7 +248,7 @@ export async function applyImageVisualEdit(
   isCurrent: () => boolean = () => true
 ): Promise<void> {
   const image = getImage(store, imageId);
-  reconcileImageVisualEdits(store);
+  reconcileImageVisualEdits(store, imageId);
   const existing = getImageVisualEdit(store, imageId);
   const initialSourceId = image.props.sourceId;
   const baseSourceId = existing?.props.sourceId ?? initialSourceId;
@@ -353,7 +354,7 @@ export async function applyImageVisualEdit(
 
 export function resetImageVisualEdit(store: Store, imageId: string): void {
   const image = getImage(store, imageId);
-  reconcileImageVisualEdits(store);
+  reconcileImageVisualEdits(store, imageId);
   const state = getImageVisualEdit(store, imageId);
   if (!state) return;
   const { baseX, baseY, baseWidth, baseHeight } = uncroppedGeometry(image, state.props);
@@ -393,7 +394,7 @@ export async function replaceImageSource(host: EditorHost, imageId: string, file
   assertCurrent();
   const bound = Bound.deserialize(image.xywh);
   const height = bound.w * (dimensions.height / dimensions.width);
-  reconcileImageVisualEdits(store);
+  reconcileImageVisualEdits(store, imageId);
   const visual = getImageVisualEdit(store, imageId);
   store.captureSync();
   store.transact(() => {
