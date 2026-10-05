@@ -1974,3 +1974,13 @@ main.session-recovery, section.session-recovery { margin: clamp(24px, 12vh, 120p
 .leave-recovery-actions button { min-height: 44px; padding: 8px 16px; border-radius: 8px; font-size: 14px; }
 .leave-recovery-confirm { color: var(--dali-danger, #b12d52); background: white; border: 1px solid currentColor; }
 @media (max-width: 490px) { .leave-recovery-actions { flex-direction: column; } .leave-recovery-actions button { width: 100%; } }
+
+.freehand-width { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--dali-line); }
+.freehand-width label { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 600; }
+.freehand-width output { color: var(--dali-accent-ink); font-variant-numeric: tabular-nums; }
+.freehand-width-preview { display: block; width: 100%; height: 32px; margin: 8px 0; color: var(--dali-accent); }
+.freehand-width input { display: block; width: 100%; margin: 8px 0 12px; accent-color: var(--dali-accent); }
+.freehand-width-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.freehand-width-presets button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 48px; padding: 4px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+.freehand-width-presets button:hover, .freehand-width-presets button[aria-pressed="true"] { background: var(--dali-accent-soft); color: var(--dali-accent-ink); }
+.freehand-width-presets button[aria-pressed="true"] { border-color: var(--dali-accent); }

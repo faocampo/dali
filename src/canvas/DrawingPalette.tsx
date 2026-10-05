@@ -25,6 +25,12 @@ const modes = [
 ];
 export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost; kind: 'Shapes' | 'Lines' | 'Freehand'; active: boolean; icon: ReactNode }) {
   const gfx = host.std.get(GfxControllerIdentifier);
+  const editProps = host.std.get(EditPropsStore);
+  const [penWidth, setPenWidth] = useState(() => editProps.lastProps$.peek().brush.lineWidth);
+  const changePenWidth = (width: number) => {
+    setPenWidth(width);
+    editProps.recordLastProps('brush', { lineWidth: width });
+  };
   const trigger = useRef<HTMLButtonElement>(null);
   const popup = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
@@ -45,13 +51,17 @@ export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost;
     <button ref={trigger} type="button" className="canvas-tool-button" aria-label={kind} title={`${kind} (${kind === 'Shapes' ? 'S' : kind === 'Lines' ? 'C' : 'P'})`} aria-pressed={active} aria-haspopup="dialog" aria-expanded={!!position} onClick={() => {
       const bounds = trigger.current!.getBoundingClientRect();
       if (position) close();
-      else setPosition({ left: Math.min(bounds.right + 12, window.innerWidth - 284), top: Math.max(64, Math.min(bounds.top, window.innerHeight - 430)) });
+      else {
+        setPenWidth(editProps.lastProps$.peek().brush.lineWidth);
+        setPosition({ left: Math.min(bounds.right + 12, window.innerWidth - 284), top: Math.max(64, Math.min(bounds.top, window.innerHeight - 430)) });
+      }
     }}><span aria-hidden="true">{icon}</span></button>
     {position && createPortal(<div ref={popup} role="dialog" aria-label={`${kind} palette`} className="drawing-palette" style={{ ...position, maxHeight: `calc(100dvh - ${position.top + 12}px)` }} onBlur={event => {
       if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) close(false);
     }} onKeyDown={event => {
       event.stopPropagation();
       if (event.key === 'Escape') { event.preventDefault(); close(); }
+      if (event.target instanceof HTMLInputElement) return;
       if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
         event.preventDefault();
         const buttons = Array.from(popup.current?.querySelectorAll<HTMLButtonElement>('button') ?? []);
@@ -71,6 +81,18 @@ export function DrawingPalette({ host, kind, active, icon }: { host: EditorHost;
           gfx.tool.setTool(ConnectorTool, { mode: item.mode });
         })}><Glyph path={item.path + (arrow ? 'M15 4H21V10' : '')} /><span>{item.name} {arrow ? 'arrow' : 'line'}</span></button>))}
       </div>
+      {kind === 'Freehand' && <div className="freehand-width">
+        <label htmlFor="freehand-pen-width">Pen width <output>{penWidth} px</output></label>
+        <svg className="freehand-width-preview" aria-hidden="true" viewBox="0 0 232 32"><path d="M16 16H216" fill="none" stroke="currentColor" strokeWidth={penWidth} strokeLinecap="round" /></svg>
+        <input id="freehand-pen-width" type="range" min="2" max="12" step="2" value={penWidth} aria-valuetext={`${penWidth} pixels`} onChange={event => changePenWidth(Number(event.target.value))} />
+        <div className="freehand-width-presets" role="group" aria-label="Pen width presets">
+          {[2, 4, 6, 8, 10, 12].map(width => <button key={width} type="button" aria-label={`${width} pixel pen`} aria-pressed={penWidth === width} onClick={() => changePenWidth(width)}>
+            <svg aria-hidden="true" width="36" height="20" viewBox="0 0 36 20"><path d="M8 10H28" stroke="currentColor" strokeWidth={width} strokeLinecap="round" /></svg>
+            <span>{width} px</span>
+          </button>)}
+        </div>
+        <p>Choose a width, then select Pen to draw. Eraser removes whole objects.</p>
+      </div>}
       {kind !== 'Freehand' && <p>{kind === 'Shapes' ? 'Choose a shape, then click or drag on the canvas. Hold Shift while dragging for equal sides.' : 'Choose a line, then drag between points or objects. Endpoints attach when drawn onto objects.'}</p>}
     </div>, document.body)}
   </>;
