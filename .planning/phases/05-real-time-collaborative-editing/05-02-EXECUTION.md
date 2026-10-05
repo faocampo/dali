@@ -148,3 +148,19 @@ The user requested a GitHub issue for the remaining formatting failure, a fresh 
 - The earlier typography failure remains open in GitHub issue #1. The full 63-case browser run remains a failed functional gate despite successful setup/startup. No Phase 5 completion or general production activation is claimed.
 
 Current disposition: setup/startup timeout concern did not reproduce in completed browser runs or server setup. A separate disk-backed test-body timeout was reproduced and corrected with a scoped integration-test budget; the complete server rerun passed. Continued native group/lock admission is verified. Issue #1 remains open; plan 05-02 remains incomplete and local changes are uncommitted. Still required: typography sequential admission, release-from-group coverage, populated-frame movement/resize-membership/deletion, asynchronous footprint revalidation, acquisition cancellation/disconnect browser cases, remaining live image control coverage, and a passing combined functional regression.
+
+
+### 2026-10-05 resumed execution after typography backlog capture
+
+The user moved sequential size-then-Bold formatting to backlog 999.8 and requested continued Phase 5 execution. That issue remains deferred; its regression case is retained. Commit `0966002` adds reservation fixes and behavioral coverage for the remaining native action inventory.
+
+- Frame resizing now uses a private preview, admits both existing and newly enclosed objects, and rechecks frame identity, bounds, lock state and affected objects before native replay.
+- Escape and pointer cancellation discard pending native gestures. A late acquisition response releases its token without replaying cancelled input.
+- Native Release from group now reserves its parent group and affected descendants. The initial browser case reproduced unchanged group membership; the structural reservation correction passed.
+- New browser evidence covers populated-frame movement with children, deletion, resize membership convergence, pending-acquisition cancellation with subsequent editing by the other participant, immediate disconnect release, native group-member release, and affected-set revalidation after a second editor moves an object into a proposed frame during admission.
+- The image scenario now also exercises crop, reset and source replacement, including remote geometry/source convergence and reopening the board.
+- Early frame-resize assertions used a third shape extending above the frame. Trace inspection identified the incorrect fixture geometry; the corrected case encloses the entire shape. Cancellation assertions now first await convergence of the preceding move. The expanded image test initially failed static checking because sourceId belongs to native image props; correcting that access restored both static checks.
+- Final focused production Chromium run: **7/7 passed**, zero skips/retries. Client account suites: **117/117 passed across 10 files**. Both client/server typechecks and whitespace checks passed before commit.
+- Combined production regression against `0966002`: **71/71 passed**, zero skips/retries, in 6.4 minutes across collaboration reservations, collaboration durability, canvas arrangement, image visual edits and UI refinements. All 15 server reservation tests also passed. The typography case passed in this run, but no typography repair was made; backlog 999.8 remains open with its prior failure evidence. The earlier 349/349 server result remains historical; no server implementation was changed in this slice.
+
+Plan 05-02 has passed its current automated gate; see 05-02-SUMMARY.md for scoped coverage and retained risks. No whole-phase completion or general live-board activation is claimed. Next: Plan 05-03 participant presence.
