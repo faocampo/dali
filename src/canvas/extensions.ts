@@ -1,3 +1,4 @@
+import { ConnectorTextOrientationExtension } from './connector-text-orientation';
 /**
  * The canvas primitive set, composed explicitly.
  *
@@ -151,5 +152,6 @@ export const viewExtensions = [
   ImageVisualEditViewExtension,
   ClassicalShapesViewExtension,
   FormattingControlsExtension,
+  ConnectorTextOrientationExtension,
   TextBoxViewExtension,
 ];

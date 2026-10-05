@@ -1,6 +1,7 @@
+import { connectorTextAngle } from './connector-text-orientation';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
-import { ConnectorElementModel } from '@blocksuite/affine/model';
+import { ConnectorElementModel, LocalShapeElementModel } from '@blocksuite/affine/model';
 import { TextUtils } from '@blocksuite/affine/blocks/surface';
 import { getFontString, getTextWidth, normalizeTextBound } from '@blocksuite/affine/gfx/text';
 import { Bound } from '@blocksuite/global/gfx';
@@ -60,6 +61,7 @@ function installLabelEditorLayout() {
       // Explicit width defeats absolute-position shrink-to-fit near the
       // viewport edge. The native ResizeObserver then measures the same wrap
       // used by the canvas renderer, including while typing and IME input.
+      container.style.transform = `${container.style.transform.replace(/\s*rotate\([^)]*\)/g, '')} rotate(${connectorTextAngle(model)}deg)`;
       container.style.width = `${layout.bound.w + 6}px`;
       container.style.maxWidth = `${layout.maxWidth + 6}px`;
       editor.richText.style.fontFamily = `${TextUtils.wrapFontFamily(model.labelStyle.fontFamily)}, sans-serif`;
@@ -77,6 +79,11 @@ export function installConnectorLabelReflow(host: EditorHost) {
   let disposed = false;
   const reflow = () => {
     frame = 0;
+    for (const local of surface.localElementModels) {
+      if (!(local instanceof LocalShapeElementModel) || !(local.creator instanceof ConnectorElementModel)) continue;
+      const angle = connectorTextAngle(local.creator);
+      if (local.rotate !== angle) local.rotate = angle;
+    }
     if (host.store.readonly) return;
     // Derived geometry must never clear redo or add an undo step. The outer
     // Yjs origin is deliberately excluded from the native user undo manager.
