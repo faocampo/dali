@@ -1,3 +1,4 @@
+import { Participants } from './Participants';
 /**
  * The app header: local board access, save state, and shared export dialog.
  */
@@ -132,6 +133,7 @@ export function Header({
 
       <nav className="djai-header-actions">
         {board?.summary.role === 'owner' && <button className="djai-ghost" onClick={event => { event.currentTarget.focus(); setSharing(true); }}>Share board</button>}
+        {board && <Participants boardId={board.summary.id} />}
         {member && <AccountMenu member={member} signOut={signOut} role={board?.summary.role} />}
 
       </nav>

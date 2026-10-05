@@ -1,3 +1,4 @@
+import { installPresence } from './account/presence';
 import { installLiveShapeGesture } from './account/reservations';
 /**
  * Mounts the infinite canvas view onto the shared runtime.
@@ -120,6 +121,7 @@ export async function mountEdgelessEditor(
   let disposeTextFormatting = () => {};
   let disposePointer = () => {};
   let disposeLiveGesture = () => {};
+  let disposePresence = () => {};
   const destroy = () => {
     if (destroyed) return;
     destroyed = true;
@@ -128,6 +130,7 @@ export async function mountEdgelessEditor(
     disposeTextFormatting();
     disposePointer();
     disposeLiveGesture();
+    disposePresence();
     viewport.removeEventListener('mousedown', preventMiddleMouseDefault, true);
     viewport.removeEventListener('auxclick', preventMiddleMouseDefault, true);
     // Removing the viewport disconnects the host and unmounts its scope once.
@@ -175,6 +178,7 @@ export async function mountEdgelessEditor(
     };
     refreshPointerRect();
     disposeLiveGesture = installLiveShapeGesture(host, runtime);
+    disposePresence = installPresence(host, runtime);
     const pointerEvents = ['pointerdown','pointermove','pointerup','wheel'] as const;
     pointerEvents.forEach(name => host.addEventListener(name, refreshPointerRect, true));
     disposePointer = () => {

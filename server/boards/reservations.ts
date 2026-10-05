@@ -23,6 +23,7 @@ export class CollaborationBroker {
     this.connections.set(connection.id, { connection, seen: this.now() });
     return connection;
   }
+  list(): LiveConnection[] { this.sweep(); return [...this.connections.values()].map(state => state.connection); }
   touch(connection: LiveConnection) {
     this.sweep();
     const state = this.connections.get(connection.id);

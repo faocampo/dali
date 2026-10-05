@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { PresenceRegistry, type PresenceIdentity } from './presence.js';
 import type { FastifyInstance } from 'fastify';
 import type { AuthConfig } from '../app.js';
 import { runMigrations, type AccountDatabase } from '../storage/database.js';
@@ -61,6 +63,17 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
     );
   ` }]);
   const broker = new CollaborationBroker(now);
+  const presence = new PresenceRegistry(broker, (boardId, accountId) => {
+    const member = database.prepare(`SELECT m.display_name AS name,
+      CASE WHEN b.owner_id=m.id THEN 'owner' WHEN m.system_role='viewer' THEN 'viewer' ELSE g.role END AS role
+      FROM members m JOIN boards b ON b.id=? LEFT JOIN board_grants g ON g.board_id=b.id AND g.member_id=m.id
+      WHERE m.id=? AND (b.owner_id=m.id OR g.member_id IS NOT NULL)`).get(boardId, accountId) as PresenceIdentity | undefined;
+    return member;
+  }, now);
+  const presenceSnapshot = (boardId: string) => {
+    const participants = presence.roster(boardId);
+    return { presence: participants, presenceVersion: createHash('sha256').update(JSON.stringify(participants)).digest('hex') };
+  };
   const polling = new WeakSet<LiveConnection>();
   type Params = { boardId: string };
   const bounded = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 256;
@@ -79,8 +92,19 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
     const accountId = request.headers['x-dali-account'] as string;
     const connection = broker.connect(board.id, accountId, request.body.tabId);
     // Synchronous reads and revision capture share one SQLite transaction.
-    return database.transaction(() => ({ connectionId: connection.id, epoch: readRecoveryEpoch(database), revision: board.revision, title: board.title,
+    return database.transaction(() => ({ connectionId: connection.id, ...presenceSnapshot(board.id), epoch: readRecoveryEpoch(database), revision: board.revision, title: board.title,
       root: documentBytes(database, board, board.root_doc_id)!.toString('base64'), content: documentBytes(database, board, board.content_doc_id)!.toString('base64') }))();
+  });
+  app.post<{ Params: Params; Body: { connectionId?: unknown; presence?: unknown } }>('/api/boards/:boardId/live/presence', {
+    bodyLimit: 64 * 1024, onRequest: async (request, reply) => { requireMutation(request, reply, config, ['application/json']); },
+  }, async (request, reply) => {
+    const board = requireBoardCapability(database, request, reply, request.params.boardId, 'read', now); if (!board) return;
+    if (!bounded(request.body?.connectionId)) return reply.code(400).send({ code: 'INVALID_CONNECTION' });
+    const connection = broker.find(request.body.connectionId, board.id, request.headers['x-dali-account'] as string);
+    if (!connection) return reply.code(409).send({ code: 'CONNECTION_EXPIRED' });
+    try { presence.update(connection, request.body.presence); }
+    catch { return reply.code(400).send({ code: 'INVALID_PRESENCE' }); }
+    return { acknowledged: true };
   });
   app.post<{ Params: Params; Body: { connectionId?: unknown; objectIds?: unknown } }>('/api/boards/:boardId/live/reserve', {
     bodyLimit: 1024 * 1024, onRequest: async (request, reply) => { requireMutation(request, reply, config, ['application/json']); },
@@ -100,7 +124,7 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
     }
     return { token };
   });
-  app.post<{ Params: Params; Body: { connectionId?: unknown; epoch?: unknown; revision?: unknown; waitMs?: unknown } }>('/api/boards/:boardId/live/poll', {
+  app.post<{ Params: Params; Body: { connectionId?: unknown; epoch?: unknown; revision?: unknown; presenceVersion?: unknown; waitMs?: unknown } }>('/api/boards/:boardId/live/poll', {
     bodyLimit: 4096, onRequest: async (request, reply) => { requireMutation(request, reply, config, ['application/json']); },
   }, async (request, reply) => {
     if (!bounded(request.body?.connectionId) || !Number.isSafeInteger(request.body.revision) || (request.body.revision as number) < 0) return reply.code(400).send({ code: 'INVALID_CURSOR' });
@@ -121,9 +145,10 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
       const epoch = readRecoveryEpoch(database);
       if (request.body.epoch !== epoch) { broker.disconnect(connection); return reply.code(409).send({ code: 'RECOVERY_EPOCH_MISMATCH' }); }
       try { broker.touch(connection); } catch { return reply.code(409).send({ code: 'CONNECTION_EXPIRED' }); }
-      if (board.revision !== request.body.revision) return { revision: board.revision, epoch, title: board.title,
+      const delivery = presenceSnapshot(board.id);
+      if (board.revision !== request.body.revision) return { revision: board.revision, epoch, ...delivery, title: board.title,
         root: documentBytes(database, board, board.root_doc_id)!.toString('base64'), content: documentBytes(database, board, board.content_doc_id)!.toString('base64') };
-      if (Date.now() >= deadline) return { revision: board.revision, epoch };
+      if (Date.now() >= deadline || (typeof request.body.presenceVersion === 'string' && request.body.presenceVersion !== delivery.presenceVersion)) return { revision: board.revision, epoch, ...delivery };
       await new Promise<void>(resolve => {
         const finish = () => { clearTimeout(timer); reply.raw.off('close', finish); resolve(); };
         const timer = setTimeout(finish, Math.min(250, deadline - Date.now()));

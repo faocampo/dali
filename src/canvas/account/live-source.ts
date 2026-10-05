@@ -1,10 +1,21 @@
+import type { PresenceParticipant } from '../../../server/boards/presence';
 import * as Y from 'yjs';
 import { RecoveryEpochError, SourceAccessError, type SourceOptions } from './doc-source';
-export type LiveSnapshot = { connectionId?: string; revision: number; epoch: string; root?: string; content?: string; title?: string };
+export type LiveSnapshot = { connectionId?: string; revision: number; epoch: string; root?: string; content?: string; title?: string; presence?: PresenceParticipant[]; presenceVersion?: string };
 const decode = (value: string) => Uint8Array.from(atob(value), character => character.charCodeAt(0));
 /** A connection belongs to exactly one runtime; recovery creates a fresh one. */
 export class BoardLiveSource {
   private controller = new AbortController();
+  private presenceVersion?: string;
+  private presenceListeners = new Set<() => void>();
+  presenceState: { state: 'loading' | 'ready' | 'error'; participants: PresenceParticipant[] } = { state: 'loading', participants: [] };
+  subscribePresence = (listener: () => void) => { this.presenceListeners.add(listener); return () => { this.presenceListeners.delete(listener); }; };
+  private publishPresence(state: typeof this.presenceState) { this.presenceState = state; this.presenceListeners.forEach(listener => listener()); }
+  async updatePresence(data: { cursor: { x: number; y: number } | null; selection: string[] }) {
+    if (!this.connected) return;
+    try { await this.request('presence', { connectionId: this.connectionId, presence: data }); }
+    catch { if (!this.controller.signal.aborted) this.publishPresence({ state: 'error', participants: [] }); }
+  }
   private connectionId?: string;
   private revision = 0;
   private reservation?: string;
@@ -46,6 +57,10 @@ export class BoardLiveSource {
   private apply(snapshot: LiveSnapshot, receive: (docId: string, bytes: Uint8Array) => void) {
     this.current();
     if (!Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0 || snapshot.epoch !== this.options.getRecoveryEpoch?.() || (this.epoch && snapshot.epoch !== this.epoch)) throw new Error('Invalid live snapshot');
+    if (snapshot.presence && typeof snapshot.presenceVersion === 'string') {
+      this.presenceVersion = snapshot.presenceVersion;
+      this.publishPresence({ state: 'ready', participants: snapshot.presence });
+    }
     if (this.epoch && snapshot.revision <= this.revision) return;
     if (snapshot.title !== undefined && (typeof snapshot.title !== 'string' || snapshot.title.length > 4000)) throw new Error('Invalid live title');
     if (!!snapshot.root !== !!snapshot.content) throw new Error('Incomplete live snapshot');
@@ -70,11 +85,11 @@ export class BoardLiveSource {
   private async poll(receive: (docId: string, bytes: Uint8Array) => void, disconnect: (reason: string) => void) {
     try {
       while (!this.controller.signal.aborted) {
-        const next = await this.request('poll', { connectionId: this.connectionId, revision: this.revision, epoch: this.epoch }) as LiveSnapshot;
+        const next = await this.request('poll', { connectionId: this.connectionId, revision: this.revision, epoch: this.epoch, presenceVersion: this.presenceVersion }) as LiveSnapshot;
         this.apply(next, receive);
       }
     } catch {
-      if (!this.controller.signal.aborted) { this.interrupted = true; disconnect('live-connection-interrupted'); }
+      if (!this.controller.signal.aborted) { this.interrupted = true; this.publishPresence({ state: 'error', participants: [] }); disconnect('live-connection-interrupted'); }
     }
   }
   get connected() { return !!this.connectionId && !this.interrupted && !this.controller.signal.aborted; }
@@ -96,6 +111,6 @@ export class BoardLiveSource {
   }
   dispose() {
     if (this.controller.signal.aborted) return;
-    this.controller.abort(); this.options.signal?.removeEventListener('abort', this.abort);
+    this.controller.abort(); this.publishPresence({ state: 'error', participants: [] }); this.options.signal?.removeEventListener('abort', this.abort);
   }
 }

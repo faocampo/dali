@@ -140,6 +140,27 @@ describe('authenticated live collaboration', () => {
   });
   afterEach(async () => { await app?.close(); database?.close(); await provider?.close(); });
 
+  it('@05-03-01 presence routes enforce connection ownership, server identity and current Viewer filtering', async () => {
+    const states: Record<string, { connectionId: string; revision: number; epoch: string }> = {};
+    for (const actor of ['owner', 'editor', 'viewer']) {
+      const open = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/connect`, headers: headers(actor), payload: { tabId: randomUUID() } });
+      expect(open.statusCode).toBe(200); states[actor] = open.json();
+    }
+    const update = (actor: string, presence: unknown, connectionId = states[actor]!.connectionId) => app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/presence`, headers: headers(actor), payload: { connectionId, presence } });
+    expect((await update('editor', { cursor: { x: 42, y: 24 }, selection: ['shape'] })).statusCode).toBe(200);
+    expect((await update('viewer', { cursor: { x: 80, y: 80 }, selection: ['shape'] })).statusCode).toBe(200);
+    expect((await update('editor', { name: 'Forged Owner', role: 'owner' })).statusCode).toBe(400);
+    expect((await update('viewer', { cursor: null }, states.owner!.connectionId)).statusCode).toBe(409);
+    const poll = () => app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/poll`, headers: headers(), payload: { ...states.owner, waitMs: 0 } });
+    const response = await poll(); expect(response.statusCode).toBe(200);
+    const roster = response.json().presence;
+    expect(roster).toHaveLength(3);
+    expect(roster.find((person: { accountId: string }) => person.accountId === actors.editor!.accountId)).toMatchObject({ name: 'Synthetic Editor', role: 'editor', cursor: { x: 42, y: 24 }, selection: ['shape'] });
+    expect(roster.find((person: { accountId: string }) => person.accountId === actors.viewer!.accountId)).toMatchObject({ role: 'viewer', cursor: null, selection: [] });
+    database.prepare("UPDATE members SET system_role='viewer' WHERE id=?").run(actors.editor!.accountId);
+    expect((await poll()).json().presence.find((person: { accountId: string }) => person.accountId === actors.editor!.accountId)).toMatchObject({ role: 'viewer', cursor: null, selection: [] });
+  });
+
   it('@05-01-01 opens a consistent authorized snapshot and viewer subscription', async () => {
     for (const actor of ['owner', 'editor', 'viewer']) {
       const response = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/connect`, headers: headers(actor), payload: { tabId: randomUUID() } });
@@ -206,7 +227,7 @@ describe('authenticated live collaboration', () => {
     expect(failed.statusCode).toBe(500); expect(bytes()).toEqual(persisted);
     expect((database.prepare('SELECT count(*) AS n FROM document_receipts').get() as { n: number }).n).toBe(1);
     const unchanged = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/poll`, headers: headers('editor'), payload: { connectionId, revision: response.json().revision, epoch: readRecoveryEpoch(database), waitMs: 0 } });
-    expect(unchanged.statusCode).toBe(200); expect(unchanged.json()).toEqual({ revision: response.json().revision, epoch: readRecoveryEpoch(database) });
+    expect(unchanged.statusCode).toBe(200); expect(unchanged.json()).toEqual({ revision: response.json().revision, epoch: readRecoveryEpoch(database), presence: [{ accountId: actors.editor!.accountId, name: 'Synthetic Editor', role: 'editor', idle: false, activity: 0, cursor: null, selection: [] }], presenceVersion: expect.stringMatching(/^[a-f0-9]{64}$/) });
     database.exec('DROP TRIGGER fail_receipt');
 
     shape.set('xywh', '[25,30,100,100]');
