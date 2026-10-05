@@ -268,7 +268,7 @@ All three tasks are complete within the accepted local scope. The local Kubernet
 - [x] 05-01-PLAN.md — Live native editing tracer
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 05-02-PLAN.md — Complete object reservations
+- [x] 05-02-PLAN.md — Complete object reservations
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 05-03-PLAN.md — Presence and participant controls
@@ -501,7 +501,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
 | 3. Okta and Board Access | 12/12 | Complete    | 2026-09-25 |
 | 4. Durable Boards and Recovery | 17/17 | Validated with approved deferrals | 2026-09-29 |
-| 5. Real-Time Collaborative Editing | 0/TBD | Not started | - |
+| 5. Real-Time Collaborative Editing | 2/9 | In progress | - |
 | 6. Follow Me | 0/TBD | Not started | - |
 | 7. Entity Comments | 0/TBD | Not started | - |
 | 8. Shared Timer | 0/TBD | Not started | - |
