@@ -616,3 +616,18 @@ Plans:
 Plans:
 
 - [ ] TBD (promote with $gsd-review-backlog when ready)
+
+
+### Phase 999.8: Sequential font size and Bold formatting fix (BACKLOG)
+
+**Goal:** Ensure that changing font size to 48 and then selecting Bold reliably applies font weight 700, instead of leaving it at 400.
+**Requirements:** Follow-up for COL-01 native formatting reservations in Phase 5, plan 05-02.
+**Plans:** 0 plans
+**Captured context:** User requested backlog capture on 2026-10-05. The latest recorded combined production Chromium regression passed 62 cases and failed this sequential typography case. Focused repetitions had passed after earlier repairs; preserve the combined failure as evidence. Reservation timing is a suspected cause requiring diagnosis.
+**Tracking:** [GitHub issue #1](https://github.com/faocampo/dali/issues/1) (existing typography failure report) and [05-02-EXECUTION.md](phases/05-real-time-collaborative-editing/05-02-EXECUTION.md) (repair attempts, regression evidence and remaining plan coverage).
+**Acceptance:** Reproduce the sequential interaction deterministically, correct the responsible formatting/admission lifecycle, and verify font size 48 and weight 700 locally and in the collaborating browser. Pass the focused reproducer and the complete combined functional regression with no mandatory skips, retries or suppressed errors. Preserve first-writer reservations and authorization checks.
+**Disposition:** Captured for future repair. Retain the failed verification result and incomplete Phase 5 status until their acceptance is explicitly resolved.
+
+Plans:
+
+- [ ] TBD (promote with $gsd-review-backlog when ready)
