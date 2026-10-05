@@ -92,7 +92,7 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
     const accountId = request.headers['x-dali-account'] as string;
     const connection = broker.connect(board.id, accountId, request.body.tabId);
     // Synchronous reads and revision capture share one SQLite transaction.
-    return database.transaction(() => ({ connectionId: connection.id, ...presenceSnapshot(board.id), epoch: readRecoveryEpoch(database), revision: board.revision, title: board.title,
+    return database.transaction(() => ({ connectionId: connection.id, epoch: readRecoveryEpoch(database), revision: board.revision, title: board.title,
       root: documentBytes(database, board, board.root_doc_id)!.toString('base64'), content: documentBytes(database, board, board.content_doc_id)!.toString('base64') }))();
   });
   app.post<{ Params: Params; Body: { connectionId?: unknown; presence?: unknown } }>('/api/boards/:boardId/live/presence', {

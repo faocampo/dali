@@ -47,7 +47,7 @@ export function installPresence(host: EditorHost, runtime: CanvasRuntime) {
       const item = document.createElement('div'); item.className = 'participant-cursor';
       Object.assign(item.style, { left: `${x + rect.left - parent.left}px`, top: `${y + rect.top - parent.top}px`, color });
       const marker = document.createElement('span'); marker.className = 'participant-cursor__marker'; marker.textContent = '➤'; marker.style.opacity = person.idle ? '.5' : '1';
-      const name = document.createElement('span'); name.className = 'participant-cursor__name'; name.textContent = person.name;
+      const name = document.createElement('span'); name.className = 'participant-cursor__name'; name.textContent = person.name; name.style.borderColor = color;
       name.style.opacity = Date.now() - seen.get(person.accountId)!.at < 3000 || Math.hypot(mouse.x - x - rect.left, mouse.y - y - rect.top) < 28 ? '1' : '0';
       name.style.maxWidth = `${Math.max(80, Math.min(220, rect.width - 24))}px`;
       name.style.transform = `translate(${Math.max(-x, Math.min(12, rect.width - x - 232))}px,${y > rect.height - 48 ? -32 : 12}px)`;

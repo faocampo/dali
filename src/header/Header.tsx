@@ -133,7 +133,7 @@ export function Header({
 
       <nav className="djai-header-actions">
         {board?.summary.role === 'owner' && <button className="djai-ghost" onClick={event => { event.currentTarget.focus(); setSharing(true); }}>Share board</button>}
-        {board && <Participants boardId={board.summary.id} />}
+        {board && <Participants boardId={board.summary.id} loading={!!board.liveEnabled && scope?.phase === 'active'} />}
         {member && <AccountMenu member={member} signOut={signOut} role={board?.summary.role} />}
 
       </nav>

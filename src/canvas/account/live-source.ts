@@ -85,7 +85,7 @@ export class BoardLiveSource {
   private async poll(receive: (docId: string, bytes: Uint8Array) => void, disconnect: (reason: string) => void) {
     try {
       while (!this.controller.signal.aborted) {
-        const next = await this.request('poll', { connectionId: this.connectionId, revision: this.revision, epoch: this.epoch, presenceVersion: this.presenceVersion }) as LiveSnapshot;
+        const next = await this.request('poll', { connectionId: this.connectionId, revision: this.revision, epoch: this.epoch, presenceVersion: this.presenceVersion ?? '' }) as LiveSnapshot;
         this.apply(next, receive);
       }
     } catch {

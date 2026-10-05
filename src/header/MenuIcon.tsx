@@ -1,4 +1,5 @@
 const menuIconPaths = {
+  people: 'M9 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8M2 21v-3a7 7 0 0 1 14 0v3M17 4a4 4 0 0 1 0 8M19 15a5 5 0 0 1 3 5',
   left: 'M4 3v18M8 6h12v4H8ZM8 14h8v4H8Z',
   right: 'M20 3v18M4 6h12v4H4ZM8 14h8v4H8Z',
   'center-x': 'M12 2v20M4 6h16v4H4ZM7 14h10v4H7Z',
