@@ -1,11 +1,11 @@
 ---
 gsd_state_version: "1.0"
 current_plan: 3
-status: executing
-stopped_at: Phase 5 plan 02 verified; continuing plan 03 participant presence
-last_updated: "2026-10-05T22:22:53.522Z"
+status: awaiting_user
+stopped_at: Plan 05-03 cursor projection verification failed after two repair attempts
+last_updated: "2026-10-05T23:07:02.093975+00:00"
 last_activity: 2026-10-05
-last_activity_desc: Plan 05-02 browser 71/71, client 117/117, reservation 15/15; typography backlog retained
+last_activity_desc: Plan 05-03 combined 79/79 passed; added pan projection fails; retry choice pending
 state_head: 110973627de98d49d15c43a3a70b0862b55599ed
 progress:
   total_phases: 13
@@ -24,7 +24,7 @@ current_phase_name: Real-Time Collaborative Editing
 See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
-**Current focus:** Phase 05 — Real-Time Collaborative Editing; executing plan 03
+**Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 03 verification checkpoint
 
 ## Current Position
 
@@ -34,7 +34,7 @@ Total Plans in Phase: 9
 Phase 4 is validated by the user on 2026-09-29 with the remaining WebKit fix deferred to 999.7. All 17 plans are dispositioned; acceptance explicitly retains the 2,051/2,052 full-run result and earlier approved deferrals.
 
 Next phase: 05 — Real-Time Collaborative Editing.
-Status: Plans 05-01 and 05-02 are verified and committed. Plan 05-02's current production gate passed 71/71 browser cases, 117/117 client cases, 15/15 reservation cases and both static checks. Prior sequential typography failures remain in user-requested backlog 999.8; the current passing case does not establish a repair. Continue Plan 05-03 participant presence.
+Status: Plans 05-01 and 05-02 are verified and committed. Plan 05-02's current production gate passed 71/71 browser cases, 117/117 client cases, 15/15 reservation cases and both static checks. Prior sequential typography failures remain in user-requested backlog 999.8; the current passing case does not establish a repair. Plan 05-03 implementation is committed through `ca34104`; its combined browser gate passed 79/79, client 250/250 and server 354/354. An added cursor projection check fails after panning despite two repair attempts. Local overlay/test changes are preserved; await Retry, Skip (mark incomplete), or Stop. See 05-03-EXECUTION.md for exact evidence.
 Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 45/52 currently planned plans dispositioned; two of nine Phase 5 plans verified.
 
 ## Historical prerequisite verification
@@ -254,3 +254,7 @@ User confirmed the six UI surfaces and their state handling. [05-UI-SPEC.md](pha
 ## Current execution handoff — 2026-10-02
 
 Plan 05-01 is complete in `9dbc9f9`, with evidence committed in `ec0bc42`. Latest plan gate: 19 collaboration server cases, 24 backup cases, 34 client cases, two native production-browser scenarios and both typechecks passed. Continue plan 05-02; activation remains gated until complete mutation coverage and recovery flows are available. No whole-phase requirement is marked complete.
+
+## Current execution checkpoint — 2026-10-05
+
+Plan 05-03 presence is incomplete at its coordinate verification gate. Tracer and UI expansion commits exist; combined regression at `ca34104` passed 79/79, client 250/250 and server 354/354. Added native zoom/pan verification still fails after two repairs: zoom passes, pan expects y=408 but renders y=476. Cause remains unresolved. Pending source/test changes are uncommitted; no test process remains active. Await Retry, Skip (incomplete), or Stop/investigate. Plan 05-04 has not begun. Native browser zoom remains human acceptance; typography 999.8 remains deferred.

@@ -70,9 +70,9 @@
     }
   ],
   "next": {
-    "command": "/gsd:progress --next",
-    "label": "Advance to the next step",
-    "reason": "Phase 05 of 13 · 31% · executing"
+    "command": "/gsd:execute-phase 5",
+    "label": "Resolve presence verification checkpoint",
+    "reason": "Plan 05-03 native pan projection failed after two repairs; retry, skip or stop choice pending"
   },
-  "updated_at": "2026-10-05T22:22:53.561Z"
+  "updated_at": "2026-10-05T23:07:02.093975+00:00"
 }

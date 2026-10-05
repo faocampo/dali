@@ -1,6 +1,6 @@
 # Plan 05-03 execution checkpoint
 
-Status: tracer committed in `e9a7b82`; UI expansion committed in `ca34104`; combined browser regression remains in progress. Plan 05-02's current automated gate passed 71/71 production browser cases; typography remains in user-requested backlog 999.8 with historical failure evidence.
+Status: tracer committed in `e9a7b82`; UI expansion committed in `ca34104`; combined browser regression passed, but added native coordinate verification is blocked after two repairs. Plan 05-02's current automated gate passed 71/71 production browser cases; typography remains in user-requested backlog 999.8 with historical failure evidence.
 
 ## Verified tracer
 
@@ -38,3 +38,17 @@ At implementation revision `ca34104`:
 - Client/server typechecks and whitespace checks passed before the implementation commit.
 - Narrow, compact and 21-participant screenshots were inspected. Names wrap and the roster scrolls inside the viewport. Native browser zoom remains phase-level human acceptance.
 - Combined native canvas, reservations, durability, images, typography and presence production-browser regression is running. Plan completion awaits that result.
+
+## Coordinate verification checkpoint
+
+The combined regression at `ca34104` passed **79/79**, zero skips/retries, 9.1 minutes. It covers all eight presence cases plus native reservations, arrangement, images, durability and UI refinements. The typography case passed again; backlog 999.8 remains open because its known race was not repaired.
+
+An additional native canvas zoom/pan assertion then exposed an unresolved coordinate discrepancy. This is separate from native browser-chrome zoom.
+
+1. Initial added check failed after canvas zoom: expected `(520, 392)`, observed `(520, 358)`. The expected point was calculated after editor focus, which could change its viewport after the original pointer event; this result alone does not establish a rendering defect.
+2. **RETRY 1:** Use native viewport bounds for overlays and its view scale for selection sizes; validate the baseline before zoom. The test failed at baseline: expected `(400, 418)`, observed `(400, 350)`.
+3. **RETRY 2:** Derive the test point from the actual authenticated pointer packet rather than a later viewport sample. Baseline and 50% canvas zoom passed. After the native Hand gesture, expected `(620, 408)`, observed `(620, 476)`. The cause remains unresolved; distinguish viewport scrolling/layout-origin changes from a stale test expectation before further repair.
+
+**ESCALATE:** The two-attempt repair budget is exhausted. Plan 05-03 is incomplete; Plan 05-04 has not begun. Await Retry, Skip (explicitly incomplete), or Stop/investigate. Current local changes in the presence overlay and its browser test are preserved and uncommitted. Both TypeScript checks passed after the second repair; the focused browser test failed. No regression process remains running. Earlier 79/79, 250/250 and 354/354 results retain their exact source scope and do not validate the pending overlay changes.
+
+The native-browser 200% zoom and final presence UX review remain phase-level human acceptance obligations. General collaboration activation remains gated. No phase requirement is marked complete.
