@@ -8,6 +8,23 @@ function pending(signal?: AbortSignal | null) {
   return new Promise<Response>((_resolve, reject) => signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
 }
 describe('generation-scoped live snapshots', () => {
+  it('explicitly disconnects the original connection on disposal without reusing its aborted signal', async () => {
+    const request = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+      if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'original-connection', revision: 3, epoch, root: update, content: update });
+      if (String(url).endsWith('/disconnect')) return Response.json({ acknowledged: true });
+      return pending(init?.signal);
+    });
+    const live = new BoardLiveSource({ ...scope, fetch: request });
+    await live.start(() => {}, () => {});
+    live.dispose(); live.dispose();
+    const cleanup = request.mock.calls.filter(([url]) => String(url).endsWith('/disconnect'));
+    expect(cleanup).toHaveLength(1);
+    expect(cleanup[0]![0]).toBe(`/api/boards/${scope.boardId}/live/disconnect`);
+    expect(cleanup[0]![1]).toMatchObject({ method: 'POST', keepalive: true, credentials: 'same-origin', headers: { 'X-Dali-Account': scope.accountId, 'X-Dali-Recovery-Epoch': epoch } });
+    expect(cleanup[0]![1]!.signal).toBeUndefined();
+    expect(JSON.parse(cleanup[0]![1]!.body as string)).toEqual({ connectionId: 'original-connection' });
+    expect(live.connected).toBe(false);
+  });
   it('retains a failed presence publication across successful polls until publication recovers', async () => {
     let resolvePoll!: (response: Response) => void;
     let polls = 0; let failPresence = true;
@@ -46,6 +63,7 @@ describe('generation-scoped live snapshots', () => {
     const receive = vi.fn(); const disconnect = vi.fn();
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
       if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'connection', revision: 3, epoch, root: update, content: update });
+      if (String(url).endsWith('/disconnect')) return Response.json({ acknowledged: true });
       pollSignal = init?.signal; return pending(pollSignal);
     });
     const live = new BoardLiveSource({ ...scope, fetch: fetcher });

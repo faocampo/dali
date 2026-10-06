@@ -42,7 +42,10 @@ export class BoardLiveSource {
   private readonly tabId = crypto.randomUUID();
   private epoch?: string;
   private readonly abort = () => this.dispose();
-  constructor(private options: SourceOptions) { options.signal?.addEventListener('abort', this.abort, { once: true }); }
+  constructor(private options: SourceOptions) {
+    options.signal?.addEventListener('abort', this.abort, { once: true });
+    if (typeof window !== 'undefined') window.addEventListener('pagehide', this.abort);
+  }
   private current() {
     if (this.controller.signal.aborted || this.options.signal?.aborted || this.options.isCurrent?.(this.options.generation) === false) throw new Error('Live source is stale');
   }
@@ -57,8 +60,9 @@ export class BoardLiveSource {
     this.current();
     const result = await response.json() as Record<string, unknown>;
     if (!response.ok) {
-      if (result.code === 'RECOVERY_EPOCH_MISMATCH') throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+      if (result.code === 'RECOVERY_EPOCH_MISMATCH') { this.interrupted = true; throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH'); }
       if ([401, 403, 404].includes(response.status) || result.code === 'IDENTITY_CHANGED') {
+        this.interrupted = true;
         const error = new SourceAccessError(response.status); this.options.onAuthorizationLost?.(error); throw error;
       }
       throw Object.assign(new Error('Live request failed'), { code: result.code, editor: typeof result.editor === 'string' ? result.editor : undefined });
@@ -125,6 +129,20 @@ export class BoardLiveSource {
   }
   dispose() {
     if (this.controller.signal.aborted) return;
+    const disconnect = this.connected;
     this.controller.abort(); this.publishPresence({ state: 'error', participants: [] }); this.options.signal?.removeEventListener('abort', this.abort);
+    if (typeof window !== 'undefined') window.removeEventListener('pagehide', this.abort);
+    if (disconnect) {
+      // Aborting a long poll does not reliably close its server connection in
+      // every browser/proxy. Retire only this original session, even on pagehide.
+      // This cleanup never applies a response to a newer runtime.
+      try {
+        void (this.options.fetch ?? fetch)(`/api/boards/${encodeURIComponent(this.options.boardId)}/live/disconnect`, {
+          method: 'POST', credentials: 'same-origin', cache: 'no-store', keepalive: true,
+          headers: { 'Content-Type': 'application/json', 'X-Dali-Account': this.options.accountId, 'X-Dali-Request': '1', ...(this.epoch ? { 'X-Dali-Recovery-Epoch': this.epoch } : {}) },
+          body: JSON.stringify({ connectionId: this.connectionId }),
+        }).catch(() => {});
+      } catch { /* Transport expiry remains the fallback when cleanup cannot be sent. */ }
+    }
   }
 }
