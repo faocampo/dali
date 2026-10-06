@@ -5,6 +5,7 @@ import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import type { CanvasRuntime } from '../runtime';
 import { historyReservationTargets, trackHistoryFootprints } from './history-footprint';
 import { installDeferredCreation } from './deferred-creation';
+import { capturePersonalHistorySessions } from './personal-history';
 
 type ReservationAction = <T>(ids: string[], create: boolean, operation: () => T | Promise<T>) => Promise<T>;
 const actions = new WeakMap<EditorHost, ReservationAction>();
@@ -19,6 +20,8 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   if (!live || host.store.readonly) return () => {};
   const gfx = host.std.get(GfxControllerIdentifier);
   const history = host.store.history.undoManager;
+  const personalCapture = capturePersonalHistorySessions(history);
+  let finishPointerCapture: (() => void) | undefined;
   const disposeHistoryFootprints = trackHistoryFootprints(host.store.spaceDoc, history);
   let token: string | undefined;
   let replay = false; let disposed = false; let finishing = false; let textSession = false;
@@ -61,13 +64,14 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   };
   const release = () => {
     if (!token || finishing) return;
-    finishing = true; textSession = false; const held = token;
+    finishing = true; textSession = false; personalCapture.setTextEditing(false); const held = token;
     releaseWork = runtime.workspace.waitForSynced().then(() => live.release(held)).then(() => { if (token === held) token = undefined; }).catch(() => {
       if (!disposed) message('Changes are waiting to save. Keep this board open.');
     }).finally(() => { finishing = false; releaseWork = undefined; });
   };
   const finished = () => {
     pointerId = undefined;
+    finishPointerCapture?.(); finishPointerCapture = undefined;
     if (gfx.selection.editing) { textSession = true; return; }
     release();
   };
@@ -118,6 +122,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
       if (!acquired) return;
       if (disposed || pending !== events) { await live.release(acquired); return; }
       pending = undefined; token = acquired; message('');
+      finishPointerCapture = personalCapture.beginOperation();
       for (const input of events) send(input);
       if (events.at(-1)?.type === 'pointerup' || events.at(-1)?.type === 'pointercancel') finished();
     }).catch((error: unknown) => {
@@ -138,7 +143,11 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   const move = (event: PointerEvent) => { if (!replay && pending) buffer(event); };
   const captureEnd = (event: PointerEvent) => { if (!replay && pending && event.pointerId === pointerId) { if (event.type === 'pointercancel') { stop(event); cancelPendingGesture(); } else buffer(event); } };
   const end = (event: PointerEvent) => { if (!replay && token && event.pointerId === pointerId) finished(); };
-  const selection = gfx.selection.slots.updated.subscribe(() => { if (textSession && !gfx.selection.editing) release(); });
+  const selection = gfx.selection.slots.updated.subscribe(() => {
+    personalCapture.setTextEditing(gfx.selection.editing && !!token);
+    if (gfx.selection.editing && token) textSession = true;
+    else if (textSession && !gfx.selection.editing) release();
+  });
   const blur = () => {
     if (!textSession) return;
     // Focus events cross nested shadow roots with a retargeted relatedTarget.
@@ -230,12 +239,16 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     void live.acquire(ids).then(async acquired => {
       if (disposed || !(target instanceof Element) || !target.isConnected) { await live.release(acquired); return; }
       token = acquired; message(''); replay = true;
+      const finishCapture = personalCapture.beginOperation();
       try {
         redispatch(target);
-      } finally { replay = false; }
-      // Native command chains may finish in promise microtasks after dispatch.
-      // Release from the next task, then wait for the resulting document write.
-      if (gfx.selection.editing) textSession = true; else setTimeout(() => { if (!disposed) release(); }, 0);
+      } finally {
+        replay = false;
+        // Native command chains may finish in promise microtasks after
+        // dispatch. Close the operation in the next task, preserving any
+        // text session entered by that command, then acknowledge and release.
+        setTimeout(() => { finishCapture(); if (!disposed && !gfx.selection.editing) release(); }, 0);
+      }
     }).catch((error: unknown) => {
       const editor = error && typeof error === 'object' && 'editor' in error ? error.editor : undefined;
       message(typeof editor === 'string' ? `${editor} is editing this object. You can edit it when they finish.` : 'Editing access could not be checked. Try again.', ids);
@@ -259,7 +272,9 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
       acquired = await live.acquire(required);
       if (disposed || host.store.readonly || !live.connected) throw new Error('Editing access changed.');
       token = acquired; message('');
-      const result = await operation();
+      const finishCapture = personalCapture.beginOperation();
+      let result;
+      try { result = await operation(); } finally { finishCapture(); }
       await runtime.workspace.waitForSynced();
       return result;
     } catch (error) {
@@ -361,7 +376,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end); host.addEventListener('focusout', blur);
   return () => {
     disposed = true; pending = undefined; status.remove(); selection.unsubscribe(); actions.delete(host);
-    disposeHistoryFootprints(); host.store.undo = nativeUndo; host.store.redo = nativeRedo;
+    personalCapture.dispose(); disposeHistoryFootprints(); host.store.undo = nativeUndo; host.store.redo = nativeRedo;
     disposeDeferred();
     if (clipboard && nativePaste) clipboard._onPaste = nativePaste;
     if (clipboard && nativeCut) clipboard._onCut = nativeCut;
