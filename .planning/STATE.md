@@ -2,11 +2,11 @@
 gsd_state_version: "1.0"
 current_plan: 4
 status: in_progress
-stopped_at: Plan 05-03 automated gates complete; continue approved plan 05-04
+stopped_at: Plan 05-04 capture foundation verified; continue authoritative property provenance
 last_updated: "2026-10-06T14:40:34+00:00"
 last_activity: 2026-10-06
-last_activity_desc: Stabilization verified in 85 Chromium and 26 Firefox/WebKit cases; next personal history
-state_head: 0fdda024b400782318a33026dd0612530e755161
+last_activity_desc: Personal history capture verified in 46 Chromium and 2 Firefox/WebKit cases; property conflict protection pending
+state_head: 661791a3d7d3924c874ad6b0baca830f4208478a
 progress:
   total_phases: 13
   completed_phases: 4
@@ -25,6 +25,8 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
 **Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 04 personal undo and redo
+
+Plan 05-04 is partially implemented at `661791a`: explicit complete text-session and reserved-operation capture passes 255 client tests, both typechecks, 46 Chromium regression cases and the new native tracer in Firefox and WebKit (2/2). Server source is unchanged from the 354/354 stabilization gate. Authoritative property provenance, conflicting inverse checks, structural/ABA cases and reconnect acceptance remain pending; no additional plan is marked complete. See [05-04-EXECUTION.md](phases/05-real-time-collaborative-editing/05-04-EXECUTION.md).
 
 ## Current Position
 
