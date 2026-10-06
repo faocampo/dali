@@ -1,11 +1,11 @@
 ---
 gsd_state_version: "1.0"
 current_plan: 4
-status: executing
-stopped_at: Plan 05-04 tracer passed twice; expanding personal history coverage
-last_updated: "2026-10-06T17:07:01.125468+00:00"
+status: awaiting_user
+stopped_at: History suite passes; resolve parallel execution ownership before overlapping work
+last_updated: "2026-10-06T17:42:06.791903+00:00"
 last_activity: 2026-10-06
-last_activity_desc: Presence changes committed; personal history tracer verified
+last_activity_desc: Personal history checkpoint verified; parallel execution ownership pending
 state_head: 110973627de98d49d15c43a3a70b0862b55599ed
 progress:
   total_phases: 13
@@ -34,7 +34,7 @@ Total Plans in Phase: 9
 Phase 4 is validated by the user on 2026-09-29 with the remaining WebKit fix deferred to 999.7. All 17 plans are dispositioned; acceptance explicitly retains the 2,051/2,052 full-run result and earlier approved deferrals.
 
 Next phase: 05 — Real-Time Collaborative Editing.
-Status: Plans 05-01 and 05-02 are verified. Presence changes are committed through `8145bbe`; 05-03 remains incomplete with its enabled cursor-pan check failing. The user authorized continuing with that exception. Plan 05-04 tracer passes twice in production Chromium, with 4/4 client and 50/50 targeted server checks plus both typechecks. Task 05-04-02 and combined regression are pending. Typography remains in backlog 999.8. See 05-04-EXECUTION.md for current evidence.
+Status: Plans 05-01 and 05-02 are verified. Presence changes are committed through `8145bbe`; 05-03 remains incomplete with its enabled cursor-pan check failing. The user authorized continuing with that exception. Plan 05-04 tracer passes twice in production Chromium, with 4/4 client and 50/50 targeted server checks plus both typechecks. Task 05-04-02 has 6/6 focused browser passes; remaining coverage and combined regression are pending. Parallel history/reconnection work exists in an isolated copy; execution ownership requires clarification. Typography remains in backlog 999.8. See 05-04-EXECUTION.md for current evidence.
 Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 45/52 currently planned plans dispositioned; two of nine Phase 5 plans verified.
 
 ## Historical prerequisite verification
@@ -266,3 +266,7 @@ User selected Skip for the unresolved cursor-alignment check. Plan 05-03 and COL
 ## Current continuation — 2026-10-06
 
 User authorized committing the preserved presence changes and continuing. Execute Plan 05-04 with the explicit dependency exception recorded in its plan. Plan 05-03, cursor-pan verification and COL-02 remain incomplete; the failing test stays enabled. Earlier dependency-review checkpoint is superseded.
+
+## Current verification checkpoint — 2026-10-06
+
+Personal history tracer committed as `658eb28`; focused expanded Chromium suite passes 6/6 with both typechecks. See 05-04-EXECUTION.md for the two test-setup repairs and remaining coverage. No Phase 5 completion is claimed. Await primary-checkout clarification before overlapping recovery work.

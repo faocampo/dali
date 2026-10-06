@@ -20,3 +20,17 @@ Repair 1 corrected the browser reader: an absent optional native text field repr
 ## Remaining
 
 Task 05-04-02 and the combined regression remain pending. No Plan 05-04 or Phase 5 completion is claimed. Typography backlog 999.8 and the earlier accepted Phase 4 exceptions remain unchanged.
+
+## Task 05-04-02 — partial verified expansion
+
+At tracer commit `658eb28`, added actual two-user browser cases for delete/undo/redo, preserving a created object after a remote edit while continuing to an older eligible step, skipping an entire conflicting group inverse, separate tabs of the same account, reload reset, and redo conflict feedback at 360px width without taking focus.
+
+- First expansion: 3/4 passed; group creation was not reached because the keyboard focus/selection setup was incomplete.
+- Repair 1: explicitly focus the host and assert selection; focused group case passed.
+- Combined expansion: 4/6 passed; Delete and Duplicate were sent before native selection settled.
+- Repair 2: wait for the selected native object and focus the editor before sending the keyboard action.
+- Final production Chromium history suite: **6/6 passed**, no retries, skips or unexpected browser errors; both typechecks passed. This is focused evidence, not a full combined regression.
+
+Remaining coverage includes connected-idle reservation behavior, additional native ABA/structural cases, and eligible history through a real reconnect. The current live source intentionally quarantines writes after interruption. Recovery is also covered by the following approved plan. No completion count or requirement status changes.
+
+A parallel isolated implementation of the same history/reconnection scope was discovered during verification. Preserve both independently; further overlapping implementation awaits clarification of the primary execution checkout. No cross-checkout changes were imported, and no other process was stopped.
