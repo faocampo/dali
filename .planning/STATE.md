@@ -1,17 +1,17 @@
 ---
 gsd_state_version: "1.0"
-current_plan: 3
-status: awaiting_user
-stopped_at: Plan 05-03 cursor projection verification failed after two repair attempts
-last_updated: "2026-10-05T23:07:02.093975+00:00"
-last_activity: 2026-10-05
-last_activity_desc: Plan 05-03 combined 79/79 passed; added pan projection fails; retry choice pending
-state_head: 110973627de98d49d15c43a3a70b0862b55599ed
+current_plan: 4
+status: in_progress
+stopped_at: Plan 05-03 automated gates complete; continue approved plan 05-04
+last_updated: "2026-10-06T14:40:34+00:00"
+last_activity: 2026-10-06
+last_activity_desc: Stabilization verified in 85 Chromium and 26 Firefox/WebKit cases; next personal history
+state_head: 0fdda024b400782318a33026dd0612530e755161
 progress:
   total_phases: 13
   completed_phases: 4
   total_plans: 52
-  completed_plans: 45
+  completed_plans: 46
   percent: 31
 current_phase: 05
 current_phase_name: Real-Time Collaborative Editing
@@ -24,18 +24,18 @@ current_phase_name: Real-Time Collaborative Editing
 See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
-**Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 03 verification checkpoint
+**Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 04 personal undo and redo
 
 ## Current Position
 
-Current Plan: 3
+Current Plan: 4
 Total Plans in Phase: 9
 
 Phase 4 is validated by the user on 2026-09-29 with the remaining WebKit fix deferred to 999.7. All 17 plans are dispositioned; acceptance explicitly retains the 2,051/2,052 full-run result and earlier approved deferrals.
 
 Next phase: 05 — Real-Time Collaborative Editing.
-Status: Plans 05-01 and 05-02 are verified and committed. Plan 05-02's current production gate passed 71/71 browser cases, 117/117 client cases, 15/15 reservation cases and both static checks. Prior sequential typography failures remain in user-requested backlog 999.8; the current passing case does not establish a repair. Plan 05-03 implementation is committed through `ca34104`; its combined browser gate passed 79/79, client 250/250 and server 354/354. An added cursor projection check fails after panning despite two repair attempts. Local overlay/test changes are preserved; await Retry, Skip (mark incomplete), or Stop. See 05-03-EXECUTION.md for exact evidence.
-Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 45/52 currently planned plans dispositioned; two of nine Phase 5 plans verified.
+Status: Plans 05-01 through 05-03 have verified automated gates. Authorized continuation on 2026-10-06 preserved both incoming modifications and left the original checkout untouched. Commits `1f15749`, `4433d01`, `ef8a5f1` and `0fdda02` repair consecutive formatting, cursor projection, publication-error recovery, pointer admission after release and explicit session disconnect. Final verification: 85/85 integrated Chromium; 26/26 focused Firefox/WebKit; 252/252 client; 354/354 server; both static checks. All browser gates have zero skips/retries or unexpected runtime errors. Deterministic tests prove fresh reservations, no denied-action replay, convergence and reopen. Historical failures remain in [05-RESUMPTION-2026-10-06.md](phases/05-real-time-collaborative-editing/05-RESUMPTION-2026-10-06.md). Begin the approved 05-04 plan; no pilot readiness or general collaboration activation is claimed.
+Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 46/52 currently planned plans dispositioned; three of nine Phase 5 plans verified.
 
 ## Historical prerequisite verification
 
@@ -142,7 +142,8 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ### Pending Todos
 
-- Complete the corrected prerequisite regression gate, then reconcile 04-15 and execute the existing approved 04-16 plan.
+- Execute the approved 05-04 personal-history plan, then 05-05 through 05-09 sequentially.
+- Preserve the distinction between engineering acceptance and actual-provider, storage and native UI follow-ups in [the internal release runbook](../docs/internal-release.md).
 
 ### Blockers/Concerns
 
@@ -161,10 +162,10 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-09-28T07:04:29Z
-Stopped at: Prerequisite full-regression retry ceiling; latest fixture corrections validated; needs_human
-Resume file: .planning/phases/04-durable-boards-and-recovery/04-PREREQUISITE-REFRESH.md
-Next action: Await autonomous retry/skip/stop choice for G-04-38. Full gate at 3e9d68b returned 2,051/2,052 passes with one WebKit blob/session runtime-error case. No regression process remains active. All seven judgments remain accepted.
+Last session: 2026-10-06
+Stopped at: Plan 05-03 automated qualification complete; next plan 05-04
+Resume file: .planning/phases/05-real-time-collaborative-editing/05-RESUMPTION-2026-10-06.md
+Next action: Execute 05-04 personal history with native text-session grouping and server-acknowledged property provenance. The old retry-choice checkpoint is superseded by the user's continuation authorization. Do not infer completion of 05-04 through 05-09 or a controlled internal release from the stabilization results. The historical 2,051/2,052 Phase 4 gate and approved 999.7 deferral remain unchanged.
 
 ## Phase 1 verification outcome
 

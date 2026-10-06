@@ -271,7 +271,7 @@ All three tasks are complete within the accepted local scope. The local Kubernet
 - [x] 05-02-PLAN.md — Complete object reservations
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 05-03-PLAN.md — Presence and participant controls
+- [x] 05-03-PLAN.md — Presence and participant controls
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 05-04-PLAN.md — Personal undo and redo
@@ -501,7 +501,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
 | 3. Okta and Board Access | 12/12 | Complete    | 2026-09-25 |
 | 4. Durable Boards and Recovery | 17/17 | Validated with approved deferrals | 2026-09-29 |
-| 5. Real-Time Collaborative Editing | 2/9 | In progress | - |
+| 5. Real-Time Collaborative Editing | 3/9 | In progress | - |
 | 6. Follow Me | 0/TBD | Not started | - |
 | 7. Entity Comments | 0/TBD | Not started | - |
 | 8. Shared Timer | 0/TBD | Not started | - |
@@ -520,7 +520,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 - [config.json](config.json) (fine granularity and enabled research, plan-check, and verification settings).
 - [research/SUMMARY.md](research/SUMMARY.md) (research findings and risks, including the final scope update that supersedes the earlier phase proposal).
 
-*Last updated: 2026-10-02 — Phase 5 planned in nine sequential waves with approved context and UI contract. Phase 4 acceptance and backlog 999.7 remain unchanged.*
+*Last updated: 2026-10-06 — Plans 05-01 through 05-03 have verified automated gates. Current stabilization passes 85 Chromium and 26 focused Firefox/WebKit cases; Phase 5 remains incomplete. Phase 4 acceptance and backlog 999.7 remain unchanged.*
 
 ## Backlog
 
@@ -626,8 +626,8 @@ Plans:
 **Captured context:** User requested backlog capture on 2026-10-05. The latest recorded combined production Chromium regression passed 62 cases and failed this sequential typography case. Focused repetitions had passed after earlier repairs; preserve the combined failure as evidence. Reservation timing is a suspected cause requiring diagnosis.
 **Tracking:** [GitHub issue #1](https://github.com/faocampo/dali/issues/1) (existing typography failure report) and [05-02-EXECUTION.md](phases/05-real-time-collaborative-editing/05-02-EXECUTION.md) (repair attempts, regression evidence and remaining plan coverage).
 **Acceptance:** Reproduce the sequential interaction deterministically, correct the responsible formatting/admission lifecycle, and verify font size 48 and weight 700 locally and in the collaborating browser. Pass the focused reproducer and the complete combined functional regression with no mandatory skips, retries or suppressed errors. Preserve first-writer reservations and authorization checks.
-**Disposition:** Captured for future repair. Retain the failed verification result and incomplete Phase 5 status until their acceptance is explicitly resolved.
+**Disposition:** Reproduced deterministically and repaired during the authorized 2026-10-06 stabilization of 05-02/05-03. On `0fdda02`, all three formatting barriers pass in Chromium, Firefox and WebKit, alongside 85/85 integrated Chromium and 26/26 focused Firefox/WebKit cases. Fresh authorization and no denied-action replay are asserted, including convergence and reopen. See [the resumption report](phases/05-real-time-collaborative-editing/05-RESUMPTION-2026-10-06.md). The earlier failures remain evidence; GitHub issue #1 was not changed. Phase 5 and release acceptance remain incomplete.
 
 Plans:
 
-- [ ] TBD (promote with $gsd-review-backlog when ready)
+Repair delivered within existing Phase 5 execution; no standalone phase plan was invented.

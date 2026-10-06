@@ -1,5 +1,7 @@
 # Plan 05-03 execution checkpoint
 
+Historical checkpoint. The user authorized continuation on 2026-10-06. The coordinate and publication-error repairs and the 83/83 Chromium refresh are recorded in [05-RESUMPTION-2026-10-06.md](05-RESUMPTION-2026-10-06.md); the current plan disposition is in [05-03-SUMMARY.md](05-03-SUMMARY.md). The failed evidence below is retained and the old retry-choice request is no longer an authorization blocker.
+
 Status: tracer committed in `e9a7b82`; UI expansion committed in `ca34104`; combined browser regression passed, but added native coordinate verification is blocked after two repairs. Plan 05-02's current automated gate passed 71/71 production browser cases; typography remains in user-requested backlog 999.8 with historical failure evidence.
 
 ## Verified tracer
