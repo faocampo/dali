@@ -177,10 +177,12 @@ export async function mountEdgelessEditor(
         gfxViewport.setRect(rect.left, rect.top, rect.width, rect.height);
     };
     refreshPointerRect();
-    disposeLiveGesture = installLiveShapeGesture(host, runtime);
-    disposePresence = installPresence(host, runtime);
     const pointerEvents = ['pointerdown','pointermove','pointerup','wheel'] as const;
     pointerEvents.forEach(name => host.addEventListener(name, refreshPointerRect, true));
+    // Admission and presence also convert client coordinates; refresh before
+    // their capture listeners, as well as before the native pointer handlers.
+    disposeLiveGesture = installLiveShapeGesture(host, runtime);
+    disposePresence = installPresence(host, runtime);
     disposePointer = () => {
       pointerEvents.forEach(name => host.removeEventListener(name, refreshPointerRect, true));
       selection.setCursor = setCursor;

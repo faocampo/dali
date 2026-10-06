@@ -224,7 +224,11 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
       message(typeof editor === 'string' ? `${editor} is editing this object. You can edit it when they finish.` : 'Editing access could not be checked. Try again.', ids);
     }).finally(() => { pendingAction = false; });
   };
-  actions.set(host, async (ids, create, operation) => {
+  // Explicit commands may arrive while the previous command is still saving
+  // or releasing. Serialize those new intents, then acquire a fresh lease for
+  // each. A rejected command settles once; it is never placed back in the queue.
+  let actionTail: Promise<void> = Promise.resolve();
+  const runAction: ReservationAction = async (ids, create, operation) => {
     if (releaseWork) await releaseWork;
     if (disposed || host.store.readonly || !live.connected) throw new Error('Editing access is unavailable.');
     if (pending || pendingAction || finishing || token) throw new Error('Finish the current editing action and try again.');
@@ -254,6 +258,12 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
         pendingAction = false;
       }
     }
+  };
+  actions.set(host, (ids, create, operation) => {
+    const targets = [...ids];
+    const work = actionTail.then(() => runAction(targets, create, operation));
+    actionTail = work.then(() => {}, () => {});
+    return work;
   });
   const nativeUndo = host.store.undo; const nativeRedo = host.store.redo;
   let historyPending = false;

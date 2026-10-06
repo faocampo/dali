@@ -51,13 +51,47 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
     await expect(roster).toContainText('You');
     await owner.keyboard.press('Escape');
     await expect(owner.getByRole('button', { name: 'People on this board: 3', exact: true })).toBeFocused();
+    const pointerPacket = editor.waitForRequest(request => request.url().endsWith('/live/presence') && request.postDataJSON()?.presence?.cursor != null);
     await editor.mouse.move(400, 350);
+    const transmittedPoint = (await pointerPacket).postDataJSON().presence.cursor as { x: number; y: number };
     await expect(owner.locator('.participant-cursor').filter({ hasText: 'Synthetic Editor' })).toBeVisible();
     await viewer.mouse.move(420, 360);
     await expect(owner.locator('.participant-cursor').filter({ hasText: 'Synthetic Viewer' })).toHaveCount(0);
     await editor.locator('editor-host').focus(); await editor.keyboard.press('ControlOrMeta+a');
     await expect(owner.locator('.participant-selection')).toHaveCount(2);
     await expect(viewer.locator('.participant-selection')).toHaveCount(2);
+    if (scenario === 'tracer') {
+      // Use the point sent by the actual pointer event. Focusing the native
+      // editor can subsequently scroll its viewport without moving the pointer.
+      const modelPoint = [transmittedPoint.x, transmittedPoint.y];
+      const assertProjection = async () => {
+        await expect.poll(() => owner.locator('affine-edgeless-root').evaluate((element, point) => {
+          const gfx = (element as HTMLElement & { gfx: import('@blocksuite/affine/std/gfx').GfxController }).gfx;
+          const [x, y] = gfx.viewport.toViewCoord(point[0]!, point[1]!);
+          // Native focus may scroll the shell without a resize or pointer
+          // event. Compare against its actual on-screen origin, not cached top.
+          const shell = element.closest('.affine-edgeless-viewport')!.getBoundingClientRect();
+          const cursor = [...document.querySelectorAll('.participant-cursor')].find(node => node.textContent?.includes('Synthetic Editor'))?.getBoundingClientRect();
+          return cursor ? [Math.round(cursor.x - x - shell.left), Math.round(cursor.y - y - shell.top)] : null;
+        }, modelPoint)).toEqual([0, 0]);
+        await expect(owner.locator('.participant-overlays')).toHaveCSS('pointer-events', 'none');
+      };
+      await assertProjection();
+      await owner.getByRole('button', { name: /^Zoom, current/ }).click();
+      await owner.getByRole('menuitemradio', { name: '50%', exact: true }).click();
+      await expect(owner.getByRole('button', { name: 'Zoom, current 50%', exact: true })).toBeVisible();
+      await assertProjection();
+      // Overlay children refresh with presence. Read the box in the same DOM
+      // task instead of retaining a handle that can detach before measurement.
+      const cursorX = () => owner.evaluate(() => [...document.querySelectorAll('.participant-cursor')]
+        .find(node => node.textContent?.includes('Synthetic Editor'))?.getBoundingClientRect().x ?? null);
+      const before = await cursorX(); expect(before).not.toBeNull();
+      await owner.getByRole('button', { name: 'Hand', exact: true }).click();
+      await owner.mouse.move(900, 550); await owner.mouse.down(); await owner.mouse.move(1000, 600, { steps: 8 }); await owner.mouse.up();
+      await expect.poll(cursorX).toBeGreaterThan(before! + 50);
+      await assertProjection();
+      await owner.screenshot({ path: '/tmp/dali-presence-projection.png' });
+    }
     if (scenario === 'tabs') {
       const second = await identities.contexts.editor.newPage(); await second.goto(`/?board=${board.summary.id}`);
       await expect(second.locator('affine-edgeless-root')).toBeVisible();
