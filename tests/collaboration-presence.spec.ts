@@ -9,6 +9,7 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
   const identities = await createIdentityContexts(browser, service.origin);
   let failure: unknown;
   let releaseConnect = () => {};
+  let releasePresence = () => {};
   const extraContexts: import('@playwright/test').BrowserContext[] = [];
   try {
     const accounts = Object.fromEntries(await Promise.all(['owner', 'editor', 'viewer'].map(async role => {
@@ -145,7 +146,12 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
       await owner.keyboard.press('Escape');
     }
     if (scenario === 'failure') {
-      await owner.route('**/live/presence', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{' }));
+      let recovering = false;
+      const publication = new Promise<void>(resolve => { releasePresence = resolve; });
+      await owner.route('**/live/presence', async route => {
+        if (!recovering) { await route.fulfill({ status: 200, contentType: 'application/json', body: '{' }); return; }
+        await publication; await route.continue();
+      });
       await owner.mouse.move(550, 450);
       await owner.getByRole('button', { name: 'People unavailable', exact: true }).click();
       const retry = roster.getByRole('button', { name: 'Retry presence', exact: true });
@@ -155,11 +161,15 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
       await healthyPoll;
       await expect(retry).toBeVisible();
       await retry.focus();
-      await owner.unroute('**/live/presence');
-      // Keyboard activation tests the explicit retry without pointer leave
-      // incidentally publishing a successful presence update first.
+      await expect(retry).toBeFocused();
+      // Keep the actual successful publication behind the complete keyboard
+      // action. An immediate response removes the button during locator.press,
+      // causing Playwright to retry a control that has correctly disappeared.
+      recovering = true;
       await retry.press('Enter');
+      releasePresence();
       await expect(owner.getByRole('button', { name: 'People on this board: 3', exact: true })).toBeVisible();
+      await owner.unroute('**/live/presence');
       await owner.keyboard.press('Escape');
     }
     if (scenario === 'many') {
@@ -191,5 +201,5 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
     await expect(owner.locator('.participant-cursor').filter({ hasText: 'Synthetic Editor' })).toHaveCount(0);
     expect(identities.runtimeErrors).toEqual([]);
   } catch (error) { failure = error; throw error; }
-  finally { releaseConnect(); await Promise.all(extraContexts.map(context => context.close())); try { await identities.close(); } catch (error) { if (!failure) throw error; } finally { await service.close(); } }
+  finally { releaseConnect(); releasePresence(); await Promise.all(extraContexts.map(context => context.close())); try { await identities.close(); } catch (error) { if (!failure) throw error; } finally { await service.close(); } }
 });
