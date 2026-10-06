@@ -60,6 +60,12 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
     await editor.locator('editor-host').focus(); await editor.keyboard.press('ControlOrMeta+a');
     await expect(owner.locator('.participant-selection')).toHaveCount(2);
     await expect(viewer.locator('.participant-selection')).toHaveCount(2);
+    // Read refreshing overlay children atomically; a saved element handle can
+    // detach between lookup and Playwright's separate bounding-box query.
+    const cursorX = () => owner.evaluate(() => {
+      const node = [...document.querySelectorAll('.participant-cursor')].find(node => node.textContent?.includes('Synthetic Editor'));
+      return node ? Math.round(node.getBoundingClientRect().x) : null;
+    });
     if (scenario === 'tracer') {
       // Use the point sent by the actual pointer event. Focusing the native
       // editor can subsequently scroll its viewport without moving the pointer.
@@ -81,10 +87,6 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
       await owner.getByRole('menuitemradio', { name: '50%', exact: true }).click();
       await expect(owner.getByRole('button', { name: 'Zoom, current 50%', exact: true })).toBeVisible();
       await assertProjection();
-      // Overlay children refresh with presence. Read the box in the same DOM
-      // task instead of retaining a handle that can detach before measurement.
-      const cursorX = () => owner.evaluate(() => [...document.querySelectorAll('.participant-cursor')]
-        .find(node => node.textContent?.includes('Synthetic Editor'))?.getBoundingClientRect().x ?? null);
       const before = await cursorX(); expect(before).not.toBeNull();
       await owner.getByRole('button', { name: 'Hand', exact: true }).click();
       await owner.mouse.move(900, 550); await owner.mouse.down(); await owner.mouse.move(1000, 600, { steps: 8 }); await owner.mouse.up();
@@ -97,10 +99,10 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
       await expect(second.locator('affine-edgeless-root')).toBeVisible();
       await second.mouse.move(500, 400);
       const cursor = owner.locator('.participant-cursor').filter({ hasText: 'Synthetic Editor' });
-      await expect.poll(async () => Math.round((await cursor.boundingBox())!.x)).toBe(500);
+      await expect.poll(cursorX).toBe(500);
       await expect(owner.getByRole('button', { name: 'People on this board: 3', exact: true })).toBeVisible();
       await editor.mouse.move(450, 380);
-      await expect.poll(async () => Math.round((await cursor.boundingBox())!.x)).toBe(450);
+      await expect.poll(cursorX).toBe(450);
       await second.close();
       await expect(owner.getByRole('button', { name: 'People on this board: 3', exact: true })).toBeVisible();
       await expect(cursor).toHaveCount(1);
@@ -146,9 +148,17 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
       await owner.route('**/live/presence', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{' }));
       await owner.mouse.move(550, 450);
       await owner.getByRole('button', { name: 'People unavailable', exact: true }).click();
-      await expect(roster.getByRole('button', { name: 'Retry presence', exact: true })).toBeVisible();
+      const retry = roster.getByRole('button', { name: 'Retry presence', exact: true });
+      await expect(retry).toBeVisible();
+      const healthyPoll = owner.waitForResponse(response => response.url().endsWith('/live/poll') && response.ok());
+      await editor.mouse.move(480, 380);
+      await healthyPoll;
+      await expect(retry).toBeVisible();
+      await retry.focus();
       await owner.unroute('**/live/presence');
-      await roster.getByRole('button', { name: 'Retry presence', exact: true }).click();
+      // Keyboard activation tests the explicit retry without pointer leave
+      // incidentally publishing a successful presence update first.
+      await retry.press('Enter');
       await expect(owner.getByRole('button', { name: 'People on this board: 3', exact: true })).toBeVisible();
       await owner.keyboard.press('Escape');
     }

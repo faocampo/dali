@@ -7,14 +7,25 @@ const decode = (value: string) => Uint8Array.from(atob(value), character => char
 export class BoardLiveSource {
   private controller = new AbortController();
   private presenceVersion?: string;
+  private presencePublishFailed = false;
+  private latestParticipants?: PresenceParticipant[];
   private presenceListeners = new Set<() => void>();
   presenceState: { state: 'loading' | 'ready' | 'error'; participants: PresenceParticipant[] } = { state: 'loading', participants: [] };
   subscribePresence = (listener: () => void) => { this.presenceListeners.add(listener); return () => { this.presenceListeners.delete(listener); }; };
   private publishPresence(state: typeof this.presenceState) { this.presenceState = state; this.presenceListeners.forEach(listener => listener()); }
   async updatePresence(data: { cursor: { x: number; y: number } | null; selection: string[] }) {
     if (!this.connected) return;
-    try { await this.request('presence', { connectionId: this.connectionId, presence: data }); }
-    catch { if (!this.controller.signal.aborted) this.publishPresence({ state: 'error', participants: [] }); }
+    try {
+      await this.request('presence', { connectionId: this.connectionId, presence: data });
+      const recovered = this.presencePublishFailed;
+      this.presencePublishFailed = false;
+      if (recovered && this.connected && this.latestParticipants) this.publishPresence({ state: 'ready', participants: this.latestParticipants });
+    } catch {
+      if (!this.controller.signal.aborted) {
+        this.presencePublishFailed = true;
+        this.publishPresence({ state: 'error', participants: [] });
+      }
+    }
   }
   private connectionId?: string;
   private revision = 0;
@@ -59,7 +70,10 @@ export class BoardLiveSource {
     if (!Number.isSafeInteger(snapshot.revision) || snapshot.revision < 0 || snapshot.epoch !== this.options.getRecoveryEpoch?.() || (this.epoch && snapshot.epoch !== this.epoch)) throw new Error('Invalid live snapshot');
     if (snapshot.presence && typeof snapshot.presenceVersion === 'string') {
       this.presenceVersion = snapshot.presenceVersion;
-      this.publishPresence({ state: 'ready', participants: snapshot.presence });
+      this.latestParticipants = snapshot.presence;
+      // Reading the roster does not acknowledge our failed cursor publication.
+      // Keep retry available until a publication actually succeeds.
+      this.publishPresence(this.presencePublishFailed ? { state: 'error', participants: [] } : { state: 'ready', participants: snapshot.presence });
     }
     if (this.epoch && snapshot.revision <= this.revision) return;
     if (snapshot.title !== undefined && (typeof snapshot.title !== 'string' || snapshot.title.length > 4000)) throw new Error('Invalid live title');

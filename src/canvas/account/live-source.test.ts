@@ -8,6 +8,27 @@ function pending(signal?: AbortSignal | null) {
   return new Promise<Response>((_resolve, reject) => signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
 }
 describe('generation-scoped live snapshots', () => {
+  it('retains a failed presence publication across successful polls until publication recovers', async () => {
+    let resolvePoll!: (response: Response) => void;
+    let polls = 0; let failPresence = true;
+    const live = new BoardLiveSource({ ...scope, fetch: vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+      if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'connection', revision: 3, epoch, root: update, content: update });
+      if (String(url).endsWith('/presence')) return failPresence ? new Response('{') : Response.json({ acknowledged: true });
+      if (++polls === 1) return new Promise<Response>(resolve => { resolvePoll = resolve; });
+      return pending(init?.signal);
+    }) });
+    try {
+      await live.start(() => {}, () => {});
+      await live.updatePresence({ cursor: { x: 1, y: 2 }, selection: [] });
+      expect(live.presenceState.state).toBe('error');
+      resolvePoll(Response.json({ revision: 3, epoch, presence: [], presenceVersion: 'roster-1' }));
+      await vi.waitFor(() => expect(polls).toBe(2));
+      expect(live.presenceState.state).toBe('error');
+      failPresence = false;
+      await live.updatePresence({ cursor: { x: 1, y: 2 }, selection: [] });
+      expect(live.presenceState).toEqual({ state: 'ready', participants: [] });
+    } finally { live.dispose(); }
+  });
   it('delivers server titles in revision order and ignores duplicate metadata', async () => {
     const metadata = vi.fn(); let calls = 0;
     const live = new BoardLiveSource({ ...scope, onLiveMetadata: metadata, fetch: vi.fn<typeof fetch>().mockImplementation(async (_url, init) => {
