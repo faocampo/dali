@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import { capturePersonalHistorySessions } from './personal-history';
+import { capturePersonalHistorySessions, discardPersonalHistoryStep, runPersonalHistoryStep } from './personal-history';
 
 afterEach(() => vi.useRealTimers());
 function fixture() {
@@ -49,5 +49,31 @@ it('keeps capture open when a reserved pointer operation enters text editing and
     expect(f.manager.captureTimeout).toBe(500);
     f.capture.dispose(); expect(f.manager.stopCapturing).toBe(f.originalStop);
     f.insert('separate'); expect(f.manager.undoStack).toHaveLength(2);
+  } finally { f.close(); }
+});
+
+it('skips only the conflicting step through native clear and preserves earlier undo/redo lifecycle', () => {
+  const f = fixture();
+  try {
+    f.doc.transact(() => f.props.set('a', 'first'), f.doc.clientID); f.manager.stopCapturing();
+    f.doc.transact(() => f.props.set('b', 'second'), f.doc.clientID);
+    const skipped = f.manager.undoStack.at(-1)!;
+    expect(discardPersonalHistoryStep(f.manager, 'undo', skipped)).toBe(true);
+    expect(f.manager.undoStack).toHaveLength(1); expect(f.props.toJSON()).toEqual({ a: 'first', b: 'second' });
+    runPersonalHistoryStep(f.manager, 'undo', f.manager.undoStack.at(-1)!, () => f.manager.undo());
+    expect(f.props.toJSON()).toEqual({ b: 'second' }); f.manager.redo();
+    expect(f.props.toJSON()).toEqual({ a: 'first', b: 'second' });
+  } finally { f.close(); }
+});
+
+it('does not let native no-effect skipping execute an older unvalidated history entry', () => {
+  const f = fixture();
+  try {
+    f.doc.transact(() => f.props.set('a', 'first'), f.doc.clientID); f.manager.stopCapturing();
+    f.doc.transact(() => f.props.set('b', 'second'), f.doc.clientID);
+    f.doc.transact(() => f.props.set('b', 'remote'), 'remote');
+    runPersonalHistoryStep(f.manager, 'undo', f.manager.undoStack.at(-1)!, () => f.manager.undo());
+    expect(f.props.toJSON()).toEqual({ a: 'first', b: 'remote' }); expect(f.manager.undoStack).toHaveLength(1);
+    expect(discardPersonalHistoryStep(f.manager, 'undo', undefined)).toBe(false);
   } finally { f.close(); }
 });

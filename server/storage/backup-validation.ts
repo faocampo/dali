@@ -4,7 +4,7 @@ import { IMAGE_LIMITS, validateStoredImage, validateImageBytes, validBlobKey } f
 import type { BoardRow } from '../boards/routes.js';
 import { readRecoveryEpoch } from './recovery-state.js';
 
-export const BACKUP_DATABASE_VERSION = 10;
+export const BACKUP_DATABASE_VERSION = 11;
 const tables = ['schema_migrations', 'members', 'sessions', 'login_transactions', 'boards', 'board_grants', 'pending_grants', 'board_documents', 'operations', 'board_thumbnails', 'board_blobs', 'import_staging', 'import_staging_blobs', 'recovery_state'];
 const bounded = (value: unknown, maximum = 4000): value is string => typeof value === 'string' && value.length > 0 && value.length <= maximum;
 function json(value: string): any {
@@ -21,8 +21,8 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
 
     const migrations = (database.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as { version: number }[]).map(row => row.version);
     const databaseVersion = migrations.at(-1)!;
-    if (![8, 9, BACKUP_DATABASE_VERSION].includes(databaseVersion) || JSON.stringify(migrations) !== JSON.stringify(Array.from({ length: databaseVersion }, (_, index) => index + 1))) throw new Error('Unsupported database version');
-    const expectedTables = databaseVersion >= 10 ? [...tables, 'document_receipts'] : tables;
+    if (![8, 9, 10, BACKUP_DATABASE_VERSION].includes(databaseVersion) || JSON.stringify(migrations) !== JSON.stringify(Array.from({ length: databaseVersion }, (_, index) => index + 1))) throw new Error('Unsupported database version');
+    const expectedTables = [...tables, ...(databaseVersion >= 10 ? ['document_receipts'] : []), ...(databaseVersion >= 11 ? ['document_action_properties'] : [])];
     if (JSON.stringify(schema) !== JSON.stringify([...expectedTables].sort())) throw new Error('Unsupported schema');
     if (databaseVersion >= 10) for (const receipt of database.prepare('SELECT * FROM document_receipts').iterate() as Iterable<{ board_id: string; account_id: string; tab_id: string; operation_id: string; doc_id: string; digest: string; previous_revision: number; revision: number }>) {
       if (![receipt.board_id, receipt.account_id, receipt.tab_id, receipt.operation_id, receipt.doc_id].every(value => bounded(value, 256)) || !/^[a-f0-9]{64}$/.test(receipt.digest) || !Number.isSafeInteger(receipt.previous_revision) || receipt.previous_revision < 1 || !Number.isSafeInteger(receipt.revision) || receipt.revision < receipt.previous_revision || receipt.revision > receipt.previous_revision + 1) throw new Error('Invalid document receipt');
@@ -30,6 +30,12 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
       if (!board || ![board.root_doc_id, board.content_doc_id].includes(receipt.doc_id) || receipt.revision > board.revision) throw new Error('Invalid receipt binding');
     }
     const epoch = readRecoveryEpoch(database);
+    if (databaseVersion >= 11) for (const property of database.prepare('SELECT * FROM document_action_properties').iterate() as Iterable<{ board_id: string; account_id: string; tab_id: string; action_id: string; object_id: string; property: string; revision: number }>) {
+      if (![property.board_id, property.account_id, property.tab_id, property.object_id, property.property].every(value => bounded(value, 256)) ||
+        !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(property.action_id) || !Number.isSafeInteger(property.revision) || property.revision < 1) throw new Error('Invalid history provenance');
+      const board = database.prepare('SELECT revision FROM boards WHERE id=?').get(property.board_id) as { revision: number } | undefined;
+      if (!board || property.revision > board.revision || !database.prepare('SELECT 1 FROM members WHERE id=?').get(property.account_id)) throw new Error('Invalid history binding');
+    }
     if ((database.prepare('SELECT count(*) AS n FROM recovery_state').get() as { n: number }).n !== 1) throw new Error('Invalid recovery state');
     const exists = (table: string, id: string) => !!database!.prepare(`SELECT 1 FROM ${table} WHERE id=?`).get(id);
     for (const member of database.prepare('SELECT * FROM members').iterate() as Iterable<{ id: string; issuer: string; subject: string; email: string; canonical_email: string; display_name: string; system_role: string; email_history: string }>) {
@@ -85,7 +91,7 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
     }
     const count = (table: string) => (database!.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n;
     if (count('board_documents') !== documents) throw new Error('Unbound document');
-    return { databaseVersion, epoch, counts: { boards: count('boards'), documents, images: count('board_blobs'), grants: count('board_grants'), pendingGrants: count('pending_grants'), members: count('members'), receipts: count('operations'), stagedImports: count('import_staging'), stagedImages: count('import_staging_blobs'), thumbnails: count('board_thumbnails'), ...(databaseVersion >= 10 ? { documentReceipts: count('document_receipts') } : {}) } };
+    return { databaseVersion, epoch, counts: { boards: count('boards'), documents, images: count('board_blobs'), grants: count('board_grants'), pendingGrants: count('pending_grants'), members: count('members'), receipts: count('operations'), stagedImports: count('import_staging'), stagedImages: count('import_staging_blobs'), thumbnails: count('board_thumbnails'), ...(databaseVersion >= 10 ? { documentReceipts: count('document_receipts') } : {}), ...(databaseVersion >= 11 ? { historyProperties: count('document_action_properties') } : {}) } };
   } catch { throw new Error('Backup database validation failed'); }
   finally { database?.close(); }
 }

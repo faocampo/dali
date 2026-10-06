@@ -2,9 +2,13 @@ import * as Y from 'yjs';
 import { changedNativeObjects, nativeObjectIds, nativeReservationTargets } from '../../../server/boards/change-footprint';
 
 const key = Symbol('dali-history-objects');
+const actionKey = Symbol('dali-history-action');
 type Item = { meta: Map<unknown, unknown> };
+export function historyActionId(item: Item | undefined): string | undefined {
+  const value = item?.meta.get(actionKey); return typeof value === 'string' ? value : undefined;
+}
 /** Record semantic effects alongside native history; remote transactions stay untracked. */
-export function trackHistoryFootprints(doc: Y.Doc, manager: Y.UndoManager): () => void {
+export function trackHistoryFootprints(doc: Y.Doc, manager: Y.UndoManager, actionId?: () => string | undefined): () => void {
   const snapshots = new Map<Y.Transaction, Y.Doc>();
   const before = (transaction: Y.Transaction) => {
     if (!manager.trackedOrigins.has(transaction.origin)) return;
@@ -18,6 +22,10 @@ export function trackHistoryFootprints(doc: Y.Doc, manager: Y.UndoManager): () =
     const ids = snapshot ? changedNativeObjects(snapshot, doc) : null;
     const previous = event.stackItem.meta.get(key) as string[] | null | undefined;
     event.stackItem.meta.set(key, !ids || previous === null ? null : [...new Set([...(previous ?? []), ...ids])].sort());
+    if (actionId) {
+      const action = actionId(); const prior = event.stackItem.meta.get(actionKey);
+      event.stackItem.meta.set(actionKey, !action || (prior !== undefined && prior !== action) ? null : action);
+    }
   };
   const after = (transaction: Y.Transaction) => { snapshots.get(transaction)?.destroy(); snapshots.delete(transaction); };
   doc.on('beforeTransaction', before); doc.on('afterTransaction', after);

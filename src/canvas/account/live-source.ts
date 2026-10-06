@@ -32,6 +32,7 @@ export class BoardLiveSource {
   private reservation?: string;
   private reservedObjects = new Set<string>();
   private createdObjects = new Set<string>();
+  get actionId() { return this.connected ? this.reservation : undefined; }
   get creationScope() { if (!this.connectionId) throw new Error('No live connection'); return `$dali:create:${this.connectionId}`; }
   get creating() { return this.connected && this.reservedObjects.has(this.creationScope); }
   registerCreated(id: string) { if (this.creating) this.createdObjects.add(id); }
@@ -126,6 +127,12 @@ export class BoardLiveSource {
   async release(token: string) {
     if (this.connected) await this.request('release', { connectionId: this.connectionId, token });
     if (this.reservation === token) { this.reservation = undefined; this.reservedObjects.clear(); this.createdObjects.clear(); }
+  }
+  async authorizeHistory(actionId: string): Promise<boolean> {
+    if (!this.connected || !this.reservation) throw new Error('History needs fresh editing access.');
+    const result = await this.request('history', { connectionId: this.connectionId, token: this.reservation, actionId });
+    if (typeof result.eligible !== 'boolean') throw new Error('Invalid history authorization');
+    return result.eligible;
   }
   dispose() {
     if (this.controller.signal.aborted) return;

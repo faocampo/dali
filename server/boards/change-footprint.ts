@@ -161,3 +161,89 @@ export function nativeReservationTargets(doc: Y.Doc, ids: string[], structural =
 }
 
 export function nativeObjectIds(doc: Y.Doc): Set<string> { return new Set(snapshot(doc).objects.keys()); }
+
+export type NativeProperty = { objectId: string; property: string };
+export type NativeChanges = { objectIds: string[]; properties: NativeProperty[] };
+const structuralProperties = new Set(['children', 'sys:children', 'prop:childElementIds', 'source', 'target', 'prop:imageId']);
+
+/** Derive committed paths from native update events, including same-value ABA.
+ * The supplied candidate starts from the authoritative `before` snapshot.
+ * Neither paths nor values supplied separately by a browser grant authority.
+ */
+export function applyNativeUpdate(before: Y.Doc, candidate: Y.Doc, update: Uint8Array): NativeChanges | null {
+  const old = snapshot(before);
+  const effects = new Map<string, Set<string>>(); const rootChildren = new Set<string>();
+  let supported = true; let structural = false;
+  const add = (objectId: string, property: string) => {
+    if (!property || property.length > 256 || (property.startsWith('$dali:') && property !== '$dali:parent')) { supported = false; return; }
+    const properties = effects.get(objectId) ?? new Set<string>();
+    if (property === '*') { properties.clear(); properties.add('*'); }
+    else if (!properties.has('*')) properties.add(property);
+    effects.set(objectId, properties);
+    if (property === '*' || structuralProperties.has(property)) structural = true;
+  };
+  const property = (id: string, key: unknown) => {
+    if (typeof key !== 'string' || key === '*' || key.startsWith('$dali:')) { supported = false; return; }
+    add(id, key);
+  };
+  const native = (id: string, tail: (string | number)[], event: unknown) => {
+    if (tail.length) { property(id, tail[0]); return; }
+    if (!(event instanceof Y.YMapEvent)) { supported = false; return; }
+    for (const key of event.keysChanged) property(id, key);
+  };
+  const blocks = candidate.getMap('blocks'); const meta = candidate.getMap('meta');
+  const observeBlocks = (events: Y.YEvent<Y.AbstractType<unknown>>[]) => {
+    for (const event of events) {
+      const [id, ...tail] = event.path;
+      if (id === undefined) {
+        if (!(event instanceof Y.YMapEvent)) { supported = false; continue; }
+        for (const key of event.keysChanged) {
+          const current = blocks.get(key);
+          const flavour = current instanceof Y.Map ? current.get('sys:flavour') : undefined;
+          if (old.roots[key] || flavour === 'affine:page' || flavour === 'affine:surface') supported = false;
+          else add(key, '*');
+        }
+      } else if (typeof id !== 'string') supported = false;
+      else if (old.roots[id]) {
+        if (tail[0] === 'sys:children') rootChildren.add(id);
+        else if (!tail.length && event instanceof Y.YMapEvent && [...event.keysChanged].every(key => key === 'sys:children')) rootChildren.add(id);
+        else if (tail[0] === 'prop:elements' && tail[1] === 'value') {
+          const elementId = tail[2];
+          if (typeof elementId === 'string') native(elementId, tail.slice(3), event);
+          else if (tail.length === 2 && event instanceof Y.YMapEvent) for (const key of event.keysChanged) add(key, '*');
+          else supported = false;
+        } else supported = false;
+      } else native(id, tail, event);
+    }
+  };
+  const observeMeta = () => { add('$dali:metadata', '*'); };
+  blocks.observeDeep(observeBlocks); meta.observeDeep(observeMeta);
+  try { Y.applyUpdate(candidate, update); }
+  finally { blocks.unobserveDeep(observeBlocks); meta.unobserveDeep(observeMeta); }
+  try {
+    const next = snapshot(candidate); const semantic = changedNativeObjects(before, candidate);
+    if (!supported || !semantic) return null;
+    for (const id of rootChildren) {
+      const previous = old.rootChildren[id] ?? []; const current = next.rootChildren[id] ?? [];
+      const changed = [...new Set([...previous, ...current])].filter(child => previous.includes(child) !== current.includes(child));
+      if (!changed.length) add('$dali:metadata', '*');
+      else for (const child of changed) { add(child, '*'); structural = true; }
+    }
+    const objectIds = new Set(semantic);
+    for (const id of effects.keys()) {
+      objectIds.add(id);
+      if (id === '$dali:metadata') continue;
+      if (!old.objects.has(id) && !next.objects.has(id)) return null;
+      // Same-value writes may have no semantic delta, but still need the
+      // owning note/image/connector dependencies and a valid native object.
+      for (const [doc, state] of [[before, old], [candidate, next]] as const) if (state.objects.has(id)) {
+        const dependencies = nativeReservationTargets(doc, [id]);
+        if (!dependencies) return null;
+        dependencies.forEach(dependency => objectIds.add(dependency));
+      }
+    }
+    if (structural) for (const id of objectIds) add(id, '*');
+    return { objectIds: [...objectIds].sort(), properties: [...effects].sort(([a], [b]) => a.localeCompare(b))
+      .flatMap(([objectId, properties]) => [...properties].sort().map(property => ({ objectId, property }))) };
+  } catch { return null; }
+}

@@ -1,5 +1,35 @@
 import type * as Y from 'yjs';
 
+type HistoryStep = Y.UndoManager['undoStack'][number];
+type HistoryDirection = 'undo' | 'redo';
+
+/** Isolate one authorized item so native no-effect skipping cannot reach an
+ * older entry that has not obtained its own reservation and version check.
+ * Native clear handles retention/GC for discarded entries; native undo/redo
+ * still owns inverse generation and the opposite stack.
+ */
+function isolatedStep(manager: Y.UndoManager, direction: HistoryDirection, item: HistoryStep | undefined, operation: () => void): boolean {
+  const key = direction === 'undo' ? 'undoStack' : 'redoStack';
+  const stack = manager[key];
+  if (!item || stack.at(-1) !== item) return false;
+  const earlier = stack.slice(0, -1);
+  manager[key] = [item];
+  try { operation(); }
+  finally {
+    manager[key] = [...earlier, ...manager[key]];
+    // Publish the restored native stack availability to Store's existing
+    // history observer. No fabricated transaction or shared undo is created.
+    manager.emit('stack-cleared', [{ undoStackCleared: false, redoStackCleared: false }]);
+  }
+  return true;
+}
+export function discardPersonalHistoryStep(manager: Y.UndoManager, direction: HistoryDirection, item: HistoryStep | undefined): boolean {
+  return isolatedStep(manager, direction, item, () => manager.clear(direction === 'undo', direction === 'redo'));
+}
+export function runPersonalHistoryStep(manager: Y.UndoManager, direction: HistoryDirection, item: HistoryStep | undefined, operation: () => void): boolean {
+  return isolatedStep(manager, direction, item, operation);
+}
+
 /** Native history capture follows completed actions, not pauses in input. */
 export function capturePersonalHistorySessions(manager: Y.UndoManager) {
   const timeout = manager.captureTimeout;

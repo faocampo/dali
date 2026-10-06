@@ -1,4 +1,5 @@
 import { CanvasMeasurements } from './CanvasMeasurements';
+import { isPersonalHistoryBusy } from './account/reservations';
 import { ConnectorQuickAdd } from './ConnectorQuickAdd';
 import { Tooltips } from './Tooltips';
 import { installCanvasAffordances } from './canvas-affordances';
@@ -189,7 +190,7 @@ function BoardControls({ host, onOpenLayers }: { host: EditorHost; onOpenLayers:
   useEffect(() => {
     const command = (event: Event) => {
       const action = (event as CustomEvent<string>).detail;
-      if (action === 'history-state') window.dispatchEvent(new CustomEvent('dali:history-state', { detail: { undo: store.history.canUndo && !store.readonly, redo: store.history.canRedo && !store.readonly } }));
+      if (action === 'history-state') window.dispatchEvent(new CustomEvent('dali:history-state', { detail: { undo: store.history.canUndo && !store.readonly && !isPersonalHistoryBusy(host), redo: store.history.canRedo && !store.readonly && !isPersonalHistoryBusy(host) } }));
       if (action === 'import') importRef.current?.click();
       if (action === 'undo' && !store.readonly) store.undo();
       if (action === 'redo' && !store.readonly) store.redo();

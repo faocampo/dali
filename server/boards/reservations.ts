@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 export type LiveConnection = Readonly<{ id: string; boardId: string; accountId: string; tabId: string }>;
 type ConnectionState = { connection: LiveConnection; seen: number };
-type Reservation = { connectionId: string; objects: Set<string> };
+type Reservation = { connectionId: string; objects: Set<string>; historyAction?: string };
 const CONNECTION_TIMEOUT = 30_000;
 const MAX_OBJECTS = 10_000;
 /** Ephemeral fencing state. Durable document receipts remain in SQLite. */
@@ -64,6 +64,18 @@ export class CollaborationBroker {
     const reservation = this.reservations.get(token);
     return reservation?.connectionId === connection.id && objectIds.length > 0 && objectIds.every(id => reservation.objects.has(id));
   }
+  bindHistory(connection: LiveConnection, token: string, actionId: string): boolean {
+    this.sweep();
+    const lease = this.reservations.get(token);
+    if (this.connections.get(connection.id)?.connection !== connection || lease?.connectionId !== connection.id || token === actionId ||
+      (lease.historyAction && lease.historyAction !== actionId)) return false;
+    lease.historyAction = actionId; return true;
+  }
+  historyAction(connection: LiveConnection, token: string): string | undefined {
+    this.sweep();
+    const lease = this.reservations.get(token);
+    return this.connections.get(connection.id)?.connection === connection && lease?.connectionId === connection.id ? lease.historyAction : undefined;
+  }
   /** Add server-derived new IDs; callers must undo this if the durable commit fails. */
   extend(connection: LiveConnection, token: string, ids: string[]): boolean {
     this.sweep();
@@ -100,4 +112,3 @@ export class CollaborationBroker {
     for (const state of this.connections.values()) if (this.now() - state.seen >= CONNECTION_TIMEOUT) this.disconnect(state.connection);
   }
 }
-

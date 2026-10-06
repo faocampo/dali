@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import * as Y from 'yjs';
-import { historyReservationTargets, trackHistoryFootprints } from './history-footprint';
+import { historyActionId, historyReservationTargets, trackHistoryFootprints } from './history-footprint';
 
 function fixture() {
   const doc = new Y.Doc(); const elements = new Y.Map<Y.Map<unknown>>();
@@ -32,4 +32,16 @@ it('reserving an undo that restores a removed object requires creation admission
   f.manager.undo();
   expect(historyReservationTargets(f.doc, f.manager.redoStack.at(-1))).toEqual({ ids: ['a'], create: false });
   f.close();
+});
+
+it('binds one native capture to its fresh action and fails closed if distinct leases merge', () => {
+  const f = fixture(); let action = 'first';
+  const dispose = trackHistoryFootprints(f.doc, f.manager, () => action);
+  f.doc.transact(() => f.elements.get('a')!.set('xywh', '[20,0,100,100]'), f.doc.clientID);
+  expect(historyActionId(f.manager.undoStack.at(-1))).toBe('first');
+  action = 'second'; f.doc.transact(() => f.elements.get('a')!.set('xywh', '[40,0,100,100]'), f.doc.clientID);
+  expect(historyActionId(f.manager.undoStack.at(-1))).toBeUndefined();
+  f.manager.stopCapturing(); f.doc.transact(() => f.elements.get('b')!.set('xywh', '[60,0,100,100]'), f.doc.clientID);
+  expect(historyActionId(f.manager.undoStack.at(-1))).toBe('second');
+  dispose(); f.close();
 });

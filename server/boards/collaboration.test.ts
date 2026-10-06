@@ -140,6 +140,130 @@ describe('authenticated live collaboration', () => {
   });
   afterEach(async () => { await app?.close(); database?.close(); await provider?.close(); });
 
+  async function historyFixture() {
+    const native = new Y.Doc(); Y.applyUpdate(native, bytes());
+    const surface = [...native.getMap<Y.Map<unknown>>('blocks').values()].find(block => block.get('sys:flavour') === 'affine:surface')!;
+    const elements = (surface.get('prop:elements') as Y.Map<unknown>).get('value') as Y.Map<unknown>;
+    elements.set('shape', new Y.Map<unknown>([['type', 'shape'], ['xywh', '[0,0,100,100]'], ['fillColor', 'red']]));
+    expect((await requestDoc('push', Y.encodeStateAsUpdate(native))).statusCode).toBe(200); native.destroy();
+    const connect = async (actor: string, tabId: string) => {
+      const response = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/connect`, headers: headers(actor), payload: { tabId, activate: true } });
+      expect(response.statusCode).toBe(200);
+      const connectionId = response.json().connectionId as string;
+      const call = (action: string, body = {}) => app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/${action}`, headers: headers(actor), payload: { connectionId, ...body } });
+      return { actor, connectionId, call, reserve: async () => {
+        const held = await call('reserve', { objectIds: ['shape'] }); expect(held.statusCode).toBe(200); return held.json().token as string;
+      }, push: async (token: string, change: (shape: Y.Map<unknown>) => void, extra = {}) => {
+        const doc = new Y.Doc(); Y.applyUpdate(doc, bytes()); const vector = Y.encodeStateVector(doc);
+        const surface = [...doc.getMap<Y.Map<unknown>>('blocks').values()].find(block => block.get('sys:flavour') === 'affine:surface')!;
+        const shape = ((surface.get('prop:elements') as Y.Map<unknown>).get('value') as Y.Map<Y.Map<unknown>>).get('shape')!;
+        change(shape); const update = Y.encodeStateAsUpdate(doc, vector); doc.destroy();
+        return requestDoc('push', update, actor, board.contentDocId, board,
+          { 'x-dali-connection': connectionId, 'x-dali-reservation': token, 'x-dali-operation': randomUUID(), ...extra });
+      } };
+    };
+    return { owner: await connect('owner', 'owner-tab'), editor: await connect('editor', 'editor-tab'), connect };
+  }
+
+  it('@05-04-01 admits an independent-property inverse and rejects additional unacknowledged paths', async () => {
+    const { owner, editor } = await historyFixture();
+    const actionId = await owner.reserve();
+    expect((await owner.push(actionId, shape => shape.set('xywh', '[30,0,100,100]'))).statusCode).toBe(200);
+    await owner.call('release', { token: actionId });
+    const remote = await editor.reserve();
+    expect((await editor.push(remote, shape => shape.set('fillColor', 'blue'))).statusCode).toBe(200);
+    await editor.call('release', { token: remote });
+    const token = await owner.reserve();
+    const admitted = await owner.call('history', { token, actionId });
+    expect(admitted.statusCode).toBe(200); expect(admitted.json()).toEqual({ eligible: true });
+    const saved = Buffer.from(bytes());
+    const invalid = await owner.push(token, shape => { shape.set('xywh', '[0,0,100,100]'); shape.set('fillColor', 'red'); });
+    expect(invalid.statusCode).toBe(409); expect(invalid.json().code).toBe('HISTORY_CONFLICT'); expect(bytes()).toEqual(saved);
+    expect((await owner.push(token, shape => shape.set('xywh', '[0,0,100,100]'))).statusCode).toBe(200);
+    const restored = new Y.Doc(); Y.applyUpdate(restored, bytes());
+    expect(JSON.stringify(restored.getMap('blocks').toJSON())).toContain('blue'); restored.destroy();
+    expect(database.prepare('SELECT property FROM document_action_properties WHERE action_id=?').all(actionId)).toEqual([{ property: 'xywh' }]);
+  });
+
+  it.each(['editor', 'same-account-tab'])('@05-04-02 rejects coalesced ABA by %s and prevents borrowing another tab history', async other => {
+    const f = await historyFixture(); const owner = f.owner;
+    const peer = other === 'editor' ? f.editor : await f.connect('owner', 'other-owner-tab');
+    const actionId = await owner.reserve();
+    expect((await owner.push(actionId, shape => shape.set('fillColor', 'green'))).statusCode).toBe(200);
+    await owner.call('release', { token: actionId });
+    const remote = await peer.reserve();
+    expect((await peer.call('history', { token: remote, actionId })).json()).toEqual({ eligible: false });
+    expect((await peer.push(remote, shape => { shape.set('fillColor', 'blue'); shape.set('fillColor', 'green'); })).statusCode).toBe(200);
+    await peer.call('release', { token: remote });
+    const token = await owner.reserve();
+    const saved = Buffer.from(bytes());
+    expect((await owner.call('history', { token, actionId })).json()).toEqual({ eligible: false });
+    expect(bytes()).toEqual(saved);
+  });
+
+  it('@05-04-02 revalidates property provenance inside the commit and rolls back rejected inverses', async () => {
+    const { owner, editor } = await historyFixture();
+    const actionId = await owner.reserve();
+    expect((await owner.push(actionId, shape => shape.set('xywh', '[30,0,100,100]'))).statusCode).toBe(200);
+    await owner.call('release', { token: actionId }); const token = await owner.reserve();
+    expect((await owner.call('history', { token, actionId })).json()).toEqual({ eligible: true });
+    const saved = Buffer.from(bytes());
+    // Fault injection at the actual scheduling barrier proves that admission
+    // is not treated as a durable version authorization.
+    barrier = async () => {
+      database.prepare('UPDATE boards SET revision=revision+1 WHERE id=?').run(board.summary.id);
+      database.prepare('INSERT INTO document_action_properties(board_id,account_id,tab_id,action_id,object_id,property,revision) SELECT ?,?,?,?,?,?,revision FROM boards WHERE id=?')
+        .run(board.summary.id, actors.editor!.accountId, 'editor-tab', randomUUID(), 'shape', 'xywh', board.summary.id);
+    };
+    const denied = await owner.push(token, shape => shape.set('xywh', '[0,0,100,100]'));
+    expect(denied.statusCode).toBe(409); expect(denied.json().code).toBe('HISTORY_CONFLICT'); expect(bytes()).toEqual(saved);
+    expect(database.prepare('SELECT 1 FROM document_action_properties WHERE action_id=?').get(token)).toBeUndefined();
+    expect((await editor.call('reserve', { objectIds: ['shape'] })).statusCode).toBe(409);
+  });
+
+  it('@05-04-02 requires current write access, connection ownership and a fresh held lease for history', async () => {
+    const { owner, editor } = await historyFixture(); const actionId = await owner.reserve();
+    expect((await owner.push(actionId, shape => shape.set('xywh', '[30,0,100,100]'))).statusCode).toBe(200);
+    await owner.call('release', { token: actionId });
+    expect((await owner.call('history', { token: actionId, actionId })).statusCode).toBe(409);
+    const token = await owner.reserve();
+    const forged = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/history`, headers: headers('editor'), payload: { connectionId: owner.connectionId, token, actionId } });
+    expect(forged.statusCode).toBe(409);
+    const viewer = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/history`, headers: headers('viewer'), payload: { connectionId: owner.connectionId, token, actionId } });
+    expect(viewer.statusCode).toBe(403);
+    expect((await owner.call('history', { token, actionId })).json()).toEqual({ eligible: true });
+    const saved = Buffer.from(bytes());
+    barrier = async () => { database.prepare('DELETE FROM sessions WHERE member_id=?').run(actors.owner!.accountId); };
+    const denied = await owner.push(token, shape => shape.set('xywh', '[0,0,100,100]'));
+    expect(denied.statusCode).toBe(401); expect(bytes()).toEqual(saved);
+    expect(database.prepare('SELECT 1 FROM document_action_properties WHERE action_id=?').get(token)).toBeUndefined();
+    expect((await editor.call('history', { token, actionId })).json()).toEqual({ eligible: false });
+  });
+
+  it('@05-04-02 rechecks an Editor downgrade after history admission but before inverse commit', async () => {
+    const { editor } = await historyFixture(); const actionId = await editor.reserve();
+    expect((await editor.push(actionId, shape => shape.set('xywh', '[30,0,100,100]'))).statusCode).toBe(200);
+    await editor.call('release', { token: actionId }); const token = await editor.reserve();
+    expect((await editor.call('history', { token, actionId })).json()).toEqual({ eligible: true });
+    const saved = Buffer.from(bytes());
+    barrier = async () => { database.prepare("UPDATE board_grants SET role='viewer' WHERE board_id=? AND member_id=?").run(board.summary.id, actors.editor!.accountId); };
+    const denied = await editor.push(token, shape => shape.set('xywh', '[0,0,100,100]'));
+    expect(denied.statusCode).toBe(403); expect(bytes()).toEqual(saved);
+    expect(database.prepare('SELECT 1 FROM document_action_properties WHERE action_id=?').get(token)).toBeUndefined();
+    expect((await editor.call('history', { token, actionId })).statusCode).toBe(403);
+  });
+
+  it('@05-04-02 rolls back document, receipt and provenance together if provenance persistence fails', async () => {
+    const { owner } = await historyFixture(); const token = await owner.reserve(); const saved = Buffer.from(bytes());
+    const receipts = database.prepare('SELECT * FROM document_receipts').all();
+    database.exec("CREATE TEMP TRIGGER fail_history BEFORE INSERT ON document_action_properties BEGIN SELECT RAISE(ABORT,'synthetic provenance failure'); END");
+    expect((await owner.push(token, shape => shape.set('xywh', '[30,0,100,100]'))).statusCode).toBe(500);
+    expect(bytes()).toEqual(saved); expect(database.prepare('SELECT * FROM document_receipts').all()).toEqual(receipts);
+    expect(database.prepare('SELECT * FROM document_action_properties').all()).toEqual([]);
+    database.exec('DROP TRIGGER fail_history');
+    expect((await owner.push(token, shape => shape.set('xywh', '[30,0,100,100]'))).statusCode).toBe(200);
+  });
+
   it('@05-03-01 presence routes enforce connection ownership, server identity and current Viewer filtering', async () => {
     const states: Record<string, { connectionId: string; revision: number; epoch: string }> = {};
     for (const actor of ['owner', 'editor', 'viewer']) {

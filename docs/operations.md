@@ -49,7 +49,7 @@ Filesystem failures after writing a marker can leave uncertain directory persist
 |---|---|
 | `schemaVersion` | Manifest schema, currently `1` |
 | `applicationVersion` | Caller-supplied release identifier; does not imply future binary compatibility |
-| `databaseVersion` | Supported complete database migration versions `8` and `9`; version 9 adds schedule metadata |
+| `databaseVersion` | Supported complete database migration versions `8`–`11`; version 9 adds schedule metadata, 10 adds live receipts and 11 adds acknowledged action/property provenance |
 | `epoch` | Captured server recovery epoch; backup itself does not rotate it |
 | `recoveryPointAt` | Snapshot start in Unix milliseconds; conservative age anchor |
 | `completedAt` | Copy validation/digest completion in Unix milliseconds, before final publication flushes |

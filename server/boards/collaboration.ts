@@ -7,6 +7,9 @@ import { requireMutation } from '../auth/session-store.js';
 import { requireBoardCapability } from './routes.js';
 import { documentBytes } from './documents.js';
 import { initializeBackupSchedule, readRecoveryEpoch } from '../storage/recovery-state.js';
+import * as Y from 'yjs';
+import { nativeObjectIds, nativeReservationTargets } from './change-footprint.js';
+import { acknowledgedAction, historyEligible } from './history-provenance.js';
 
 export { CollaborationBroker } from './reservations.js';
 import { CollaborationBroker, type LiveConnection } from './reservations.js';
@@ -61,6 +64,15 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
       previous_revision INTEGER NOT NULL, revision INTEGER NOT NULL,
       PRIMARY KEY(board_id,account_id,tab_id,operation_id)
     );
+  ` }, { version: 11, sql: `
+    CREATE TABLE document_action_properties (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      account_id TEXT NOT NULL REFERENCES members(id), tab_id TEXT NOT NULL,
+      action_id TEXT NOT NULL, object_id TEXT NOT NULL, property TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK(revision>0),
+      PRIMARY KEY(board_id,account_id,tab_id,action_id,object_id,property)
+    );
+    CREATE INDEX document_property_versions ON document_action_properties(board_id,object_id,revision);
   ` }]);
   const broker = new CollaborationBroker(now);
   const presence = new PresenceRegistry(broker, (boardId, accountId) => {
@@ -123,6 +135,33 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
       return reply.code(409).send({ code: 'OBJECT_RESERVED', editor: member?.display_name ?? 'Another participant' });
     }
     return { token };
+  });
+  app.post<{ Params: Params; Body: { connectionId?: unknown; token?: unknown; actionId?: unknown } }>('/api/boards/:boardId/live/history', {
+    bodyLimit: 4096, onRequest: async (request, reply) => { requireMutation(request, reply, config, ['application/json']); },
+  }, async (request, reply) => {
+    const board = requireBoardCapability(database, request, reply, request.params.boardId, 'write', now); if (!board) return;
+    const { connectionId, token, actionId } = request.body ?? {};
+    if (!bounded(connectionId) || !bounded(token) || !bounded(actionId)) return reply.code(400).send({ code: 'INVALID_HISTORY' });
+    const connection = broker.find(connectionId, board.id, request.headers['x-dali-account'] as string);
+    if (!connection) return reply.code(409).send({ code: 'CONNECTION_EXPIRED' });
+    return database.transaction(() => {
+      const properties = acknowledgedAction(database, connection, actionId);
+      if (!historyEligible(database, connection, properties)) return { eligible: false };
+      const doc = new Y.Doc();
+      try {
+        Y.applyUpdate(doc, documentBytes(database, board, board.content_doc_id)!);
+        const existing = nativeObjectIds(doc); const ids = [...new Set(properties.map(item => item.objectId))];
+        const targets = nativeReservationTargets(doc, ids.filter(id => existing.has(id)), true);
+        if (!targets) return { eligible: false };
+        if (ids.includes('$dali:metadata')) targets.push('$dali:metadata');
+        if (ids.some(id => id !== '$dali:metadata' && !existing.has(id))) targets.push(`$dali:create:${connection.id}`);
+        if (!broker.owns(connection, token, [...new Set(targets)])) return reply.code(409).send({ code: 'RESERVATION_REQUIRED' });
+        // A lease already used for a normal action cannot retroactively become
+        // a historical inverse. Bind once; every later push rechecks the guard.
+        if (acknowledgedAction(database, connection, token).length || !broker.bindHistory(connection, token, actionId)) return reply.code(409).send({ code: 'INVALID_HISTORY' });
+        return { eligible: true };
+      } finally { doc.destroy(); }
+    })();
   });
   app.post<{ Params: Params; Body: { connectionId?: unknown; epoch?: unknown; revision?: unknown; presenceVersion?: unknown; waitMs?: unknown } }>('/api/boards/:boardId/live/poll', {
     bodyLimit: 4096, onRequest: async (request, reply) => { requireMutation(request, reply, config, ['application/json']); },

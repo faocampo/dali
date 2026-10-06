@@ -1,4 +1,5 @@
-import { changedNativeObjects, nativeObjectIds } from './change-footprint.js';
+import { applyNativeUpdate, nativeObjectIds, type NativeChanges } from './change-footprint.js';
+import { admitsHistoryInverse, recordNativeAction } from './history-provenance.js';
 import { createHash } from 'node:crypto';
 import type { LiveConnection } from './reservations.js';
 import { type CollaborationBroker } from './collaboration.js';
@@ -102,10 +103,14 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
         }
       }
       const doc = new Y.Doc({ guid: docId }); const before = new Y.Doc({ guid: docId }); let merged: Buffer; let created: string[] = [];
+      let effects: NativeChanges | null = null;
       try {
-        Y.applyUpdate(before, stored); Y.applyUpdate(doc, stored); Y.applyUpdate(doc, request.body); validateDocument(doc, latest, docId);
+        Y.applyUpdate(before, stored); Y.applyUpdate(doc, stored);
+        if (live && docId === latest.content_doc_id) effects = applyNativeUpdate(before, doc, request.body);
+        else Y.applyUpdate(doc, request.body);
+        validateDocument(doc, latest, docId);
         if (live && connection) {
-          const ids = docId === latest.content_doc_id ? changedNativeObjects(before, doc) :
+          const ids = docId === latest.content_doc_id ? effects?.objectIds ?? null :
             Buffer.from(Y.encodeStateAsUpdate(before)).equals(Buffer.from(Y.encodeStateAsUpdate(doc))) ? [] : null;
           if (ids === null) return reply.code(409).send({ code: 'UNSUPPORTED_LIVE_ACTION' });
           const existing = docId === latest.content_doc_id ? nativeObjectIds(before) : new Set<string>();
@@ -113,6 +118,8 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
           const required = ids.filter(id => !created.includes(id));
           if (created.length) required.push(`$dali:create:${connection.id}`);
           if (required.length && (typeof reservation !== 'string' || !collaboration!.owns(connection, reservation, required))) return reply.code(409).send({ code: 'RESERVATION_REQUIRED' });
+          const historyAction = typeof reservation === 'string' ? collaboration!.historyAction(connection, reservation) : undefined;
+          if (historyAction && !admitsHistoryInverse(database, connection, historyAction, effects?.properties ?? [])) return reply.code(409).send({ code: 'HISTORY_CONFLICT' });
         }
         if (docId === latest.content_doc_id) for (const key of referencedImageKeys(doc)) if (!database.prepare('SELECT 1 FROM board_blobs WHERE board_id=? AND blob_key=?').get(boardId, key)) throw new Error('Unbound image');
         merged = Buffer.from(Y.encodeStateAsUpdate(doc));
@@ -133,6 +140,7 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
       }
       if (live && connection) database.prepare('INSERT INTO document_receipts(board_id,account_id,tab_id,operation_id,doc_id,digest,previous_revision,revision) VALUES(?,?,?,?,?,?,?,?)')
         .run(boardId, connection.accountId, connection.tabId, operationId, docId, digest, previousRevision, revision);
+      if (live && connection && typeof reservation === 'string' && effects?.properties.length) recordNativeAction(database, connection, reservation, effects.properties, revision);
       return { acknowledged: true, previousRevision, revision };
     });
     try { return commit(); }

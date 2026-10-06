@@ -58,6 +58,27 @@ beforeEach(async () => {
 });
 afterEach(async () => { await app?.close(); if (database?.open) database.close(); await provider?.close(); if (directory) await rm(directory, { recursive: true, force: true }); });
 
+it('@05-04-02 preserves acknowledged property provenance in a validated backup and rejects corrupt versions', async () => {
+  const opened = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/connect`, headers: headers(), payload: { tabId: 'synthetic-history-tab', activate: true } });
+  expect(opened.statusCode).toBe(200); const connectionId = opened.json().connectionId;
+  const held = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/reserve`, headers: headers(), payload: { connectionId, objectIds: ['synthetic-image'] } });
+  expect(held.statusCode).toBe(200); const actionId = held.json().token;
+  const bytes = (database.prepare('SELECT update_bytes FROM board_documents WHERE doc_id=?').get(board.contentDocId) as { update_bytes: Buffer }).update_bytes;
+  const doc = new Y.Doc(); Y.applyUpdate(doc, bytes); const vector = Y.encodeStateVector(doc);
+  (doc.getMap('blocks').get('synthetic-image') as Y.Map<unknown>).set('prop:xywh', '[20,0,100,100]');
+  const response = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/docs/${board.contentDocId}/push`,
+    headers: { ...headers(), 'content-type': 'application/octet-stream', 'x-dali-connection': connectionId, 'x-dali-reservation': actionId, 'x-dali-operation': randomUUID() },
+    payload: Buffer.from(Y.encodeStateAsUpdate(doc, vector)) }); doc.destroy(); expect(response.statusCode).toBe(200);
+  const result = await publishBackup(options());
+  expect(result.manifest.counts.historyProperties).toBe(1);
+  const path = join(directory, 'provenance-copy.sqlite'); await copyFile(join(destination, result.id, 'database.sqlite'), path);
+  expect(validateBackupDatabase(path).counts.historyProperties).toBe(1);
+  const copy = new Database(path);
+  expect(copy.prepare('SELECT action_id,property,revision FROM document_action_properties').all()).toEqual([{ action_id: actionId, property: 'prop:xywh', revision: response.json().revision }]);
+  copy.prepare('UPDATE document_action_properties SET revision=revision+100').run(); copy.close();
+  expect(() => validateBackupDatabase(path)).toThrow('Backup database validation failed');
+});
+
 it('@04-10-01 online backup during writes publishes a complete independently reopenable copy', async () => {
   let writes = 0; const start = Date.now();
   const result = await publishBackup({ ...options(), progress: () => {
@@ -65,7 +86,7 @@ it('@04-10-01 online backup during writes publishes a complete independently reo
     return 16;
   } });
   expect(writes).toBeGreaterThan(0);
-  expect(result.manifest).toMatchObject({ schemaVersion: 1, databaseVersion: 10, epoch: board.recoveryEpoch, counts: { boards: 1, documents: 2, images: 1, grants: 2, members: 4, receipts: 1 } });
+  expect(result.manifest).toMatchObject({ schemaVersion: 1, databaseVersion: 11, epoch: board.recoveryEpoch, counts: { boards: 1, documents: 2, images: 1, grants: 2, members: 4, receipts: 1 } });
   expect(result.manifest.recoveryPointAt).toBeGreaterThanOrEqual(start); expect(result.manifest.completedAt).toBeGreaterThanOrEqual(result.manifest.recoveryPointAt);
   const target = join(destination, result.id); const bytes = await readFile(join(target, 'database.sqlite'));
   expect(result.manifest.byteLength).toBe(bytes.length); expect(result.manifest.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
@@ -174,11 +195,12 @@ for (const corruption of ['missing-image', 'document', 'image-hash', 'schema', '
   copy.close(); expect(() => validateBackupDatabase(path)).toThrow();
 });
 
-for (const version of [8, 9]) it(`@05-01-01 upgrades a version ${version} backup without changing canvas or access`, async () => {
+for (const version of [8, 9, 10]) it(`@05-04-02 upgrades a version ${version} backup without changing canvas or access`, async () => {
   const path = join(directory, `prior-${version}.sqlite`);
   await database.backup(path);
   const prior = new Database(path);
-  prior.exec('DROP TABLE document_receipts; ALTER TABLE boards DROP COLUMN live_enabled; DELETE FROM schema_migrations WHERE version=10');
+  prior.exec('DROP TABLE document_action_properties; DELETE FROM schema_migrations WHERE version=11');
+  if (version < 10) prior.exec('DROP TABLE document_receipts; ALTER TABLE boards DROP COLUMN live_enabled; DELETE FROM schema_migrations WHERE version=10');
   if (version === 8) prior.exec('ALTER TABLE recovery_state DROP COLUMN backup_point; ALTER TABLE recovery_state DROP COLUMN backup_completed; ALTER TABLE recovery_state DROP COLUMN backup_checked; DELETE FROM schema_migrations WHERE version=9');
   const content = prior.prepare('SELECT update_bytes FROM board_documents WHERE doc_id=?').get(board.contentDocId);
   const grants = prior.prepare('SELECT * FROM board_grants ORDER BY member_id').all();
@@ -190,6 +212,6 @@ for (const version of [8, 9]) it(`@05-01-01 upgrades a version ${version} backup
   const second = await buildApp({ storagePolicy: { kind: 'fixture' }, database: migrated, config });
   expect(migrated.prepare('SELECT update_bytes FROM board_documents WHERE doc_id=?').get(board.contentDocId)).toEqual(content);
   expect(migrated.prepare('SELECT * FROM board_grants ORDER BY member_id').all()).toEqual(grants);
-  expect(validateBackupDatabase(path).databaseVersion).toBe(10);
+  expect(validateBackupDatabase(path).databaseVersion).toBe(11);
   await second.close(); migrated.close();
 });

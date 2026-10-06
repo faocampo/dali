@@ -3,12 +3,14 @@ import { ClipboardEventState, UIEventStateContext, type EditorHost } from '@bloc
 import { EdgelessClipboardController } from '@blocksuite/affine/blocks/root';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import type { CanvasRuntime } from '../runtime';
-import { historyReservationTargets, trackHistoryFootprints } from './history-footprint';
+import { historyActionId, historyReservationTargets, trackHistoryFootprints } from './history-footprint';
 import { installDeferredCreation } from './deferred-creation';
-import { capturePersonalHistorySessions } from './personal-history';
+import { capturePersonalHistorySessions, discardPersonalHistoryStep, runPersonalHistoryStep } from './personal-history';
 
 type ReservationAction = <T>(ids: string[], create: boolean, operation: () => T | Promise<T>) => Promise<T>;
 const actions = new WeakMap<EditorHost, ReservationAction>();
+const busyHistory = new WeakSet<EditorHost>();
+export const isPersonalHistoryBusy = (host: EditorHost) => busyHistory.has(host);
 export async function withCanvasReservation<T>(host: EditorHost, ids: string[], create: boolean, operation: () => T | Promise<T>): Promise<T> {
   const action = actions.get(host);
   return action ? action(ids, create, operation) : operation();
@@ -22,7 +24,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   const history = host.store.history.undoManager;
   const personalCapture = capturePersonalHistorySessions(history);
   let finishPointerCapture: (() => void) | undefined;
-  const disposeHistoryFootprints = trackHistoryFootprints(host.store.spaceDoc, history);
+  const disposeHistoryFootprints = trackHistoryFootprints(host.store.spaceDoc, history, () => live.actionId);
   let token: string | undefined;
   let replay = false; let disposed = false; let finishing = false; let textSession = false;
   let pointerId: number | undefined;
@@ -305,22 +307,33 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     // Keep one explicit next history action while the prior acknowledged
     // mutation releases its lease. Never replay the denied action itself.
     if (historyPending) { queuedHistory ??= direction; return; }
-    historyPending = true;
+    historyPending = true; busyHistory.add(host);
+    window.dispatchEvent(new CustomEvent('dali:board-command', { detail: 'history-state' }));
+    let skipped = false;
     try {
       if (textSession) release();
       if (releaseWork) await releaseWork;
-      const stack = direction === 'undo' ? history.undoStack : history.redoStack;
-      const item = stack.at(-1);
-      if (!item) return;
-      const targets = historyReservationTargets(host.store.spaceDoc, item);
-      if (!targets) { message('This history action is unavailable. Your current canvas is unchanged.'); return; }
-      await withCanvasReservation(host, targets.ids, targets.create, () => {
-        if (stack.at(-1) !== item) throw new Error('History changed. Try the action again.');
-        (direction === 'undo' ? nativeUndo : nativeRedo).call(host.store);
-      });
+      while (!disposed && !host.store.readonly) {
+        const stack = direction === 'undo' ? history.undoStack : history.redoStack;
+        const item = stack.at(-1);
+        if (!item) break;
+        const targets = historyReservationTargets(host.store.spaceDoc, item); const actionId = historyActionId(item);
+        if (!targets || !actionId) { message('This history action is unavailable. Your current canvas is unchanged.'); return; }
+        const performed = await withCanvasReservation(host, targets.ids, targets.create, async () => {
+          const eligible = await live.authorizeHistory(actionId);
+          if ((direction === 'undo' ? history.undoStack : history.redoStack).at(-1) !== item) throw new Error('History changed. Try the action again.');
+          if (!eligible) { discardPersonalHistoryStep(history, direction, item); return false; }
+          runPersonalHistoryStep(history, direction, item, () => (direction === 'undo' ? nativeUndo : nativeRedo).call(host.store));
+          return true;
+        });
+        if (performed) break;
+        skipped = true;
+      }
+      if (skipped) message(direction === 'undo' ? "Skipped an undo step to preserve someone else's changes." : "Skipped a redo step to preserve someone else's changes.");
     } catch { /* The reservation helper presents the failed action. */ }
     finally {
-      historyPending = false;
+      historyPending = false; busyHistory.delete(host);
+      window.dispatchEvent(new CustomEvent('dali:board-command', { detail: 'history-state' }));
       const next = queuedHistory; queuedHistory = undefined;
       if (next && !disposed) void runHistory(next);
     }
@@ -375,7 +388,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   window.addEventListener('pointerup', captureEnd, true); window.addEventListener('pointercancel', captureEnd, true);
   window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end); host.addEventListener('focusout', blur);
   return () => {
-    disposed = true; pending = undefined; status.remove(); selection.unsubscribe(); actions.delete(host);
+    disposed = true; pending = undefined; status.remove(); selection.unsubscribe(); actions.delete(host); busyHistory.delete(host);
     personalCapture.dispose(); disposeHistoryFootprints(); host.store.undo = nativeUndo; host.store.redo = nativeRedo;
     disposeDeferred();
     if (clipboard && nativePaste) clipboard._onPaste = nativePaste;
