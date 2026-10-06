@@ -8,6 +8,42 @@ function pending(signal?: AbortSignal | null) {
   return new Promise<Response>((_resolve, reject) => signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
 }
 describe('generation-scoped live snapshots', () => {
+  it('retires a known interrupted connection without waiting for server heartbeat expiry', async () => {
+    const disconnected = vi.fn();
+    const request = vi.fn<typeof fetch>().mockImplementation(async url => {
+      if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'interrupted-connection', revision: 3, epoch, root: update, content: update });
+      if (String(url).endsWith('/disconnect')) return Response.json({ acknowledged: true });
+      throw new Error('Interrupted poll');
+    });
+    const live = new BoardLiveSource({ ...scope, fetch: request });
+    await live.start(() => {}, disconnected);
+    await vi.waitFor(() => expect(disconnected).toHaveBeenCalledOnce());
+    expect(live.connected).toBe(false);
+    live.dispose(); live.dispose();
+    const cleanup = request.mock.calls.filter(([url]) => String(url).endsWith('/disconnect'));
+    expect(cleanup).toHaveLength(1);
+    expect(JSON.parse(cleanup[0]![1]!.body as string)).toEqual({ connectionId: 'interrupted-connection' });
+  });
+  it('retires the original connection through its independent transport after runtime requests are aborted', async () => {
+    const runtime = new AbortController();
+    const transport = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+      if (init?.signal?.aborted) throw new DOMException('Runtime ended', 'AbortError');
+      if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'retiring-connection', revision: 3, epoch, root: update, content: update });
+      if (String(url).endsWith('/disconnect')) return Response.json({ acknowledged: true });
+      return pending(init?.signal);
+    });
+    const scoped = vi.fn<typeof fetch>((input, init) => transport(input, { ...init,
+      signal: init?.signal ? AbortSignal.any([runtime.signal, init.signal]) : runtime.signal }));
+    const live = new BoardLiveSource({ ...scope, fetch: scoped, disconnectFetch: transport });
+    await live.start(() => {}, () => {});
+    runtime.abort(); live.dispose();
+    const cleanup = transport.mock.calls.filter(([url]) => String(url).endsWith('/disconnect'));
+    expect(cleanup).toHaveLength(1);
+    expect(cleanup[0]![1]!.signal).toBeUndefined();
+    expect(cleanup[0]![1]).toMatchObject({ keepalive: true, headers: { 'X-Dali-Account': scope.accountId, 'X-Dali-Recovery-Epoch': epoch } });
+    expect(JSON.parse(cleanup[0]![1]!.body as string)).toEqual({ connectionId: 'retiring-connection' });
+    expect(scoped.mock.calls.filter(([url]) => String(url).endsWith('/disconnect'))).toHaveLength(0);
+  });
   it('explicitly disconnects the original connection on disposal without reusing its aborted signal', async () => {
     const request = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
       if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'original-connection', revision: 3, epoch, root: update, content: update });

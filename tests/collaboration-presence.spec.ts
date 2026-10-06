@@ -196,7 +196,9 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
       // This is roster projection coverage; concurrent native editing is the later load plan.
       expect(identities.runtimeErrors).toEqual([]); return;
     }
+    const disconnected = service.acknowledgedDisconnects(accounts.editor!);
     await editor.goto('/');
+    await expect.poll(() => service.acknowledgedDisconnects(accounts.editor!)).toBeGreaterThan(disconnected);
     await expect(owner.getByRole('button', { name: 'People on this board: 2', exact: true })).toBeVisible();
     await expect(owner.locator('.participant-cursor').filter({ hasText: 'Synthetic Editor' })).toHaveCount(0);
     expect(identities.runtimeErrors).toEqual([]);

@@ -30,9 +30,16 @@ export async function acceptanceService(baseURL: string) {
     DALI_OIDC_ISSUER: provider.issuer, DALI_OIDC_CLIENT_ID: registration.clientId, DALI_OIDC_CLIENT_SECRET: registration.clientSecret,
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',
   } });
+  const disconnects = new Map<string, number>();
+  app.addHook('onResponse', async (request, reply) => {
+    const account = request.headers['x-dali-account'];
+    if (request.method === 'POST' && request.url.endsWith('/live/disconnect') && reply.statusCode === 200 && typeof account === 'string')
+      disconnects.set(account, (disconnects.get(account) ?? 0) + 1);
+  });
   const closeProxy = proxyApplicationAssets(app, baseURL);
   await app.listen({ host: '127.0.0.1', port: testPort(5499) });
   return { origin, database, provider, setBarrier(value?: () => Promise<void>) { barrier = value; },
+    acknowledgedDisconnects(accountId: string) { return disconnects.get(accountId) ?? 0; },
     async close() { closeProxy(); await app.close(); database.close(); await provider.close(); } };
 }
 

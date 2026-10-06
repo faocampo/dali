@@ -56,6 +56,22 @@ Executed checkpoint evidence:
 
 The first expanded run after executor reconnection exited before test selection because a newly added optional native text read failed TypeScript compilation. The read now handles absent text, both static checks pass, and the fresh 12-case run above passes. This was a real compile failure, not attributed to executor transport. Interrupted runs remain unaccepted. The original checkout now contains independent external work and active services; it was left untouched. `dc575a5` adds optional fixture port isolation so the gates can coexist with that work.
 
+## Final feedback and regression qualification
+
+The full history/reconnection matrix on `fded236` passes **26/26 Firefox/WebKit**, thirteen per engine, zero skips/retries, 7.3 minutes. `33454ae` then keeps status text clear of the actual sibling drawing and history controls. Two responsive native cases pass again in Firefox/WebKit, **2/2**, 53.7 seconds; the reviewed synthetic screenshot confirms the text remains readable at 390px. The first attempt to find the controls inside the inner viewport failed both targeted assertions, so the implementation now measures the actual canvas shell. Both final-source typechecks pass.
+
+The first expanded integrated Chromium gate on `33454ae` completed **97 passed, one failed**, 11.2 minutes. All thirteen history cases, all formatting/pointer barriers, native reservations, images and the cold Viewer-first restore passed. The sole failure was the presence fixture's keyboard retry: the successful publication removed Retry presence during `locator.press`, and Playwright retried the correctly detached button until timeout. The failure snapshot already showed the recovered three-person roster. This is separate from the earlier product defect where incoming polls incorrectly cleared an outgoing-publication error.
+
+`c495c74` holds successful outgoing publication behind completion of the real keyboard action. It retains the healthy-poll/error persistence assertions, requires keyboard focus, then releases the actual service request and verifies recovery. No assertion, runtime-error collection or timeout was weakened. It passes **3/3 deliberately repeated Chromium executions** and **2/2 Firefox/WebKit cases**, zero automatic retries. The second integrated Chromium gate on that revision completed **97 passed, one failed**, 12.2 minutes. Retry now passed, as did every history case and cold Viewer-first hydration. The failure was a real connection-retirement defect: after navigation, the departed editor remained in the roster. It is not a layout assertion failure or a repeat of the retry fixture race.
+
+## Connection retirement correction
+
+The auth pagehide listener cancels scoped runtime requests before the live cleanup listener. The runtime fetch wrapper then attached that already-aborted signal to the keepalive disconnect request. A second path skipped cleanup when an interrupted poll had already marked the known connection disconnected. Two deterministic unit reproductions failed before the correction (2 failed, 9 passed).
+
+Retirement now uses a separate cleanup transport and captures the original connection ID even after interruption. It retains the original account and epoch, does not apply any response, and remains idempotent. Normal runtime requests retain their existing cancellation. The synthetic service records successful disconnect acknowledgments, and native presence tests now require a real acknowledgment before checking roster removal instead of relying on eventual expiry.
+
+Current focused evidence: **16/16 connection/reconnection units**, **265/265 full client tests across 24 files**, and **3/3 deliberately repeated Chromium native layout/exit cases**. The repeated native cases confirm successful server retirement and roster removal. Final cross-browser history/presence and the complete 98-case integrated Chromium rerun remain pending; 05-04 is still open.
+
 ## Remaining approved work
 
 Authoritative provenance, inverse checks, skip feedback, busy/empty controls and basic native conflict/structural cases are implemented in the qualification slice above. 05-04 remains incomplete until the remaining native structural/text/ABA cases, reservation/long-idle interactions, temporary reconnect lifetime, responsive status acceptance and relevant regression gates pass. Reconnect must retain native tab memory while keeping unacknowledged local candidates separate from remote changes; 05-05's divergent recovery obligations remain in force.

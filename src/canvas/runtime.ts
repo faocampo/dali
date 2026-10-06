@@ -412,6 +412,9 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   }).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, descriptor: authorizedDescriptor, isCurrent, recoveryBaseline: baseline,
     // Workspace lifetime is distinct from request cancellation while preservation is pending.
     durableLocalBlobs: true,
+    // pagehide pauses this runtime before the live-source cleanup listener.
+    // Retirement must not inherit the requestAbort signal from the wrapper below.
+    disconnectFetch: options.disconnectFetch ?? options.fetch ?? fetch,
     onDocumentOutcome: documentOutcome,
     canReconnectLive: async () => {
       const clean = () => isCurrent() && !initializing && !storagePaused && scope?.phase === 'active' &&

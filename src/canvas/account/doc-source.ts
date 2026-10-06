@@ -6,6 +6,8 @@ export type SourceOptions = {
   boardId: string; rootDocId: string; contentDocId: string; accountId: string; generation: number;
   live?: BoardLiveSource;
   signal?: AbortSignal; readonly?: boolean; isCurrent?: (generation: number) => boolean; fetch?: typeof fetch;
+  /** Only retires the original connection; independent from canceled runtime requests. */
+  disconnectFetch?: typeof fetch;
   onAuthorizationLost?: (error: SourceAccessError) => void;
   onPendingDocument?: (docId: string, data: Uint8Array) => unknown | Promise<unknown>;
   onDocumentCommit?: (receipt: DocumentRevisionReceipt) => Promise<void>;

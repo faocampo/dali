@@ -2,11 +2,11 @@
 gsd_state_version: "1.0"
 current_plan: 4
 status: in_progress
-stopped_at: Plan 05-04 clean reconnect implemented; cross-browser, narrow feedback and integrated acceptance remain
+stopped_at: Plan 05-04 connection retirement repaired; final cross-browser and integrated gates pending
 last_updated: "2026-10-06T17:42:04+00:00"
 last_activity: 2026-10-06
-last_activity_desc: Clean reconnect and expanded history pass 12 Chromium plus a reservation case; client 263/263
-state_head: eb1d2218e1aaa0e74909792626d1e212687c8350
+last_activity_desc: History cross-browser 26/26; retirement regression reproduced and fixed; client 265/265; final integrated gate pending
+state_head: c495c74d6f7ddb42e1d1d59e3ac9eb81876bfccd
 progress:
   total_phases: 13
   completed_phases: 4
@@ -26,7 +26,7 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
 **Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 04 personal undo and redo
 
-Plan 05-04 remains partial. Acknowledged per-property account/tab provenance, fresh reservations, commit-time inverse checks and migration 11/backup support are committed at `eb1d221`. The clean reconnect checkpoint retains the native tab history behind fresh authority and strict no-pending-work checks, fences delayed responses, and fixes actual viewport control availability. Expanded native history/reconnect passes 12/12 Chromium; the reserved-history/no-replay case passes separately, and full client passes 263/263. Both static checks pass; the unchanged server retains its 375/375 gate. Cross-browser expansion, final narrow feedback separation and integrated regression remain pending. No additional plan is marked complete. See [05-04-EXECUTION.md](phases/05-real-time-collaborative-editing/05-04-EXECUTION.md).
+Plan 05-04 remains partial. Personal history, server provenance and clean reconnect are implemented. The expanded history matrix passed 26/26 Firefox/WebKit, and final responsive feedback passed 2/2. Two integrated Chromium gates each passed 97/98: the first exposed a retry fixture race (corrected and verified 3 Chromium + 2 Firefox/WebKit); the second exposed a real pagehide connection-retirement race. Two failing unit reproductions now pass, with 16/16 connection units, 265/265 full client tests and 3/3 repeated native retirement cases. Full final-source browser qualification remains pending. The unchanged server retains its 375/375 gate. No additional plan is marked complete. See [05-04-EXECUTION.md](phases/05-real-time-collaborative-editing/05-04-EXECUTION.md).
 
 ## Current Position
 

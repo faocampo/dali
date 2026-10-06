@@ -195,19 +195,19 @@ export class BoardLiveSource {
   }
   dispose() {
     if (this.controller.signal.aborted) return;
-    const disconnect = this.connected;
+    const connection = this.connectionId;
     this.controller.abort(); this.publishPresence({ state: 'error', participants: [] }); this.options.signal?.removeEventListener('abort', this.abort);
     this.connectionChanged('disconnected');
     if (typeof window !== 'undefined') window.removeEventListener('pagehide', this.abort);
-    if (disconnect) {
+    if (connection) {
       // Aborting a long poll does not reliably close its server connection in
       // every browser/proxy. Retire only this original session, even on pagehide.
       // This cleanup never applies a response to a newer runtime.
       try {
-        void (this.options.fetch ?? fetch)(`/api/boards/${encodeURIComponent(this.options.boardId)}/live/disconnect`, {
+        void (this.options.disconnectFetch ?? this.options.fetch ?? fetch)(`/api/boards/${encodeURIComponent(this.options.boardId)}/live/disconnect`, {
           method: 'POST', credentials: 'same-origin', cache: 'no-store', keepalive: true,
           headers: { 'Content-Type': 'application/json', 'X-Dali-Account': this.options.accountId, 'X-Dali-Request': '1', ...(this.epoch ? { 'X-Dali-Recovery-Epoch': this.epoch } : {}) },
-          body: JSON.stringify({ connectionId: this.connectionId }),
+          body: JSON.stringify({ connectionId: connection }),
         }).catch(() => {});
       } catch { /* Transport expiry remains the fallback when cleanup cannot be sent. */ }
     }
