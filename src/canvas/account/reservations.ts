@@ -36,20 +36,27 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   let queuedAction = false;
   const pointerTargets = new WeakMap<PointerEvent, EventTarget>();
   const status = document.createElement('div'); status.setAttribute('role', 'status');
-  status.style.cssText = 'position:absolute;bottom:16px;right:16px;z-index:10;background:var(--color-surface,#fff);color:var(--color-text,#211830);padding:8px 12px;border-radius:8px;max-width:min(320px,calc(100% - 32px));overflow-wrap:anywhere;';
+  status.style.cssText = 'position:absolute;bottom:16px;right:16px;z-index:10;background:var(--color-surface,#fff);color:var(--color-text,#211830);padding:8px 12px;border-radius:8px;box-sizing:border-box;overflow-wrap:anywhere;';
   status.hidden = true; host.parentElement?.append(status);
   let statusTarget: string | undefined;
   const positionStatus = () => {
-    if (status.hidden) return;
-    Object.assign(status.style, { top: '', left: '', bottom: '16px', right: '16px' });
+    if (status.hidden || !status.parentElement) return;
+    const parent = status.parentElement.getBoundingClientRect();
+    const shell = host.closest('.affine-edgeless-viewport')?.parentElement ?? status.parentElement;
+    const rail = shell.querySelector('.board-action-panel')?.getBoundingClientRect();
+    const controls = shell.querySelector('.canvas-viewport-controls')?.getBoundingClientRect();
+    const left = Math.max(8, rail?.width ? rail.right - parent.left + 8 : 8);
+    const bottom = Math.min(parent.height - 16, controls?.height ? controls.top - parent.top - 8 : parent.height - 16);
+    Object.assign(status.style, { top: '', left: '', bottom: `${parent.height - bottom}px`, right: '16px',
+      maxWidth: `${Math.max(0, Math.min(320, parent.width - left - 16))}px` });
     const model = statusTarget ? gfx.getElementById(statusTarget) : undefined;
-    if (model && 'elementBound' in model && status.parentElement) {
+    if (model && 'elementBound' in model) {
       const bound = model.elementBound;
       const [x, y] = gfx.viewport.toViewCoord(bound.x, bound.y + bound.h);
-      const parent = status.parentElement.getBoundingClientRect(); const canvas = host.getBoundingClientRect();
+      const canvas = host.getBoundingClientRect();
       Object.assign(status.style, { bottom: 'auto', right: 'auto',
-        left: `${Math.max(8, Math.min(x + canvas.left - parent.left, parent.width - status.offsetWidth - 8))}px`,
-        top: `${Math.max(8, Math.min(y + canvas.top - parent.top + 12, parent.height - status.offsetHeight - 8))}px` });
+        left: `${Math.max(left, Math.min(x + canvas.left - parent.left, parent.width - status.offsetWidth - 8))}px`,
+        top: `${Math.max(8, Math.min(y + canvas.top - parent.top + 12, bottom - status.offsetHeight))}px` });
     }
   };
   const message = (text: string, ids?: string[]) => {

@@ -41,6 +41,15 @@ test('@05-04-02 a denied history action never replays after another editor relea
     await expect.poll(async () => {
       const bounds = await status.boundingBox(); return !!bounds && bounds.x >= 0 && bounds.x + bounds.width <= 390;
     }).toBe(true);
+    const notice = (await status.boundingBox())!;
+    const rail = (await owner.getByRole('toolbar', { name: 'Drawing and board tools', exact: true }).boundingBox())!;
+    const controls = (await owner.getByRole('toolbar', { name: 'Viewport and history', exact: true }).boundingBox())!;
+    expect(notice.x).toBeGreaterThanOrEqual(rail.x + rail.width + 8);
+    expect(notice.y + notice.height).toBeLessThanOrEqual(controls.y - 8);
+    expect(await status.evaluate(element => {
+      const rect = element.getBoundingClientRect();
+      return [rect.left + 4, rect.right - 4].every(x => document.elementFromPoint(x, rect.top + rect.height / 2) === element);
+    })).toBe(true);
     expect(await status.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
     await expect(status).not.toBeFocused();
     await owner.screenshot({ path: test.info().outputPath('history-reservation-narrow.png') });
