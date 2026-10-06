@@ -10,6 +10,7 @@ import { descriptor, requireBoardCapability } from './routes.js';
 import { documentBytes, referencedImageKeys, type BeforeCommit } from './documents.js';
 import { BlobRepository } from './blobs.js';
 import { readRecoveryEpoch } from '../storage/recovery-state.js';
+import { currentRecoveryFingerprint } from './recovery-baseline.js';
 
 type Mutation = { operationId: string; revision: number; title?: string };
 const operationSchema = { type: 'string', minLength: 1, maxLength: 128, pattern: '^[a-zA-Z0-9_-]+$' };
@@ -53,6 +54,11 @@ export function registerActionRoutes(app: FastifyInstance, config: AuthConfig, d
         const board = requireBoardCapability(database, request, reply, boardId, kind, now); if (!board) return;
         const committed = previous(member!.accountId, request.body.operationId);
         if (committed) return committed.kind === kind && committed.board_id === boardId ? JSON.parse(committed.result) : reply.code(409).send({ code: 'OPERATION_CONFLICT' });
+        const recoveryBaseline = request.headers['x-dali-recovery-baseline'];
+        if (recoveryBaseline !== undefined) {
+          if (kind !== 'rename' || (board as typeof board & { live_enabled?: number }).live_enabled !== 1 || typeof recoveryBaseline !== 'string' || !/^[a-f0-9]{64}$/.test(recoveryBaseline)) return reply.code(400).send({ code: 'INVALID_RECOVERY_BASELINE' });
+          if (recoveryBaseline !== currentRecoveryFingerprint(database, board)) return reply.code(409).send({ code: 'RECOVERY_DIVERGED' });
+        }
         if (metadataConnection && !collaboration!.owns(metadataConnection, metadataToken!, ['$dali:metadata'])) return reply.code(409).send({ code: 'RESERVATION_REQUIRED' });
         if (board.revision !== request.body.revision) return reply.code(409).send({ code: 'BOARD_CHANGED' });
         let result: unknown;

@@ -86,7 +86,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   return <div className="djai-app" data-board-id={board!.summary.id}>
     <Header boardTitle={activeScope?.title ?? board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={board?.summary.role !== 'viewer' ? renameBoard : undefined} onOpenRestored={() => { setRestored(true); setRetry(value => value + 1); }} />
     <main className="djai-canvas-area"><BlockSuiteCanvas runtime={runtime!} /></main>
-    {activeScope?.recoveryState === 'choice' && <RecoveryVersionChoice reason={activeScope.recoveryChoice} />}
+    {activeScope?.recoveryChoice && <RecoveryVersionChoice reason={activeScope.recoveryChoice} onRestored={() => setRetry(value => value + 1)} />}
   </div>;
 }
 export default function App() {

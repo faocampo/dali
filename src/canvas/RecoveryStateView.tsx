@@ -2,30 +2,40 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { RecoveryOutcome } from './account/recovery';
 import type { RecoveryDownloadState } from './save-status';
+import { restorePendingRecovery } from './runtime';
 
 /** Pending versions stay immutable when this dialog is dismissed or reopened. */
-export function RecoveryVersionChoice({ reason }: { reason?: 'divergent' | 'unknown' | 'unchanged' }) {
+export function RecoveryVersionChoice({ reason, onRestored }: { reason?: 'divergent' | 'unknown' | 'unchanged' | 'restored'; onRestored?: () => void }) {
   const [open, setOpen] = useState(true);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
   const dialog = useRef<HTMLDialogElement>(null); const heading = useRef<HTMLHeadingElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (open) { dialog.current?.showModal(); heading.current?.focus({ preventScroll: true }); }
   }, [open]);
-  const close = () => { setOpen(false); requestAnimationFrame(() => trigger.current?.focus()); };
-  const title = reason === 'divergent' ? 'This board changed while you were away' : reason === 'unchanged' ? 'Review your pending changes' : 'Choose a version to recover';
+  const close = () => { if (busy) return; setOpen(false); requestAnimationFrame(() => trigger.current?.focus()); };
+  const title = reason === 'divergent' ? 'This board changed while you were away' : reason === 'restored' ? 'Editing access restored' : reason === 'unchanged' ? 'Review your pending changes' : 'Choose a version to recover';
+  const restore = async () => {
+    if (busy) return; setBusy(true); setError('');
+    try { if (await restorePendingRecovery()) onRestored?.(); }
+    catch { setError('Your changes could not be recovered. Your local version is still here.'); }
+    finally { setBusy(false); }
+  };
   return <>
     <section className="board-recovery board-recovery--compact" aria-label="Pending local version">
       <button ref={trigger} className="djai-ghost" aria-haspopup="dialog" onClick={() => setOpen(true)}>Review pending changes</button>
     </section>
-    {open && createPortal(<dialog ref={dialog} className="session-recovery recovery-version-dialog" aria-labelledby="recovery-version-heading" aria-describedby="recovery-version-description"
+    {open && createPortal(<dialog ref={dialog} className="session-recovery recovery-version-dialog" aria-labelledby="recovery-version-heading" aria-describedby="recovery-version-description" aria-busy={busy}
       onCancel={event => { event.preventDefault(); close(); }} onKeyDown={event => event.stopPropagation()}>
       <h2 ref={heading} id="recovery-version-heading" tabIndex={-1}>{title}</h2>
-      <p id="recovery-version-description">Load the latest shared board, or create a private copy with your local changes.</p>
+      <p id="recovery-version-description">{reason === 'restored' ? 'This browser has pending edits. Restore them or load the latest shared board.' : 'Load the latest shared board, or create a private copy with your local changes.'}</p>
       <p>Your local version is kept in this browser. Shared changes are paused until you decide.</p>
+      {busy && <p role="status">Checking access before recovering your changes.</p>}
+      {error && <p role="alert">{error}</p>}
       <div className="board-recovery__actions">
-        <button className="djai-primary" disabled>Create private copy</button>
+        {reason === 'restored' ? <button className="djai-primary" disabled={busy} onClick={() => { void restore(); }}>Restore pending edits</button> : <button className="djai-primary" disabled>Create private copy</button>}
         <button disabled>Load latest changes</button>
-        <button onClick={close}>Decide later</button>
+        <button disabled={busy} onClick={close}>Decide later</button>
       </div>
     </dialog>, document.body)}
   </>;

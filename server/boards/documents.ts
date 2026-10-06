@@ -9,6 +9,7 @@ import type { AuthConfig } from '../app.js';
 import { requireMutation } from '../auth/session-store.js';
 import type { AccountDatabase } from '../storage/database.js';
 import { requireBoardCapability, type BoardRow } from './routes.js';
+import { currentRecoveryFingerprint } from './recovery-baseline.js';
 
 export const DOCUMENT_LIMITS = { update: 8 * 1024 * 1024, vector: 64 * 1024, objects: 10000 };
 export type BeforeCommit = () => Promise<void>;
@@ -101,6 +102,11 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
           if (receipt.doc_id !== docId || receipt.digest !== digest) return reply.code(409).send({ code: 'OPERATION_CONFLICT' });
           return { acknowledged: true, previousRevision: receipt.previous_revision, revision: receipt.revision };
         }
+      }
+      const expectedBaseline = request.headers['x-dali-recovery-baseline'];
+      if (expectedBaseline !== undefined) {
+        if (!live || typeof expectedBaseline !== 'string' || !/^[a-f0-9]{64}$/.test(expectedBaseline)) return reply.code(400).send({ code: 'INVALID_RECOVERY_BASELINE' });
+        if (currentRecoveryFingerprint(database, latest) !== expectedBaseline) return reply.code(409).send({ code: 'RECOVERY_DIVERGED' });
       }
       const doc = new Y.Doc({ guid: docId }); const before = new Y.Doc({ guid: docId }); let merged: Buffer; let created: string[] = [];
       let effects: NativeChanges | null = null;

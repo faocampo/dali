@@ -8,6 +8,8 @@ import { createOidcProvider, IDENTITY_COOKIE } from '../../tests/oidc-provider.j
 
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
+import * as Y from 'yjs';
+import { recoveryFingerprint, type SharedRecoveryBaseline } from '../../src/canvas/account/recovery-baseline.js';
 
 describe('authorized recovery baseline', () => {
   let app: FastifyInstance; let database: AccountDatabase;
@@ -49,7 +51,7 @@ describe('authorized recovery baseline', () => {
   });
   afterEach(async () => { await app?.close(); database?.close(); await provider?.close(); });
 
-  const snapshot = (actor = 'owner', attempts: unknown[] = [], extra = {}) => app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/recovery/baseline`, headers: { ...headers(actor), ...extra }, payload: { attempts } });
+  const snapshot = (actor = 'owner', attempts: unknown[] = [], extra = {}, titleAttempt?: { operationId: string; title: string }) => app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/recovery/baseline`, headers: { ...headers(actor), ...extra }, payload: { attempts, ...(titleAttempt ? { titleAttempt } : {}) } });
   it('@05-05-01 returns a consistent authorized root/content/title without changing content or revision', async () => {
     const before = database.prepare('SELECT title,revision FROM boards WHERE id=?').get(board.summary.id);
     const response = await snapshot(); expect(response.statusCode).toBe(200);
@@ -81,5 +83,80 @@ describe('authorized recovery baseline', () => {
     const attempt = { tabId: 'tab', operationId: randomUUID(), docId: board.contentDocId, digest: '0'.repeat(64) };
     expect((await snapshot('owner', Array.from({ length: 257 }, () => attempt))).statusCode).toBe(400);
     expect((await snapshot('owner', [{ ...attempt, docId: foreign.contentDocId }])).statusCode).toBe(400);
+  });
+  it('@05-05-02 a lost rename acknowledgement proves its original title even after a foreign rename', async () => {
+    const attempt = { operationId: randomUUID(), title: 'Own acknowledged name' };
+    const rename = async (actor: string, title: string, operationId = randomUUID()) => {
+      const current = database.prepare('SELECT revision FROM boards WHERE id=?').get(board.summary.id) as { revision: number };
+      const response = await app.inject({ method: 'PATCH', url: `/api/boards/${board.summary.id}`, headers: headers(actor), payload: { operationId, revision: current.revision, title } });
+      expect(response.statusCode).toBe(200); return response.json();
+    };
+    const own = await rename('owner', attempt.title, attempt.operationId);
+    await rename('editor', 'Later foreign name');
+    const response = await snapshot('owner', [], {}, attempt); expect(response.statusCode).toBe(200);
+    expect(response.json().title).toBe('Later foreign name');
+    expect(response.json().titleReceipt).toEqual({ ...attempt, revision: own.revision });
+    expect((await snapshot('editor', [], {}, attempt)).json().titleReceipt).toBeUndefined();
+    expect((await snapshot('owner', [], {}, { ...attempt, title: 'Different request' })).json().titleReceipt).toBeUndefined();
+    expect((await snapshot('owner', [], {}, { ...attempt, operationId: randomUUID() })).json().titleReceipt).toBeUndefined();
+  });
+  it('@05-05-02 a recovery rename loses to a disjoint document commit and cannot change the title', async () => {
+    const seed = new Y.Doc(); Y.applyUpdate(seed, bytes());
+    const surface = [...seed.getMap<Y.Map<unknown>>('blocks').values()].find(v => v.get('sys:flavour') === 'affine:surface')!;
+    const shape = new Y.Map(); shape.set('type', 'shape'); shape.set('xywh', '[0,0,100,100]');
+    ((surface.get('prop:elements') as Y.Map<unknown>).get('value') as Y.Map<Y.Map<unknown>>).set('remote', shape);
+    database.prepare('UPDATE board_documents SET update_bytes=? WHERE board_id=? AND doc_id=?').run(Buffer.from(Y.encodeStateAsUpdate(seed)), board.summary.id, board.contentDocId); seed.destroy();
+    database.prepare('UPDATE boards SET live_enabled=1 WHERE id=?').run(board.summary.id);
+    const connection = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/connect`, headers: headers('editor'), payload: { tabId: 'remote-tab' } }); expect(connection.statusCode).toBe(200);
+    const connectionId = connection.json().connectionId;
+    const reservation = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/reserve`, headers: headers('editor'), payload: { connectionId, objectIds: ['remote'] } }); expect(reservation.statusCode).toBe(200);
+    const wire = (await snapshot()).json();
+    const baseline = { ...wire, root: { ...wire.root, data: new Uint8Array(Buffer.from(wire.root.data, 'base64')) }, content: { ...wire.content, data: new Uint8Array(Buffer.from(wire.content.data, 'base64')) } } as SharedRecoveryBaseline;
+    let entered!: () => void; let release!: () => void;
+    const waiting = new Promise<void>(resolve => { entered = resolve; }); const held = new Promise<void>(resolve => { release = resolve; });
+    barrier = async () => { entered(); await held; };
+    const operationId = randomUUID();
+    const pending = app.inject({ method: 'PATCH', url: `/api/boards/${board.summary.id}`, headers: { ...headers(), 'x-dali-recovery-baseline': await recoveryFingerprint(baseline) }, payload: { operationId, revision: wire.revision, title: 'Uncommitted local name' } });
+    await waiting; barrier = async () => {};
+    const doc = new Y.Doc(); Y.applyUpdate(doc, bytes());
+    const remote = [...doc.getMap<Y.Map<unknown>>('blocks').values()].find(v => v.get('sys:flavour') === 'affine:surface')!;
+    ((remote.get('prop:elements') as Y.Map<unknown>).get('value') as Y.Map<Y.Map<unknown>>).get('remote')!.set('xywh', '[50,0,100,100]');
+    const changed = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/docs/${board.contentDocId}/push`, headers: { ...headers('editor'), 'content-type': 'application/octet-stream', 'x-dali-connection': connectionId, 'x-dali-reservation': reservation.json().token, 'x-dali-operation': randomUUID() }, payload: Buffer.from(Y.encodeStateAsUpdate(doc)) }); doc.destroy(); expect(changed.statusCode).toBe(200);
+    release(); const response = await pending;
+    expect(response.statusCode).toBe(409); expect(response.json().code).toBe('RECOVERY_DIVERGED');
+    expect(database.prepare('SELECT title FROM boards WHERE id=?').get(board.summary.id)).toEqual({ title: 'Owner canary' });
+    expect(database.prepare('SELECT 1 FROM operations WHERE operation_id=?').get(operationId)).toBeUndefined();
+  });
+  it('@05-05-02 a remote write between comparison and replay wins atomically without merging local bytes', async () => {
+    const seed = new Y.Doc(); Y.applyUpdate(seed, bytes());
+    const surface = [...seed.getMap<Y.Map<unknown>>('blocks').values()].find(v => v.get('sys:flavour') === 'affine:surface')!;
+    const elements = (surface.get('prop:elements') as Y.Map<unknown>).get('value') as Y.Map<Y.Map<unknown>>;
+    for (const id of ['local', 'remote']) { const shape = new Y.Map(); shape.set('type', 'shape'); shape.set('xywh', '[0,0,100,100]'); elements.set(id, shape); }
+    database.prepare('UPDATE board_documents SET update_bytes=? WHERE board_id=? AND doc_id=?').run(Buffer.from(Y.encodeStateAsUpdate(seed)), board.summary.id, board.contentDocId); seed.destroy();
+    const wire = (await snapshot()).json();
+    const baseline = { ...wire, root: { ...wire.root, data: new Uint8Array(Buffer.from(wire.root.data, 'base64')) }, content: { ...wire.content, data: new Uint8Array(Buffer.from(wire.content.data, 'base64')) } } as SharedRecoveryBaseline;
+    const fingerprint = await recoveryFingerprint(baseline);
+    const connect = async (actor: string, object: string) => {
+      const opened = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/connect`, headers: headers(actor), payload: { tabId: actor + '-recovery-tab', activate: true } }); expect(opened.statusCode).toBe(200);
+      const connectionId = opened.json().connectionId;
+      const held = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/reserve`, headers: headers(actor), payload: { connectionId, objectIds: [object] } }); expect(held.statusCode).toBe(200);
+      return { 'x-dali-connection': connectionId, 'x-dali-reservation': held.json().token, 'x-dali-operation': randomUUID() };
+    };
+    const owner = await connect('owner', 'local'); const editor = await connect('editor', 'remote');
+    const update = (id: string) => {
+      const doc = new Y.Doc(); Y.applyUpdate(doc, bytes()); const vector = Y.encodeStateVector(doc);
+      const block = [...doc.getMap<Y.Map<unknown>>('blocks').values()].find(v => v.get('sys:flavour') === 'affine:surface')!;
+      ((block.get('prop:elements') as Y.Map<unknown>).get('value') as Y.Map<Y.Map<unknown>>).get(id)!.set('xywh', '[40,0,100,100]');
+      const result = Buffer.from(Y.encodeStateAsUpdate(doc, vector)); doc.destroy(); return result;
+    };
+    const local = update('local'); let entered!: () => void; let release!: () => void;
+    const waiting = new Promise<void>(resolve => { entered = resolve; }); const held = new Promise<void>(resolve => { release = resolve; });
+    barrier = async () => { entered(); await held; };
+    const pending = app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/docs/${board.contentDocId}/push`, headers: { ...headers(), ...owner, 'content-type': 'application/octet-stream', 'x-dali-recovery-baseline': fingerprint }, payload: local });
+    await waiting; barrier = async () => {};
+    const remote = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/docs/${board.contentDocId}/push`, headers: { ...headers('editor'), ...editor, 'content-type': 'application/octet-stream' }, payload: update('remote') }); expect(remote.statusCode).toBe(200);
+    const committed = Buffer.from(bytes()); release(); const response = await pending;
+    expect(response.statusCode).toBe(409); expect(response.json().code).toBe('RECOVERY_DIVERGED'); expect(bytes()).toEqual(committed);
+    expect(database.prepare('SELECT 1 FROM document_receipts WHERE operation_id=?').get(owner['x-dali-operation'])).toBeUndefined();
   });
 });

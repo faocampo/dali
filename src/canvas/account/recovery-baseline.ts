@@ -6,8 +6,16 @@ export type SharedRecoveryBaseline = { version: 1; epoch: string; root: Recovery
   title: string; revision: number; titleRevision: number };
 export type RecoveryAttempt = { tabId: string; operationId: string; digest: string };
 export type RecoveryReceipt = RecoveryAttempt & { docId: string; previousRevision: number; revision: number };
+export type RecoveryTitleAttempt = { operationId: string; title: string };
+export type RecoveryTitleReceipt = RecoveryTitleAttempt & { revision: number };
 export type AttemptedUpdate = { id: string; resource: string; data: Uint8Array | Blob; coveredIds?: string[]; attempt?: RecoveryAttempt };
 const bounded = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 256;
+export function validRecoveryTitleAttempt(value: unknown): value is RecoveryTitleAttempt {
+  const attempt = value as RecoveryTitleAttempt | undefined;
+  return !!attempt && typeof attempt.operationId === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(attempt.operationId) &&
+    typeof attempt.title === 'string' && !!attempt.title.trim() && attempt.title.length <= 4000 &&
+    [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(attempt.title)].length <= 200;
+}
 export function validRecoveryAttempt(value: unknown): value is RecoveryAttempt {
   const a = value as RecoveryAttempt | undefined;
   return !!a && bounded(a.tabId) && typeof a.operationId === 'string' && /^[a-zA-Z0-9-]{1,128}$/.test(a.operationId) && typeof a.digest === 'string' && /^[a-f0-9]{64}$/.test(a.digest);
@@ -50,7 +58,7 @@ export async function recoveryDigest(bytes: Uint8Array) {
 }
 export async function recoveryFingerprint(baseline: SharedRecoveryBaseline) { return recoveryDigest(new TextEncoder().encode(recoveryFingerprintInput(baseline))); }
 /** Reconcile exact uncertain submissions in an isolated copy, never the candidate. */
-export async function reconcileRecoveryReceipts(baseline: SharedRecoveryBaseline, rows: readonly AttemptedUpdate[], receipts: readonly RecoveryReceipt[]) {
+export async function reconcileRecoveryReceipts(baseline: SharedRecoveryBaseline, rows: readonly AttemptedUpdate[], receipts: readonly RecoveryReceipt[], title?: RecoveryTitleAttempt, titleReceipt?: RecoveryTitleReceipt) {
   let next = advanceSharedBaseline(undefined, baseline); const acknowledged = new Set<string>();
   for (const row of rows) {
     if (!validRecoveryAttempt(row.attempt) || !(row.data instanceof Uint8Array)) continue;
@@ -61,7 +69,12 @@ export async function reconcileRecoveryReceipts(baseline: SharedRecoveryBaseline
     next = { ...next, revision: Math.max(next.revision, receipt.revision), [key]: { docId: row.resource, data: canonicalRecoveryUpdate([next[key].data, row.data]) } };
     acknowledged.add(row.id); for (const id of row.coveredIds ?? []) acknowledged.add(id);
   }
-  return { baseline: next, acknowledgedIds: [...acknowledged] };
+  let acknowledgedTitle: RecoveryTitleReceipt | undefined;
+  if (validRecoveryTitleAttempt(title) && validRecoveryTitleAttempt(titleReceipt) && titleReceipt.operationId === title.operationId && titleReceipt.title === title.title && Number.isSafeInteger(titleReceipt.revision) && titleReceipt.revision > 0) {
+    acknowledgedTitle = titleReceipt;
+    if (titleReceipt.revision >= next.titleRevision) next = { ...next, title: titleReceipt.title, titleRevision: titleReceipt.revision, revision: Math.max(next.revision, titleReceipt.revision) };
+  }
+  return { baseline: next, acknowledgedIds: [...acknowledged], acknowledgedTitle };
 }
 export function recoveryVersionsDiffer(expected: SharedRecoveryBaseline | undefined, current: SharedRecoveryBaseline) {
   return !expected || expected.epoch !== current.epoch || recoveryFingerprintInput(expected) !== recoveryFingerprintInput(current);

@@ -26,3 +26,22 @@ Candidate reconstruction selects one tab and preserves all other rows. A quarant
 This checkpoint does not complete 05-05. Unchanged-baseline replay with fresh affected-object reservations and a transactional whole-canvas precondition, active dirty reconnect, title receipt/partition handling, restored-write confirmation, concurrent tabs, storage/epoch races and outage-editing integration remain to be implemented and verified in the second task. The current conservative decision also pauses unchanged candidates. Private-copy and latest/download completion belong to 05-06; their decision actions are currently disabled. No shared overwrite exists.
 
 The full phase still requires active-access transitions, collaborative mind maps, twenty distinct simultaneous native editors and human acceptance. No release readiness, publication, merge or shared deployment is claimed.
+
+## Task 05-05-02 continuation — title recovery
+
+The original and isolated histories are reconciled without mixing their incompatible migration-11 databases; see [reconciliation](05-RECONCILIATION-2026-10-06.md). The delivered preview remains at `c072cb9`. Its separate full-server investigation passed 375/375 without changing code or timeouts; [timing evidence](05-SERVER-TIMING-2026-10-06.md) preserves the earlier two timeout failures. Those checks are not evidence for the new recovery implementation.
+
+The continuation implements unchanged-canvas recovery with fresh leases, exact durable submission identities and a transactional canvas fingerprint on document, image and rename commits. The selected tab's candidate remains isolated; restored write permission requires an explicit choice tied to the permission-loss marker version. Collaborative title intents are partitioned by tab, while legacy rows remain preserved and conservative.
+
+Title recovery initially failed two server cases (missing original rename receipt and missing transactional divergence response), one baseline unit case and the native `unchanged-title` case, which never reached Saved. Exact rename receipts now come from the original committed operation, scoped to the current member, board and recovery epoch. A later foreign rename stays divergent. The client reconciles this proof before deciding whether to replay; it removes only the matching title intent and advances its checkpoint in one strict IndexedDB transaction. Newer local intents, another tab's intent and the previous baseline survive storage failure.
+
+Verified title checkpoint:
+
+- Server title/baseline cases: 7/7 after the recorded red reproduction.
+- Client outbox, title and baseline suites: 52/52 across three files.
+- Both TypeScript checks pass.
+- Native Chromium title cases: 3/3, 53.8 seconds, zero skips/retries. They verify unchanged replay, lost acknowledgement without a second rename, foreign divergence without a write, convergence and reopening.
+
+Integrated continuation checkpoint: **14/14 Chromium**, 2.5 minutes, covering all nine current recovery cases, both clean-history reconnect cases and all three consecutive-formatting races. Full client: **280/280**, 26 files, 15.23 seconds. Full serialized server: **382/382**, 19 files, 154.74 seconds, executed after client and browser gates had finished. No skips/retries or unexpected browser errors. Firefox/WebKit have not been rerun for this increment.
+
+Task 05-05-02 remains incomplete. Active pending reconnect with retained personal history, partial-action provenance, native disconnected editing, concurrent candidates and remaining storage/access/epoch races require additional evidence before this plan can close. Private-copy/latest choices remain plan 05-06; the preview and published branch are unchanged.

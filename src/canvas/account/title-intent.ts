@@ -1,19 +1,19 @@
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
 import type { RecoveryAuthority } from './recovery';
-export type TitleIntent = { schemaVersion: 1; accountId: string; boardId: string; epoch: string; operationId: string; baseRevision: number; title: string };
-export type TitleStore = { read(): Promise<TitleIntent | undefined>; write(value: TitleIntent): Promise<void>; acknowledge(id: string): Promise<void>; advance?(id: string, previousRevision: number, revision: number): Promise<TitleIntent | undefined> };
+export type TitleIntent = { schemaVersion: 1; accountId: string; boardId: string; epoch: string; operationId: string; baseRevision: number; title: string; tabId?: string };
+export type TitleStore = { tabId?: string; read(): Promise<TitleIntent | undefined>; write(value: TitleIntent): Promise<void>; acknowledge(id: string): Promise<void>; advance?(id: string, previousRevision: number, revision: number): Promise<TitleIntent | undefined> };
 export function validTitleIntent(value: TitleIntent): boolean {
-  return value?.schemaVersion === 1 && [value.accountId, value.boardId, value.epoch, value.operationId].every(part => typeof part === 'string' && part.length > 0 && part.length <= 256) && Number.isSafeInteger(value.baseRevision) && value.baseRevision > 0 && typeof value.title === 'string' && !!value.title.trim() && [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(value.title)].length <= 200;
+  return value?.schemaVersion === 1 && (value.tabId === undefined || typeof value.tabId === 'string' && value.tabId.length > 0 && value.tabId.length <= 256) && [value.accountId, value.boardId, value.epoch, value.operationId].every(part => typeof part === 'string' && part.length > 0 && part.length <= 256) && Number.isSafeInteger(value.baseRevision) && value.baseRevision > 0 && typeof value.title === 'string' && !!value.title.trim() && [...new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(value.title)].length <= 200;
 }
 export async function captureTitleIntent(store: TitleStore, descriptor: BoardDescriptor, title: string, canWrite: boolean): Promise<TitleIntent> {
   if (!canWrite) throw new Error('Editing is paused. Retry saving before renaming.');
   const previous = await store.read();
   if (previous?.title === title) return previous;
-  const value: TitleIntent = { schemaVersion: 1, accountId: descriptor.summary.accountId, boardId: descriptor.summary.id, epoch: descriptor.recoveryEpoch, operationId: crypto.randomUUID(), baseRevision: descriptor.revision, title };
+  const value: TitleIntent = { schemaVersion: 1, accountId: descriptor.summary.accountId, boardId: descriptor.summary.id, epoch: descriptor.recoveryEpoch, operationId: crypto.randomUUID(), baseRevision: descriptor.revision, title, ...(store.tabId ? { tabId: store.tabId } : {}) };
   if (!validTitleIntent(value)) throw new Error('Use a board name of 200 characters or fewer.');
   await store.write(value); return value;
 }
-export async function replayTitleIntent(store: TitleStore, authority: RecoveryAuthority, request: (path: string, init?: RequestInit) => Promise<unknown>): Promise<BoardDescriptor | undefined> {
+export async function replayTitleIntent(store: TitleStore, authority: RecoveryAuthority, request: (path: string, init?: RequestInit) => Promise<unknown>, confirm?: (intent: TitleIntent, result: BoardDescriptor) => Promise<void>): Promise<BoardDescriptor | undefined> {
   const intent = await store.read(); if (!intent) return;
   const fresh = authority.descriptor;
   if (!validTitleIntent(intent)) throw Object.assign(new Error('Invalid title recovery'), { code: 'CORRUPT' });
@@ -27,6 +27,7 @@ export async function replayTitleIntent(store: TitleStore, authority: RecoveryAu
     result = await request('/api/boards/' + encodeURIComponent(intent.boardId), { method: 'PATCH', body: JSON.stringify({ operationId: intent.operationId, revision: intent.baseRevision, title: intent.title }) }) as BoardDescriptor;
   }
   if (!result || result.summary?.id !== intent.boardId || result.summary.accountId !== intent.accountId || result.summary.title !== intent.title || result.recoveryEpoch !== intent.epoch || !Number.isSafeInteger(result.revision) || result.revision <= intent.baseRevision) throw new Error('The saved name could not be confirmed.');
+  await confirm?.(intent, result);
   await store.acknowledge(intent.operationId);
   return result;
 }
@@ -76,6 +77,7 @@ export function bufferedTitleStore(durable: TitleStore, onFailure: (error: unkno
     return advanced;
   }
   const store: TitleStore & { preserve(): Promise<void> } = {
+    ...(durable.tabId ? { tabId: durable.tabId } : {}),
     read: async () => retained ?? durable.read(),
     write: value => {
       onWrite(value);

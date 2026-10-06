@@ -51,3 +51,20 @@ it('@05-05-01 incomplete or mismatched baseline metadata cannot authorize replay
   expect(() => advanceSharedBaseline(base, { ...base, epoch: '22222222-2222-4222-8222-222222222222' })).toThrow();
   expect(() => canonicalRecoveryUpdate([change(base, 'a', 5).update])).toThrow();
 });
+
+it('@05-05-02 lost title acknowledgements reconcile only the exact own title and cannot hide later foreign renames', async () => {
+  const base = fixture();
+  const intent = { operationId: 'own-rename', title: 'Own name' };
+  const receipt = { ...intent, revision: 2 };
+  const own = { ...base, title: intent.title, titleRevision: 2, revision: 2 };
+  const result = await reconcileRecoveryReceipts(base, [], [], intent, receipt);
+  expect(result.acknowledgedTitle).toEqual(receipt); expect(recoveryVersionsDiffer(result.baseline, own)).toBe(false);
+  expect(recoveryVersionsDiffer(result.baseline, { ...own, title: 'Foreign later name', revision: 3, titleRevision: 3 })).toBe(true);
+  for (const altered of [{ ...receipt, operationId: 'different' }, { ...receipt, title: 'Different' }, { ...receipt, revision: 0 }]) {
+    const ignored = await reconcileRecoveryReceipts(base, [], [], intent, altered);
+    expect(ignored.acknowledgedTitle).toBeUndefined(); expect(ignored.baseline.title).toBe(base.title);
+  }
+  const observed = { ...base, title: 'Already observed foreign name', revision: 3, titleRevision: 3 };
+  expect((await reconcileRecoveryReceipts(observed, [], [], intent, receipt)).baseline.title).toBe(observed.title);
+  expect(base.title).toBe('Synthetic board');
+});

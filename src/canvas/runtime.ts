@@ -10,16 +10,19 @@ import { BoardDocSource, RecoveryEpochError, SourceAccessError } from './account
 import { acknowledgedUpdateCovered } from './account/acknowledged-update';
 import { interruptSession, revalidateSession } from '../auth/session';
 import { attachLocalCapture } from './account/local-capture';
-import { titleIntentStore, inspectPendingScopes } from './account/outbox';
-import { captureTitleIntent, replayTitleIntent, advanceLiveTitleIntent, validDocumentRevisionReceipt, type DocumentRevisionReceipt, bufferedTitleStore } from './account/title-intent';
+import { titleIntentStore, inspectPendingScopes, pendingTitleIntents, acknowledgeRecoveredTitle, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission } from './account/outbox';
+import { captureTitleIntent, replayTitleIntent, advanceLiveTitleIntent, validDocumentRevisionReceipt, validTitleIntent, type DocumentRevisionReceipt, bufferedTitleStore } from './account/title-intent';
 import { reconcileRecoveryReceipts, recoveryVersionsDiffer, validSharedRecoveryBaseline, type RecoveryReceipt, type SharedRecoveryBaseline } from './account/recovery-baseline';
+import { replayLiveCandidate } from './account/live-recovery';
 
 let captureTitle: ((title: string) => Promise<void>) | undefined;
 let preserveTitle: (() => Promise<void>) | undefined;
+let confirmRestoredRecovery: (() => Promise<boolean>) | undefined;
+export const restorePendingRecovery = () => confirmRestoredRecovery?.() ?? Promise.resolve(false);
 export async function renameActiveBoard(title: string) { if (!captureTitle) throw new Error('Board access is unavailable'); await captureTitle(title); }
 
 export type BoardRole = BoardSummary['role'];
-export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; recoveryChoice?: 'divergent' | 'unknown' | 'unchanged'; storageFailure?: RecoveryStorageFailure; retainedPending?: boolean | 'unavailable'; stalled?: boolean; title?: string }>;
+export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; recoveryChoice?: 'divergent' | 'unknown' | 'unchanged' | 'restored'; storageFailure?: RecoveryStorageFailure; retainedPending?: boolean | 'unavailable'; stalled?: boolean; title?: string }>;
 export type CanvasRuntime = { workspace: Workspace & Pick<BoardWorkspace, 'docSync' | 'waitForSynced' | 'live'>; store: Store; descriptor: BoardDescriptor; scope: AccessScope; captureUnacknowledged: () => Promise<unknown>[]; stopSaveStatus: () => void; dispose: () => void };
 let scope: AccessScope | null = null;
 let current: CanvasRuntime | null = null;
@@ -116,6 +119,7 @@ export function disposeCanvasRuntime(expectedGeneration = scope?.generation): vo
   if (!scope || scope.generation !== expectedGeneration) return;
   const old = current; current = null; pending = null;
   captureTitle = undefined; preserveTitle = undefined; replayDocumentCommit = undefined;
+  confirmRestoredRecovery = undefined;
   recoveryAssets = new Map();
   recovery?.dispose(); recovery = undefined;
   if (saveScope) dispatchSaveEvent({ type: 'recovery', scope: saveScope, state: 'disposed' });
@@ -144,6 +148,8 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   const isCurrent = () => scope?.generation === initial.generation && scope.phase === 'active';
   let baseline: AccountWorkspaceOptions['recoveryBaseline'];
   let quarantined = false;
+  let chosenTab: string | undefined; let chosenConfirmation: string | undefined;
+  let restoredConsentTab: string | undefined; let restoredConsentVersion: string | undefined;
   let captureReady = false;
   const sharedEvidence: (() => Promise<void>)[] = [];
   let sharedQueue = Promise.resolve();
@@ -160,7 +166,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   let initializing = true;
   let authorizedDescriptor = options.descriptor;
   const liveTitleOperations = new Set<string>();
-  const titles = bufferedTitleStore(titleIntentStore(scopedJournal.scope), error => {
+  const titles = bufferedTitleStore(titleIntentStore(scopedJournal.scope, options.descriptor.liveEnabled ? scopedJournal.tabId : undefined), error => {
     if (isCurrent()) pauseRecoveryStorage(error);
   }, value => liveTitleOperations.add(value.operationId));
   const documentCommit: NonNullable<AccountWorkspaceOptions['onDocumentCommit']> = async (receipt, document) => {
@@ -228,6 +234,10 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
             }
             if (init?.method === 'PATCH' && response.headers.get('X-Dali-Recovery-Epoch') !== authority.descriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
             return response.json();
+          }, async (saved, result) => {
+            if (!isCurrent()) throw new Error('Stale title receipt');
+            try { await acknowledgeRecoveredTitle(scopedJournal.scope, scopedJournal.tabId, { operationId: saved.operationId, title: saved.title, revision: result.revision }); }
+            catch (error) { if (isCurrent()) pauseRecoveryStorage(error); throw error; }
           });
           if (result) { acknowledgedTitleRevision = result.revision; authorizedDescriptor = result; if (current === liveRuntime) current.descriptor = result; }
           dispatchSaveEvent({ type: 'title', scope: statusScope, id: intent.operationId, outcome: 'acknowledged', at: Date.now() });
@@ -292,7 +302,10 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (!isCurrent() || signal.aborted || member.accountId !== options.accountId) throw new SourceAccessError(409);
       if (!Number.isSafeInteger(member.expiresAt) || member.expiresAt <= Date.now()) throw new SourceAccessError(401);
       const response = await fetch(`/api/boards/${encodeURIComponent(initial.boardId)}`, { cache: 'no-store', signal, headers: { 'X-Dali-Account': options.accountId } });
-      if (!response.ok) throw [401, 403, 404, 409].includes(response.status) ? new SourceAccessError(response.status) : new Error('Board unavailable');
+      if (!response.ok) {
+        if (options.descriptor.liveEnabled && [403, 404].includes(response.status)) await markRecoveryPermissionLoss(scopedJournal.scope);
+        throw [401, 403, 404, 409].includes(response.status) ? new SourceAccessError(response.status) : new Error('Board unavailable');
+      }
       const descriptor = await response.json() as BoardDescriptor;
       if (!isCurrent() || signal.aborted || !validDescriptor(descriptor, options.accountId) || descriptor.summary.id !== initial.boardId) throw new SourceAccessError(409);
       if (descriptor.recoveryEpoch !== options.descriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
@@ -302,20 +315,29 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     current: isCurrent,
     beforeReplay: async (authority, signal) => {
       if (!authority.descriptor.liveEnabled) return;
+      if (!initializing && !quarantined && current?.workspace.live?.connected) return;
+      if (current) {
+        quarantined = true; current.store.readonly = true; current.workspace.docSync.forceStop();
+        publish({ ...scope!, canWrite: false }); await scopedJournal.preserve();
+      }
       const allRows = await pendingRecords(initial.accountId, initial.boardId);
       const rows = options.openRestored ? allRows.filter(row => row.epoch === authority.descriptor.recoveryEpoch) : allRows;
       const title = await titles.read();
+      const titleRows = await pendingTitleIntents(initial.accountId, initial.boardId);
       if (!isCurrent() || signal.aborted) throw new Error('Stale recovery inspection');
-      if (rows.some(row => row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
-      if (rows.some(row => !validRecord(row))) throw new RecoveryStorageError('CORRUPT');
-      if (!rows.length && !title) return;
+      if (rows.some(row => row.epoch !== authority.descriptor.recoveryEpoch) || !options.openRestored && titleRows.some(row => row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+      if (rows.some(row => !validRecord(row)) || titleRows.some(row => !validTitleIntent(row) || row.accountId !== initial.accountId || row.boardId !== initial.boardId)) throw new RecoveryStorageError('CORRUPT');
+      if (!rows.length && !titleRows.some(row => row.epoch === authority.descriptor.recoveryEpoch)) { quarantined = false; return; }
       // An online native send owns its own reservation and acknowledgement.
       // The generic recovery drain must never race that ordinary save.
-      if (!initializing && !quarantined && current?.workspace.live?.connected) return;
       quarantined = true;
-      if (current) { current.store.readonly = true; current.workspace.docSync.forceStop(); current.workspace.live?.dispose(); }
+      if (current) { current.store.readonly = true; current.workspace.docSync.forceStop(); }
       publish({ ...scope!, canWrite: false });
-      const tab = rows.some(row => row.tabId === scopedJournal.tabId) ? scopedJournal.tabId : rows[0]?.tabId ?? scopedJournal.tabId;
+      const tab = rows.some(row => row.tabId === scopedJournal.tabId) || title ? scopedJournal.tabId : rows[0]?.tabId ?? titleRows.find(row => row.epoch === authority.descriptor.recoveryEpoch)?.tabId ?? scopedJournal.tabId;
+      const candidateTitle = titleRows.find(row => row.epoch === authority.descriptor.recoveryEpoch && row.tabId === tab);
+      chosenTab = tab;
+      const confirmation = await recoveryPermissionConfirmation(scopedJournal.scope, tab);
+      chosenConfirmation = confirmation;
       const candidateRows = rows.filter(row => row.tabId === tab);
       const checkpoint = await readCheckpoint(scopedJournal.scope, tab);
       if (!checkpoint || checkpoint.root.docId !== authority.descriptor.rootDocId || checkpoint.content.docId !== authority.descriptor.contentDocId || candidateRows.some(row => row.kind === 'document' && ![checkpoint.root.docId, checkpoint.content.docId].includes(row.resource))) throw new RecoveryStorageError('CORRUPT');
@@ -330,7 +352,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       const attempts = attempted.length <= 256 ? attempted.map(row => ({ ...row.attempt!, docId: row.resource })) : [];
       const response = await (options.fetch ?? fetch)(`/api/boards/${encodeURIComponent(initial.boardId)}/recovery/baseline`, {
         method: 'POST', credentials: 'same-origin', cache: 'no-store', signal,
-        headers: { 'Content-Type': 'application/json', 'X-Dali-Account': initial.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': authority.descriptor.recoveryEpoch }, body: JSON.stringify({ attempts }),
+        headers: { 'Content-Type': 'application/json', 'X-Dali-Account': initial.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': authority.descriptor.recoveryEpoch }, body: JSON.stringify({ attempts, ...(candidateTitle ? { titleAttempt: { operationId: candidateTitle.operationId, title: candidateTitle.title } } : {}) }),
       });
       if (!isCurrent() || signal.aborted) throw new Error('Stale recovery baseline');
       if (!response.ok) {
@@ -343,9 +365,35 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       const decode = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0));
       const latest: SharedRecoveryBaseline = { ...wire, root: { ...wire.root, data: decode(wire.root?.data) }, content: { ...wire.content, data: decode(wire.content?.data) } };
       if (!validSharedRecoveryBaseline(latest) || latest.epoch !== authority.descriptor.recoveryEpoch || latest.root.docId !== checkpoint.root.docId || latest.content.docId !== checkpoint.content.docId || !Array.isArray(wire.receipts) || wire.receipts.length > attempts.length) throw new Error('Invalid recovery baseline');
-      const expected = checkpoint.shared && attempted.length <= 256 ? (await reconcileRecoveryReceipts(checkpoint.shared, candidateRows, wire.receipts as RecoveryReceipt[])).baseline : undefined;
+      const reconciled = checkpoint.shared && attempted.length <= 256 && !titleRows.some(row => !row.tabId) ? await reconcileRecoveryReceipts(checkpoint.shared, candidateRows, wire.receipts as RecoveryReceipt[], candidateTitle, wire.titleReceipt) : undefined;
+      const expected = reconciled?.baseline;
       if (!isCurrent() || signal.aborted) throw new Error('Stale recovery decision');
-      publish({ ...scope!, title: title?.title ?? checkpoint.title, recoveryChoice: !expected ? 'unknown' : recoveryVersionsDiffer(expected, latest) ? 'divergent' : 'unchanged' });
+      if (expected && !recoveryVersionsDiffer(expected, latest) && (!confirmation || restoredConsentTab === tab && restoredConsentVersion === confirmation)) {
+        const originalLive = current?.workspace.live;
+        await replayLiveCandidate({ ...options, boardId: initial.boardId, rootDocId: authority.descriptor.rootDocId, contentDocId: authority.descriptor.contentDocId,
+          scope: scopedJournal.scope, tab, baseline: latest, rows: candidateRows, signal, isCurrent, getRecoveryEpoch: () => authority.descriptor.recoveryEpoch,
+          liveTabId: originalLive?.transportTabId, acknowledge: (ids, revision) => scopedJournal.acknowledge(ids, revision), outcome: observeReplay, committed: documentCommit,
+          ...(candidateTitle ? { title: { intent: candidateTitle, receipt: reconciled?.acknowledgedTitle } } : {}),
+          acknowledgeTitle: async receipt => {
+            await acknowledgeRecoveredTitle(scopedJournal.scope, tab, receipt);
+            if (isCurrent()) dispatchSaveEvent({ type: 'title', scope: statusScope, id: receipt.operationId, outcome: 'acknowledged', at: Date.now() });
+          },
+          recoveredAction: (original, committed) => originalLive?.recoverAction(original, committed),
+        });
+        if (!isCurrent() || signal.aborted) throw new Error('Stale recovered version');
+        const remaining = await pendingRecords(initial.accountId, initial.boardId);
+        const remainingTitles = await pendingTitleIntents(initial.accountId, initial.boardId);
+        if (remaining.some(row => row.epoch === authority.descriptor.recoveryEpoch && row.tabId === tab) || remainingTitles.some(row => row.epoch === authority.descriptor.recoveryEpoch && row.tabId === tab)) throw new Error('More changes are waiting to save');
+        const fresh = await authorize(signal);
+        if (fresh.descriptor.summary.role === 'viewer' || !fresh.descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
+        if (confirmation) await resolveRecoveryPermission(scopedJournal.scope, tab, confirmation);
+        quarantined = false; await persistSharedEvidence();
+        Object.assign(authority, fresh); authorizedDescriptor = fresh.descriptor;
+        if (current) current.descriptor = fresh.descriptor;
+        publish({ ...scope!, title: fresh.descriptor.summary.title, recoveryChoice: undefined });
+        return;
+      }
+      publish({ ...scope!, title: candidateTitle?.title ?? checkpoint.title, recoveryChoice: !expected ? 'unknown' : recoveryVersionsDiffer(expected, latest) ? 'divergent' : confirmation ? 'restored' : 'unchanged' });
       throw Object.assign(new Error('Choose a recovery version'), { code: 'RECOVERY_CHOICE' });
     },
     title: async (authority, signal) => {
@@ -456,10 +504,17 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       }
       const blocked = storagePaused || quarantined || ['choice', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(recoveryState);
       if (current && blocked) current.store.readonly = true;
+      else if (current && recoveryState === 'saved' && scope?.role !== 'viewer') current.store.readonly = false;
       publish({ ...scope!, canWrite: !blocked && initial.role !== 'viewer', recoveryState: storagePaused ? 'storage-paused' : recoveryState, storageFailure: storagePaused ? scope?.storageFailure : undefined, stalled });
       if (recoveryState === 'expired') void interruptSession();
     },
   });
+  confirmRestoredRecovery = async () => {
+    if (!isCurrent() || scope?.recoveryState !== 'choice' || scope.recoveryChoice !== 'restored' || !chosenTab) return false;
+    restoredConsentTab = chosenTab; restoredConsentVersion = chosenConfirmation;
+    try { await coordinator.retryRecovery(); return isCurrent() && getActiveAccessScope()?.recoveryState === 'saved'; }
+    finally { restoredConsentTab = undefined; restoredConsentVersion = undefined; }
+  };
   requestAbort.signal.addEventListener('abort', () => coordinator.dispose(), { once: true });
   const promise = coordinator.open().then(async authority => {
     if (!authority) { if (scope?.recoveryState === 'denied') throw new SourceAccessError(404); throw new Error('Board unavailable'); }
@@ -476,6 +531,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       try {
         const pending = await inspectPendingScopes(authority.accountId);
         retainedPending = pending.some(row => row.accountId === authority.accountId && row.boardId === authority.descriptor.summary.id && row.count > 0);
+        if (retainedPending && authority.descriptor.liveEnabled) await markRecoveryPermissionLoss(scopedJournal.scope);
       } catch { retainedPending = 'unavailable'; }
     }
     if (!isCurrent() || requestAbort.signal.aborted || scope?.accountId !== authority.accountId || scope.boardId !== authority.descriptor.summary.id) throw new SourceAccessError(409);
@@ -494,6 +550,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       const clean = () => isCurrent() && !initializing && !storagePaused && scope?.phase === 'active' &&
         (scope.role === 'viewer' || (getAccountSaveSnapshot()?.scope === statusScope && getAccountSaveSnapshot()?.state === 'saved' &&
           live.size === 2 && [...live.keys()].every(covered) && !titlesInFlight && !scopedJournal.pendingMemory().length));
+      if (!clean()) await coordinator.retryRecovery();
       if (!clean()) return false;
       const rows = await pendingRecords(initial.accountId, initial.boardId); const title = await titles.read();
       return clean() && !title && !rows.some(row => row.tabId === scopedJournal.tabId);
@@ -515,7 +572,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (isCurrent() && init?.method === 'GET' && local) return Promise.resolve(new Response(local, { headers: { 'Content-Type': local.type } }));
       return (options.fetch ?? fetch)(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, requestAbort.signal]) : requestAbort.signal });
     },
-    onPendingDocument: (id, data, attempt) => scopedJournal.captureSubmission(id, data, attempt),
+    onPendingDocument: (id, data, attempt, actionId) => scopedJournal.captureSubmission(id, data, attempt, actionId),
     onPendingBlob: (key, value) => { retainedAssets.set(key, value); return scopedJournal.capture('blob', key, value); },
     onFetchedBlob: authorizedDescriptor.summary.role !== 'viewer' ? async (key, value) => {
       retainedAssets.set(key, value);
@@ -558,13 +615,16 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (acknowledgedUpdateCovered(confirmed.get(docId), data)) return 'acknowledged';
     },
     onAuthorizationLost: error => {
+      if (isCurrent() && authorizedDescriptor.liveEnabled && [403, 404].includes(error.status)) {
+        const preserving = markRecoveryPermissionLoss(scopedJournal.scope); capture.push(preserving); void preserving.catch(() => {});
+      }
       if (isCurrent()) { suspendAccessScope('authorization'); if (error.status === 401) void interruptSession(); else if (error.status === 409) void revalidateSession(); }
       if (![401, 409].includes(error.status)) options.onAuthorizationLost?.(error);
     },
   })).then(async workspace => {
     if (!isCurrent()) { workspace.dispose(); throw new Error('Board access changed'); }
     const store = workspace.getDoc(options.descriptor.contentDocId)!.getStore();
-    const local = authorizedDescriptor.summary.role !== 'viewer' && !quarantined ? attachLocalCapture({ journal: scopedJournal, root: workspace.doc, content: store.spaceDoc, title: authorizedDescriptor.summary.title, isCurrent }) : undefined;
+    const local = authorizedDescriptor.summary.role !== 'viewer' && !quarantined ? attachLocalCapture({ journal: scopedJournal, root: workspace.doc, content: store.spaceDoc, title: authorizedDescriptor.summary.title, isCurrent, actionId: () => workspace.live?.actionId }) : undefined;
     try {
       try { await local?.ready; captureReady = !!local; await persistSharedEvidence(); } catch (error) { pauseRecoveryStorage(error); }
       if (local) {

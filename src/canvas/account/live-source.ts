@@ -50,11 +50,14 @@ export class BoardLiveSource {
   get editing() { return this.connected && this.reservedObjects.size > 0; }
   private interrupted = false;
   private started = false;
-  private readonly tabId = crypto.randomUUID();
+  private readonly tabId: string;
+  private recoveredActions = new Map<string, string>();
   get transportTabId() { return this.tabId; }
+  recoverAction(original: string, committed: string) { this.recoveredActions.set(original, committed); }
   private epoch?: string;
   private readonly abort = () => this.dispose();
   constructor(private options: SourceOptions) {
+    this.tabId = options.liveTabId ?? crypto.randomUUID();
     options.signal?.addEventListener('abort', this.abort, { once: true });
     if (typeof window !== 'undefined') window.addEventListener('pagehide', this.abort);
   }
@@ -194,7 +197,7 @@ export class BoardLiveSource {
   async authorizeHistory(actionId: string): Promise<boolean> {
     if (!this.connected || !this.reservation) throw new Error('History needs fresh editing access.');
     const connection = this.connectionId; const token = this.reservation;
-    const result = await this.request('history', { connectionId: connection, token, actionId });
+    const result = await this.request('history', { connectionId: connection, token, actionId: this.recoveredActions.get(actionId) ?? actionId });
     if (!this.connected || connection !== this.connectionId || token !== this.reservation) throw new Error('History response is stale. Try the action again.');
     if (typeof result.eligible !== 'boolean') throw new Error('Invalid history authorization');
     return result.eligible;

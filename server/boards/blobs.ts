@@ -7,6 +7,7 @@ import { requireMutation } from '../auth/session-store.js';
 import { runMigrations, type AccountDatabase } from '../storage/database.js';
 import { requireBoardCapability } from './routes.js';
 import { documentBytes, referencedImageKeys, type BeforeCommit } from './documents.js';
+import { currentRecoveryFingerprint } from './recovery-baseline.js';
 
 /** Same input limits as canvas/image-input; checked before raster allocation. */
 export const IMAGE_LIMITS = { bytes: 16 * 1024 * 1024, pixels: 16_000_000, dimension: 8192, boardBytes: 256 * 1024 * 1024 };
@@ -126,6 +127,11 @@ export function registerBlobRoutes(app: FastifyInstance, config: AuthConfig, dat
       await beforeCommit?.();
       return database.transaction(() => {
         const latest = requireBoardCapability(database, request, reply, boardId, 'write', now); if (!latest) return;
+        const expectedBaseline = request.headers['x-dali-recovery-baseline'];
+        if (expectedBaseline !== undefined) {
+          if (typeof expectedBaseline !== 'string' || !/^[a-f0-9]{64}$/.test(expectedBaseline)) return reply.code(400).send({ code: 'INVALID_RECOVERY_BASELINE' });
+          if (currentRecoveryFingerprint(database, latest) !== expectedBaseline) return reply.code(409).send({ code: 'RECOVERY_DIVERGED' });
+        }
         if (method === 'DELETE') {
           const doc = new Y.Doc();
           try { Y.applyUpdate(doc, documentBytes(database, latest, latest.content_doc_id)!); if (referencedImageKeys(doc).has(key)) return reply.code(409).send({ code: 'IMAGE_REFERENCED' }); }

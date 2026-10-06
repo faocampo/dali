@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { AccountJournal, acknowledgeRecords, readCheckpoint, replayJournal, requestRecoveryStorage, type JournalRecord } from './outbox';
+import { AccountJournal, acknowledgeRecords, acknowledgeRecoveredTitle, readCheckpoint, replayJournal, requestRecoveryStorage, titleIntentStore, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission, type JournalRecord } from './outbox';
 import { attachLocalCapture, RECOVERY_REPLAY_ORIGIN } from './local-capture';
 import * as Y from 'yjs';
 import { createHash } from 'node:crypto';
@@ -49,6 +49,43 @@ function storage(initial: JournalRecord[] = []) {
   return { rows, fail(value: boolean) { fail = value; } };
 }
 afterEach(() => { vi.unstubAllGlobals(); });
+it('@05-05-02 restored-write consent belongs to one candidate and cannot resolve a later permission loss', async () => {
+  storage(); expect(await recoveryPermissionConfirmation(scope, 'a')).toBeUndefined();
+  await markRecoveryPermissionLoss(scope); const first = (await recoveryPermissionConfirmation(scope, 'a'))!;
+  expect(first).toBeTruthy(); expect(await recoveryPermissionConfirmation(scope, 'b')).toBe(first);
+  await resolveRecoveryPermission(scope, 'a', first);
+  expect(await recoveryPermissionConfirmation(scope, 'a')).toBeUndefined(); expect(await recoveryPermissionConfirmation(scope, 'b')).toBe(first);
+  await markRecoveryPermissionLoss(scope); const later = (await recoveryPermissionConfirmation(scope, 'a'))!; expect(later).not.toBe(first);
+  await expect(resolveRecoveryPermission(scope, 'a', first)).rejects.toMatchObject({ code: 'RECOVERY_CHOICE' });
+  expect(await recoveryPermissionConfirmation(scope, 'a')).toBe(later);
+});
+it('@05-05-02 collaborative title intents remain in their original tab and preserve legacy metadata', async () => {
+  storage(); const legacy = titleIntentStore(scope); const a = titleIntentStore(scope, 'tab-a'); const b = titleIntentStore(scope, 'tab-b');
+  const intent = { schemaVersion: 1 as const, accountId: scope.accountId, boardId: scope.boardId, epoch: scope.recoveryEpoch!, operationId: 'legacy-name', baseRevision: 1, title: 'Legacy name' };
+  await legacy.write(intent); await a.write({ ...intent, operationId: 'tab-a-name', title: 'Tab A name' });
+  expect(await b.read()).toBeUndefined(); expect((await a.read())?.title).toBe('Tab A name'); expect((await legacy.read())?.title).toBe('Legacy name');
+  await b.write({ ...intent, operationId: 'tab-b-name', title: 'Tab B name' }); await a.acknowledge('tab-a-name');
+  expect(await a.read()).toBeUndefined(); expect((await b.read())?.title).toBe('Tab B name'); expect((await legacy.read())?.title).toBe('Legacy name');
+});
+it('@05-05-02 a title receipt atomically advances its baseline and preserves newer or other-tab intents on failure', async () => {
+  const db = storage(); const journal = new AccountJournal(scope, () => {}); const doc = new Y.Doc();
+  const base: SharedRecoveryBaseline = { version: 1, epoch: scope.recoveryEpoch!, root: { docId: 'root', data: Y.encodeStateAsUpdate(doc) }, content: { docId: 'content', data: Y.encodeStateAsUpdate(doc) }, title: 'Original', revision: 1, titleRevision: 1 };
+  await journal.checkpoint({ root: base.root, content: base.content, title: base.title, assets: {} }); await journal.observeShared(base);
+  const own = titleIntentStore(scope, journal.tabId); const other = titleIntentStore(scope, 'other-tab');
+  const intent = { schemaVersion: 1 as const, accountId: scope.accountId, boardId: scope.boardId, epoch: scope.recoveryEpoch!, operationId: 'own-name', baseRevision: 1, title: 'Own name' };
+  await own.write(intent); await other.write({ ...intent, operationId: 'foreign-name', title: 'Other tab name' });
+  const proof = { operationId: intent.operationId, title: intent.title, revision: 2 };
+  db.fail(true); await expect(acknowledgeRecoveredTitle(scope, journal.tabId, proof)).rejects.toThrow(); db.fail(false);
+  expect((await own.read())?.operationId).toBe(intent.operationId); expect((await readCheckpoint(scope, journal.tabId))?.shared?.title).toBe('Original');
+  await own.write({ ...intent, operationId: 'newer', title: 'Newer local name' });
+  await acknowledgeRecoveredTitle(scope, journal.tabId, proof);
+  expect((await own.read())?.operationId).toBe('newer'); expect((await other.read())?.operationId).toBe('foreign-name');
+  expect((await readCheckpoint(scope, journal.tabId))?.shared).toMatchObject({ title: 'Own name', titleRevision: 2 });
+  await acknowledgeRecoveredTitle(scope, journal.tabId, { operationId: 'newer', title: 'Newer local name', revision: 3 });
+  expect(await own.read()).toBeUndefined(); await acknowledgeRecoveredTitle(scope, journal.tabId, proof);
+  expect((await readCheckpoint(scope, journal.tabId))?.shared).toMatchObject({ title: 'Newer local name', titleRevision: 3 });
+  expect((await other.read())?.operationId).toBe('foreign-name'); doc.destroy();
+});
 it('@05-05-01 records remote baseline updates without losing pending local edits', async () => {
   const db = storage(); const journal = new AccountJournal(scope, () => {});
   const root = new Y.Doc(); const content = new Y.Doc(); content.getMap('shapes').set('a', 0);

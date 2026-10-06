@@ -3,11 +3,11 @@ import type { BoardDescriptor } from '../../boards/BoardLibrary';
 import { SourceAccessError, RecoveryEpochError, validRecoveryEpoch } from './doc-source';
 import * as Y from 'yjs';
 import { validTitleIntent, type TitleIntent, type TitleStore } from './title-intent';
-import { advanceSharedBaseline, canonicalRecoveryUpdate, validRecoveryAttempt, validSharedRecoveryBaseline, type RecoveryAttempt, type SharedRecoveryBaseline } from './recovery-baseline';
+import { advanceSharedBaseline, canonicalRecoveryUpdate, validRecoveryAttempt, validRecoveryTitleAttempt, validSharedRecoveryBaseline, type RecoveryAttempt, type RecoveryTitleReceipt, type SharedRecoveryBaseline } from './recovery-baseline';
 
 export type JournalScope = { accountId: string; boardId: string; generation: number; recoveryEpoch?: string };
 export type JournalRecord = JournalScope & { id: string; sequence: number; kind: 'document' | 'blob'; resource: string; data: Uint8Array | Blob; mime?: string;
-  schemaVersion?: number; epoch?: string; tabId?: string; coveredIds?: string[]; attempt?: RecoveryAttempt };
+  schemaVersion?: number; epoch?: string; tabId?: string; coveredIds?: string[]; attempt?: RecoveryAttempt; actionId?: string };
 export type RecoveryCheckpoint = { schemaVersion: 2; accountId: string; boardId: string; epoch: string; tabId: string;
   root: { docId: string; data: Uint8Array }; content: { docId: string; data: Uint8Array }; title: string;
   assets: Record<string, { mime?: string; data?: Uint8Array }>; shared?: SharedRecoveryBaseline };
@@ -50,6 +50,7 @@ function assertScope(scope: JournalScope) {
   if (!bounded(scope.accountId) || !bounded(scope.boardId) || !validRecoveryEpoch(scope.recoveryEpoch) || !Number.isSafeInteger(scope.generation) || scope.generation < 0) throw new RecoveryStorageError('CORRUPT');
 }
 export function validRecord(record: JournalRecord): boolean {
+  if (record.actionId !== undefined && !bounded(record.actionId)) return false;
   if (record.attempt !== undefined && (record.kind !== 'document' || !validRecoveryAttempt(record.attempt))) return false;
   if (record.schemaVersion !== 2 || !validRecoveryEpoch(record.epoch) || record.epoch !== record.recoveryEpoch || !bounded(record.id) || !bounded(record.tabId) || !bounded(record.accountId) || !bounded(record.boardId) || !bounded(record.resource) || !Number.isSafeInteger(record.sequence) || record.sequence < 1 || !Array.isArray(record.coveredIds) || record.coveredIds.length > 10000 || !record.coveredIds.every(bounded)) return false;
   if (!(record.data instanceof Uint8Array || record.data instanceof Blob)) return false;
@@ -140,16 +141,19 @@ export async function inspectPendingScopes(accountId: string) {
   return [...scopes.values()];
 }
 /** Metadata shares the existing strict journal database and transactional ID acknowledgment. */
-export function titleIntentStore(scope: JournalScope): TitleStore {
-  assertScope(scope); const id = 'title:' + scopeKey(scope);
+export function titleIntentStore(scope: JournalScope, tab?: string): TitleStore {
+  assertScope(scope); if (tab !== undefined && !bounded(tab)) throw new RecoveryStorageError('CORRUPT');
+  const id = 'title:' + JSON.stringify([scope.accountId, scope.boardId, scope.recoveryEpoch, ...(tab ? [tab] : [])]);
   return {
+    ...(tab ? { tabId: tab } : {}),
     read: () => transaction(['sequences'], 'readonly', (tx, done) => {
       const request = tx.objectStore('sequences').get(id);
-      request.onsuccess = () => { const row = request.result; if (row && (!validTitleIntent(row) || row.accountId !== scope.accountId || row.boardId !== scope.boardId || row.epoch !== scope.recoveryEpoch)) { tx.abort(); return; } done(row); };
+      request.onsuccess = () => { const row = request.result; if (row && (!validTitleIntent(row) || row.accountId !== scope.accountId || row.boardId !== scope.boardId || row.epoch !== scope.recoveryEpoch || row.tabId !== tab)) { tx.abort(); return; } done(row); };
     }),
     write: value => transaction(['sequences'], 'readwrite', (tx, done) => {
       if (!validTitleIntent(value) || value.accountId !== scope.accountId || value.boardId !== scope.boardId || value.epoch !== scope.recoveryEpoch) throw new RecoveryStorageError('CORRUPT');
-      tx.objectStore('sequences').put({ ...value, id }); done(undefined);
+      if (value.tabId !== undefined && value.tabId !== tab) throw new RecoveryStorageError('CORRUPT');
+      tx.objectStore('sequences').put({ ...value, ...(tab ? { tabId: tab } : {}), id }); done(undefined);
     }),
     advance: (operationId, previousRevision, revision) => transaction(['sequences'], 'readwrite', (tx, done) => {
       if (!validDocumentRevisionReceipt({ previousRevision, revision })) throw new RecoveryStorageError('CORRUPT');
@@ -157,7 +161,7 @@ export function titleIntentStore(scope: JournalScope): TitleStore {
       request.onsuccess = () => {
         const row = request.result as (TitleIntent & { id: string }) | undefined;
         if (!row || row.operationId !== operationId || row.baseRevision !== previousRevision) { done(undefined); return; }
-        if (!validTitleIntent(row) || row.accountId !== scope.accountId || row.boardId !== scope.boardId || row.epoch !== scope.recoveryEpoch) { tx.abort(); return; }
+        if (!validTitleIntent(row) || row.accountId !== scope.accountId || row.boardId !== scope.boardId || row.epoch !== scope.recoveryEpoch || row.tabId !== tab) { tx.abort(); return; }
         const next = { ...row, baseRevision: revision }; store.put(next); done(next);
       };
     }),
@@ -173,6 +177,70 @@ export async function pendingTitleIntents(accountId: string, boardId: string): P
   return transaction(['sequences'], 'readonly', (tx, done) => {
     const request = tx.objectStore('sequences').getAll(IDBKeyRange.bound(prefix, prefix + '\uffff'));
     request.onsuccess = () => done(request.result);
+  });
+}
+/** Commit proof and intent removal together; a newer local title remains pending. */
+export async function acknowledgeRecoveredTitle(scope: JournalScope, tab: string, receipt: RecoveryTitleReceipt) {
+  assertScope(scope);
+  if (!bounded(tab) || !validRecoveryTitleAttempt(receipt) || !Number.isSafeInteger(receipt.revision) || receipt.revision < 1) throw new RecoveryStorageError('CORRUPT');
+  const id = 'title:' + JSON.stringify([scope.accountId, scope.boardId, scope.recoveryEpoch, tab]);
+  return transaction<void>(['checkpoints', 'sequences'], 'readwrite', (tx, done) => {
+    const checkpoints = tx.objectStore('checkpoints'); const request = checkpoints.get(checkpointId(scope, tab));
+    request.onsuccess = () => {
+      try {
+        const checkpoint = request.result as RecoveryCheckpoint | undefined;
+        if (!checkpoint) throw new RecoveryStorageError('CORRUPT');
+        assertCheckpoint(checkpoint);
+        if (!checkpoint.shared || checkpoint.accountId !== scope.accountId || checkpoint.boardId !== scope.boardId || checkpoint.epoch !== scope.recoveryEpoch || checkpoint.tabId !== tab) throw new RecoveryStorageError('CORRUPT');
+        const store = tx.objectStore('sequences'); const pending = store.get(id);
+        pending.onsuccess = () => {
+          try {
+            const row = pending.result as TitleIntent | undefined;
+            if (row && (!validTitleIntent(row) || row.accountId !== scope.accountId || row.boardId !== scope.boardId || row.epoch !== scope.recoveryEpoch || row.tabId !== tab)) throw new RecoveryStorageError('CORRUPT');
+            if (row?.operationId === receipt.operationId) {
+              if (row.title !== receipt.title) throw new RecoveryStorageError('CORRUPT');
+              store.delete(id);
+            }
+            if (receipt.revision >= checkpoint.shared!.titleRevision) {
+              const value = { ...checkpoint, ...(!row || row.operationId === receipt.operationId ? { title: receipt.title } : {}), shared: { ...checkpoint.shared!, title: receipt.title, titleRevision: receipt.revision, revision: Math.max(checkpoint.shared!.revision, receipt.revision) } };
+              assertCheckpoint(value); checkpoints.put({ ...value, id: checkpointId(scope, tab) });
+            }
+            done(undefined);
+          } catch (error) { abortWithFailure(tx, error); }
+        };
+      } catch (error) { abortWithFailure(tx, error); }
+    };
+  });
+}
+type RecoveryPermissionMarker = { id: string; version: string; resolvedTabs: string[] };
+/** Permission markers contain no canvas bytes and survive closing a denied tab. */
+export async function markRecoveryPermissionLoss(scope: JournalScope) {
+  assertScope(scope); const id = 'permission:' + scopeKey(scope);
+  return transaction<void>(['sequences'], 'readwrite', (tx, done) => {
+    tx.objectStore('sequences').put({ id, version: crypto.randomUUID(), resolvedTabs: [] }); done(undefined);
+  });
+}
+export async function recoveryPermissionConfirmation(scope: JournalScope, tab: string): Promise<string | undefined> {
+  assertScope(scope); if (!bounded(tab)) throw new RecoveryStorageError('CORRUPT');
+  return transaction(['sequences'], 'readonly', (tx, done) => {
+    const request = tx.objectStore('sequences').get('permission:' + scopeKey(scope));
+    request.onsuccess = () => {
+      const row = request.result as RecoveryPermissionMarker | undefined;
+      if (row && (!bounded(row.version) || !Array.isArray(row.resolvedTabs) || !row.resolvedTabs.every(bounded))) { abortWithFailure(tx, new RecoveryStorageError('CORRUPT')); return; }
+      done(row && !row.resolvedTabs.includes(tab) ? row.version : undefined);
+    };
+  });
+}
+export async function resolveRecoveryPermission(scope: JournalScope, tab: string, version: string) {
+  assertScope(scope); if (!bounded(tab) || !bounded(version)) throw new RecoveryStorageError('CORRUPT');
+  return transaction<void>(['sequences'], 'readwrite', (tx, done) => {
+    const store = tx.objectStore('sequences'); const request = store.get('permission:' + scopeKey(scope));
+    request.onsuccess = () => {
+      const row = request.result as RecoveryPermissionMarker | undefined;
+      if (!row || row.version !== version) { abortWithFailure(tx, Object.assign(new Error('Access changed again'), { code: 'RECOVERY_CHOICE' })); return; }
+      if (!Array.isArray(row.resolvedTabs) || !row.resolvedTabs.every(bounded)) { abortWithFailure(tx, new RecoveryStorageError('CORRUPT')); return; }
+      store.put({ ...row, resolvedTabs: [...new Set([...row.resolvedTabs, tab])] }); done(undefined);
+    };
   });
 }
 export async function readCheckpoint(scope: JournalScope, tab: string): Promise<RecoveryCheckpoint | undefined> {
@@ -192,7 +260,7 @@ export async function readCheckpoint(scope: JournalScope, tab: string): Promise<
   });
 }
 const matchesScope = (record: JournalRecord, scope: JournalScope) => record.accountId === scope.accountId && record.boardId === scope.boardId && record.epoch === scope.recoveryEpoch;
-export async function acknowledgeRecords(scope: JournalScope, ids: readonly string[]) {
+export async function acknowledgeRecords(scope: JournalScope, ids: readonly string[], revision?: number) {
   assertScope(scope); const exact = [...new Set(ids)];
   if (exact.length > 10000 || !exact.every(bounded)) throw new RecoveryStorageError('CORRUPT');
   if (!exact.length) return;
@@ -226,6 +294,16 @@ export async function acknowledgeRecords(scope: JournalScope, ids: readonly stri
                 for (const doc of [value.root, value.content]) {
                   const pending = updates.get(doc.docId); if (pending) doc.data = Y.mergeUpdates(pending);
                 }
+                if (value.shared) {
+                  for (const doc of [value.shared.root, value.shared.content]) {
+                    const committed = records.filter(row => row.tabId === tab && row.kind === 'document' && row.resource === doc.docId).map(row => row.data as Uint8Array);
+                    if (committed.length) doc.data = canonicalRecoveryUpdate([doc.data, ...committed]);
+                  }
+                  if (revision !== undefined) {
+                    if (!Number.isSafeInteger(revision) || revision < 0) throw new RecoveryStorageError('CORRUPT');
+                    value.shared.revision = Math.max(value.shared.revision, revision);
+                  }
+                }
                 assertCheckpoint(value); checkpoints.put({ ...value, id: checkpointId(scope, tab) });
               }
               if (--baselines === 0) { for (const record of records) store.delete(record.id); done(undefined); }
@@ -244,7 +322,7 @@ export async function discardRecords(accountId: string, boardId: string) {
   // Explicit authorized discard also covers quarantined rows, without trusting epochs.
   await transaction(['journal', 'sequences'], 'readwrite', (tx, done) => {
     for (const title of titles) {
-      const store = tx.objectStore('sequences'); const id = 'title:' + JSON.stringify([accountId, boardId, title.epoch]);
+      const store = tx.objectStore('sequences'); const id = 'title:' + JSON.stringify([accountId, boardId, title.epoch, ...(title.tabId ? [title.tabId] : [])]);
       const request = store.get(id); request.onsuccess = () => { if (request.result?.operationId === title.operationId) store.delete(id); };
     }
     for (const id of ids) {
@@ -280,6 +358,15 @@ async function persistRecord(record: JournalRecord) {
     };
   });
 }
+/** A retry's exact bytes and identity survive reload before any network send. */
+export async function preserveRecoverySubmission(scope: JournalScope, tab: string, records: readonly JournalRecord[], data: Uint8Array, attempt: RecoveryAttempt) {
+  assertScope(scope);
+  if (!records.length || records.length > 10000 || !bounded(tab) || !validRecoveryAttempt(attempt) || records.some(row => !validRecord(row) || !matchesScope(row, scope) || row.tabId !== tab || row.kind !== 'document' || row.resource !== records[0]!.resource)) throw new RecoveryStorageError('CORRUPT');
+  const record: JournalRecord = { ...scope, schemaVersion: 2, epoch: scope.recoveryEpoch, tabId: tab, id: crypto.randomUUID(), sequence: 0, kind: 'document', resource: records[0]!.resource,
+    data: new Uint8Array(data), attempt: { ...attempt }, coveredIds: records.map(row => row.id), ...(records[0]!.actionId ? { actionId: records[0]!.actionId } : {}) };
+  await persistRecord(record);
+  return record;
+}
 /** Failed captures remain in memory until a successful explicit preservation retry. */
 export class AccountJournal {
   private memory = new Map<string, JournalRecord>();
@@ -291,8 +378,8 @@ export class AccountJournal {
   constructor(readonly scope: JournalScope, private onFailure: (error: unknown) => void) { assertScope(scope); this.scope = Object.freeze({ ...scope }); }
   get tabId() { return tabId; }
   pendingMemory() { return [...this.memory.values()].map(record => structuredClone(record)); }
-  captureUpdate(resource: string, data: Uint8Array) { return this.capture('document', resource, data); }
-  async captureSubmission(resource: string, data: Uint8Array, attempt?: RecoveryAttempt) {
+  captureUpdate(resource: string, data: Uint8Array, actionId?: string) { return this.capture('document', resource, data, [], undefined, actionId); }
+  async captureSubmission(resource: string, data: Uint8Array, attempt?: RecoveryAttempt, actionId?: string) {
     const update = new Uint8Array(data);
     // Native sync may observe a Yjs event before the independent listener.
     // Let all synchronous listeners capture it before freezing exact coverage.
@@ -309,12 +396,12 @@ export class AccountJournal {
       const snapshot = Y.snapshot(candidate);
       covered = [...this.owned.values()].filter(record => record.kind === 'document' && record.resource === resource && record.data instanceof Uint8Array && Y.snapshotContainsUpdate(snapshot, record.data)).map(record => record.id);
     } finally { candidate.destroy(); }
-    const id = await this.capture('document', resource, update, covered, attempt);
+    const id = await this.capture('document', resource, update, covered, attempt, actionId);
     await this.preserve();
     return Object.freeze({ scope: this.scope, ids: Object.freeze([id, ...covered]) });
   }
-  async acknowledge(ids: readonly string[]) {
-    await acknowledgeRecords(this.scope, ids);
+  async acknowledge(ids: readonly string[], revision?: number) {
+    await acknowledgeRecords(this.scope, ids, revision);
     for (const id of ids) { this.owned.delete(id); this.memory.delete(id); }
   }
   async compact(ids: readonly string[]): Promise<string | undefined> {
@@ -398,8 +485,8 @@ export class AccountJournal {
       };
     });
   }
-  async capture(kind: JournalRecord['kind'], resource: string, data: Uint8Array | Blob, coveredIds: string[] = [], attempt?: RecoveryAttempt): Promise<string> {
-    const record: JournalRecord = { ...this.scope, schemaVersion: 2, epoch: this.scope.recoveryEpoch, tabId, coveredIds: [...coveredIds], ...(attempt ? { attempt: { ...attempt } } : {}), id: crypto.randomUUID(), sequence: 0, kind, resource,
+  async capture(kind: JournalRecord['kind'], resource: string, data: Uint8Array | Blob, coveredIds: string[] = [], attempt?: RecoveryAttempt, actionId?: string): Promise<string> {
+    const record: JournalRecord = { ...this.scope, schemaVersion: 2, epoch: this.scope.recoveryEpoch, tabId, coveredIds: [...coveredIds], ...(attempt ? { attempt: { ...attempt } } : {}), ...(actionId ? { actionId } : {}), id: crypto.randomUUID(), sequence: 0, kind, resource,
       data: data instanceof Uint8Array ? new Uint8Array(data) : data };
     this.memory.set(record.id, record); this.owned.set(record.id, record);
     const write = (async () => { if (kind === 'blob' && data instanceof Blob) await this.cacheAsset(resource, data); await persistRecord(record); })(); this.writes.add(write);

@@ -6,11 +6,12 @@ import { recoveryDigest, type RecoveryAttempt, type SharedRecoveryBaseline } fro
 export type SourceOptions = {
   boardId: string; rootDocId: string; contentDocId: string; accountId: string; generation: number;
   live?: BoardLiveSource;
+  liveTabId?: string;
   signal?: AbortSignal; readonly?: boolean; isCurrent?: (generation: number) => boolean; fetch?: typeof fetch;
   /** Only retires the original connection; independent from canceled runtime requests. */
   disconnectFetch?: typeof fetch;
   onAuthorizationLost?: (error: SourceAccessError) => void;
-  onPendingDocument?: (docId: string, data: Uint8Array, attempt?: RecoveryAttempt) => unknown | Promise<unknown>;
+  onPendingDocument?: (docId: string, data: Uint8Array, attempt?: RecoveryAttempt, actionId?: string) => unknown | Promise<unknown>;
   onDocumentCommit?: (receipt: DocumentRevisionReceipt, document?: { docId: string; data: Uint8Array }) => Promise<void>;
   onLiveSnapshot?: (snapshot: SharedRecoveryBaseline) => void;
   onLiveMetadata?: (metadata: { title: string; revision: number }) => void;
@@ -83,7 +84,7 @@ export class BoardDocSource implements DocSource {
     try {
       const epoch = sourceRecoveryEpoch(this.options);
       const metadata = this.options.live ? { tabId: this.options.live.transportTabId, operationId: attempt, digest: await recoveryDigest(copy) } : undefined;
-      const token = await this.options.onPendingDocument?.(docId, copy, metadata);
+      const token = await this.options.onPendingDocument?.(docId, copy, metadata, this.options.live?.actionId);
       let replayOutcome: 'acknowledged' | void;
       try { replayOutcome = await this.options.beforeDocumentWrite?.(docId, copy, !!this.options.live); }
       catch (error) { if (error instanceof SourceAccessError) this.options.onAuthorizationLost?.(error); throw error; }
