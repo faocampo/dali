@@ -1,4 +1,5 @@
 import { registerCollaborationRoutes } from './collaboration.js';
+import { registerRecoveryBaselineRoutes } from './recovery-baseline.js';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import * as Y from 'yjs';
@@ -122,6 +123,7 @@ export function registerBoardRoutes(app: FastifyInstance, config: AuthConfig, da
       board_id TEXT, result TEXT NOT NULL, PRIMARY KEY(member_id,operation_id));
   ` }, { version: 3, sql: `CREATE TABLE board_thumbnails (board_id TEXT PRIMARY KEY REFERENCES boards(id) ON DELETE CASCADE, bytes BLOB NOT NULL, mime TEXT NOT NULL CHECK(mime='image/png'));` }]);
   const collaboration = registerCollaborationRoutes(app, config, database, now);
+  registerRecoveryBaselineRoutes(app, config, database, now);
   registerDocumentRoutes(app, config, database, now, beforeCommit, collaboration);
   registerBlobRoutes(app, config, database, now, beforeCommit);
   registerGrantRoutes(app, config, database, now, beforeCommit);

@@ -4,6 +4,7 @@ import { attachLocalCapture, RECOVERY_REPLAY_ORIGIN } from './local-capture';
 import * as Y from 'yjs';
 import { createHash } from 'node:crypto';
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
+import { recoveryDigest, recoveryVersionsDiffer, type SharedRecoveryBaseline } from './recovery-baseline';
 
 // Browser regressions cover native storage. This strict transaction double
 // exercises failure retention and migration from already persisted Blob rows.
@@ -48,6 +49,40 @@ function storage(initial: JournalRecord[] = []) {
   return { rows, fail(value: boolean) { fail = value; } };
 }
 afterEach(() => { vi.unstubAllGlobals(); });
+it('@05-05-01 records remote baseline updates without losing pending local edits', async () => {
+  const db = storage(); const journal = new AccountJournal(scope, () => {});
+  const root = new Y.Doc(); const content = new Y.Doc(); content.getMap('shapes').set('a', 0);
+  const base: SharedRecoveryBaseline = { version: 1, epoch: scope.recoveryEpoch!, root: { docId: 'root', data: Y.encodeStateAsUpdate(root) }, content: { docId: 'content', data: Y.encodeStateAsUpdate(content) }, title: 'Synthetic baseline', revision: 1, titleRevision: 1 };
+  await journal.checkpoint({ root: base.root, content: base.content, title: base.title, assets: {} });
+  await journal.observeShared(base);
+  const local = new Y.Doc(); Y.applyUpdate(local, base.content.data); const localVector = Y.encodeStateVector(local); local.getMap('shapes').set('a', 3);
+  const localId = await journal.captureUpdate('content', Y.encodeStateAsUpdate(local, localVector));
+  content.getMap('shapes').set('b', 7);
+  const remote = { ...base, content: { ...base.content, data: Y.encodeStateAsUpdate(content) }, revision: 2, titleRevision: 2 };
+  await journal.observeShared(remote);
+  const checkpoint = (await readCheckpoint(scope, journal.tabId))!;
+  expect(recoveryVersionsDiffer(checkpoint.shared, remote)).toBe(false);
+  const restored = new Y.Doc(); Y.applyUpdate(restored, checkpoint.content.data); Y.applyUpdate(restored, db.rows.get(localId)!.data as Uint8Array);
+  expect(restored.getMap('shapes').toJSON()).toEqual({ a: 3, b: 7 });
+  expect(db.rows.has(localId)).toBe(true);
+  root.destroy(); content.destroy(); local.destroy(); restored.destroy();
+});
+it('@05-05-01 exact transport identities persist separately and cannot be compacted into another receipt', async () => {
+  const db = storage(); const journal = new AccountJournal(scope, () => {}); const doc = new Y.Doc(); doc.getText('text').insert(0, 'Synthetic uncertain update');
+  const data = Y.encodeStateAsUpdate(doc); const attempt = { tabId: 'actual-live-tab', operationId: 'uncertain-operation', digest: await recoveryDigest(data) };
+  const token = await journal.captureSubmission('content', data, attempt);
+  const row = db.rows.get(token.ids[0]!)!; expect(row.attempt).toEqual(attempt); expect(row.tabId).toBe(journal.tabId);
+  await expect(journal.compact(token.ids)).rejects.toThrow(); expect(db.rows.has(row.id)).toBe(true); doc.destroy();
+});
+it('@05-05-01 failed baseline persistence leaves the previous checkpoint and all pending rows intact', async () => {
+  const db = storage(); const failed = vi.fn(); const journal = new AccountJournal(scope, failed); const doc = new Y.Doc();
+  const base: SharedRecoveryBaseline = { version: 1, epoch: scope.recoveryEpoch!, root: { docId: 'root', data: Y.encodeStateAsUpdate(doc) }, content: { docId: 'content', data: Y.encodeStateAsUpdate(doc) }, title: 'Synthetic baseline', revision: 1, titleRevision: 1 };
+  await journal.checkpoint({ root: base.root, content: base.content, title: base.title, assets: {} });
+  const id = await journal.captureUpdate('content', Y.encodeStateAsUpdate(doc)); db.fail(true);
+  await expect(journal.observeShared(base)).rejects.toThrow(); expect(failed).toHaveBeenCalledOnce();
+  expect((await readCheckpoint(scope, journal.tabId))!.shared).toBeUndefined(); expect(db.rows.has(id)).toBe(true);
+  db.fail(false); await journal.observeShared(base); expect((await readCheckpoint(scope, journal.tabId))!.shared).toEqual(base); doc.destroy();
+});
 function documentRows(doc: Y.Doc, count: number, resource = 'content'): JournalRecord[] {
   const rows: JournalRecord[] = [];
   const capture = (data: Uint8Array) => rows.push({ ...scope, schemaVersion: 2, epoch: scope.recoveryEpoch, tabId: 'batch-tab', coveredIds: [], id: `${resource}-${rows.length}`, sequence: rows.length + 1, kind: 'document', resource, data });

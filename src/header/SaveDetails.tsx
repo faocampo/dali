@@ -41,6 +41,7 @@ export function saveDetailsCopy(status: LocalSaveStatus, snapshot?: SaveSnapshot
     return { label: 'Read only', message: 'You can view this board. Editing requires access from the board owner.' };
   }
   const recovery = scope?.recoveryState;
+  if (recovery === 'choice') return { label: 'Changes pending', message: 'Your local version is kept separately. Use Review pending changes to choose how to continue.' };
   if (recovery === 'storage-paused') return { label: 'Editing paused', message: recoveryStorageMessage(scope?.storageFailure) };
   if (recovery === 'epoch-mismatch') return { label: 'Recovery needs attention', message: 'The server copy changed after a restore. Pending changes have been kept separately. Download a recovery copy before continuing with the restored board.' };
   if (recovery === 'corrupt') return { label: 'Recovery needs attention', message: "These pending changes could not be opened safely. Keep this browser's data and contact your operator for recovery help." };
@@ -70,7 +71,7 @@ export function SaveDetails({ status, snapshot, scope, downloadStatus, trigger, 
     if (!imageLabels.current.has(row.id)) imageLabels.current.set(row.id, caption || row.label);
     return { ...row, label: imageLabels.current.get(row.id)! };
   }) : [];
-  const retryable = permitted && status.state !== 'saved' && !['corrupt', 'epoch-mismatch', 'denied', 'expired'].includes(scope.recoveryState ?? '');
+  const retryable = permitted && status.state !== 'saved' && !['choice', 'corrupt', 'epoch-mismatch', 'denied', 'expired'].includes(scope.recoveryState ?? '');
   useLayoutEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
   useLayoutEffect(() => {
     const header = trigger.current?.closest('header');

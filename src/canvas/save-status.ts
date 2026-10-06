@@ -69,7 +69,10 @@ export function reduceSaveStatus(state: SaveSnapshot, event: SaveEvent): SaveSna
   const contentFailed = documents.some(row => row.failure && !row.acknowledged) || !!next.title?.failed;
   const unsafe = ['expired', 'denied', 'storage-paused', 'corrupt', 'epoch-mismatch', 'disposed'].includes(next.recovery ?? '');
   const allSaved = covered && (!next.title || next.title.acknowledged) && images.filter(row => row.required).every(row => row.state === 'saved') && !failed.length;
-  if (unsafe) {
+  if (next.recovery === 'choice') {
+    next.state = 'saving'; next.label = 'Changes pending'; next.retrying = false;
+    next.message = 'Your local version is kept separately. Review pending changes before continuing.';
+  } else if (unsafe) {
     next.state = 'failed'; next.label = next.recovery === 'expired' ? 'Sign in to continue' : next.recovery === 'denied' ? 'Access changed' : next.recovery === 'storage-paused' ? 'Editing paused' : 'Recovery needs attention';
     next.message = 'Keep this tab open. Your pending work needs attention.';
   } else if (failed.length || contentFailed) {

@@ -20,6 +20,7 @@ export type AccountWorkspaceOptions = Omit<SourceOptions, 'boardId' | 'rootDocId
   descriptor: BoardDescriptor;
   onReadonlyMutation?: (error: Error) => void;
   recoveryBaseline?: { root: Uint8Array; content: Uint8Array; assets: Map<string, Blob> };
+  recoveryQuarantined?: boolean;
   openRestored?: boolean;
 };
 
@@ -54,7 +55,7 @@ export class BoardWorkspace implements Workspace {
     if (!options.accountId || d.summary.accountId !== options.accountId || !Number.isSafeInteger(options.generation) ||
       !d.rootDocId || !d.contentDocId || d.rootDocId === d.contentDocId || !d.summary.id || !['owner', 'editor', 'viewer'].includes(d.summary.role)) throw new Error('Invalid board scope');
     if (mode === 'staging' && d.summary.role === 'viewer') throw new Error('Board is read-only');
-    this.readonly = d.summary.role === 'viewer';
+    this.readonly = d.summary.role === 'viewer' || !!options.recoveryQuarantined;
     this.key = JSON.stringify([options.accountId, d.summary.id, options.generation]);
     this.doc = new Y.Doc({ guid: d.rootDocId });
     this.awarenessStore = new AwarenessStore(new Awareness(this.doc));

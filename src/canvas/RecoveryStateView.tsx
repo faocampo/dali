@@ -1,6 +1,35 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { RecoveryOutcome } from './account/recovery';
 import type { RecoveryDownloadState } from './save-status';
+
+/** Pending versions stay immutable when this dialog is dismissed or reopened. */
+export function RecoveryVersionChoice({ reason }: { reason?: 'divergent' | 'unknown' | 'unchanged' }) {
+  const [open, setOpen] = useState(true);
+  const dialog = useRef<HTMLDialogElement>(null); const heading = useRef<HTMLHeadingElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (open) { dialog.current?.showModal(); heading.current?.focus({ preventScroll: true }); }
+  }, [open]);
+  const close = () => { setOpen(false); requestAnimationFrame(() => trigger.current?.focus()); };
+  const title = reason === 'divergent' ? 'This board changed while you were away' : reason === 'unchanged' ? 'Review your pending changes' : 'Choose a version to recover';
+  return <>
+    <section className="board-recovery board-recovery--compact" aria-label="Pending local version">
+      <button ref={trigger} className="djai-ghost" aria-haspopup="dialog" onClick={() => setOpen(true)}>Review pending changes</button>
+    </section>
+    {open && createPortal(<dialog ref={dialog} className="session-recovery recovery-version-dialog" aria-labelledby="recovery-version-heading" aria-describedby="recovery-version-description"
+      onCancel={event => { event.preventDefault(); close(); }} onKeyDown={event => event.stopPropagation()}>
+      <h2 ref={heading} id="recovery-version-heading" tabIndex={-1}>{title}</h2>
+      <p id="recovery-version-description">Load the latest shared board, or create a private copy with your local changes.</p>
+      <p>Your local version is kept in this browser. Shared changes are paused until you decide.</p>
+      <div className="board-recovery__actions">
+        <button className="djai-primary" disabled>Create private copy</button>
+        <button disabled>Load latest changes</button>
+        <button onClick={close}>Decide later</button>
+      </div>
+    </dialog>, document.body)}
+  </>;
+}
 
 export function RecoveryStateView({ state, retry, openRestored, download, downloadStatus, compact = false }: {
   state: RecoveryOutcome; retry?: () => void | Promise<unknown>; openRestored?: () => void; download?: () => Promise<unknown>; compact?: boolean;

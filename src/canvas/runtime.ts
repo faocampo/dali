@@ -12,13 +12,14 @@ import { interruptSession, revalidateSession } from '../auth/session';
 import { attachLocalCapture } from './account/local-capture';
 import { titleIntentStore, inspectPendingScopes } from './account/outbox';
 import { captureTitleIntent, replayTitleIntent, advanceLiveTitleIntent, validDocumentRevisionReceipt, type DocumentRevisionReceipt, bufferedTitleStore } from './account/title-intent';
+import { reconcileRecoveryReceipts, recoveryVersionsDiffer, validSharedRecoveryBaseline, type RecoveryReceipt, type SharedRecoveryBaseline } from './account/recovery-baseline';
 
 let captureTitle: ((title: string) => Promise<void>) | undefined;
 let preserveTitle: (() => Promise<void>) | undefined;
 export async function renameActiveBoard(title: string) { if (!captureTitle) throw new Error('Board access is unavailable'); await captureTitle(title); }
 
 export type BoardRole = BoardSummary['role'];
-export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; storageFailure?: RecoveryStorageFailure; retainedPending?: boolean | 'unavailable'; stalled?: boolean; title?: string }>;
+export type AccessScope = Readonly<{ accountId: string; boardId: string; generation: number; role: BoardRole; canWrite: boolean; phase: 'active' | 'paused' | 'disposed'; recoveryState?: RecoveryOutcome; recoveryChoice?: 'divergent' | 'unknown' | 'unchanged'; storageFailure?: RecoveryStorageFailure; retainedPending?: boolean | 'unavailable'; stalled?: boolean; title?: string }>;
 export type CanvasRuntime = { workspace: Workspace & Pick<BoardWorkspace, 'docSync' | 'waitForSynced' | 'live'>; store: Store; descriptor: BoardDescriptor; scope: AccessScope; captureUnacknowledged: () => Promise<unknown>[]; stopSaveStatus: () => void; dispose: () => void };
 let scope: AccessScope | null = null;
 let current: CanvasRuntime | null = null;
@@ -87,6 +88,12 @@ export async function synchronizeActiveBoard(accountId: string, boardId: string)
     await Promise.race([
       (async () => {
         if (!localJournal) throw new Error('Pending changes are unavailable');
+        if (runtime.descriptor.liveEnabled) {
+          if (!runtime.workspace.live?.connected) throw new Error('Recovery needs a version decision');
+          await runtime.workspace.waitForSynced(); assertCurrent();
+          if (getAccountSaveSnapshot()?.state !== 'saved' || (await pendingRecords(accountId, boardId)).some(row => row.tabId === localJournal.tabId)) throw new Error('Changes are waiting to save');
+          return;
+        }
         for (let attempt = 0; attempt < 3; attempt++) {
           assertCurrent(); if (controller.signal.aborted) throw new Error('Copy synchronization timed out');
           const root = Y.encodeStateAsUpdate(runtime.workspace.doc); const content = Y.encodeStateAsUpdate(runtime.store.spaceDoc);
@@ -136,16 +143,35 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   journal = scopedJournal;
   const isCurrent = () => scope?.generation === initial.generation && scope.phase === 'active';
   let baseline: AccountWorkspaceOptions['recoveryBaseline'];
+  let quarantined = false;
+  let captureReady = false;
+  const sharedEvidence: (() => Promise<void>)[] = [];
+  let sharedQueue = Promise.resolve();
+  const persistSharedEvidence = () => {
+    if (!captureReady || quarantined) return sharedQueue;
+    sharedQueue = sharedQueue.catch(() => {}).then(async () => {
+      while (sharedEvidence.length) {
+        if (!isCurrent()) throw new Error('Stale committed evidence');
+        await sharedEvidence[0]!(); sharedEvidence.shift();
+      }
+    });
+    return sharedQueue;
+  };
   let initializing = true;
   let authorizedDescriptor = options.descriptor;
   const liveTitleOperations = new Set<string>();
   const titles = bufferedTitleStore(titleIntentStore(scopedJournal.scope), error => {
     if (isCurrent()) pauseRecoveryStorage(error);
   }, value => liveTitleOperations.add(value.operationId));
-  const documentCommit = async (receipt: DocumentRevisionReceipt) => {
+  const documentCommit: NonNullable<AccountWorkspaceOptions['onDocumentCommit']> = async (receipt, document) => {
     if (!isCurrent() || !validDocumentRevisionReceipt(receipt)) throw new Error('Stale document receipt');
     if (authorizedDescriptor.revision === receipt.previousRevision) authorizedDescriptor.revision = receipt.revision;
     await advanceLiveTitleIntent(titles, liveTitleOperations, receipt);
+    if (authorizedDescriptor.liveEnabled && document) {
+      const data = new Uint8Array(document.data);
+      sharedEvidence.push(() => scopedJournal.acknowledgeSharedUpdate(document.docId, data, receipt.revision));
+      await persistSharedEvidence();
+    }
     if (!isCurrent()) throw new Error('Stale document receipt');
   };
   preserveTitle = () => titles.preserve();
@@ -274,8 +300,55 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   };
   const coordinator = recovery = new RecoveryCoordinator({
     current: isCurrent,
+    beforeReplay: async (authority, signal) => {
+      if (!authority.descriptor.liveEnabled) return;
+      const allRows = await pendingRecords(initial.accountId, initial.boardId);
+      const rows = options.openRestored ? allRows.filter(row => row.epoch === authority.descriptor.recoveryEpoch) : allRows;
+      const title = await titles.read();
+      if (!isCurrent() || signal.aborted) throw new Error('Stale recovery inspection');
+      if (rows.some(row => row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+      if (rows.some(row => !validRecord(row))) throw new RecoveryStorageError('CORRUPT');
+      if (!rows.length && !title) return;
+      // An online native send owns its own reservation and acknowledgement.
+      // The generic recovery drain must never race that ordinary save.
+      if (!initializing && !quarantined && current?.workspace.live?.connected) return;
+      quarantined = true;
+      if (current) { current.store.readonly = true; current.workspace.docSync.forceStop(); current.workspace.live?.dispose(); }
+      publish({ ...scope!, canWrite: false });
+      const tab = rows.some(row => row.tabId === scopedJournal.tabId) ? scopedJournal.tabId : rows[0]?.tabId ?? scopedJournal.tabId;
+      const candidateRows = rows.filter(row => row.tabId === tab);
+      const checkpoint = await readCheckpoint(scopedJournal.scope, tab);
+      if (!checkpoint || checkpoint.root.docId !== authority.descriptor.rootDocId || checkpoint.content.docId !== authority.descriptor.contentDocId || candidateRows.some(row => row.kind === 'document' && ![checkpoint.root.docId, checkpoint.content.docId].includes(row.resource))) throw new RecoveryStorageError('CORRUPT');
+      if (!isCurrent() || signal.aborted) throw new Error('Stale recovery candidate');
+      const merged = (id: string, data: Uint8Array) => Y.mergeUpdates([data, ...candidateRows.filter(row => row.kind === 'document' && row.resource === id).map(row => row.data as Uint8Array)]);
+      const assets = new Map<string, Blob>();
+      for (const [id, asset] of Object.entries(checkpoint.assets)) if (asset.data) assets.set(id, new Blob([new Uint8Array(asset.data)], { type: asset.mime }));
+      for (const row of candidateRows) if (row.kind === 'blob') assets.set(row.resource, row.data instanceof Blob ? row.data : new Blob([new Uint8Array(row.data)], { type: row.mime }));
+      baseline = { root: merged(checkpoint.root.docId, checkpoint.root.data), content: merged(checkpoint.content.docId, checkpoint.content.data), assets };
+      for (const [id, blob] of assets) retainedAssets.set(id, blob);
+      const attempted = candidateRows.filter(row => row.attempt);
+      const attempts = attempted.length <= 256 ? attempted.map(row => ({ ...row.attempt!, docId: row.resource })) : [];
+      const response = await (options.fetch ?? fetch)(`/api/boards/${encodeURIComponent(initial.boardId)}/recovery/baseline`, {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store', signal,
+        headers: { 'Content-Type': 'application/json', 'X-Dali-Account': initial.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': authority.descriptor.recoveryEpoch }, body: JSON.stringify({ attempts }),
+      });
+      if (!isCurrent() || signal.aborted) throw new Error('Stale recovery baseline');
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({})) as { code?: string };
+        if (result.code === 'RECOVERY_EPOCH_MISMATCH') throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+        if ([401, 403, 404, 409].includes(response.status)) throw new SourceAccessError(response.status);
+        throw new Error('Recovery baseline unavailable');
+      }
+      const wire = await response.json();
+      const decode = (value: string) => Uint8Array.from(atob(value), c => c.charCodeAt(0));
+      const latest: SharedRecoveryBaseline = { ...wire, root: { ...wire.root, data: decode(wire.root?.data) }, content: { ...wire.content, data: decode(wire.content?.data) } };
+      if (!validSharedRecoveryBaseline(latest) || latest.epoch !== authority.descriptor.recoveryEpoch || latest.root.docId !== checkpoint.root.docId || latest.content.docId !== checkpoint.content.docId || !Array.isArray(wire.receipts) || wire.receipts.length > attempts.length) throw new Error('Invalid recovery baseline');
+      const expected = checkpoint.shared && attempted.length <= 256 ? (await reconcileRecoveryReceipts(checkpoint.shared, candidateRows, wire.receipts as RecoveryReceipt[])).baseline : undefined;
+      if (!isCurrent() || signal.aborted) throw new Error('Stale recovery decision');
+      publish({ ...scope!, title: title?.title ?? checkpoint.title, recoveryChoice: !expected ? 'unknown' : recoveryVersionsDiffer(expected, latest) ? 'divergent' : 'unchanged' });
+      throw Object.assign(new Error('Choose a recovery version'), { code: 'RECOVERY_CHOICE' });
+    },
     title: async (authority, signal) => {
-      if (authority.descriptor.liveEnabled && (await pendingRecords(initial.accountId, initial.boardId)).length) throw new Error('Live recovery requires version reconciliation');
       const titleScopes = await inspectPendingScopes(initial.accountId);
       if (!isCurrent() || signal.aborted) throw new Error('Stale title recovery');
       if (!options.openRestored && titleScopes.some(row => row.boardId === initial.boardId && row.epoch !== authority.descriptor.recoveryEpoch)) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
@@ -317,6 +390,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     },
     authorize,
     inspect: async authority => {
+      if (authority.descriptor.liveEnabled) return false; // Pending live candidates are handled by the version gate.
       const allRows = await pendingRecords(initial.accountId, initial.boardId);
       const rows = options.openRestored ? allRows.filter(row => row.epoch === authority.descriptor.recoveryEpoch) : allRows;
       if (!isCurrent()) throw new Error('Stale recovery');
@@ -337,7 +411,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       }
       return rows.length > 0;
     },
-    preserve: async () => { await scopedJournal.preserve(); await titles.preserve(); },
+    preserve: async () => { await scopedJournal.preserve(); await titles.preserve(); await persistSharedEvidence(); },
     verify: async (authority, signal) => {
       const snapshot = getAccountSaveSnapshot();
       if (snapshot?.scope !== statusScope) return;
@@ -380,7 +454,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
         storagePaused = false;
         if (current) { current.store.readonly = false; current.workspace.docSync.start(); }
       }
-      const blocked = storagePaused || ['corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(recoveryState);
+      const blocked = storagePaused || quarantined || ['choice', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(recoveryState);
       if (current && blocked) current.store.readonly = true;
       publish({ ...scope!, canWrite: !blocked && initial.role !== 'viewer', recoveryState: storagePaused ? 'storage-paused' : recoveryState, storageFailure: storagePaused ? scope?.storageFailure : undefined, stalled });
       if (recoveryState === 'expired') void interruptSession();
@@ -407,9 +481,9 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     if (!isCurrent() || requestAbort.signal.aborted || scope?.accountId !== authority.accountId || scope.boardId !== authority.descriptor.summary.id) throw new SourceAccessError(409);
     initializing = false;
     authorizedDescriptor = authority.descriptor;
-    publish({ ...scope!, role: authority.descriptor.summary.role, canWrite: !storagePaused && authority.descriptor.summary.role !== 'viewer', retainedPending });
+    publish({ ...scope!, role: authority.descriptor.summary.role, canWrite: !storagePaused && !quarantined && authority.descriptor.summary.role !== 'viewer', retainedPending });
     return import('./account/board-workspace');
-  }).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, descriptor: authorizedDescriptor, isCurrent, recoveryBaseline: baseline,
+  }).then(({ createAccountWorkspace }) => createAccountWorkspace({ ...options, descriptor: authorizedDescriptor, isCurrent, recoveryBaseline: baseline, recoveryQuarantined: quarantined,
     // Workspace lifetime is distinct from request cancellation while preservation is pending.
     durableLocalBlobs: true,
     // pagehide pauses this runtime before the live-source cleanup listener.
@@ -425,6 +499,11 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       return clean() && !title && !rows.some(row => row.tabId === scopedJournal.tabId);
     },
     onDocumentCommit: documentCommit,
+    onLiveSnapshot: observed => {
+      const snapshot = structuredClone(observed);
+      sharedEvidence.push(() => scopedJournal.observeShared(snapshot));
+      void persistSharedEvidence().catch(error => { if (isCurrent()) pauseRecoveryStorage(error); });
+    },
     onLiveMetadata: metadata => {
       ++liveMetadataVersion; latestLiveMetadata = metadata;
       projectLiveMetadata();
@@ -436,7 +515,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (isCurrent() && init?.method === 'GET' && local) return Promise.resolve(new Response(local, { headers: { 'Content-Type': local.type } }));
       return (options.fetch ?? fetch)(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, requestAbort.signal]) : requestAbort.signal });
     },
-    onPendingDocument: (id, data) => scopedJournal.captureSubmission(id, data),
+    onPendingDocument: (id, data, attempt) => scopedJournal.captureSubmission(id, data, attempt),
     onPendingBlob: (key, value) => { retainedAssets.set(key, value); return scopedJournal.capture('blob', key, value); },
     onFetchedBlob: authorizedDescriptor.summary.role !== 'viewer' ? async (key, value) => {
       retainedAssets.set(key, value);
@@ -454,7 +533,9 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       return scopedJournal.acknowledge(receipt.ids);
     },
     beforeDocumentWrite: async (docId, data, live) => {
+      if (quarantined) throw new Error('Choose a recovery version before saving');
       if (live) {
+        await persistSharedEvidence();
         const authority = await authorize(requestAbort.signal);
         if (!isCurrent() || authority.descriptor.summary.role === 'viewer' || !authority.descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
         if (authority.descriptor.recoveryEpoch !== authorizedDescriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
@@ -483,9 +564,9 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
   })).then(async workspace => {
     if (!isCurrent()) { workspace.dispose(); throw new Error('Board access changed'); }
     const store = workspace.getDoc(options.descriptor.contentDocId)!.getStore();
-    const local = authorizedDescriptor.summary.role !== 'viewer' ? attachLocalCapture({ journal: scopedJournal, root: workspace.doc, content: store.spaceDoc, title: options.descriptor.summary.title, isCurrent }) : undefined;
+    const local = authorizedDescriptor.summary.role !== 'viewer' && !quarantined ? attachLocalCapture({ journal: scopedJournal, root: workspace.doc, content: store.spaceDoc, title: authorizedDescriptor.summary.title, isCurrent }) : undefined;
     try {
-      try { await local?.ready; } catch (error) { pauseRecoveryStorage(error); }
+      try { await local?.ready; captureReady = !!local; await persistSharedEvidence(); } catch (error) { pauseRecoveryStorage(error); }
       if (local) {
         void requestRecoveryStorage();
         const keys = new Set<string>();
@@ -524,7 +605,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       }),
       stopSaveStatus: stopStatus, dispose: () => { local?.dispose(); stopStatus(); workspace.dispose(); } };
     current = value;
-    if (storagePaused) { store.readonly = true; workspace.docSync.forceStop(); }
+    if (storagePaused || quarantined) { store.readonly = true; workspace.docSync.forceStop(); }
     return value;
   }).catch(error => { for (const timer of timers.values()) clearTimeout(timer); for (const doc of confirmed.values()) doc.destroy(); if (pending?.key === key) pending = null; throw error; });
   pending = { key, promise }; return promise;

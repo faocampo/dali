@@ -3,13 +3,14 @@ import type { BoardDescriptor } from '../../boards/BoardLibrary';
 import { SourceAccessError, RecoveryEpochError, validRecoveryEpoch } from './doc-source';
 import * as Y from 'yjs';
 import { validTitleIntent, type TitleIntent, type TitleStore } from './title-intent';
+import { advanceSharedBaseline, canonicalRecoveryUpdate, validRecoveryAttempt, validSharedRecoveryBaseline, type RecoveryAttempt, type SharedRecoveryBaseline } from './recovery-baseline';
 
 export type JournalScope = { accountId: string; boardId: string; generation: number; recoveryEpoch?: string };
 export type JournalRecord = JournalScope & { id: string; sequence: number; kind: 'document' | 'blob'; resource: string; data: Uint8Array | Blob; mime?: string;
-  schemaVersion?: number; epoch?: string; tabId?: string; coveredIds?: string[] };
+  schemaVersion?: number; epoch?: string; tabId?: string; coveredIds?: string[]; attempt?: RecoveryAttempt };
 export type RecoveryCheckpoint = { schemaVersion: 2; accountId: string; boardId: string; epoch: string; tabId: string;
   root: { docId: string; data: Uint8Array }; content: { docId: string; data: Uint8Array }; title: string;
-  assets: Record<string, { mime?: string; data?: Uint8Array }> };
+  assets: Record<string, { mime?: string; data?: Uint8Array }>; shared?: SharedRecoveryBaseline };
 export const recoveryDatabaseName = 'dali-account-recovery-v1';
 const tabId = (() => {
   const fresh = crypto.randomUUID();
@@ -49,6 +50,7 @@ function assertScope(scope: JournalScope) {
   if (!bounded(scope.accountId) || !bounded(scope.boardId) || !validRecoveryEpoch(scope.recoveryEpoch) || !Number.isSafeInteger(scope.generation) || scope.generation < 0) throw new RecoveryStorageError('CORRUPT');
 }
 export function validRecord(record: JournalRecord): boolean {
+  if (record.attempt !== undefined && (record.kind !== 'document' || !validRecoveryAttempt(record.attempt))) return false;
   if (record.schemaVersion !== 2 || !validRecoveryEpoch(record.epoch) || record.epoch !== record.recoveryEpoch || !bounded(record.id) || !bounded(record.tabId) || !bounded(record.accountId) || !bounded(record.boardId) || !bounded(record.resource) || !Number.isSafeInteger(record.sequence) || record.sequence < 1 || !Array.isArray(record.coveredIds) || record.coveredIds.length > 10000 || !record.coveredIds.every(bounded)) return false;
   if (!(record.data instanceof Uint8Array || record.data instanceof Blob)) return false;
   const size = record.data instanceof Blob ? record.data.size : record.data.byteLength;
@@ -58,6 +60,7 @@ export function validRecord(record: JournalRecord): boolean {
   try { Y.decodeUpdate(record.data); return true; } catch { return false; }
 }
 function assertCheckpoint(value: RecoveryCheckpoint) {
+  if (value.shared !== undefined && (!validSharedRecoveryBaseline(value.shared) || value.shared.epoch !== value.epoch || value.shared.root.docId !== value.root?.docId || value.shared.content.docId !== value.content?.docId)) throw new RecoveryStorageError('CORRUPT');
   if (value.schemaVersion !== 2 || !bounded(value.accountId) || !bounded(value.boardId) || !validRecoveryEpoch(value.epoch) || !bounded(value.tabId) || !bounded(value.root?.docId) || !bounded(value.content?.docId) || value.root.docId === value.content.docId || typeof value.title !== 'string' || value.title.length > 4000 || !value.assets || typeof value.assets !== 'object' || Array.isArray(value.assets) || Object.keys(value.assets).length > 10000) throw new RecoveryStorageError('CORRUPT');
   for (const doc of [value.root, value.content]) {
     if (!(doc.data instanceof Uint8Array) || !doc.data.byteLength || doc.data.byteLength > 8 * 1024 * 1024) throw new RecoveryStorageError('CORRUPT');
@@ -289,7 +292,7 @@ export class AccountJournal {
   get tabId() { return tabId; }
   pendingMemory() { return [...this.memory.values()].map(record => structuredClone(record)); }
   captureUpdate(resource: string, data: Uint8Array) { return this.capture('document', resource, data); }
-  async captureSubmission(resource: string, data: Uint8Array) {
+  async captureSubmission(resource: string, data: Uint8Array, attempt?: RecoveryAttempt) {
     const update = new Uint8Array(data);
     // Native sync may observe a Yjs event before the independent listener.
     // Let all synchronous listeners capture it before freezing exact coverage.
@@ -306,7 +309,7 @@ export class AccountJournal {
       const snapshot = Y.snapshot(candidate);
       covered = [...this.owned.values()].filter(record => record.kind === 'document' && record.resource === resource && record.data instanceof Uint8Array && Y.snapshotContainsUpdate(snapshot, record.data)).map(record => record.id);
     } finally { candidate.destroy(); }
-    const id = await this.capture('document', resource, update, covered);
+    const id = await this.capture('document', resource, update, covered, attempt);
     await this.preserve();
     return Object.freeze({ scope: this.scope, ids: Object.freeze([id, ...covered]) });
   }
@@ -326,7 +329,8 @@ export class AccountJournal {
           if (record && matchesScope(record, this.scope) && record.tabId === tabId) records.push(record);
           if (--pending) return;
           if (!records.length) { done(undefined); return; }
-          if (records.some(record => !validRecord(record) || record.kind !== 'document' || record.resource !== records[0]!.resource)) { tx.abort(); return; }
+          // Exact uncertain transport attempts must remain separately provable.
+          if (records.some(record => !validRecord(record) || record.kind !== 'document' || record.attempt || record.resource !== records[0]!.resource)) { tx.abort(); return; }
           const sequences = tx.objectStore('sequences'); const key = scopeKey(this.scope); const sequence = sequences.get(key);
           sequence.onsuccess = () => {
             try {
@@ -394,8 +398,8 @@ export class AccountJournal {
       };
     });
   }
-  async capture(kind: JournalRecord['kind'], resource: string, data: Uint8Array | Blob, coveredIds: string[] = []): Promise<string> {
-    const record: JournalRecord = { ...this.scope, schemaVersion: 2, epoch: this.scope.recoveryEpoch, tabId, coveredIds: [...coveredIds], id: crypto.randomUUID(), sequence: 0, kind, resource,
+  async capture(kind: JournalRecord['kind'], resource: string, data: Uint8Array | Blob, coveredIds: string[] = [], attempt?: RecoveryAttempt): Promise<string> {
+    const record: JournalRecord = { ...this.scope, schemaVersion: 2, epoch: this.scope.recoveryEpoch, tabId, coveredIds: [...coveredIds], ...(attempt ? { attempt: { ...attempt } } : {}), id: crypto.randomUUID(), sequence: 0, kind, resource,
       data: data instanceof Uint8Array ? new Uint8Array(data) : data };
     this.memory.set(record.id, record); this.owned.set(record.id, record);
     const write = (async () => { if (kind === 'blob' && data instanceof Blob) await this.cacheAsset(resource, data); await persistRecord(record); })(); this.writes.add(write);
@@ -410,6 +414,42 @@ export class AccountJournal {
     for (const record of this.memory.values()) {
       await persistRecord(record); this.memory.delete(record.id);
     }
+  }
+  /** Advance only committed evidence and already received remote content. */
+  async observeShared(observed: SharedRecoveryBaseline) {
+    if (!validSharedRecoveryBaseline(observed) || observed.epoch !== this.scope.recoveryEpoch) throw new RecoveryStorageError('CORRUPT');
+    return this.updateShared(value => advanceSharedBaseline(value, observed));
+  }
+  async acknowledgeSharedUpdate(resource: string, data: Uint8Array, revision: number) {
+    return this.updateShared(value => {
+      if (!value) return undefined; // Legacy checkpoints remain conservative.
+      const key = resource === value.root.docId ? 'root' : resource === value.content.docId ? 'content' : undefined;
+      if (!key || !Number.isSafeInteger(revision) || revision < 0) throw new RecoveryStorageError('CORRUPT');
+      return { ...value, revision: Math.max(revision, value.revision), [key]: { docId: resource, data: canonicalRecoveryUpdate([value[key].data, data]) } };
+    });
+  }
+  private async updateShared(update: (previous?: SharedRecoveryBaseline) => SharedRecoveryBaseline | undefined) {
+    const write = transaction<void>(['checkpoints'], 'readwrite', (tx, done) => {
+      const store = tx.objectStore('checkpoints'); const request = store.get(checkpointId(this.scope));
+      request.onsuccess = () => {
+        try {
+          const value = request.result as RecoveryCheckpoint | undefined;
+          if (!value) throw new RecoveryStorageError('FAILED');
+          assertCheckpoint(value);
+          if (value.accountId !== this.scope.accountId || value.boardId !== this.scope.boardId || value.epoch !== this.scope.recoveryEpoch || value.tabId !== tabId) throw new RecoveryStorageError('CORRUPT');
+          const shared = update(value.shared);
+          if (shared) {
+            value.shared = shared;
+            value.root.data = canonicalRecoveryUpdate([value.root.data, shared.root.data]);
+            value.content.data = canonicalRecoveryUpdate([value.content.data, shared.content.data]);
+            assertCheckpoint(value); store.put({ ...value, id: checkpointId(this.scope) });
+          }
+          done(undefined);
+        } catch (error) { abortWithFailure(tx, error); }
+      };
+    });
+    this.writes.add(write);
+    try { await write; } catch (error) { this.onFailure(error); throw error; } finally { this.writes.delete(write); }
   }
 }
 /** Fresh descriptor and expected identity precede every replay; Yjs/hash keys are idempotent. */

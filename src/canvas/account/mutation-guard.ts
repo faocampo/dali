@@ -3,7 +3,7 @@ import * as Y from 'yjs';
 import type { Store } from '@blocksuite/affine/store';
 import { getActiveAccessScope, subscribeAccessScope, type AccessScope } from '../runtime';
 const guards = new WeakMap<Store, { references: number; release: () => void }>();
-export const recoveryBlocksMutation = (scope: AccessScope) => ['storage-paused', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(scope.recoveryState ?? '');
+export const recoveryBlocksMutation = (scope: AccessScope) => ['choice', 'storage-paused', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(scope.recoveryState ?? '');
 export function canMutateCurrentScope(expected: AccessScope) { return accessScopeCurrent(expected, true); }
 export function canExportRecoveryScope(expected: AccessScope) { const current = getActiveAccessScope(); return accessScopeCurrent(expected) && current?.role !== 'viewer' && !['expired', 'denied', 'corrupt'].includes(current?.recoveryState ?? ''); }
 

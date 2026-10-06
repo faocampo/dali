@@ -1,5 +1,5 @@
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
-export type RecoveryOutcome = 'checking-access' | 'recovering' | 'pending' | 'retrying' | 'saved' | 'expired' | 'denied' | 'storage-paused' | 'corrupt' | 'epoch-mismatch';
+export type RecoveryOutcome = 'checking-access' | 'recovering' | 'pending' | 'retrying' | 'choice' | 'saved' | 'expired' | 'denied' | 'storage-paused' | 'corrupt' | 'epoch-mismatch';
 export type RecoveryStorageFailure = 'quota' | 'unavailable';
 /** Preserve typed storage failures through coordinator wrappers; never infer from copy. */
 export function recoveryStorageFailure(error: unknown): RecoveryStorageFailure {
@@ -17,20 +17,21 @@ export function recoveryStorageMessage(failure?: RecoveryStorageFailure) {
     : 'This browser cannot preserve more changes. Keep this tab open. Download a recovery copy, allow storage for this site, then retry saving.';
 }
 export type RecoveryAuthority = { accountId: string; expiresAt: number; descriptor: BoardDescriptor };
-export type RecoveryDependencies = { authorize: (signal: AbortSignal) => Promise<RecoveryAuthority>; title?: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; inspect: (authority: RecoveryAuthority) => Promise<boolean>; drain: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; verify?: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; preserve: () => Promise<void>; current: () => boolean; changed: (state: RecoveryOutcome, stalled: boolean, error?: unknown) => void; now?: () => number; random?: () => number };
+export type RecoveryDependencies = { authorize: (signal: AbortSignal) => Promise<RecoveryAuthority>; beforeReplay?: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; title?: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; inspect: (authority: RecoveryAuthority) => Promise<boolean>; drain: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; verify?: (authority: RecoveryAuthority, signal: AbortSignal) => Promise<void>; preserve: () => Promise<void>; current: () => boolean; changed: (state: RecoveryOutcome, stalled: boolean, error?: unknown) => void; now?: () => number; random?: () => number };
 export class RecoveryCoordinator {
   private flight?: Promise<RecoveryAuthority | undefined>;
   private controller?: AbortController;
   private timer?: ReturnType<typeof setTimeout>;
   private attempt = 0;
   private disposed = false;
+  private awaitingChoice = false;
   private authority?: RecoveryAuthority;
   constructor(private dependencies: RecoveryDependencies) {}
   private emit(state: RecoveryOutcome, stalled = false, error?: unknown) { if (!this.disposed && this.dependencies.current()) this.dependencies.changed(state, stalled, error); }
   private assertCurrent(signal: AbortSignal) { if (this.disposed || signal.aborted || !this.dependencies.current()) throw new Error('Recovery interrupted'); }
   open() { return this.run(false); }
   retryRecovery() { return this.run(true); }
-  retryIfIdle() { if (!this.flight && !this.timer && !this.disposed) void this.run(true); }
+  retryIfIdle() { if (!this.flight && !this.timer && !this.disposed && !this.awaitingChoice) void this.run(true); }
   dispose() { this.disposed = true; clearTimeout(this.timer); this.controller?.abort(); }
   private run(retry: boolean): Promise<RecoveryAuthority | undefined> {
     if (this.disposed || !this.dependencies.current()) return Promise.resolve(undefined);
@@ -56,6 +57,7 @@ export class RecoveryCoordinator {
           if (authority.descriptor.summary.role === 'viewer' || !authority.descriptor.capabilities.includes('write')) { this.emit('denied'); return authority; }
           try { await d.preserve(); } catch (error) { throw Object.assign(new Error('Local preservation failed'), { code: 'STORAGE_PAUSED', cause: error }); }
           this.assertCurrent(signal);
+          await d.beforeReplay?.(authority, signal); this.assertCurrent(signal);
           await d.title?.(authority, signal); this.assertCurrent(signal);
           const pending = await d.inspect(authority); this.assertCurrent(signal);
           if (pending) {
@@ -63,7 +65,7 @@ export class RecoveryCoordinator {
             await d.drain(authority, signal); this.assertCurrent(signal);
           }
           await d.verify?.(authority, signal); this.assertCurrent(signal);
-          this.attempt = 0; this.emit('saved'); return authority;
+          this.attempt = 0; this.awaitingChoice = false; this.emit('saved'); return authority;
         })(),
         new Promise<never>((_, reject) => { timeout = setTimeout(() => { controller.abort(); reject(new Error('Recovery timed out')); }, 30000); }),
       ]);
@@ -71,7 +73,8 @@ export class RecoveryCoordinator {
     } catch (error) {
       if (this.disposed || !d.current()) return;
       const { status, code } = error as { status?: number; code?: string };
-      if (status === 401) this.emit('expired');
+      if (code === 'RECOVERY_CHOICE') { this.awaitingChoice = true; this.emit('choice'); }
+      else if (status === 401) this.emit('expired');
       else if ([403, 404, 409].includes(status ?? 0)) this.emit('denied');
       else if (code === 'RECOVERY_EPOCH_MISMATCH' || code === 'RECOVERY_EPOCH_REQUIRED') this.emit('epoch-mismatch');
       else if (code === 'CORRUPT' || code === 'LEGACY') this.emit('corrupt');

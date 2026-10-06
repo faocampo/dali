@@ -51,6 +51,7 @@ export class BoardLiveSource {
   private interrupted = false;
   private started = false;
   private readonly tabId = crypto.randomUUID();
+  get transportTabId() { return this.tabId; }
   private epoch?: string;
   private readonly abort = () => this.dispose();
   constructor(private options: SourceOptions) {
@@ -96,7 +97,12 @@ export class BoardLiveSource {
     // Decode the pair before delivering either document.
     const root = snapshot.root ? decode(snapshot.root) : undefined;
     const content = snapshot.content ? decode(snapshot.content) : undefined;
-    if (root && content) { Y.decodeUpdate(root); Y.decodeUpdate(content); receive(this.options.rootDocId, root); this.current(); receive(this.options.contentDocId, content); }
+    if (root && content) {
+      Y.decodeUpdate(root); Y.decodeUpdate(content);
+      if (snapshot.title !== undefined) this.options.onLiveSnapshot?.({ version: 1, epoch: snapshot.epoch, revision: snapshot.revision, titleRevision: snapshot.revision, title: snapshot.title,
+        root: { docId: this.options.rootDocId, data: root }, content: { docId: this.options.contentDocId, data: content } });
+      receive(this.options.rootDocId, root); this.current(); receive(this.options.contentDocId, content);
+    }
     this.revision = snapshot.revision; this.epoch = snapshot.epoch;
     if (snapshot.title !== undefined) this.options.onLiveMetadata?.({ title: snapshot.title, revision: snapshot.revision });
   }

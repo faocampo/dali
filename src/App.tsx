@@ -4,7 +4,7 @@ import { BoardLibrary, validDescriptor, type BoardDescriptor } from './boards/Bo
 import BlockSuiteCanvas from './canvas/BlockSuiteCanvas';
 import { Header } from './header/Header';
 import { disposeCanvasRuntime, getCanvasRuntime, getActiveAccessScope, subscribeAccessScope, nextAccessGeneration, suspendAccessScope, type CanvasRuntime } from './canvas/runtime';
-import { RecoveryStateView } from './canvas/RecoveryStateView';
+import { RecoveryStateView, RecoveryVersionChoice } from './canvas/RecoveryStateView';
 import { accountBoardUrl, accountIntent } from './boards/preferences';
 import { createAccountBoard, renameOpenAccountBoard } from './boards/operations';
 import { discardRecords } from './canvas/account/outbox';
@@ -86,6 +86,7 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   return <div className="djai-app" data-board-id={board!.summary.id}>
     <Header boardTitle={activeScope?.title ?? board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={board?.summary.role !== 'viewer' ? renameBoard : undefined} onOpenRestored={() => { setRestored(true); setRetry(value => value + 1); }} />
     <main className="djai-canvas-area"><BlockSuiteCanvas runtime={runtime!} /></main>
+    {activeScope?.recoveryState === 'choice' && <RecoveryVersionChoice reason={activeScope.recoveryChoice} />}
   </div>;
 }
 export default function App() {

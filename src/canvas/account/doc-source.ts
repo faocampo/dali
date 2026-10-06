@@ -1,6 +1,7 @@
 import type { BoardLiveSource } from './live-source';
 import { validDocumentRevisionReceipt, type DocumentRevisionReceipt } from './title-intent';
 import type { DocSource } from '@blocksuite/affine/sync';
+import { recoveryDigest, type RecoveryAttempt, type SharedRecoveryBaseline } from './recovery-baseline';
 
 export type SourceOptions = {
   boardId: string; rootDocId: string; contentDocId: string; accountId: string; generation: number;
@@ -9,8 +10,9 @@ export type SourceOptions = {
   /** Only retires the original connection; independent from canceled runtime requests. */
   disconnectFetch?: typeof fetch;
   onAuthorizationLost?: (error: SourceAccessError) => void;
-  onPendingDocument?: (docId: string, data: Uint8Array) => unknown | Promise<unknown>;
-  onDocumentCommit?: (receipt: DocumentRevisionReceipt) => Promise<void>;
+  onPendingDocument?: (docId: string, data: Uint8Array, attempt?: RecoveryAttempt) => unknown | Promise<unknown>;
+  onDocumentCommit?: (receipt: DocumentRevisionReceipt, document?: { docId: string; data: Uint8Array }) => Promise<void>;
+  onLiveSnapshot?: (snapshot: SharedRecoveryBaseline) => void;
   onLiveMetadata?: (metadata: { title: string; revision: number }) => void;
   canReconnectLive?: (snapshot?: { root: Uint8Array; content: Uint8Array }) => Promise<boolean>;
   onLiveReconnected?: () => void;
@@ -80,7 +82,8 @@ export class BoardDocSource implements DocSource {
     this.options.onDocumentOutcome?.(docId, copy, 'sending', attempt);
     try {
       const epoch = sourceRecoveryEpoch(this.options);
-      const token = await this.options.onPendingDocument?.(docId, copy);
+      const metadata = this.options.live ? { tabId: this.options.live.transportTabId, operationId: attempt, digest: await recoveryDigest(copy) } : undefined;
+      const token = await this.options.onPendingDocument?.(docId, copy, metadata);
       let replayOutcome: 'acknowledged' | void;
       try { replayOutcome = await this.options.beforeDocumentWrite?.(docId, copy, !!this.options.live); }
       catch (error) { if (error instanceof SourceAccessError) this.options.onAuthorizationLost?.(error); throw error; }
@@ -102,7 +105,7 @@ export class BoardDocSource implements DocSource {
         const result: unknown = await response.json(); this.assertCurrent(docId, true);
         if (!result || typeof result !== 'object' || !('acknowledged' in result) || result.acknowledged !== true) throw new Error('Document commit unconfirmed');
         confirmRecoveryEpoch(this.options, epoch, response);
-        if (validDocumentRevisionReceipt(result)) await this.options.onDocumentCommit?.(result);
+        if (validDocumentRevisionReceipt(result)) await this.options.onDocumentCommit?.(result, { docId, data: copy });
         this.assertCurrent(docId, true);
       }
       await this.options.onAcknowledged?.(token);
