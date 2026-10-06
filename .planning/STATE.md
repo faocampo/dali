@@ -5,7 +5,7 @@ status: in_progress
 stopped_at: Plan 05-04 property provenance committed; continue reconnect lifetime and native acceptance
 last_updated: "2026-10-06T16:46:48+00:00"
 last_activity: 2026-10-06
-last_activity_desc: Property history passes 7 native Chromium, 258 client and 375 server tests; cross-browser gate running
+last_activity_desc: Property history passes 7 Chromium, 14 Firefox/WebKit, 258 client and 375 server tests
 state_head: eb1d2218e1aaa0e74909792626d1e212687c8350
 progress:
   total_phases: 13
@@ -26,7 +26,7 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
 **Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 04 personal undo and redo
 
-Plan 05-04 remains partial at `eb1d221`: acknowledged per-property account/tab provenance, ABA detection, fresh history reservations, commit-time inverse checks, native conflicting-step skipping, busy controls and migration 11/backup support are implemented. Fresh resumed gates pass 258/258 client, 375/375 server, both typechecks and 7/7 native Chromium history cases, zero skips/retries. Expanded Firefox/WebKit qualification is running. Reconnect lifetime, the remaining native structural/text/ABA cases and relevant regression gates remain pending; no additional plan is marked complete. The earlier capture foundation `661791a` retains its separate 46 Chromium and 2 Firefox/WebKit evidence. Interrupted runs during the executor outage are not counted as passing. See [05-04-EXECUTION.md](phases/05-real-time-collaborative-editing/05-04-EXECUTION.md).
+Plan 05-04 remains partial at `eb1d221`: acknowledged per-property account/tab provenance, ABA detection, fresh history reservations, commit-time inverse checks, native conflicting-step skipping, busy controls and migration 11/backup support are implemented. Fresh resumed gates pass 258/258 client, 375/375 server, both typechecks, 7/7 native Chromium history cases and 14/14 Firefox/WebKit cases, zero skips/retries. Reconnect lifetime, the remaining native structural/text/ABA cases and relevant regression gates remain pending; no additional plan is marked complete. The earlier capture foundation `661791a` retains its separate 46 Chromium and 2 Firefox/WebKit evidence. Interrupted runs during the executor outage are not counted as passing. See [05-04-EXECUTION.md](phases/05-real-time-collaborative-editing/05-04-EXECUTION.md).
 
 ## Current Position
 

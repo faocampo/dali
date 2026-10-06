@@ -37,7 +37,7 @@ Evidence so far:
 - On resumed current source: both typechecks and full client 258/258 pass.
 - Expanded native Chromium history: 7/7 pass, zero skips/retries, 1.3 minutes. Covers same-object independent properties, skipped conflicting steps, redo conflicts, another tab of the same account, remotely edited creations, delete/undo/redo, complete text sessions, convergence and reopen/reset.
 - Full serialized server: 375/375 across 18 files, 154.64 seconds. Includes the synthetic local storage drill; it is not independent-storage/operator acceptance.
-- Expanded Firefox/WebKit gate is still running; no success is inferred.
+- Expanded Firefox/WebKit native history: 14/14 (seven per engine), zero skips/retries, 2.9 minutes on the same runtime source.
 
 Preserved failed evidence: the first expanded browser run passed 6/7 and failed because its deletion oracle read a not-yet-restored object; it now waits for native existence before reading bounds. An initial security assertion incorrectly expected a restricted creator to lose creator write rights; separate expired-session and Editor-downgrade cases now verify the actual product policy. A subsequent browser rerun timed out during an executor disconnection and had no final suite summary; the concurrent full server run also had no summary and the full client command did not reach its log creation. These interrupted runs are not acceptance evidence. On reconnection the original diff was verified unchanged, the WIP was backed up, only identified orphan fixture processes were stopped, and fresh runs began.
 
