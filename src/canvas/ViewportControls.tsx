@@ -3,6 +3,7 @@ import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from '@blocksuite/affine/std/gfx';
 import { getCommonBound } from '@blocksuite/global/gfx';
 import { canvasModelVisible } from './selection-summary';
+import { isPersonalHistoryBusy } from './account/reservations';
 
 /** Native viewport operations with explicit names and a stable history group. */
 export function ViewportControls({ host }: { host: EditorHost }) {
@@ -39,12 +40,14 @@ export function ViewportControls({ host }: { host: EditorHost }) {
   }, [host, gfx]);
   const [state, setState] = useState(() => ({ zoom: gfx.viewport.zoom, locked: gfx.viewport.locked, undo: store.history.canUndo, redo: store.history.canRedo }));
   useEffect(() => {
-    const sync = () => setState({ zoom: gfx.viewport.zoom, locked: gfx.viewport.locked, undo: store.history.canUndo, redo: store.history.canRedo });
+    const sync = () => setState({ zoom: gfx.viewport.zoom, locked: gfx.viewport.locked, undo: store.history.canUndo && !isPersonalHistoryBusy(host), redo: store.history.canRedo && !isPersonalHistoryBusy(host) });
+    const availability = (event: Event) => { if ((event as CustomEvent<string>).detail === 'history-state') sync(); };
     sync();
     const viewport = gfx.viewport.viewportUpdated.subscribe(sync);
     const history = store.history.onUpdated.subscribe(sync);
-    return () => { viewport.unsubscribe(); history.unsubscribe(); };
-  }, [gfx, store]);
+    window.addEventListener('dali:board-command', availability);
+    return () => { viewport.unsubscribe(); history.unsubscribe(); window.removeEventListener('dali:board-command', availability); };
+  }, [gfx, store, host]);
   const zoom = (step: number) => gfx.viewport.smoothZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, gfx.viewport.zoom + step)));
   return <div className="canvas-viewport-controls" role="toolbar" aria-label="Viewport and history">
     <button type="button" aria-label="Undo" title={navigator.platform.includes('Mac') ? 'Undo (⌘Z)' : 'Undo (Ctrl+Z)'} disabled={!state.undo || store.readonly} onClick={() => store.undo()}><Icon path="m9 5-5 5 5 5M4 10h10a5 5 0 0 1 0 10" /></button>

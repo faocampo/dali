@@ -23,7 +23,7 @@ export async function shapeBounds(page: Page, id: string) {
     return Object.values(data).find(block => block['sys:flavour'] === 'affine:surface')!['prop:elements'].value[objectId]!.xywh;
   }, id);
 }
-export async function moveNativeShape(page: Page, id: string, dx: number) {
+export async function moveNativeShape(page: Page, id: string, dx: number, dy = 40) {
   await expect(page.locator('affine-edgeless-root')).toBeVisible();
   const position = await page.locator('affine-edgeless-root').evaluate((element, objectId) => {
     const gfx = (element as HTMLElement & { gfx: GfxController }).gfx;
@@ -36,7 +36,7 @@ export async function moveNativeShape(page: Page, id: string, dx: number) {
   const reserved = page.waitForResponse(response => response.url().endsWith('/live/reserve') && response.ok(), { timeout: 10000 });
   await page.mouse.move(position.x, position.y); await page.mouse.down();
   await reserved;
-  await page.mouse.move(position.x + dx, position.y + 40, { steps: 8 }); await page.mouse.up();
+  await page.mouse.move(position.x + dx, position.y + dy, { steps: 8 }); await page.mouse.up();
 }
 
 /** Read the native renderer model and confirm it remains hit-testable. */

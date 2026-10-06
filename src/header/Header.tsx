@@ -1,4 +1,4 @@
-import { Participants } from './Participants';
+import { LiveConnectionStatus, Participants } from './Participants';
 /**
  * The app header: local board access, save state, and shared export dialog.
  */
@@ -128,6 +128,7 @@ export function Header({
           </button>
           <span className="save-announcement" role={saveStatus.state === 'failed' && scope?.role !== 'viewer' ? 'alert' : 'status'}>{saveCopy.label}{downloadStatus && scope?.role !== 'viewer' && downloadStatus.phase !== 'error' && ` ${downloadStatus.label}`}</span>
           {saveHelpOpen && <SaveDetails key={`${scope?.accountId}:${scope?.boardId}:${scope?.generation}`} status={saveStatus} snapshot={accountSave} scope={scope} downloadStatus={downloadStatus} trigger={saveTrigger} onClose={closeSaveDetails} onOpenRestored={onOpenRestored} />}
+          {board && <LiveConnectionStatus boardId={board.summary.id} />}
         </div>
       </div>
 

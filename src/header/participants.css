@@ -1,4 +1,7 @@
 .board-participants { display: flex; align-items: center; }
+.board-connection { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; max-width: min(320px, 45vw); font-size: 12px; line-height: 1.4; }
+.board-connection span { overflow-wrap: anywhere; }
+.board-connection button { min-height: 32px; white-space: normal; }
 .participants-trigger { min-height: 40px; padding: 6px 8px; }
 .participants-avatars, .participants-compact { display: flex; align-items: center; gap: 4px; }
 .participants-compact { display: none; }

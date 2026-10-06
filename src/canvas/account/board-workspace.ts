@@ -61,6 +61,25 @@ export class BoardWorkspace implements Workspace {
     this.storeExtensions = new StoreExtensionManager(storeExtensions).get('store');
     const sourceOptions = { ...options, getRecoveryEpoch: options.getRecoveryEpoch ?? (() => d.recoveryEpoch), boardId: d.summary.id, rootDocId: d.rootDocId, contentDocId: d.contentDocId,
       readonly: this.readonly, signal: this.abort.signal,
+      canReconnectLive: async (snapshot?: { root: Uint8Array; content: Uint8Array }) => {
+        this.assertCurrent();
+        if (!await options.canReconnectLive?.()) return false;
+        this.assertCurrent();
+        if (!snapshot) return true;
+        if (!this.content) return false;
+        // Check isolated authoritative documents before touching the local
+        // pair. Even a nominally clean reconnect cannot revive lost history
+        // against a server snapshot that lacks acknowledged local operations.
+        for (const [local, bytes] of [[this.doc, snapshot.root], [this.content, snapshot.content]] as const) {
+          const remote = new Y.Doc();
+          try {
+            Y.applyUpdate(remote, bytes);
+            if (remote.store.pendingStructs || remote.store.pendingDs || !Y.snapshotContainsUpdate(Y.snapshot(remote), Y.encodeStateAsUpdate(local))) return false;
+          } finally { remote.destroy(); }
+        }
+        return true;
+      },
+      onLiveReconnected: () => { this.assertCurrent(); if (!this.readonly) this.docSync.start(); },
       onLiveMetadata: (metadata: { title: string; revision: number }) => {
         this.assertCurrent(); this.meta.receiveTitle(metadata.title);
         options.onLiveMetadata?.(metadata);
@@ -176,12 +195,17 @@ export class BoardWorkspace implements Workspace {
   removeDoc(_id: string) { throw new Error('Board deletion requires the board service'); }
   async waitForSynced() {
     this.assertCurrent();
+    if (this.live && !this.live.connected) throw new Error('Live editing is disconnected. Keep this board open.');
     if (!this.readonly && this.mode === 'account' && this.docSync.status.step !== DocEngineStep.Synced) {
       await new Promise<void>((resolve, reject) => {
-        const abort = () => { subscription.unsubscribe(); reject(new Error('Account workspace is stale')); };
+        const clear = () => { subscription.unsubscribe(); disconnected?.(); this.abort.signal.removeEventListener('abort', abort); };
+        const abort = () => { clear(); reject(new Error('Account workspace is stale')); };
+        const disconnected = this.live?.subscribeConnection(() => {
+          if (!this.live?.connected) { clear(); reject(new Error('Live editing is disconnected. Keep this board open.')); }
+        });
         const subscription = this.docSync.onStatusChange.subscribe(status => {
           if (status.step === DocEngineStep.Synced) {
-            subscription.unsubscribe(); this.abort.signal.removeEventListener('abort', abort); resolve();
+            clear(); resolve();
           }
         });
         this.abort.signal.addEventListener('abort', abort, { once: true });

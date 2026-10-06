@@ -41,6 +41,21 @@ Evidence so far:
 
 Preserved failed evidence: the first expanded browser run passed 6/7 and failed because its deletion oracle read a not-yet-restored object; it now waits for native existence before reading bounds. An initial security assertion incorrectly expected a restricted creator to lose creator write rights; separate expired-session and Editor-downgrade cases now verify the actual product policy. A subsequent browser rerun timed out during an executor disconnection and had no final suite summary; the concurrent full server run also had no summary and the full client command did not reach its log creation. These interrupted runs are not acceptance evidence. On reconnection the original diff was verified unchanged, the WIP was backed up, only identified orphan fixture processes were stopped, and fresh runs began.
 
+## Clean reconnection checkpoint — 2026-10-06
+
+Explicit Reconnect obtains a fresh authorized connection while keeping the same tab and native Store/UndoManager. Both before and after the request, the runtime requires acknowledged local documents, no current-tab journal/title work and a current generation. Isolated authoritative documents must contain the acknowledged local operations before any remote bytes enter the local pair. Pending candidates remain separate for 05-05. Delayed reservation/history/presence responses cannot install an old connection fence. The existing native sync engine resumes on the retained documents; no rejected input is replayed.
+
+Connection status is separate from Saved. The actual viewport Undo/Redo buttons now observe busy/disconnected state. Reservation notices re-clamp on canvas/window resize without changing focus or repeating their live-region text. The first narrow screenshot exposed overlap with the drawing rail after the viewport-bound correction; rail separation remains a follow-up before final UI qualification.
+
+Executed checkpoint evidence:
+
+- Both TypeScript checks pass. Full client passes **263/263 across 24 files**, including five fresh-connection/pending-candidate/stale-response cases.
+- Expanded native history plus reconnection passes **12/12 Chromium**, zero skips/retries, 1.7 minutes: ten history cases plus two reconnection cases. Additional native cases cover ABA, grouped structural protection and remote text replacement.
+- Native reserved-history/no-replay case passes **1/1 Chromium** after correcting a reproduced 67px overflow on viewport shrink. It proves a 409 leaves history intact, release does not replay it, deliberate later actions acquire current access, and acknowledged results converge/reopen. Numeric bounds pass; screenshot review still requires the rail-separation follow-up above.
+- Firefox/WebKit expansion and the integrated current-source regression are still running/pending at this checkpoint; do not count them as passing yet. The server implementation is unchanged from the independently completed **375/375** gate at `eb1d221`.
+
+The first expanded run after executor reconnection exited before test selection because a newly added optional native text read failed TypeScript compilation. The read now handles absent text, both static checks pass, and the fresh 12-case run above passes. This was a real compile failure, not attributed to executor transport. Interrupted runs remain unaccepted. The original checkout now contains independent external work and active services; it was left untouched. `dc575a5` adds optional fixture port isolation so the gates can coexist with that work.
+
 ## Remaining approved work
 
 Authoritative provenance, inverse checks, skip feedback, busy/empty controls and basic native conflict/structural cases are implemented in the qualification slice above. 05-04 remains incomplete until the remaining native structural/text/ABA cases, reservation/long-idle interactions, temporary reconnect lifetime, responsive status acceptance and relevant regression gates pass. Reconnect must retain native tab memory while keeping unacknowledged local candidates separate from remote changes; 05-05's divergent recovery obligations remain in force.

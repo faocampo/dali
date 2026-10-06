@@ -2,7 +2,8 @@ import type { EditorHost } from '@blocksuite/affine/std';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import type { PresenceParticipant } from '../../../server/boards/presence';
 import type { CanvasRuntime } from '../runtime';
-export type PresenceView = { boardId: string; accountId: string; state: 'loading' | 'ready' | 'error'; participants: PresenceParticipant[]; retry: () => void };
+export type PresenceView = { boardId: string; accountId: string; state: 'loading' | 'ready' | 'error'; participants: PresenceParticipant[]; retry: () => void;
+  connection?: 'connecting' | 'connected' | 'disconnected' | 'checking'; connectionError?: string; reconnect?: () => void };
 let current: PresenceView | null = null;
 let owner: symbol | undefined;
 const listeners = new Set<() => void>();
@@ -60,7 +61,9 @@ export function installPresence(host: EditorHost, runtime: CanvasRuntime) {
   };
   const refresh = () => {
     if (owner !== key || stopped) return;
-    publish({ boardId: runtime.scope.boardId, accountId: runtime.scope.accountId, ...live.presenceState, retry: () => { void send(); } }); render();
+    publish({ boardId: runtime.scope.boardId, accountId: runtime.scope.accountId, ...live.presenceState,
+      connection: live.connectionState, connectionError: live.connectionError, reconnect: () => { void live.reconnect().catch(() => {}); },
+      retry: () => { if (live.connected) void send(); else void live.reconnect().catch(() => {}); } }); render();
   };
   const pointer = (event: PointerEvent) => {
     mouse = { x: event.clientX, y: event.clientY };
@@ -72,10 +75,11 @@ export function installPresence(host: EditorHost, runtime: CanvasRuntime) {
   const selection = gfx.selection.slots.updated.subscribe(activity);
   const viewport = gfx.viewport.viewportUpdated.subscribe(render);
   const unsubscribe = live.subscribePresence(refresh);
+  const unsubscribeConnection = live.subscribeConnection(refresh);
   const timer = setInterval(() => { if (queued) void send(); render(); }, 100);
   refresh();
   return () => {
-    stopped = true; clearInterval(timer); unsubscribe(); selection.unsubscribe(); viewport.unsubscribe(); overlay.remove();
+    stopped = true; clearInterval(timer); unsubscribe(); unsubscribeConnection(); selection.unsubscribe(); viewport.unsubscribe(); overlay.remove();
     host.removeEventListener('pointermove', pointer, true); host.removeEventListener('pointerleave', leave); host.removeEventListener('keydown', activity, true);
     if (owner === key) { owner = undefined; publish(null); }
   };

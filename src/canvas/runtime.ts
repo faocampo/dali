@@ -413,6 +413,14 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     // Workspace lifetime is distinct from request cancellation while preservation is pending.
     durableLocalBlobs: true,
     onDocumentOutcome: documentOutcome,
+    canReconnectLive: async () => {
+      const clean = () => isCurrent() && !initializing && !storagePaused && scope?.phase === 'active' &&
+        (scope.role === 'viewer' || (getAccountSaveSnapshot()?.scope === statusScope && getAccountSaveSnapshot()?.state === 'saved' &&
+          live.size === 2 && [...live.keys()].every(covered) && !titlesInFlight && !scopedJournal.pendingMemory().length));
+      if (!clean()) return false;
+      const rows = await pendingRecords(initial.accountId, initial.boardId); const title = await titles.read();
+      return clean() && !title && !rows.some(row => row.tabId === scopedJournal.tabId);
+    },
     onDocumentCommit: documentCommit,
     onLiveMetadata: metadata => {
       ++liveMetadataVersion; latestLiveMetadata = metadata;

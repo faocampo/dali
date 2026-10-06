@@ -10,6 +10,8 @@ export type SourceOptions = {
   onPendingDocument?: (docId: string, data: Uint8Array) => unknown | Promise<unknown>;
   onDocumentCommit?: (receipt: DocumentRevisionReceipt) => Promise<void>;
   onLiveMetadata?: (metadata: { title: string; revision: number }) => void;
+  canReconnectLive?: (snapshot?: { root: Uint8Array; content: Uint8Array }) => Promise<boolean>;
+  onLiveReconnected?: () => void;
   onAcknowledged?: (token: unknown) => void | Promise<void>;
   durableLocalBlobs?: boolean;
   beforeDocumentWrite?: (docId: string, data: Uint8Array, live?: boolean) => Promise<'acknowledged' | void>;

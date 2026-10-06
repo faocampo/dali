@@ -3,6 +3,16 @@ import { getPresence, participantColor, subscribePresence } from '../canvas/acco
 import { MenuIcon } from './MenuIcon';
 import './participants.css';
 
+export function LiveConnectionStatus({ boardId }: { boardId: string }) {
+  const presence = useSyncExternalStore(subscribePresence, getPresence);
+  if (presence?.boardId !== boardId || !presence.connection || presence.connection === 'connected') return null;
+  const checking = presence.connection === 'checking';
+  return <div className="board-connection">
+    <span role="status">{presence.connectionError ?? (checking ? 'Checking access…' : presence.connection === 'connecting' ? 'Connecting…' : 'Disconnected')}</span>
+    {presence.connection !== 'connecting' && <button className="djai-ghost" disabled={checking} onClick={presence.reconnect}>Reconnect</button>}
+  </div>;
+}
+
 export function Participants({ boardId, loading = false }: { boardId: string; loading?: boolean }) {
   const snapshot = useSyncExternalStore(subscribePresence, getPresence);
   const presence = snapshot?.boardId === boardId ? snapshot : loading ? { boardId, accountId: '', state: 'loading' as const, participants: [], retry: () => {} } : null;

@@ -10,7 +10,8 @@ import { capturePersonalHistorySessions, discardPersonalHistoryStep, runPersonal
 type ReservationAction = <T>(ids: string[], create: boolean, operation: () => T | Promise<T>) => Promise<T>;
 const actions = new WeakMap<EditorHost, ReservationAction>();
 const busyHistory = new WeakSet<EditorHost>();
-export const isPersonalHistoryBusy = (host: EditorHost) => busyHistory.has(host);
+const liveAvailability = new WeakMap<EditorHost, () => boolean>();
+export const isPersonalHistoryBusy = (host: EditorHost) => busyHistory.has(host) || liveAvailability.get(host)?.() === false;
 export async function withCanvasReservation<T>(host: EditorHost, ids: string[], create: boolean, operation: () => T | Promise<T>): Promise<T> {
   const action = actions.get(host);
   return action ? action(ids, create, operation) : operation();
@@ -20,6 +21,7 @@ export async function withCanvasReservation<T>(host: EditorHost, ids: string[], 
 export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime) {
   const live = runtime.workspace.live;
   if (!live || host.store.readonly) return () => {};
+  liveAvailability.set(host, () => live.connected);
   const gfx = host.std.get(GfxControllerIdentifier);
   const history = host.store.history.undoManager;
   const personalCapture = capturePersonalHistorySessions(history);
@@ -36,10 +38,11 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   const status = document.createElement('div'); status.setAttribute('role', 'status');
   status.style.cssText = 'position:absolute;bottom:16px;right:16px;z-index:10;background:var(--color-surface,#fff);color:var(--color-text,#211830);padding:8px 12px;border-radius:8px;max-width:min(320px,calc(100% - 32px));overflow-wrap:anywhere;';
   status.hidden = true; host.parentElement?.append(status);
-  const message = (text: string, ids?: string[]) => {
-    status.textContent = text; status.hidden = !text;
+  let statusTarget: string | undefined;
+  const positionStatus = () => {
+    if (status.hidden) return;
     Object.assign(status.style, { top: '', left: '', bottom: '16px', right: '16px' });
-    const model = ids?.length ? gfx.getElementById(ids[0]!) : undefined;
+    const model = statusTarget ? gfx.getElementById(statusTarget) : undefined;
     if (model && 'elementBound' in model && status.parentElement) {
       const bound = model.elementBound;
       const [x, y] = gfx.viewport.toViewCoord(bound.x, bound.y + bound.h);
@@ -49,6 +52,14 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
         top: `${Math.max(8, Math.min(y + canvas.top - parent.top + 12, parent.height - status.offsetHeight - 8))}px` });
     }
   };
+  const message = (text: string, ids?: string[]) => {
+    status.textContent = text; status.hidden = !text; statusTarget = ids?.[0]; positionStatus();
+  };
+  // Reposition without rewriting the live region or moving keyboard focus.
+  const statusViewport = gfx.viewport.viewportUpdated.subscribe(positionStatus);
+  const statusResize = new ResizeObserver(positionStatus);
+  if (status.parentElement) statusResize.observe(status.parentElement);
+  window.addEventListener('resize', positionStatus);
   const stop = (event: Event) => { event.preventDefault(); event.stopImmediatePropagation(); };
   const send = (event: PointerEvent) => {
     replay = true;
@@ -303,7 +314,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   let historyPending = false;
   let queuedHistory: 'undo' | 'redo' | undefined;
   const runHistory = async (direction: 'undo' | 'redo') => {
-    if (host.store.readonly || disposed) return;
+    if (host.store.readonly || disposed || !live.connected) return;
     // Keep one explicit next history action while the prior acknowledged
     // mutation releases its lease. Never replay the denied action itself.
     if (historyPending) { queuedHistory ??= direction; return; }
@@ -374,6 +385,16 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     } catch { /* The reservation helper presents the failure; selection remains intact. */ }
   };
   const actionEvents = ['click', 'input', 'change', 'select', 'pickFillColor', 'pickStrokeColor'] as const;
+  const disposeConnection = live.subscribeConnection(() => {
+    if (disposed) return;
+    if (!live.connected) {
+      pending = undefined; pointerId = undefined; token = undefined; queuedHistory = undefined;
+      finishPointerCapture?.(); finishPointerCapture = undefined;
+      textSession = false; personalCapture.setTextEditing(false);
+      if (gfx.selection.editing) gfx.selection.set({ elements: gfx.selection.selectedElements.map(model => model.id), editing: false });
+    }
+    window.dispatchEvent(new CustomEvent('dali:board-command', { detail: 'history-state' }));
+  });
   const disposeDeferred = installDeferredCreation(host, {
     replaying: () => replay,
     busy: () => !!(pending || pendingAction || finishing || token),
@@ -388,7 +409,8 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   window.addEventListener('pointerup', captureEnd, true); window.addEventListener('pointercancel', captureEnd, true);
   window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end); host.addEventListener('focusout', blur);
   return () => {
-    disposed = true; pending = undefined; status.remove(); selection.unsubscribe(); actions.delete(host); busyHistory.delete(host);
+    statusResize.disconnect(); statusViewport.unsubscribe(); window.removeEventListener('resize', positionStatus);
+    disposed = true; pending = undefined; status.remove(); selection.unsubscribe(); actions.delete(host); busyHistory.delete(host); liveAvailability.delete(host); disposeConnection();
     personalCapture.dispose(); disposeHistoryFootprints(); host.store.undo = nativeUndo; host.store.redo = nativeRedo;
     disposeDeferred();
     if (clipboard && nativePaste) clipboard._onPaste = nativePaste;
