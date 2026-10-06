@@ -50,9 +50,13 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     try {
       const original = pointerTargets.get(event);
       const target = original instanceof Element && original.isConnected ? original : host;
-      target.dispatchEvent(new PointerEvent(event.type, { bubbles: true, composed: true, cancelable: true,
+      const input = new PointerEvent(event.type, { bubbles: true, composed: true, cancelable: true,
         pointerId: event.pointerId, pointerType: event.pointerType, isPrimary: event.isPrimary, button: event.button, buttons: event.buttons,
-        clientX: event.clientX, clientY: event.clientY, detail: event.detail, shiftKey: event.shiftKey, altKey: event.altKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey }));
+        clientX: event.clientX, clientY: event.clientY, detail: event.detail, shiftKey: event.shiftKey, altKey: event.altKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey });
+      // Native multi-click recognition uses input timing, not the time spent
+      // waiting for an authenticated reservation or its prior release.
+      Object.defineProperty(input, 'timeStamp', { value: event.timeStamp });
+      target.dispatchEvent(input);
     } finally { replay = false; }
   };
   const release = () => {
@@ -84,7 +88,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     if (pending) { buffer(event); return; }
     if (textSession && token) return;
     if (event.composedPath().some(node => node instanceof Element && node.matches('editor-toolbar,editor-menu-content,input,textarea,button'))) return;
-    if (finishing || pendingAction) { stop(event); return; }
+    if (pendingAction) { stop(event); return; }
     const point = gfx.viewport.toModelCoordFromClientCoord([event.clientX, event.clientY]);
     const hit = gfx.getElementByPoint(...point);
     const selected = gfx.selection.selectedElements;
@@ -98,7 +102,20 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     if (target) pointerTargets.set(event, target);
     stop(event); pointerId = event.pointerId; const events = [event]; pending = events;
     message('Waiting for editing access');
-    void live.acquire(targets).then(async acquired => {
+    const previousRelease = releaseWork;
+    const acquire = async () => {
+      if (previousRelease) await previousRelease;
+      if (disposed || pending !== events) return;
+      if (host.store.readonly || !live.connected || finishing || token) throw new Error('Editing access changed.');
+      // A new explicit gesture can follow a click whose lease is releasing.
+      // Recompute its dependencies only after release, then acquire afresh.
+      const currentTargets = nativeReservationTargets(host.store.spaceDoc, models.map(model => model.id));
+      if (!currentTargets) throw new Error('Selection changed. Try the action again.');
+      if (creating) currentTargets.push(live.creationScope);
+      return live.acquire(currentTargets);
+    };
+    void acquire().then(async acquired => {
+      if (!acquired) return;
       if (disposed || pending !== events) { await live.release(acquired); return; }
       pending = undefined; token = acquired; message('');
       for (const input of events) send(input);

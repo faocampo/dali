@@ -6,7 +6,7 @@ import { acceptanceService, createIdentityContexts } from './access-fixtures';
 import { seedCollaborationShapes } from './collaboration-fixtures';
 import { readRecoveryEpoch } from '../server/storage/recovery-state';
 
-for (const boundary of ['save', 'release', 'competing-owner'] as const) test(`@05-02-02 explicit consecutive typography at ${boundary}`, async ({ browser, baseURL }) => {
+for (const boundary of ['save', 'release', 'competing-owner'] as const) test(`@05-02-02 explicit consecutive typography at ${boundary}`, async ({ browser, browserName, baseURL }) => {
   const service = await acceptanceService(baseURL!);
   const identities = await createIdentityContexts(browser, service.origin);
   let unblock = () => {};
@@ -80,7 +80,9 @@ for (const boundary of ['save', 'release', 'competing-owner'] as const) test(`@0
     for (const page of [editor, owner]) await expect.poll(() => value(page)).toEqual(expected);
     await expect(editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     await editor.reload(); await expect.poll(() => value(editor)).toEqual(expected);
-    expect(identities.runtimeErrors).toEqual(boundary === 'competing-owner' ? ['editor: Failed to load resource: the server responded with a status of 409 (Conflict)'] : []);
+    // The denied reservation is asserted from its actual response above.
+    // Firefox does not emit Chromium's HTTP-resource console diagnostic.
+    expect(identities.runtimeErrors).toEqual(boundary === 'competing-owner' && browserName !== 'firefox' ? ['editor: Failed to load resource: the server responded with a status of 409 (Conflict)'] : []);
     identities.runtimeErrors.length = 0;
   } catch (error) { failure = error; throw error; }
   finally { unblock(); try { await identities.close(); } catch (error) { if (!failure) throw error; } finally { await service.close(); } }
