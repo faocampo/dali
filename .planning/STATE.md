@@ -2,10 +2,10 @@
 gsd_state_version: "1.0"
 current_plan: 3
 status: awaiting_user
-stopped_at: Plan 05-03 cursor projection verification failed after two repair attempts
-last_updated: "2026-10-05T23:07:02.093975+00:00"
-last_activity: 2026-10-05
-last_activity_desc: Plan 05-03 combined 79/79 passed; added pan projection fails; retry choice pending
+stopped_at: User skipped incomplete 05-03 coordinate check; dependent plans require review
+last_updated: "2026-10-06T17:07:01.125468+00:00"
+last_activity: 2026-10-06
+last_activity_desc: Cursor check skipped by user; plan 05-03 incomplete; no independent remaining plan
 state_head: 110973627de98d49d15c43a3a70b0862b55599ed
 progress:
   total_phases: 13
@@ -34,7 +34,7 @@ Total Plans in Phase: 9
 Phase 4 is validated by the user on 2026-09-29 with the remaining WebKit fix deferred to 999.7. All 17 plans are dispositioned; acceptance explicitly retains the 2,051/2,052 full-run result and earlier approved deferrals.
 
 Next phase: 05 — Real-Time Collaborative Editing.
-Status: Plans 05-01 and 05-02 are verified and committed. Plan 05-02's current production gate passed 71/71 browser cases, 117/117 client cases, 15/15 reservation cases and both static checks. Prior sequential typography failures remain in user-requested backlog 999.8; the current passing case does not establish a repair. Plan 05-03 implementation is committed through `ca34104`; its combined browser gate passed 79/79, client 250/250 and server 354/354. An added cursor projection check fails after panning despite two repair attempts. Local overlay/test changes are preserved; await Retry, Skip (mark incomplete), or Stop. See 05-03-EXECUTION.md for exact evidence.
+Status: Plans 05-01 and 05-02 are verified and committed. Plan 05-02's current production gate passed 71/71 browser cases, 117/117 client cases, 15/15 reservation cases and both static checks. Prior sequential typography failures remain in user-requested backlog 999.8; the current passing case does not establish a repair. Plan 05-03 implementation is committed through `ca34104`; its combined browser gate passed 79/79, client 250/250 and server 354/354. An added cursor projection check fails after panning despite two repair attempts. Local overlay/test changes are preserved. On 2026-10-06 the user chose Skip, retaining the check as incomplete. All remaining plans depend on 05-03, so dependency review is required before advancing. See 05-03-EXECUTION.md for exact evidence.
 Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 45/52 currently planned plans dispositioned; two of nine Phase 5 plans verified.
 
 ## Historical prerequisite verification
@@ -258,3 +258,7 @@ Plan 05-01 is complete in `9dbc9f9`, with evidence committed in `ec0bc42`. Lates
 ## Current execution checkpoint — 2026-10-05
 
 Plan 05-03 presence is incomplete at its coordinate verification gate. Tracer and UI expansion commits exist; combined regression at `ca34104` passed 79/79, client 250/250 and server 354/354. Added native zoom/pan verification still fails after two repairs: zoom passes, pan expects y=408 but renders y=476. Cause remains unresolved. Pending source/test changes are uncommitted; no test process remains active. Await Retry, Skip (incomplete), or Stop/investigate. Plan 05-04 has not begun. Native browser zoom remains human acceptance; typography 999.8 remains deferred.
+
+## Current skip disposition — 2026-10-06
+
+User selected Skip for the unresolved cursor-alignment check. Plan 05-03 and COL-02 remain incomplete; completed-plan counts are unchanged. No remaining plan is independent: 05-04 depends on 05-03, and 05-05 through 05-09 depend transitively. Preserve pending source/test changes and failure evidence. Next action: review a scoped dependency exception for personal history while carrying the open coordinate issue. The earlier retry/skip/stop question is resolved.

@@ -52,3 +52,9 @@ An additional native canvas zoom/pan assertion then exposed an unresolved coordi
 **ESCALATE:** The two-attempt repair budget is exhausted. Plan 05-03 is incomplete; Plan 05-04 has not begun. Await Retry, Skip (explicitly incomplete), or Stop/investigate. Current local changes in the presence overlay and its browser test are preserved and uncommitted. Both TypeScript checks passed after the second repair; the focused browser test failed. No regression process remains running. Earlier 79/79, 250/250 and 354/354 results retain their exact source scope and do not validate the pending overlay changes.
 
 The native-browser 200% zoom and final presence UX review remain phase-level human acceptance obligations. General collaboration activation remains gated. No phase requirement is marked complete.
+
+## User disposition — 2026-10-06
+
+The user selected option 2: skip the unresolved cursor-alignment check, retain it as incomplete, and proceed only where dependencies permit. No additional coordinate repair or browser rerun was attempted. The failing check and pending overlay/test changes remain preserved. The skip is not a passing test or acceptance of COL-02.
+
+Dependency review: Plan 05-04 explicitly depends on completion of 05-03. Plans 05-05 through 05-09 form a sequential chain through 05-04. No remaining plan is currently independent under the approved graph. Do not automatically infer readiness from the existence of an incomplete SUMMARY. Next action is a scoped dependency review permitting 05-04 to proceed with the cursor issue explicitly carried, or eventual resolution of the incomplete check. Phase 5 remains incomplete.

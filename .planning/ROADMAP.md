@@ -271,7 +271,7 @@ All three tasks are complete within the accepted local scope. The local Kubernet
 - [x] 05-02-PLAN.md — Complete object reservations
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 05-03-PLAN.md — Presence and participant controls
+- [ ] 05-03-PLAN.md — Presence and participant controls (cursor projection check user-skipped on 2026-10-06; incomplete)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 05-04-PLAN.md — Personal undo and redo
