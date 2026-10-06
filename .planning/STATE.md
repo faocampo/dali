@@ -1,17 +1,17 @@
 ---
 gsd_state_version: "1.0"
-current_plan: 4
+current_plan: 5
 status: in_progress
-stopped_at: Plan 05-04 connection retirement repaired; final cross-browser and integrated gates pending
-last_updated: "2026-10-06T18:44:05+00:00"
+stopped_at: Plan 05-04 automated verification complete; proceed with 05-05 divergence-aware recovery
+last_updated: "2026-10-06T20:18:07+00:00"
 last_activity: 2026-10-06
-last_activity_desc: Final runtime history 26/26 across Firefox/WebKit; expanded gate 41/42 exposed missing fixture heartbeats; final Chromium pending
-state_head: a58fcddcfc10e39bc86b28d7698ce64a0ad30fb9
+last_activity_desc: Personal history verified with 98 Chromium, 26 cross-browser history, corrected roster 2/2 and client 265/265
+state_head: 8dc921c5fd3569d23e0ae5a81a69a3135dcb56db
 progress:
   total_phases: 13
   completed_phases: 4
   total_plans: 52
-  completed_plans: 46
+  completed_plans: 47
   percent: 31
 current_phase: 05
 current_phase_name: Real-Time Collaborative Editing
@@ -24,20 +24,20 @@ current_phase_name: Real-Time Collaborative Editing
 See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
-**Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 04 personal undo and redo
+**Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 05 divergence-aware recovery
 
-Plan 05-04 remains partial. Personal history, server provenance and clean reconnect are implemented. The expanded history matrix passed 26/26 Firefox/WebKit, and final responsive feedback passed 2/2. Two integrated Chromium gates each passed 97/98: the first exposed a retry fixture race (corrected and verified 3 Chromium + 2 Firefox/WebKit); the second exposed a real pagehide connection-retirement race. Two failing unit reproductions now pass, with 16/16 connection units, 265/265 full client tests and 3/3 repeated native retirement cases. On final runtime `a58fcdd`, the expanded Firefox/WebKit gate passed 41/42: all 26 history cases and all retirement assertions passed, while the Firefox many-participant fixture omitted heartbeats and let its synthetic connections expire. The corrected fixture passes 2/2 Firefox/WebKit; final Chromium qualification remains pending. The unchanged server retains its 375/375 gate. No additional plan is marked complete. See [05-04-EXECUTION.md](phases/05-real-time-collaborative-editing/05-04-EXECUTION.md).
+Plan 05-04 has verified automated acceptance. Complete native text/operation capture, account/tab property provenance, transactional inverse protection, conflict skipping and clean reconnect are implemented. Final integrated Chromium at `8dc921c` passes **98/98**; all thirteen history cases pass in Firefox and WebKit (**26/26**). The expanded history/presence matrix passed 41/42 and exposed missing synthetic roster heartbeats; its corrected case passes **2/2**. The final full Firefox/WebKit matrix on `8dc921c` then passes **42/42**. Full client passes **265/265**, both static checks pass, and unchanged server source retains **375/375**. Original failures are preserved. Continue the approved 05-05 plan; no whole-phase or release acceptance is claimed. See [05-04-SUMMARY.md](phases/05-real-time-collaborative-editing/05-04-SUMMARY.md).
 
 ## Current Position
 
-Current Plan: 4
+Current Plan: 5
 Total Plans in Phase: 9
 
 Phase 4 is validated by the user on 2026-09-29 with the remaining WebKit fix deferred to 999.7. All 17 plans are dispositioned; acceptance explicitly retains the 2,051/2,052 full-run result and earlier approved deferrals.
 
 Next phase: 05 — Real-Time Collaborative Editing.
-Status: Plans 05-01 through 05-03 have verified automated gates. Authorized continuation on 2026-10-06 preserved both incoming modifications and left the original checkout untouched. Commits `1f15749`, `4433d01`, `ef8a5f1` and `0fdda02` repair consecutive formatting, cursor projection, publication-error recovery, pointer admission after release and explicit session disconnect. Final verification: 85/85 integrated Chromium; 26/26 focused Firefox/WebKit; 252/252 client; 354/354 server; both static checks. All browser gates have zero skips/retries or unexpected runtime errors. Deterministic tests prove fresh reservations, no denied-action replay, convergence and reopen. Historical failures remain in [05-RESUMPTION-2026-10-06.md](phases/05-real-time-collaborative-editing/05-RESUMPTION-2026-10-06.md). Begin the approved 05-04 plan; no pilot readiness or general collaboration activation is claimed.
-Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 46/52 currently planned plans dispositioned; three of nine Phase 5 plans verified.
+Status: Plans 05-01 through 05-04 have verified automated gates. Consecutive typography, pointer admission after release, presence projection/retry/retirement and personal history now have deterministic and integrated evidence. The remote issue remains unchanged. Failure history and original scope limits remain in the resumption and execution reports. Continue 05-05 through 05-09; no pilot readiness or general collaboration activation is claimed.
+Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 47/52 currently planned plans dispositioned; four of nine Phase 5 plans verified.
 
 ## Historical prerequisite verification
 
@@ -144,7 +144,7 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ### Pending Todos
 
-- Execute the approved 05-04 personal-history plan, then 05-05 through 05-09 sequentially.
+- Execute the approved 05-05 divergence-aware recovery plan, then 05-06 through 05-09 sequentially.
 - Preserve the distinction between engineering acceptance and actual-provider, storage and native UI follow-ups in [the internal release runbook](../docs/internal-release.md).
 
 ### Blockers/Concerns
@@ -165,9 +165,9 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 ## Session Continuity
 
 Last session: 2026-10-06
-Stopped at: Plan 05-03 automated qualification complete; next plan 05-04
-Resume file: .planning/phases/05-real-time-collaborative-editing/05-RESUMPTION-2026-10-06.md
-Next action: Execute 05-04 personal history with native text-session grouping and server-acknowledged property provenance. The old retry-choice checkpoint is superseded by the user's continuation authorization. Do not infer completion of 05-04 through 05-09 or a controlled internal release from the stabilization results. The historical 2,051/2,052 Phase 4 gate and approved 999.7 deferral remain unchanged.
+Stopped at: Plan 05-04 automated verification complete; next plan 05-05
+Resume file: .planning/phases/05-real-time-collaborative-editing/05-04-SUMMARY.md
+Next action: Execute 05-05 divergent recovery, beginning with isolated local candidate reconstruction and a current-authority baseline gate before title replay, server hydration or document drain. The old retry-choice checkpoint is superseded by the user's continuation authorization. Do not infer completion of 05-05 through 05-09 or a controlled internal release from the stabilization results. The historical 2,051/2,052 Phase 4 gate and approved 999.7 deferral remain unchanged.
 
 ## Phase 1 verification outcome
 
@@ -254,10 +254,10 @@ Research and draft validation strategy are saved in the Phase 5 directory. The U
 
 User confirmed the six UI surfaces and their state handling. [05-UI-SPEC.md](phases/05-real-time-collaborative-editing/05-UI-SPEC.md) (approved visual and interaction contract) records seven inline design-dimension passes and 28 explicitly resolved state considerations. The prior missing-UI-contract handoff is superseded. Resume `$gsd-plan-phase 5` with the existing context, research and UI contract; runtime UI validation remains pending implementation.
 
-## Current execution handoff — 2026-10-02
+## Historical execution handoff — 2026-10-02
 
 Plan 05-01 is complete in `9dbc9f9`, with evidence committed in `ec0bc42`. Latest plan gate: 19 collaboration server cases, 24 backup cases, 34 client cases, two native production-browser scenarios and both typechecks passed. Continue plan 05-02; activation remains gated until complete mutation coverage and recovery flows are available. No whole-phase requirement is marked complete.
 
-## Current execution checkpoint — 2026-10-05
+## Historical execution checkpoint — 2026-10-05 (superseded)
 
 Plan 05-03 presence is incomplete at its coordinate verification gate. Tracer and UI expansion commits exist; combined regression at `ca34104` passed 79/79, client 250/250 and server 354/354. Added native zoom/pan verification still fails after two repairs: zoom passes, pan expects y=408 but renders y=476. Cause remains unresolved. Pending source/test changes are uncommitted; no test process remains active. Await Retry, Skip (incomplete), or Stop/investigate. Plan 05-04 has not begun. Native browser zoom remains human acceptance; typography 999.8 remains deferred.

@@ -274,7 +274,7 @@ All three tasks are complete within the accepted local scope. The local Kubernet
 - [x] 05-03-PLAN.md — Presence and participant controls
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 05-04-PLAN.md — Personal undo and redo
+- [x] 05-04-PLAN.md — Personal undo and redo
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [ ] 05-05-PLAN.md — Divergence-aware recovery
@@ -501,7 +501,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
 | 3. Okta and Board Access | 12/12 | Complete    | 2026-09-25 |
 | 4. Durable Boards and Recovery | 17/17 | Validated with approved deferrals | 2026-09-29 |
-| 5. Real-Time Collaborative Editing | 3/9 | In progress | - |
+| 5. Real-Time Collaborative Editing | 4/9 | In progress | - |
 | 6. Follow Me | 0/TBD | Not started | - |
 | 7. Entity Comments | 0/TBD | Not started | - |
 | 8. Shared Timer | 0/TBD | Not started | - |

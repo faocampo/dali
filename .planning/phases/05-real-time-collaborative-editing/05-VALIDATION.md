@@ -9,7 +9,7 @@ created: "2026-10-02"
 
 # Phase 5 — Validation Strategy
 
-Strategy derived from research and approved UI contract, mapped to nine executable plans. Plans 05-01 and 05-02 have recorded execution evidence; verified 05-03 stabilization is documented in [the resumption report](05-RESUMPTION-2026-10-06.md). Plans 05-04 through 05-09 remain pending. Whole-phase validation is incomplete.
+Strategy derived from research and approved UI contract, mapped to nine executable plans. Plans 05-01 and 05-02 have recorded execution evidence; verified 05-03 stabilization is documented in [the resumption report](05-RESUMPTION-2026-10-06.md). Plan 05-04 has [verified automated evidence](05-04-SUMMARY.md); plans 05-05 through 05-09 remain pending. Whole-phase validation is incomplete.
 
 ## Test Infrastructure
 
@@ -37,7 +37,7 @@ Requirement-level map below is expanded into the per-task commands that follow.
 |---|---|---|---|
 | COL-01 | Independent simultaneous native edits, reservation enforcement, 20 distinct authenticated participants, durable reopen | `tests/collaboration.spec.ts` | Yes; 20-editor load suite remains pending |
 | COL-02 | Names, cursor role filtering, multi-tab deduplication, fade/removal and spoof resistance | `tests/collaboration-presence.spec.ts` | Yes |
-| CAN-03 | Per-tab personal undo/redo, complete text session, independent remote edits preserved, conflicts skipped | `tests/collaboration-history.spec.ts` | No |
+| CAN-03 | Per-tab personal undo/redo, complete text session, independent remote edits preserved, conflicts skipped | `tests/collaboration-history.spec.ts`, `tests/collaboration-history-reconnect.spec.ts`, `tests/collaboration-history-reservation.spec.ts` | Yes; 05-04 slice |
 | COL-03 | Unchanged baseline replay; divergent latest/fork choice; no automatic merge; exact fork content/images and lost receipts | `tests/collaboration-recovery.spec.ts` | No |
 | COL-04 | Active revocation, queued writes, direct document/image access, held response reauthorization, restoration confirmation | `tests/collaboration-access.spec.ts` | No |
 | MIND-05 | Concurrent independent branches and conflicting structural operations with valid reopened hierarchy | `tests/collaboration-mindmap.spec.ts` | No |
@@ -78,8 +78,8 @@ All listed new suites are created by the owning task before its command runs. Wa
 | 05-02-02 | 2 | COL-01 | T-05-02 | `npm exec playwright test -- tests/collaboration-reservations.spec.ts --project=prod --grep @05-02-02` | Recorded pass; see 05-02-SUMMARY.md and current resumption gate |
 | 05-03-01 | 3 | COL-02 | T-05-03 | `npm exec playwright test -- tests/collaboration-presence.spec.ts --project=prod --grep @05-03-01` | Automated gate passed; see 05-03-SUMMARY.md and resumption evidence |
 | 05-03-02 | 3 | COL-02 | T-05-03 | `npm exec playwright test -- tests/collaboration-presence.spec.ts --project=prod --grep @05-03-02` | Automated gate passed; see 05-03-SUMMARY.md and resumption evidence |
-| 05-04-01 | 4 | CAN-03 | T-05-04 | `npm exec playwright test -- tests/collaboration-history.spec.ts --project=prod --grep @05-04-01` | Pending; new suite owned by plan 04 |
-| 05-04-02 | 4 | CAN-03 | T-05-04 | `npm exec playwright test -- tests/collaboration-history.spec.ts --project=prod --grep @05-04-02` | Pending; new suite owned by plan 04 |
+| 05-04-01 | 4 | CAN-03 | T-05-04 | `npm exec playwright test -- tests/collaboration-history.spec.ts --project=prod --grep @05-04-01` | Pass; see [05-04 summary](05-04-SUMMARY.md); whole-phase requirement remains open |
+| 05-04-02 | 4 | CAN-03 | T-05-04 | `npm exec playwright test -- tests/collaboration-history.spec.ts tests/collaboration-history-reconnect.spec.ts tests/collaboration-history-reservation.spec.ts --project=prod --grep @05-04-02` | Pass; see [05-04 summary](05-04-SUMMARY.md); whole-phase requirement remains open |
 | 05-05-01 | 5 | COL-03 | T-05-05 | `npm exec playwright test -- tests/collaboration-recovery.spec.ts --project=prod --grep @05-05-01` | Pending; new suite owned by plan 05 |
 | 05-05-02 | 5 | COL-03 | T-05-05 | `npm exec playwright test -- tests/collaboration-recovery.spec.ts --project=prod --grep @05-05-02` | Pending; new suite owned by plan 05 |
 | 05-06-01 | 6 | COL-03 | T-05-06 | `npm exec playwright test -- tests/collaboration-fork.spec.ts --project=prod --grep @05-06-01` | Pending; new suite owned by plan 06 |

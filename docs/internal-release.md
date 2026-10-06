@@ -12,7 +12,7 @@ The authoritative sequence remains [.planning/ROADMAP.md](../.planning/ROADMAP.m
 | 2. Daily Mind Maps | Hierarchy, keyboard editing, collapse, layout and styling | Local persistence model | Accepted; collaborative hierarchy belongs to 05-08 |
 | 3. Okta and Board Access | Sign-in, library, owner/editor/viewer controls | Generic OIDC, sessions and board/document/image authorization | Accepted with actual-provider and spoken assistive-technology follow-ups |
 | 4. Durable Boards and Recovery | Acknowledged save status, pending-work preservation and recovery | Durable SQLite, epochs, receipts, backup/restore and deployment package | Accepted with independent storage/capacity and WebKit exception |
-| 5. Real-Time Collaborative Editing | Native reservations and participant UI implemented; personal history/recovery/access-transition acceptance incomplete | Live transport, fencing and presence implemented; later provenance/recovery/access/load obligations incomplete | In progress; opt-in boundary retained |
+| 5. Real-Time Collaborative Editing | Native reservations and participant UI implemented; personal history verified; recovery/access-transition acceptance incomplete | Live transport, fencing and presence implemented; history provenance implemented; recovery/access/load obligations incomplete | In progress; opt-in boundary retained |
 
 Existing single-user undo or generic recovery must not be presented as completion of personal collaborative history or divergence-aware recovery. A roster of 20 or more accounts is not evidence of 20 simultaneous native editors.
 
@@ -23,7 +23,7 @@ Existing single-user undo or generic recovery must not be presented as completio
 | 05-01 live tracer | Authenticated live feed, native independent edits, idempotent commit receipts, Viewer projection and durable restart tests | Whole-phase load and interruption matrix remains 05-09 |
 | 05-02 reservations | Native action admission, complete object dependencies, cancellation and release; sequential-format repair in this stabilization slice | Deterministic and combined gates pass; remote issue #1 remains unchanged for maintainer disposition |
 | 05-03 presence | Server-derived identities/roles, account aggregation, editor cursor/selection overlays, publication retry and explicit original-session disconnect | Automated plan gate passes; native browser-chrome zoom and phase-level human UX acceptance remain |
-| 05-04 personal history | Complete session capture plus acknowledged per-property/tab provenance, commit-time inverse protection and conflicting-step skipping implemented at `eb1d221`; 7 Chromium, 14 Firefox/WebKit, 258 client and 375 server tests pass | Reconnect lifetime, remaining structural/text/ABA native cases and relevant regression acceptance pending |
+| 05-04 personal history | Complete text/operation capture, server provenance, conflict-safe inverse checks and clean reconnect verified; final 98/98 Chromium, 26/26 cross-browser history, 265 client and unchanged 375 server tests pass | Automated plan complete; pending-work recovery remains 05-05 and whole-phase/human acceptance remains open; [revision-scoped evidence](../.planning/phases/05-real-time-collaborative-editing/05-04-SUMMARY.md) retains failed matrix and targeted corrections |
 | 05-05 divergent recovery | Phase 4 local preservation and generic recovery exist | Durable shared baseline/receipt reconciliation, no automatic divergent merge, decision flow and race-safe unchanged-baseline replay |
 | 05-06 private recovery copy | Generic authorized copy/export primitives exist | Whole local snapshot and assets forked privately; latest-version/download/cancel flow with scoped cleanup and renewed authority |
 | 05-07 active access transitions | Direct API capability checks and live reauthorization exist | Verified downgrade/revocation/restoration UX, pending-work isolation and queued/held request matrix |
@@ -69,12 +69,12 @@ npm run typecheck
 npm run typecheck:server
 npm test
 npm run test:server -- --maxWorkers=1
-npm exec playwright test -- tests/collaboration.spec.ts tests/collaboration-reservations.spec.ts tests/collaboration-formatting-race.spec.ts tests/collaboration-pointer-race.spec.ts tests/collaboration-presence.spec.ts tests/canvas-arrangement.spec.ts tests/image-visual-edits.spec.ts tests/ui-refinements.spec.ts tests/restored-viewer.spec.ts --project=prod
+npm exec playwright test -- tests/collaboration.spec.ts tests/collaboration-reservations.spec.ts tests/collaboration-formatting-race.spec.ts tests/collaboration-pointer-race.spec.ts tests/collaboration-presence.spec.ts tests/collaboration-history.spec.ts tests/collaboration-history-reconnect.spec.ts tests/collaboration-history-reservation.spec.ts tests/canvas-arrangement.spec.ts tests/image-visual-edits.spec.ts tests/ui-refinements.spec.ts tests/restored-viewer.spec.ts --project=prod
 ```
 
 Example with isolated ports: `DALI_TEST_PORT_OFFSET=2000 npm exec playwright test -- tests/collaboration-history.spec.ts --project=prod`. Keep the same offset for every fixture launched by that command.
 
-Repeat the applicable native gates with `--project=prod-firefox` and `--project=prod-webkit`. The current suites above cover delivered slices; they do not replace the future Phase 5 history, recovery, access, mind-map and load suites. Check the selected-test inventory before interpreting success. Record command, source revision, counts, skips/retries and failures. Keep raw machine paths and private operator evidence outside publishable history.
+Repeat the applicable native gates with `--project=prod-firefox` and `--project=prod-webkit`. The current suites above cover delivered slices; they do not replace the remaining Phase 5 recovery, access, mind-map and load suites. Check the selected-test inventory before interpreting success. Record command, source revision, counts, skips/retries and failures. Keep raw machine paths and private operator evidence outside publishable history.
 
 ## Launch, observation and rollback
 

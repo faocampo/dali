@@ -1,6 +1,6 @@
 # Plan 05-04 execution — personal undo and redo
 
-Status: **in progress; plan not complete**. The prior stabilization is recorded at `0fdda02` with its documentation checkpoint `e0ddcb2`. No whole-phase or internal-release acceptance is inferred from this first slice.
+Status: **automated plan verification complete**. See [05-04-SUMMARY.md](05-04-SUMMARY.md) for final revision-scoped acceptance. Earlier checkpoints below retain their original incomplete status. The prior stabilization is recorded at `0fdda02` with its documentation checkpoint `e0ddcb2`. No whole-phase or internal-release acceptance is inferred from this first slice.
 
 ## Session capture foundation — `661791a`
 
@@ -80,16 +80,22 @@ The sole failure was Firefox's many-participant roster fixture. It connected eig
 
 The corrected fixture keeps each extra participant's authenticated poll active throughout preparation and assertion, checks every poll response, and stops its owned polling during teardown. It preserves server expiry and roster assertions. Both typechecks pass. The corrected many-participant case passes **2/2 Firefox/WebKit**, zero skips/retries, 1.8 minutes. The subsequent 98-case integrated Chromium gate remains pending at this checkpoint. Runtime source remains identical to `a58fcdd`; the failed 41/42 matrix remains separate evidence from these targeted passes.
 
+## Additional initial-sign-in failure — `8dc921c`
+
+The first retirement-qualified integrated Chromium run completed **97 passed, one failed**, 9.7 minutes. Every collaboration/history/presence case and cold Viewer-first restore passed. The final 390px header case stalled at Signing you in before board creation; its cause was not established. Six deliberate repetitions of the wide/narrow cases passed on unchanged source, **6/6**, 36.0 seconds. No application repair or relaxed timeout is claimed for this isolated failure. The subsequent complete reruns below retain it as failed historical evidence.
+
+## Interrupted rerun and resumption
+
+The next Chromium rerun lost its executor session. Its retained log stopped at case26 without a suite summary; one failed case was waiting for the library in fixture setup, before the formatting gesture. The trace records a nearly ten-minute gap. This run is unaccepted. Orphan fixture service chains were verified under the isolated checkout and terminated; original-checkout services were untouched. A fresh run used a command-lifetime idle-sleep assertion, with no permanent power-setting change.
+
+## Accepted final gate — `8dc921c`
+
+The final complete integrated Chromium gate passes **98/98**, zero skips/retries, 12.6m. It includes all thirteen history scenarios, live editing/reservations, consecutive formatting and pointer races, all presence cases, image editing, arrangement, UI refinements and the cold Viewer-first restore. Runtime source is identical to `a58fcdd`; the later change only maintains the synthetic roster clients' activity.
+
+Both 05-04 tasks are now automated-verified. Current client **265/265**, both typechecks, the unchanged server **375/375**, all 26 Firefox/WebKit history cases, final retirement checks, the corrected many-participant **2/2** gate and the final **42/42 Firefox/WebKit matrix** support this boundary. The original failed integrated and expanded gates remain recorded above.
+
 ## Remaining approved work
 
-Authoritative provenance, inverse checks, skip feedback, busy/empty controls and basic native conflict/structural cases are implemented in the qualification slice above. 05-04 remains incomplete until the remaining native structural/text/ABA cases, reservation/long-idle interactions, temporary reconnect lifetime, responsive status acceptance and relevant regression gates pass. Reconnect must retain native tab memory while keeping unacknowledged local candidates separate from remote changes; 05-05's divergent recovery obligations remain in force.
+Continue 05-05 through 05-09 in order: divergent candidate isolation and receipt reconciliation, private-copy/latest/download decisions, active access transitions, collaborative mind maps and twenty distinct simultaneous native editors. Clean reconnect retains acknowledged tab memory; it does not implement pending-work recovery. CAN-03 remains subject to later collaborative mind-map and whole-phase acceptance. General collaboration remains opt-in.
 
-Design requirements retained for subsequent verification:
-
-1. Bind the native history entry to its server-issued reservation/action identity. Explicit capture boundaries must prevent unrelated leases from merging into one entry; a text session can contain several acknowledged document pushes under one action.
-2. Record server-derived affected properties and authenticated account/tab provenance at the existing durable document commit boundary. Receipts alone contain revisions/digests and cannot prove which property was changed. Value equality alone cannot detect ABA.
-3. Resolve eligibility from the original acknowledged action and current property provenance after fresh reservation acquisition. Independent properties remain eligible; creation/deletion and structural dependencies require appropriate atomic protection.
-4. Revalidate the actual inverse footprint and versions in the authoritative commit transaction. A preflight-only check cannot replace that check. Scope records and guards to account, board, tab, connection, lease and epoch as appropriate.
-5. Preserve native undo/redo lifecycle and tab-local in-memory stacks. Server provenance metadata is not a persisted shared undo stack. Do not claim reconnect retention until its actual lifecycle path is exercised.
-
-All work remains inside the isolated checkout with synthetic fixtures and the existing collaboration opt-in boundary. Operator/provider access is not needed for these remaining engineering checks.
+Native browser-chrome zoom, OS-level IME, Finder/system clipboard and spoken assistive technology have not been established by these automated checks. Human phase acceptance and the separately documented operator/provider/storage gates remain. No pilot or internal-release readiness is inferred. The isolated checkout preserves incoming changes; no publication, merge or shared deployment occurred.
