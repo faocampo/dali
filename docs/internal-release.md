@@ -62,7 +62,7 @@ Synthetic local acceptance can proceed without real-provider or infrastructure c
 
 ## Local verification procedure
 
-Use an isolated checkout, the committed lockfile, installed pinned dependencies, disposable synthetic identity fixtures and their owned temporary databases. Preserve any incoming local changes. Run only one browser/build gate at a time because the browser fixture owns fixed loopback ports.
+Use an isolated checkout, the committed lockfile, installed pinned dependencies, disposable synthetic identity fixtures and their owned temporary databases. Preserve any incoming local changes. Run only one browser/build gate at a time per checkout. If another checkout is using the default loopback fixtures, set an unused integer `DALI_TEST_PORT_OFFSET` for the browser command; for example, `2000` moves the configured 5493–5499 ports to 7493–7499. The synthetic provider callbacks and application proxies move together. This changes test fixtures only. Do not stop another checkout's services to free its ports.
 
 ```sh
 npm run typecheck
@@ -71,6 +71,8 @@ npm test
 npm run test:server -- --maxWorkers=1
 npm exec playwright test -- tests/collaboration.spec.ts tests/collaboration-reservations.spec.ts tests/collaboration-formatting-race.spec.ts tests/collaboration-pointer-race.spec.ts tests/collaboration-presence.spec.ts tests/canvas-arrangement.spec.ts tests/image-visual-edits.spec.ts tests/ui-refinements.spec.ts tests/restored-viewer.spec.ts --project=prod
 ```
+
+Example with isolated ports: `DALI_TEST_PORT_OFFSET=2000 npm exec playwright test -- tests/collaboration-history.spec.ts --project=prod`. Keep the same offset for every fixture launched by that command.
 
 Repeat the applicable native gates with `--project=prod-firefox` and `--project=prod-webkit`. The current suites above cover delivered slices; they do not replace the future Phase 5 history, recovery, access, mind-map and load suites. Check the selected-test inventory before interpreting success. Record command, source revision, counts, skips/retries and failures. Keep raw machine paths and private operator evidence outside publishable history.
 

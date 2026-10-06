@@ -8,8 +8,9 @@ import { pathToFileURL } from 'node:url';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import cookie from '@fastify/cookie';
 import * as oidc from 'openid-client';
+import { testOrigin, testPort } from './test-ports.js';
 
-export const PROVIDER_PORT = 5496;
+export const PROVIDER_PORT = testPort(5496);
 export const IDENTITY_COOKIE = 'dali_fixture_identity';
 export const identities = {
   owner: { sub: 'synthetic-owner', name: 'Synthetic Owner', email: 'owner@example.org', membership: 'internal', app_role: 'editor' },
@@ -243,8 +244,8 @@ export async function providerSelfTest() {
 export async function startAccessHarness() {
   const directory = await mkdtemp(join(tmpdir(), 'dali-access-'));
   const registrations = [
-    { clientId: 'synthetic-dev', clientSecret: opaque(), redirectUri: 'http://127.0.0.1:5494/auth/callback' },
-    { clientId: 'synthetic-preview', clientSecret: opaque(), redirectUri: 'http://127.0.0.1:5493/auth/callback' },
+    { clientId: 'synthetic-dev', clientSecret: opaque(), redirectUri: `${testOrigin(5494)}/auth/callback` },
+    { clientId: 'synthetic-preview', clientSecret: opaque(), redirectUri: `${testOrigin(5493)}/auth/callback` },
   ];
   let provider: Awaited<ReturnType<typeof createOidcProvider>> | undefined;
   const apps: FastifyInstance[] = [];
@@ -271,7 +272,7 @@ export async function startAccessHarness() {
         DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]',
         DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]', DALI_EMAIL_CASE_FOLD: 'false',
       } });
-      apps.push(app); await app.listen({ host: '127.0.0.1', port: index === 0 ? 5495 : 5497 });
+      apps.push(app); await app.listen({ host: '127.0.0.1', port: testPort(index === 0 ? 5495 : 5497) });
     }
     return { provider, apps, now, advanceClock(milliseconds: number) {
       assert(Number.isSafeInteger(milliseconds)); assert(Number.isSafeInteger(offset + milliseconds)); offset += milliseconds;

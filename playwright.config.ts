@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import { testOrigin, testPort } from './tests/test-ports';
 
-const DEV_URL = 'http://127.0.0.1:5494';
-const PROD_URL = 'http://127.0.0.1:5493';
+const DEV_URL = testOrigin(5494);
+const PROD_URL = testOrigin(5493);
 const DEV_ONLY = /account-workspace\.spec\.ts/;
 const ACCESS_SUITES = /(?:authentication|board-access|board-library|board-sharing|board-actions|board-roles|session-recovery|local-board-import|access-boundaries|accessibility-access|durable-restart)\.spec\.ts/;
 
@@ -26,20 +27,20 @@ export default defineConfig({
   webServer: [
     {
       command: 'npm run test:access:server',
-      url: 'http://127.0.0.1:5497/api/session',
+      url: `${testOrigin(5497)}/api/session`,
       reuseExistingServer: false,
       timeout: 120_000,
     },
     {
-      command: 'npm run dev:ui -- --host 127.0.0.1 --port 5494 --strictPort',
-      env: { DALI_API_PROXY_TARGET: 'http://127.0.0.1:5495' },
+      command: `npm run dev:ui -- --host 127.0.0.1 --port ${testPort(5494)} --strictPort`,
+      env: { DALI_API_PROXY_TARGET: testOrigin(5495) },
       url: DEV_URL,
       reuseExistingServer: false,
       timeout: 180_000,
     },
     {
-      command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 5493 --strictPort',
-      env: { DALI_API_PROXY_TARGET: 'http://127.0.0.1:5497' },
+      command: `npm run build && npm run preview -- --host 127.0.0.1 --port ${testPort(5493)} --strictPort`,
+      env: { DALI_API_PROXY_TARGET: testOrigin(5497) },
       url: PROD_URL,
       reuseExistingServer: false,
       timeout: 300_000,

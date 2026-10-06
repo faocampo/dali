@@ -8,6 +8,7 @@ import { openDatabase } from '../server/storage/database.js';
 import { createOidcProvider } from './oidc-provider.js';
 import type { APIResponse, Browser, BrowserContext } from '@playwright/test';
 import { test, expect } from './fixtures.js';
+import { testOrigin, testPort } from './test-ports.js';
 
 // Kept independent of the provider module so browser helpers never start a service on import.
 export type AccessIdentity = 'owner' | 'editor' | 'viewer' | 'nonMember';
@@ -19,7 +20,7 @@ export { test, expect };
 
 /** Isolated final-acceptance service; all identities still use signed OIDC. */
 export async function acceptanceService(baseURL: string) {
-  const origin = 'http://127.0.0.1:5499';
+  const origin = testOrigin(5499);
   const registration = { clientId: 'synthetic-acceptance', clientSecret: randomBytes(32).toString('hex'), redirectUri: origin + '/auth/callback' };
   const provider = await createOidcProvider({ clients: [registration] });
   const database = openDatabase(':memory:');
@@ -30,7 +31,7 @@ export async function acceptanceService(baseURL: string) {
     DALI_OIDC_CALLBACK_URL: registration.redirectUri, DALI_INTERNAL_CLAIM: 'membership', DALI_INTERNAL_VALUES_JSON: '["internal"]', DALI_INTERNAL_EMAIL_DOMAINS_JSON: '["example.org"]',
   } });
   const closeProxy = proxyApplicationAssets(app, baseURL);
-  await app.listen({ host: '127.0.0.1', port: 5499 });
+  await app.listen({ host: '127.0.0.1', port: testPort(5499) });
   return { origin, database, provider, setBarrier(value?: () => Promise<void>) { barrier = value; },
     async close() { closeProxy(); await app.close(); database.close(); await provider.close(); } };
 }
