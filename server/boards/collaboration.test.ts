@@ -235,6 +235,36 @@ describe('authenticated live collaboration', () => {
     native.destroy();
   });
 
+  it('@05-04-01 checks history provenance again at commit and fences undeclared inverse properties', async () => {
+    const native = new Y.Doc(); Y.applyUpdate(native, bytes());
+    const surface = [...native.getMap<Y.Map<unknown>>('blocks').values()].find(block => block.get('sys:flavour') === 'affine:surface')!;
+    const elements = (surface.get('prop:elements') as Y.Map<unknown>).get('value') as Y.Map<unknown>;
+    const shape = new Y.Map<unknown>(); shape.set('type','shape'); shape.set('xywh','[0,0,100,100]'); elements.set('history-shape',shape);
+    expect((await requestDoc('push',Y.encodeStateAsUpdate(native))).statusCode).toBe(200);
+    database.prepare('UPDATE boards SET live_enabled=1 WHERE id=?').run(board.summary.id);
+    const opened = (await app.inject({ method:'POST', url:`/api/boards/${board.summary.id}/live/connect`, headers:headers(), payload:{tabId:'history-tab'} })).json();
+    const reserve = async () => (await app.inject({method:'POST',url:`/api/boards/${board.summary.id}/live/reserve`,headers:headers(),payload:{connectionId:opened.connectionId,objectIds:['history-shape']}})).json().token as string;
+    const token = await reserve();
+    const prepare = (paths: string[][], actor='owner') => app.inject({method:'POST',url:`/api/boards/${board.summary.id}/live/history`,headers:headers(actor),payload:{connectionId:opened.connectionId,token,baseline:opened.revision,paths}});
+    expect((await prepare([['history-shape','xywh']],'viewer')).statusCode).toBe(403);
+    expect((await prepare([['history-shape','xywh']])).json()).toEqual({eligible:true});
+    const vector = Y.encodeStateVector(native); shape.set('xywh','[20,0,100,100]');
+    const delta=Y.encodeStateAsUpdate(native,vector); const before=Buffer.from(bytes());
+    const metadata={'x-dali-connection':opened.connectionId,'x-dali-reservation':token,'x-dali-operation':randomUUID()};
+    barrier=async()=> { database.prepare('INSERT INTO document_property_changes VALUES(?,?,?,?,?,?)').run(board.summary.id,'history-shape','xywh',opened.revision+1,actors.editor!.accountId,'other-tab'); };
+    const denied=await requestDoc('push',delta,'owner',board.contentDocId,board,metadata);
+    expect(denied.statusCode).toBe(409); expect(denied.json().code).toBe('HISTORY_CONFLICT'); expect(bytes()).toEqual(before);
+    barrier=async()=>{}; database.prepare('DELETE FROM document_property_changes WHERE board_id=?').run(board.summary.id);
+    expect((await prepare([['history-shape','fillColor']])).json()).toEqual({eligible:true});
+    const undeclared=await requestDoc('push',delta,'owner',board.contentDocId,board,{...metadata,'x-dali-operation':randomUUID()});
+    expect(undeclared.statusCode).toBe(409); expect(undeclared.json().code).toBe('HISTORY_CONFLICT'); expect(bytes()).toEqual(before);
+    expect((await prepare([['history-shape','xywh']])).json()).toEqual({eligible:true});
+    const accepted=await requestDoc('push',delta,'owner',board.contentDocId,board,{...metadata,'x-dali-operation':randomUUID()});
+    expect(accepted.statusCode).toBe(200);
+    expect(database.prepare('SELECT object_id,property,account_id,tab_id FROM document_property_changes WHERE board_id=?').all(board.summary.id)).toEqual([{object_id:'history-shape',property:'xywh',account_id:actors.owner!.accountId,tab_id:'history-tab'}]);
+    native.destroy();
+  });
+
   it('@05-01-01 accepts native synchronization of an unchanged root', async () => {
     database.prepare('UPDATE boards SET live_enabled=1 WHERE id=?').run(board.summary.id);
     const open = await app.inject({ method: 'POST', url: `/api/boards/${board.summary.id}/live/connect`, headers: headers(), payload: { tabId: 'root-tab' } });

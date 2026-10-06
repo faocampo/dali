@@ -4,7 +4,7 @@ import { IMAGE_LIMITS, validateStoredImage, validateImageBytes, validBlobKey } f
 import type { BoardRow } from '../boards/routes.js';
 import { readRecoveryEpoch } from './recovery-state.js';
 
-export const BACKUP_DATABASE_VERSION = 10;
+export const BACKUP_DATABASE_VERSION = 11;
 const tables = ['schema_migrations', 'members', 'sessions', 'login_transactions', 'boards', 'board_grants', 'pending_grants', 'board_documents', 'operations', 'board_thumbnails', 'board_blobs', 'import_staging', 'import_staging_blobs', 'recovery_state'];
 const bounded = (value: unknown, maximum = 4000): value is string => typeof value === 'string' && value.length > 0 && value.length <= maximum;
 function json(value: string): any {
@@ -21,8 +21,13 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
 
     const migrations = (database.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as { version: number }[]).map(row => row.version);
     const databaseVersion = migrations.at(-1)!;
-    if (![8, 9, BACKUP_DATABASE_VERSION].includes(databaseVersion) || JSON.stringify(migrations) !== JSON.stringify(Array.from({ length: databaseVersion }, (_, index) => index + 1))) throw new Error('Unsupported database version');
-    const expectedTables = databaseVersion >= 10 ? [...tables, 'document_receipts'] : tables;
+    if (![8, 9, 10, BACKUP_DATABASE_VERSION].includes(databaseVersion) || JSON.stringify(migrations) !== JSON.stringify(Array.from({ length: databaseVersion }, (_, index) => index + 1))) throw new Error('Unsupported database version');
+    const expectedTables = [...tables, ...(databaseVersion >= 10 ? ['document_receipts'] : []), ...(databaseVersion >= 11 ? ['document_property_changes'] : [])];
+    if (databaseVersion >= 11) for (const change of database.prepare('SELECT * FROM document_property_changes').iterate() as Iterable<{ board_id: string; object_id: string; property: string; revision: number; account_id: string; tab_id: string }>) {
+      if (![change.board_id, change.object_id, change.property, change.account_id, change.tab_id].every(value => bounded(value, 256)) || !Number.isSafeInteger(change.revision) || change.revision < 1) throw new Error('Invalid property provenance');
+      const board = database.prepare('SELECT revision FROM boards WHERE id=?').get(change.board_id) as { revision: number } | undefined;
+      if (!board || change.revision > board.revision) throw new Error('Invalid property revision');
+    }
     if (JSON.stringify(schema) !== JSON.stringify([...expectedTables].sort())) throw new Error('Unsupported schema');
     if (databaseVersion >= 10) for (const receipt of database.prepare('SELECT * FROM document_receipts').iterate() as Iterable<{ board_id: string; account_id: string; tab_id: string; operation_id: string; doc_id: string; digest: string; previous_revision: number; revision: number }>) {
       if (![receipt.board_id, receipt.account_id, receipt.tab_id, receipt.operation_id, receipt.doc_id].every(value => bounded(value, 256)) || !/^[a-f0-9]{64}$/.test(receipt.digest) || !Number.isSafeInteger(receipt.previous_revision) || receipt.previous_revision < 1 || !Number.isSafeInteger(receipt.revision) || receipt.revision < receipt.previous_revision || receipt.revision > receipt.previous_revision + 1) throw new Error('Invalid document receipt');

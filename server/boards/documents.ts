@@ -1,4 +1,5 @@
-import { changedNativeObjects, nativeObjectIds } from './change-footprint.js';
+import { historyIntents, historyConflicts, coversHistoryPaths, recordPropertyChanges, type PropertyPath } from './personal-history.js';
+import { changedNativeObjects, changedNativeProperties, nativeObjectIds } from './change-footprint.js';
 import { createHash } from 'node:crypto';
 import type { LiveConnection } from './reservations.js';
 import { type CollaborationBroker } from './collaboration.js';
@@ -101,13 +102,18 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
           return { acknowledged: true, previousRevision: receipt.previous_revision, revision: receipt.revision };
         }
       }
-      const doc = new Y.Doc({ guid: docId }); const before = new Y.Doc({ guid: docId }); let merged: Buffer; let created: string[] = [];
+      const doc = new Y.Doc({ guid: docId }); const before = new Y.Doc({ guid: docId }); let merged: Buffer; let created: string[] = []; let propertyChanges: PropertyPath[] = [];
       try {
         Y.applyUpdate(before, stored); Y.applyUpdate(doc, stored); Y.applyUpdate(doc, request.body); validateDocument(doc, latest, docId);
         if (live && connection) {
           const ids = docId === latest.content_doc_id ? changedNativeObjects(before, doc) :
             Buffer.from(Y.encodeStateAsUpdate(before)).equals(Buffer.from(Y.encodeStateAsUpdate(doc))) ? [] : null;
           if (ids === null) return reply.code(409).send({ code: 'UNSUPPORTED_LIVE_ACTION' });
+          const properties = docId === latest.content_doc_id ? changedNativeProperties(before, doc) : [];
+          if (!properties) return reply.code(409).send({ code: 'UNSUPPORTED_LIVE_ACTION' });
+          propertyChanges = properties;
+          const intent = historyIntents.get(connection);
+          if (intent && intent.token === reservation && (!coversHistoryPaths(intent, properties) || historyConflicts(database, connection, intent.baseline, intent.paths))) return reply.code(409).send({ code: 'HISTORY_CONFLICT' });
           const existing = docId === latest.content_doc_id ? nativeObjectIds(before) : new Set<string>();
           created = ids.filter(id => id !== '$dali:metadata' && !existing.has(id));
           const required = ids.filter(id => !created.includes(id));
@@ -131,6 +137,7 @@ export function registerDocumentRoutes(app: FastifyInstance, config: AuthConfig,
         revision = previousRevision + 1;
         database.prepare('DELETE FROM board_thumbnails WHERE board_id=?').run(boardId);
       }
+      if (live && connection && revision !== previousRevision) recordPropertyChanges(database, connection, revision, propertyChanges);
       if (live && connection) database.prepare('INSERT INTO document_receipts(board_id,account_id,tab_id,operation_id,doc_id,digest,previous_revision,revision) VALUES(?,?,?,?,?,?,?,?)')
         .run(boardId, connection.accountId, connection.tabId, operationId, docId, digest, previousRevision, revision);
       return { acknowledged: true, previousRevision, revision };

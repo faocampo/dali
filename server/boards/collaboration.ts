@@ -1,3 +1,4 @@
+import { historyIntents, historyConflicts, validHistoryPaths } from './personal-history.js';
 import { createHash } from 'node:crypto';
 import { PresenceRegistry, type PresenceIdentity } from './presence.js';
 import type { FastifyInstance } from 'fastify';
@@ -62,6 +63,13 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
       PRIMARY KEY(board_id,account_id,tab_id,operation_id)
     );
   ` }]);
+  runMigrations(database, [{ version: 11, sql: `
+    CREATE TABLE document_property_changes (
+      board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+      object_id TEXT NOT NULL, property TEXT NOT NULL, revision INTEGER NOT NULL,
+      account_id TEXT NOT NULL REFERENCES members(id), tab_id TEXT NOT NULL);
+    CREATE INDEX history_property_lookup ON document_property_changes(board_id,object_id,revision);
+  ` }]);
   const broker = new CollaborationBroker(now);
   const presence = new PresenceRegistry(broker, (boardId, accountId) => {
     const member = database.prepare(`SELECT m.display_name AS name,
@@ -123,6 +131,19 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
       return reply.code(409).send({ code: 'OBJECT_RESERVED', editor: member?.display_name ?? 'Another participant' });
     }
     return { token };
+  });
+  app.post<{ Params: Params; Body: { connectionId?: unknown; token?: unknown; baseline?: unknown; paths?: unknown } }>('/api/boards/:boardId/live/history', {
+    bodyLimit: 1024 * 1024, onRequest: async (request, reply) => { requireMutation(request, reply, config, ['application/json']); },
+  }, async (request, reply) => {
+    const board = requireBoardCapability(database, request, reply, request.params.boardId, 'write', now); if (!board) return;
+    const body = request.body;
+    if (!bounded(body?.connectionId) || !bounded(body.token) || !Number.isSafeInteger(body.baseline) || (body.baseline as number) < 0 || (body.baseline as number) > board.revision || !validHistoryPaths(body.paths)) return reply.code(400).send({ code: 'INVALID_HISTORY' });
+    const connection = broker.find(body.connectionId, board.id, request.headers['x-dali-account'] as string);
+    if (!connection) return reply.code(409).send({ code: 'CONNECTION_EXPIRED' });
+    if (!body.paths.some(([id]) => broker.owns(connection, body.token as string, [id])) && !broker.owns(connection, body.token, [`$dali:create:${connection.id}`])) return reply.code(409).send({ code: 'RESERVATION_REQUIRED' });
+    const eligible = !historyConflicts(database, connection, body.baseline as number, body.paths);
+    if (eligible) historyIntents.set(connection, { token: body.token, baseline: body.baseline as number, paths: body.paths });
+    return { eligible };
   });
   app.post<{ Params: Params; Body: { connectionId?: unknown; epoch?: unknown; revision?: unknown; presenceVersion?: unknown; waitMs?: unknown } }>('/api/boards/:boardId/live/poll', {
     bodyLimit: 4096, onRequest: async (request, reply) => { requireMutation(request, reply, config, ['application/json']); },

@@ -1,9 +1,10 @@
+import { installHistorySessions } from './personal-history';
 import { nativeReservationTargets } from '../../../server/boards/change-footprint';
 import { ClipboardEventState, UIEventStateContext, type EditorHost } from '@blocksuite/affine/std';
 import { EdgelessClipboardController } from '@blocksuite/affine/blocks/root';
 import { GfxControllerIdentifier } from '@blocksuite/affine/std/gfx';
 import type { CanvasRuntime } from '../runtime';
-import { historyReservationTargets, trackHistoryFootprints } from './history-footprint';
+import { historyReservationTargets, trackHistoryFootprints, historyEligibility } from './history-footprint';
 import { installDeferredCreation } from './deferred-creation';
 
 type ReservationAction = <T>(ids: string[], create: boolean, operation: () => T | Promise<T>) => Promise<T>;
@@ -19,7 +20,8 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   if (!live || host.store.readonly) return () => {};
   const gfx = host.std.get(GfxControllerIdentifier);
   const history = host.store.history.undoManager;
-  const disposeHistoryFootprints = trackHistoryFootprints(host.store.spaceDoc, history);
+  const disposeHistoryFootprints = trackHistoryFootprints(host.store.spaceDoc, history, () => live.historyRevision);
+  const sessions = installHistorySessions(history);
   let token: string | undefined;
   let replay = false; let disposed = false; let finishing = false; let textSession = false;
   let pointerId: number | undefined;
@@ -57,7 +59,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   };
   const release = () => {
     if (!token || finishing) return;
-    finishing = true; textSession = false; const held = token;
+    finishing = true; textSession = false; sessions.end(); const held = token;
     releaseWork = runtime.workspace.waitForSynced().then(() => live.release(held)).then(() => { if (token === held) token = undefined; }).catch(() => {
       if (!disposed) message('Changes are waiting to save. Keep this board open.');
     }).finally(() => { finishing = false; releaseWork = undefined; });
@@ -100,7 +102,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     message('Waiting for editing access');
     void live.acquire(targets).then(async acquired => {
       if (disposed || pending !== events) { await live.release(acquired); return; }
-      pending = undefined; token = acquired; message('');
+      pending = undefined; token = acquired; sessions.begin(); message('');
       for (const input of events) send(input);
       if (events.at(-1)?.type === 'pointerup' || events.at(-1)?.type === 'pointercancel') finished();
     }).catch((error: unknown) => {
@@ -212,7 +214,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     const target = path[0];
     void live.acquire(ids).then(async acquired => {
       if (disposed || !(target instanceof Element) || !target.isConnected) { await live.release(acquired); return; }
-      token = acquired; message(''); replay = true;
+      token = acquired; sessions.begin(); message(''); replay = true;
       try {
         redispatch(target);
       } finally { replay = false; }
@@ -237,8 +239,9 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     try {
       acquired = await live.acquire(required);
       if (disposed || host.store.readonly || !live.connected) throw new Error('Editing access changed.');
-      token = acquired; message('');
+      token = acquired; sessions.begin(); message('');
       const result = await operation();
+      sessions.end();
       await runtime.workspace.waitForSynced();
       return result;
     } catch (error) {
@@ -248,6 +251,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
       if (!disposed) message(explanation, ids);
       throw new Error(explanation, { cause: error });
     } finally {
+      sessions.end();
       try { if (acquired) await live.release(acquired); }
       finally {
         if (token === acquired) token = undefined;
@@ -268,14 +272,23 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
       if (textSession) release();
       if (releaseWork) await releaseWork;
       const stack = direction === 'undo' ? history.undoStack : history.redoStack;
-      const item = stack.at(-1);
-      if (!item) return;
-      const targets = historyReservationTargets(host.store.spaceDoc, item);
-      if (!targets) { message('This history action is unavailable. Your current canvas is unchanged.'); return; }
-      await withCanvasReservation(host, targets.ids, targets.create, () => {
-        if (stack.at(-1) !== item) throw new Error('History changed. Try the action again.');
-        (direction === 'undo' ? nativeUndo : nativeRedo).call(host.store);
-      });
+      let skipped = false;
+      while (stack.length) {
+        const item = stack.at(-1)!;
+        const targets = historyReservationTargets(host.store.spaceDoc, item);
+        const eligibility = historyEligibility(item);
+        if (!targets || !eligibility) { message('This history action is unavailable. Your current canvas is unchanged.'); return; }
+        const applied = await withCanvasReservation(host, targets.ids, targets.create, async () => {
+          if (stack.at(-1) !== item) throw new Error('History changed. Try the action again.');
+          if (!await live.prepareHistory(eligibility.baseline, eligibility.paths)) return false;
+          (direction === 'undo' ? nativeUndo : nativeRedo).call(host.store);
+          return true;
+        });
+        if (applied) break;
+        stack.pop(); skipped = true;
+        history.emit('stack-cleared', [{ undoStackCleared: false, redoStackCleared: false }]);
+      }
+      if (skipped) message(`Skipped ${direction === 'undo' ? 'an undo' : 'a redo'} step to preserve someone else's changes.`);
     } catch { /* The reservation helper presents the failed action. */ }
     finally {
       historyPending = false;
@@ -334,7 +347,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end); host.addEventListener('focusout', blur);
   return () => {
     disposed = true; pending = undefined; status.remove(); selection.unsubscribe(); actions.delete(host);
-    disposeHistoryFootprints(); host.store.undo = nativeUndo; host.store.redo = nativeRedo;
+    sessions.dispose(); disposeHistoryFootprints(); host.store.undo = nativeUndo; host.store.redo = nativeRedo;
     disposeDeferred();
     if (clipboard && nativePaste) clipboard._onPaste = nativePaste;
     if (clipboard && nativeCut) clipboard._onCut = nativeCut;

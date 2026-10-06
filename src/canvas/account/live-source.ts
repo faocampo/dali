@@ -92,6 +92,13 @@ export class BoardLiveSource {
       if (!this.controller.signal.aborted) { this.interrupted = true; this.publishPresence({ state: 'error', participants: [] }); disconnect('live-connection-interrupted'); }
     }
   }
+  get historyRevision() { return this.revision; }
+  async prepareHistory(baseline: number, paths: import('../../../server/boards/personal-history').PropertyPath[]) {
+    if (!this.reservation) throw new Error('History requires editing access');
+    const result = await this.request('history', { connectionId: this.connectionId, token: this.reservation, baseline, paths });
+    if (typeof result.eligible !== 'boolean') throw new Error('Invalid history response');
+    return result.eligible;
+  }
   get connected() { return !!this.connectionId && !this.interrupted && !this.controller.signal.aborted; }
   writeHeaders(operationId: string, reservation = this.reservation) {
     this.current();

@@ -1,11 +1,11 @@
 ---
 gsd_state_version: "1.0"
-current_plan: 3
-status: awaiting_user
-stopped_at: User skipped incomplete 05-03 coordinate check; dependent plans require review
+current_plan: 4
+status: executing
+stopped_at: Plan 05-04 tracer passed twice; expanding personal history coverage
 last_updated: "2026-10-06T17:07:01.125468+00:00"
 last_activity: 2026-10-06
-last_activity_desc: Cursor check skipped by user; plan 05-03 incomplete; no independent remaining plan
+last_activity_desc: Presence changes committed; personal history tracer verified
 state_head: 110973627de98d49d15c43a3a70b0862b55599ed
 progress:
   total_phases: 13
@@ -24,17 +24,17 @@ current_phase_name: Real-Time Collaborative Editing
 See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
-**Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 03 verification checkpoint
+**Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 04 personal history execution
 
 ## Current Position
 
-Current Plan: 3
+Current Plan: 4
 Total Plans in Phase: 9
 
 Phase 4 is validated by the user on 2026-09-29 with the remaining WebKit fix deferred to 999.7. All 17 plans are dispositioned; acceptance explicitly retains the 2,051/2,052 full-run result and earlier approved deferrals.
 
 Next phase: 05 — Real-Time Collaborative Editing.
-Status: Plans 05-01 and 05-02 are verified and committed. Plan 05-02's current production gate passed 71/71 browser cases, 117/117 client cases, 15/15 reservation cases and both static checks. Prior sequential typography failures remain in user-requested backlog 999.8; the current passing case does not establish a repair. Plan 05-03 implementation is committed through `ca34104`; its combined browser gate passed 79/79, client 250/250 and server 354/354. An added cursor projection check fails after panning despite two repair attempts. Local overlay/test changes are preserved. On 2026-10-06 the user chose Skip, retaining the check as incomplete. All remaining plans depend on 05-03, so dependency review is required before advancing. See 05-03-EXECUTION.md for exact evidence.
+Status: Plans 05-01 and 05-02 are verified. Presence changes are committed through `8145bbe`; 05-03 remains incomplete with its enabled cursor-pan check failing. The user authorized continuing with that exception. Plan 05-04 tracer passes twice in production Chromium, with 4/4 client and 50/50 targeted server checks plus both typechecks. Task 05-04-02 and combined regression are pending. Typography remains in backlog 999.8. See 05-04-EXECUTION.md for current evidence.
 Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 45/52 currently planned plans dispositioned; two of nine Phase 5 plans verified.
 
 ## Historical prerequisite verification
@@ -262,3 +262,7 @@ Plan 05-03 presence is incomplete at its coordinate verification gate. Tracer an
 ## Current skip disposition — 2026-10-06
 
 User selected Skip for the unresolved cursor-alignment check. Plan 05-03 and COL-02 remain incomplete; completed-plan counts are unchanged. No remaining plan is independent: 05-04 depends on 05-03, and 05-05 through 05-09 depend transitively. Preserve pending source/test changes and failure evidence. Next action: review a scoped dependency exception for personal history while carrying the open coordinate issue. The earlier retry/skip/stop question is resolved.
+
+## Current continuation — 2026-10-06
+
+User authorized committing the preserved presence changes and continuing. Execute Plan 05-04 with the explicit dependency exception recorded in its plan. Plan 05-03, cursor-pan verification and COL-02 remain incomplete; the failing test stays enabled. Earlier dependency-review checkpoint is superseded.

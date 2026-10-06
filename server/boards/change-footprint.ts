@@ -161,3 +161,24 @@ export function nativeReservationTargets(doc: Y.Doc, ids: string[], structural =
 }
 
 export function nativeObjectIds(doc: Y.Doc): Set<string> { return new Set(snapshot(doc).objects.keys()); }
+
+/** Property-level history dependencies; structural inverses remain indivisible. */
+export function changedNativeProperties(before: Y.Doc, after: Y.Doc): import('./personal-history.js').PropertyPath[] | null {
+  const affected = changedNativeObjects(before, after); if (!affected) return null;
+  try {
+    const old = snapshot(before); const next = snapshot(after);
+    const paths: import('./personal-history.js').PropertyPath[] = [];
+    let structural = false;
+    for (const id of affected) {
+      if (id === '$dali:metadata') { paths.push([id, '*']); continue; }
+      const previous = old.objects.get(id); const current = next.objects.get(id);
+      if (!previous || !current) { paths.push([id, '*']); structural = true; continue; }
+      for (const key of new Set([...Object.keys(previous), ...Object.keys(current)])) {
+        if (stable(previous[key]) === stable(current[key])) continue;
+        paths.push([id,key]);
+        if (['sys:children','children','prop:childElementIds','source','target','prop:imageId'].includes(key)) structural = true;
+      }
+    }
+    return structural ? affected.map(id => [id, '*']) : paths;
+  } catch { return null; }
+}

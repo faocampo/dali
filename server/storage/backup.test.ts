@@ -65,7 +65,7 @@ it('@04-10-01 online backup during writes publishes a complete independently reo
     return 16;
   } });
   expect(writes).toBeGreaterThan(0);
-  expect(result.manifest).toMatchObject({ schemaVersion: 1, databaseVersion: 10, epoch: board.recoveryEpoch, counts: { boards: 1, documents: 2, images: 1, grants: 2, members: 4, receipts: 1 } });
+  expect(result.manifest).toMatchObject({ schemaVersion: 1, databaseVersion: 11, epoch: board.recoveryEpoch, counts: { boards: 1, documents: 2, images: 1, grants: 2, members: 4, receipts: 1 } });
   expect(result.manifest.recoveryPointAt).toBeGreaterThanOrEqual(start); expect(result.manifest.completedAt).toBeGreaterThanOrEqual(result.manifest.recoveryPointAt);
   const target = join(destination, result.id); const bytes = await readFile(join(target, 'database.sqlite'));
   expect(result.manifest.byteLength).toBe(bytes.length); expect(result.manifest.sha256).toBe(createHash('sha256').update(bytes).digest('hex'));
@@ -178,7 +178,7 @@ for (const version of [8, 9]) it(`@05-01-01 upgrades a version ${version} backup
   const path = join(directory, `prior-${version}.sqlite`);
   await database.backup(path);
   const prior = new Database(path);
-  prior.exec('DROP TABLE document_receipts; ALTER TABLE boards DROP COLUMN live_enabled; DELETE FROM schema_migrations WHERE version=10');
+  prior.exec('DROP TABLE document_property_changes; DELETE FROM schema_migrations WHERE version=11; DROP TABLE document_receipts; ALTER TABLE boards DROP COLUMN live_enabled; DELETE FROM schema_migrations WHERE version=10');
   if (version === 8) prior.exec('ALTER TABLE recovery_state DROP COLUMN backup_point; ALTER TABLE recovery_state DROP COLUMN backup_completed; ALTER TABLE recovery_state DROP COLUMN backup_checked; DELETE FROM schema_migrations WHERE version=9');
   const content = prior.prepare('SELECT update_bytes FROM board_documents WHERE doc_id=?').get(board.contentDocId);
   const grants = prior.prepare('SELECT * FROM board_grants ORDER BY member_id').all();
@@ -190,6 +190,6 @@ for (const version of [8, 9]) it(`@05-01-01 upgrades a version ${version} backup
   const second = await buildApp({ storagePolicy: { kind: 'fixture' }, database: migrated, config });
   expect(migrated.prepare('SELECT update_bytes FROM board_documents WHERE doc_id=?').get(board.contentDocId)).toEqual(content);
   expect(migrated.prepare('SELECT * FROM board_grants ORDER BY member_id').all()).toEqual(grants);
-  expect(validateBackupDatabase(path).databaseVersion).toBe(10);
+  expect(validateBackupDatabase(path).databaseVersion).toBe(11);
   await second.close(); migrated.close();
 });

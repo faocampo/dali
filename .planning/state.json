@@ -70,9 +70,9 @@
     }
   ],
   "next": {
-    "command": "/gsd:plan-phase 5",
-    "label": "Review dependency after skipped presence check",
-    "reason": "User skipped the unresolved cursor check; 05-03 remains incomplete and 05-04 through 05-09 depend on it"
+    "command": "/gsd:execute-phase 5",
+    "label": "Continue personal history expansion",
+    "reason": "05-04 tracer passed twice; user-authorized 05-03 dependency exception remains active"
   },
   "updated_at": "2026-10-06T17:07:01.125468+00:00"
 }
