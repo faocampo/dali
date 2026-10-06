@@ -11,6 +11,7 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
   let releaseConnect = () => {};
   let releasePresence = () => {};
   const extraContexts: import('@playwright/test').BrowserContext[] = [];
+  const extraPolls: Promise<void>[] = []; const extraPollErrors: string[] = []; let stopExtraPolls = false;
   try {
     const accounts = Object.fromEntries(await Promise.all(['owner', 'editor', 'viewer'].map(async role => {
       const context = identities.contexts[role as 'owner' | 'editor' | 'viewer'];
@@ -185,6 +186,24 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
         service.database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board.summary.id, accountId, 'viewer');
         const joined = await context.request.post(`/api/boards/${board.summary.id}/live/connect`, { headers: { Origin: service.origin, 'X-Dali-Request': '1', 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(service.database) }, data: { tabId: randomUUID() } });
         expect(joined.status()).toBe(200);
+        const connection = await joined.json() as { connectionId: string; revision: number; epoch: string; presenceVersion?: string };
+        // These roster-only clients must maintain their real authenticated
+        // connections while later identities complete sign-in. Bare connects
+        // correctly expire after 30 seconds on slower browser runs.
+        extraPolls.push((async () => {
+          let cursor = connection;
+          try {
+            while (!stopExtraPolls) {
+              const polled = await context.request.post(`/api/boards/${board.summary.id}/live/poll`, {
+                headers: { Origin: service.origin, 'X-Dali-Request': '1', 'X-Dali-Account': accountId, 'X-Dali-Recovery-Epoch': connection.epoch },
+                data: { connectionId: connection.connectionId, revision: cursor.revision, epoch: connection.epoch, presenceVersion: cursor.presenceVersion, waitMs: 1000 },
+              });
+              if (stopExtraPolls) break;
+              if (polled.status() !== 200) throw new Error(`Synthetic participant poll returned ${polled.status()}`);
+              cursor = await polled.json();
+            }
+          } catch (error) { if (!stopExtraPolls) extraPollErrors.push(String(error)); }
+        })());
         if (i === 16) await expect(owner.getByRole('button', { name: 'People on this board: 20', exact: true })).toBeVisible();
       }
       await owner.getByRole('button', { name: 'People on this board: 21', exact: true }).click();
@@ -194,7 +213,7 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
       await owner.screenshot({ path: '/tmp/dali-presence-many.png' });
       await owner.keyboard.press('Escape');
       // This is roster projection coverage; concurrent native editing is the later load plan.
-      expect(identities.runtimeErrors).toEqual([]); return;
+      expect(extraPollErrors).toEqual([]); expect(identities.runtimeErrors).toEqual([]); return;
     }
     const disconnected = service.acknowledgedDisconnects(accounts.editor!);
     await editor.goto('/');
@@ -203,5 +222,5 @@ for (const scenario of ['tracer', 'tabs', 'layout', 'idle', 'failure', 'many', '
     await expect(owner.locator('.participant-cursor').filter({ hasText: 'Synthetic Editor' })).toHaveCount(0);
     expect(identities.runtimeErrors).toEqual([]);
   } catch (error) { failure = error; throw error; }
-  finally { releaseConnect(); releasePresence(); await Promise.all(extraContexts.map(context => context.close())); try { await identities.close(); } catch (error) { if (!failure) throw error; } finally { await service.close(); } }
+  finally { releaseConnect(); releasePresence(); stopExtraPolls = true; await Promise.all(extraContexts.map(context => context.close())); await Promise.all(extraPolls); try { await identities.close(); } catch (error) { if (!failure) throw error; } finally { await service.close(); } }
 });

@@ -72,6 +72,14 @@ Retirement now uses a separate cleanup transport and captures the original conne
 
 Current focused evidence: **16/16 connection/reconnection units**, **265/265 full client tests across 24 files**, and **3/3 deliberately repeated Chromium native layout/exit cases**. The repeated native cases confirm successful server retirement and roster removal. Final cross-browser history/presence and the complete 98-case integrated Chromium rerun remain pending; 05-04 is still open.
 
+## Final-source cross-browser expansion — `a58fcdd`
+
+The complete history/presence matrix finished **41 passed, one failed**, 42 selected Firefox/WebKit cases, zero skips/retries, 13.6 minutes. All thirteen history cases passed in both engines, including clean reconnect, reserved denial/no replay and narrow feedback. All original-session retirement assertions passed. Reviewed WebKit narrow presence rendering wraps the long synthetic name within the viewport.
+
+The sole failure was Firefox's many-participant roster fixture. It connected eighteen additional authenticated accounts without polling; those passive connections correctly expired after the existing 30-second timeout while later accounts signed in. The failure snapshot showed eight remaining participants instead of twenty. WebKit's faster preparation passed the same case. This is roster projection coverage, not twenty simultaneous native editors.
+
+The corrected fixture keeps each extra participant's authenticated poll active throughout preparation and assertion, checks every poll response, and stops its owned polling during teardown. It preserves server expiry and roster assertions. Both typechecks pass. The corrected many-participant case passes **2/2 Firefox/WebKit**, zero skips/retries, 1.8 minutes. The subsequent 98-case integrated Chromium gate remains pending at this checkpoint. Runtime source remains identical to `a58fcdd`; the failed 41/42 matrix remains separate evidence from these targeted passes.
+
 ## Remaining approved work
 
 Authoritative provenance, inverse checks, skip feedback, busy/empty controls and basic native conflict/structural cases are implemented in the qualification slice above. 05-04 remains incomplete until the remaining native structural/text/ABA cases, reservation/long-idle interactions, temporary reconnect lifetime, responsive status acceptance and relevant regression gates pass. Reconnect must retain native tab memory while keeping unacknowledged local candidates separate from remote changes; 05-05's divergent recovery obligations remain in force.

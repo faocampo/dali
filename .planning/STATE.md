@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 current_plan: 4
 status: in_progress
 stopped_at: Plan 05-04 connection retirement repaired; final cross-browser and integrated gates pending
-last_updated: "2026-10-06T17:42:04+00:00"
+last_updated: "2026-10-06T18:44:05+00:00"
 last_activity: 2026-10-06
-last_activity_desc: History cross-browser 26/26; retirement regression reproduced and fixed; client 265/265; final integrated gate pending
-state_head: c495c74d6f7ddb42e1d1d59e3ac9eb81876bfccd
+last_activity_desc: Final runtime history 26/26 across Firefox/WebKit; expanded gate 41/42 exposed missing fixture heartbeats; final Chromium pending
+state_head: a58fcddcfc10e39bc86b28d7698ce64a0ad30fb9
 progress:
   total_phases: 13
   completed_phases: 4
@@ -26,7 +26,7 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
 **Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 04 personal undo and redo
 
-Plan 05-04 remains partial. Personal history, server provenance and clean reconnect are implemented. The expanded history matrix passed 26/26 Firefox/WebKit, and final responsive feedback passed 2/2. Two integrated Chromium gates each passed 97/98: the first exposed a retry fixture race (corrected and verified 3 Chromium + 2 Firefox/WebKit); the second exposed a real pagehide connection-retirement race. Two failing unit reproductions now pass, with 16/16 connection units, 265/265 full client tests and 3/3 repeated native retirement cases. Full final-source browser qualification remains pending. The unchanged server retains its 375/375 gate. No additional plan is marked complete. See [05-04-EXECUTION.md](phases/05-real-time-collaborative-editing/05-04-EXECUTION.md).
+Plan 05-04 remains partial. Personal history, server provenance and clean reconnect are implemented. The expanded history matrix passed 26/26 Firefox/WebKit, and final responsive feedback passed 2/2. Two integrated Chromium gates each passed 97/98: the first exposed a retry fixture race (corrected and verified 3 Chromium + 2 Firefox/WebKit); the second exposed a real pagehide connection-retirement race. Two failing unit reproductions now pass, with 16/16 connection units, 265/265 full client tests and 3/3 repeated native retirement cases. On final runtime `a58fcdd`, the expanded Firefox/WebKit gate passed 41/42: all 26 history cases and all retirement assertions passed, while the Firefox many-participant fixture omitted heartbeats and let its synthetic connections expire. The corrected fixture passes 2/2 Firefox/WebKit; final Chromium qualification remains pending. The unchanged server retains its 375/375 gate. No additional plan is marked complete. See [05-04-EXECUTION.md](phases/05-real-time-collaborative-editing/05-04-EXECUTION.md).
 
 ## Current Position
 
