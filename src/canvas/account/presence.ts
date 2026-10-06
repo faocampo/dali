@@ -28,7 +28,7 @@ export function installPresence(host: EditorHost, runtime: CanvasRuntime) {
   };
   const render = () => {
     if (stopped) return;
-    const rect = host.getBoundingClientRect(); const parent = overlay.getBoundingClientRect();
+    const rect = gfx.viewport.boundingClientRect; const parent = overlay.getBoundingClientRect();
     const nodes: HTMLElement[] = [];
     for (const person of live.presenceState.participants) {
       if (person.accountId === runtime.scope.accountId || person.role === 'viewer') continue;
@@ -37,7 +37,7 @@ export function installPresence(host: EditorHost, runtime: CanvasRuntime) {
         const model = gfx.getElementById(id); if (!model || !('elementBound' in model)) continue;
         const bound = model.elementBound; const [x, y] = gfx.viewport.toViewCoord(bound.x, bound.y);
         const selection = document.createElement('div'); selection.className = 'participant-selection';
-        Object.assign(selection.style, { left: `${x + rect.left - parent.left}px`, top: `${y + rect.top - parent.top}px`, width: `${bound.w * gfx.viewport.zoom}px`, height: `${bound.h * gfx.viewport.zoom}px`, borderColor: color, opacity: person.idle ? '.5' : '1' });
+        Object.assign(selection.style, { left: `${x + rect.left - parent.left}px`, top: `${y + rect.top - parent.top}px`, width: `${bound.w * gfx.viewport.zoom * gfx.viewport.viewScale}px`, height: `${bound.h * gfx.viewport.zoom * gfx.viewport.viewScale}px`, borderColor: color, opacity: person.idle ? '.5' : '1' });
         nodes.push(selection);
       }
       if (!person.cursor) continue;
