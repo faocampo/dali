@@ -1,11 +1,11 @@
 ---
 gsd_state_version: "1.0"
 current_plan: 4
-status: awaiting_user
-stopped_at: History suite passes; resolve parallel execution ownership before overlapping work
+status: paused
+stopped_at: User selected continuation in the parallel isolated checkout
 last_updated: "2026-10-06T17:42:06.791903+00:00"
 last_activity: 2026-10-06
-last_activity_desc: Personal history checkpoint verified; parallel execution ownership pending
+last_activity_desc: Checkpoint preserved; continuation assigned to parallel execution
 state_head: 110973627de98d49d15c43a3a70b0862b55599ed
 progress:
   total_phases: 13
@@ -270,3 +270,7 @@ User authorized committing the preserved presence changes and continuing. Execut
 ## Current verification checkpoint — 2026-10-06
 
 Personal history tracer committed as `658eb28`; focused expanded Chromium suite passes 6/6 with both typechecks. See 05-04-EXECUTION.md for the two test-setup repairs and remaining coverage. No Phase 5 completion is claimed. Await primary-checkout clarification before overlapping recovery work.
+
+## Execution ownership resolved — 2026-10-06
+
+The user selected option 1: continue remaining Phase 5 implementation in the parallel isolated checkout and preserve this checkout at its verified checkpoint (`8145bbe`, `658eb28`, `55c465c`). Overlapping implementation here is paused by that choice. Reconciliation must preserve both histories and their scoped evidence; Phase 5 and Plan 05-04 remain incomplete.

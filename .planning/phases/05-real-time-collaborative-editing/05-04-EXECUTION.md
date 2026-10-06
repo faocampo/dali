@@ -34,3 +34,5 @@ At tracer commit `658eb28`, added actual two-user browser cases for delete/undo/
 Remaining coverage includes connected-idle reservation behavior, additional native ABA/structural cases, and eligible history through a real reconnect. The current live source intentionally quarantines writes after interruption. Recovery is also covered by the following approved plan. No completion count or requirement status changes.
 
 A parallel isolated implementation of the same history/reconnection scope was discovered during verification. Preserve both independently; further overlapping implementation awaits clarification of the primary execution checkout. No cross-checkout changes were imported, and no other process was stopped.
+
+Ownership resolution: the user selected continuation in the isolated execution and preservation of this checkpoint. No additional implementation is authorized here by that choice. Reconcile the independent histories before integrating overlapping changes.
