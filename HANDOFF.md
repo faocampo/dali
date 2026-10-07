@@ -10,14 +10,22 @@ Repositorio: [faocampo/dali](https://github.com/faocampo/dali). Código consolid
 - `6918823`: incorpora el checkpoint de revisión `c072cb9` y su documentación histórica.
 - `d7c12ab`: incorpora la ascendencia del checkpoint original `184b731`, conservando la implementación seleccionada en la [reconciliación documentada](.planning/phases/05-real-time-collaborative-editing/05-RECONCILIATION-2026-10-06.md). Sus variantes superpuestas no se mezclaron.
 
-Antes del cierre había dos ramas remotas (`main`, `codex/internal-release-20261006`) y ningún PR. La continuación tenía cuatro ramas locales y el checkout original tres. Objetivo del cierre: una sola rama activa, `main`, y estos dos checkpoints recuperables como etiquetas:
+**Cierre completado:** [PR #2](https://github.com/faocampo/dali/pull/2) fusionado mediante merge normal en `49d738031e76384a9566f67167ec73c35241b7b3`. GitHub queda con **una rama, `main`, y cero PR abiertos**. Este informe final añade únicamente documentación sobre ese commit de integración.
+
+| Ubicación | Antes | Después |
+|---|---|---|
+| GitHub | `main`, `codex/internal-release-20261006`; ningún PR | Solo `main`; PR #2 fusionado; rama temporal de publicación también cerrada |
+| Checkout de continuación | Cuatro ramas `codex/*` | Solo `main`, siguiendo `origin/main`; `origin` apunta a GitHub |
+| Checkout original | `main`, `list`, `codex/phase-1-canvas-images` | Solo la referencia `main`; archivos y HEAD conservados en `184b731` |
+
+Todos los extremos de las ramas cerradas son ancestros de la integración. No se utilizó force push ni bypass de protecciones. Estos dos checkpoints están publicados como etiquetas:
 
 | Etiqueta | Commit conservado |
 |---|---|
 | `archive/original-checkpoint-20261006` | `184b73178020c59a0e2dbdf51edec41fd2a23325` |
 | `archive/internal-release-20261006` | `c072cb9f5113839445787ab3eab87392dee93007` |
 
-Los bundles locales completos anteriores al cierre son una segunda copia de recuperación. Los checkouts de revisión y original conservarán sus archivos en el mismo commit, con HEAD separado de una rama. No se reinicia ninguna demo ni se cambia su almacenamiento. El resultado remoto definitivo se registra al finalizar la fusión.
+Los bundles locales completos anteriores al cierre son una segunda copia de recuperación. El checkout original conserva `184b731`; los dos worktrees de revisión/verificación conservan `c072cb9`, todos con HEAD separado de una rama y sin cambios en sus archivos. No se reinició ninguna demo ni se cambió su almacenamiento. El checkout de continuación es el canónico para `main`.
 
 ## Pruebas del código consolidado
 
