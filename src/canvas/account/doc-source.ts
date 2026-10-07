@@ -16,6 +16,9 @@ export type SourceOptions = {
   onLiveSnapshot?: (snapshot: SharedRecoveryBaseline) => void;
   onLiveMetadata?: (metadata: { title: string; revision: number }) => void;
   canReconnectLive?: (snapshot?: { root: Uint8Array; content: Uint8Array }) => Promise<boolean>;
+  /** An already-open authenticated board may retain new local actions during an outage. */
+  canEditDisconnected?: () => boolean;
+  preserveLocal?: () => Promise<void>;
   onLiveReconnected?: () => void;
   onAcknowledged?: (token: unknown) => void | Promise<void>;
   durableLocalBlobs?: boolean;

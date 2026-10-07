@@ -85,7 +85,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   const release = () => {
     if (!token || finishing) return;
     finishing = true; textSession = false; personalCapture.setTextEditing(false); const held = token;
-    releaseWork = runtime.workspace.waitForSynced().then(() => live.release(held)).then(() => { if (token === held) token = undefined; }).catch(() => {
+    releaseWork = (live.isLocalAction(held) ? Promise.resolve() : runtime.workspace.waitForSynced()).then(() => live.release(held)).then(() => { if (token === held) token = undefined; }).catch(() => {
       if (!disposed) message('Changes are waiting to save. Keep this board open.');
     }).finally(() => { finishing = false; releaseWork = undefined; });
   };
@@ -130,7 +130,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     const acquire = async () => {
       if (previousRelease) await previousRelease;
       if (disposed || pending !== events) return;
-      if (host.store.readonly || !live.connected || finishing || token) throw new Error('Editing access changed.');
+      if (host.store.readonly || !live.canEdit || finishing || token) throw new Error('Editing access changed.');
       // A new explicit gesture can follow a click whose lease is releasing.
       // Recompute its dependencies only after release, then acquire afresh.
       const currentTargets = nativeReservationTargets(host.store.spaceDoc, models.map(model => model.id));
@@ -280,7 +280,7 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
   let actionTail: Promise<void> = Promise.resolve();
   const runAction: ReservationAction = async (ids, create, operation) => {
     if (releaseWork) await releaseWork;
-    if (disposed || host.store.readonly || !live.connected) throw new Error('Editing access is unavailable.');
+    if (disposed || host.store.readonly || !live.canEdit) throw new Error('Editing access is unavailable.');
     if (pending || pendingAction || finishing || token) throw new Error('Finish the current editing action and try again.');
     const required = nativeReservationTargets(host.store.spaceDoc, ids.filter(id => id !== '$dali:metadata'), true);
     if (!required) throw new Error('This action is not yet available during live editing.');
@@ -290,12 +290,12 @@ export function installLiveShapeGesture(host: EditorHost, runtime: CanvasRuntime
     let acquired: string | undefined;
     try {
       acquired = await live.acquire(required);
-      if (disposed || host.store.readonly || !live.connected) throw new Error('Editing access changed.');
+      if (disposed || host.store.readonly || !live.canEdit) throw new Error('Editing access changed.');
       token = acquired; message('');
       const finishCapture = personalCapture.beginOperation();
       let result;
       try { result = await operation(); } finally { finishCapture(); }
-      await runtime.workspace.waitForSynced();
+      if (!live.isLocalAction(acquired)) await runtime.workspace.waitForSynced();
       return result;
     } catch (error) {
       const editor = error && typeof error === 'object' && 'editor' in error ? error.editor : undefined;

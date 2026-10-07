@@ -8,6 +8,61 @@ function pending(signal?: AbortSignal | null) {
   return new Promise<Response>((_resolve, reject) => signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
 }
 describe('generation-scoped live snapshots', () => {
+  it('@05-05-02 admits explicit disconnected actions locally and preserves them without a remote lease', async () => {
+    let allowed = true; const preserve = vi.fn(async () => {});
+    const request = vi.fn<typeof fetch>().mockImplementation(async url => {
+      if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'original', revision: 3, epoch, root: update, content: update });
+      if (String(url).endsWith('/disconnect')) return Response.json({ acknowledged: true });
+      throw new Error('Offline');
+    });
+    const live = new BoardLiveSource({ ...scope, fetch: request, canEditDisconnected: () => allowed, preserveLocal: preserve });
+    try {
+      await live.start(() => {}, () => {}); await vi.waitFor(() => expect(live.connectionState).toBe('disconnected'));
+      const action = await live.acquire(['shape', live.creationScope]);
+      expect(action).toMatch(/^local-/); expect(live.actionId).toBe(action); expect(live.creating).toBe(true);
+      live.registerCreated('new-shape'); expect(live.allowsObject('new-shape')).toBe(true); expect(live.allowsObject('foreign')).toBe(false);
+      expect(() => live.writeHeaders('operation', action)).toThrow(); await expect(live.authorizeHistory(action)).rejects.toThrow();
+      allowed = false; expect(live.actionId).toBeUndefined(); expect(live.allowsObject('shape')).toBe(false); expect(live.editing).toBe(false);
+      await expect(live.acquire(['shape'])).rejects.toThrow();
+      await live.release(action); expect(preserve).toHaveBeenCalledOnce();
+      allowed = true; const next = await live.acquire(['shape']); expect(next).not.toBe(action); await live.release(next);
+      expect(request.mock.calls.some(([url]) => /reserve|release|history/.test(String(url)))).toBe(false);
+      live.dispose(); await expect(live.acquire(['shape'])).rejects.toThrow();
+    } finally { live.dispose(); }
+  });
+  it('@05-05-02 checking a reconnection retires local admission before awaiting fresh authority', async () => {
+    let resolve!: (value: boolean) => void;
+    const request = vi.fn<typeof fetch>().mockImplementation(async url => {
+      if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'original', revision: 3, epoch, root: update, content: update });
+      if (String(url).endsWith('/disconnect')) return Response.json({ acknowledged: true });
+      throw new Error('Offline');
+    });
+    const live = new BoardLiveSource({ ...scope, fetch: request, canEditDisconnected: () => true, preserveLocal: async () => {}, canReconnectLive: () => new Promise<boolean>(done => { resolve = done; }) });
+    try {
+      await live.start(() => {}, () => {}); await vi.waitFor(() => expect(live.connectionState).toBe('disconnected'));
+      await live.acquire(['shape']); const reconnect = live.reconnect();
+      expect(live.connectionState).toBe('checking'); expect(live.actionId).toBeUndefined(); expect(live.allowsObject('shape')).toBe(false);
+      await expect(live.acquire(['shape'])).rejects.toThrow(); resolve(false); await expect(reconnect).rejects.toThrow();
+      expect(live.actionId).toBeUndefined();
+    } finally { live.dispose(); }
+  });
+  it('@05-05-02 a reservation denied by another editor never becomes a local action', async () => {
+    const request = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+      if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'original', revision: 3, epoch, root: update, content: update });
+      if (String(url).endsWith('/reserve')) return Response.json({ code: 'OBJECT_RESERVED' }, { status: 409 });
+      if (String(url).endsWith('/disconnect')) return Response.json({ acknowledged: true });
+      return pending(init?.signal);
+    });
+    const preserve = vi.fn(async () => {});
+    const live = new BoardLiveSource({ ...scope, fetch: request, canEditDisconnected: () => true, preserveLocal: preserve });
+    try {
+      await live.start(() => {}, () => {});
+      expect(() => live.writeHeaders('operation', 'local-retired-action')).toThrow();
+      await expect(live.acquire(['shape'])).rejects.toMatchObject({ code: 'OBJECT_RESERVED' });
+      expect(live.actionId).toBeUndefined(); expect(live.editing).toBe(false); expect(preserve).not.toHaveBeenCalled();
+      expect(request.mock.calls.filter(([url]) => String(url).endsWith('/reserve'))).toHaveLength(1);
+    } finally { live.dispose(); }
+  });
   it('@05-05-02 retains the original and every recovered action identity for personal history', async () => {
     const request = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
       if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'connection', revision: 3, epoch, root: update, content: update });

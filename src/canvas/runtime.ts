@@ -8,7 +8,7 @@ import { AccountJournal, replayJournal, requestRecoveryStorage, pendingRecords, 
 import { RecoveryCoordinator, recoveryStorageFailure, type RecoveryStorageFailure, type RecoveryOutcome } from './account/recovery';
 import { BoardDocSource, RecoveryEpochError, SourceAccessError } from './account/doc-source';
 import { acknowledgedUpdateCovered } from './account/acknowledged-update';
-import { interruptSession, revalidateSession } from '../auth/session';
+import { getSessionState, interruptSession, revalidateSession } from '../auth/session';
 import { attachLocalCapture } from './account/local-capture';
 import { titleIntentStore, inspectPendingScopes, pendingTitleIntents, acknowledgeRecoveredTitle, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission } from './account/outbox';
 import { captureTitleIntent, replayTitleIntent, advanceLiveTitleIntent, validDocumentRevisionReceipt, validTitleIntent, type DocumentRevisionReceipt, bufferedTitleStore } from './account/title-intent';
@@ -555,6 +555,15 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     // Retirement must not inherit the requestAbort signal from the wrapper below.
     disconnectFetch: options.disconnectFetch ?? options.fetch ?? fetch,
     onDocumentOutcome: documentOutcome,
+    canEditDisconnected: () => {
+      const session = getSessionState();
+      return isCurrent() && !initializing && !quarantined && !storagePaused && scope?.canWrite === true && scope.role !== 'viewer' &&
+        session.phase === 'authenticated' && session.member?.accountId === initial.accountId && session.member.expiresAt > Date.now();
+    },
+    preserveLocal: async () => {
+      try { await scopedJournal.preserve(); await titles.preserve(); await persistSharedEvidence(); }
+      catch (error) { if (isCurrent()) pauseRecoveryStorage(error); throw error; }
+    },
     canReconnectLive: async () => {
       const clean = () => isCurrent() && !initializing && !storagePaused && scope?.phase === 'active' &&
         (scope.role === 'viewer' || (getAccountSaveSnapshot()?.scope === statusScope && getAccountSaveSnapshot()?.state === 'saved' &&

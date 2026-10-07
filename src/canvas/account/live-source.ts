@@ -40,14 +40,22 @@ export class BoardLiveSource {
   private connectionId?: string;
   private revision = 0;
   private reservation?: string;
+  private localAction?: string;
   private reservedObjects = new Set<string>();
   private createdObjects = new Set<string>();
-  get actionId() { return this.connected ? this.reservation : undefined; }
+  private get localEditingAllowed() {
+    return !!this.connectionId && !!this.epoch && this.connectionState === 'disconnected' && !this.options.readonly &&
+      !this.controller.signal.aborted && !this.options.signal?.aborted && this.options.isCurrent?.(this.options.generation) !== false &&
+      !!this.options.preserveLocal && this.options.canEditDisconnected?.() === true;
+  }
+  get canEdit() { return this.connected || this.localEditingAllowed; }
+  get actionId() { return this.connected ? this.reservation : this.localEditingAllowed ? this.localAction : undefined; }
   get creationScope() { if (!this.connectionId) throw new Error('No live connection'); return `$dali:create:${this.connectionId}`; }
-  get creating() { return this.connected && this.reservedObjects.has(this.creationScope); }
+  get creating() { return !!this.actionId && this.reservedObjects.has(this.creationScope); }
   registerCreated(id: string) { if (this.creating) this.createdObjects.add(id); }
-  allowsObject(id: string) { return this.connected && (this.reservedObjects.has(id) || this.createdObjects.has(id)); }
-  get editing() { return this.connected && this.reservedObjects.size > 0; }
+  allowsObject(id: string) { return !!this.actionId && (this.reservedObjects.has(id) || this.createdObjects.has(id)); }
+  get editing() { return !!this.actionId && this.reservedObjects.size > 0; }
+  isLocalAction(token: string) { return this.localAction === token; }
   private interrupted = false;
   private started = false;
   private readonly tabId: string;
@@ -137,6 +145,7 @@ export class BoardLiveSource {
   private async resume() {
     this.current();
     if (this.connected || !this.started || !this.receive || !this.disconnected) return;
+    this.localAction = undefined; this.reservation = undefined; this.reservedObjects.clear(); this.createdObjects.clear();
     this.connectionError = undefined; this.connectionChanged('checking');
     let fresh: string | undefined;
     try {
@@ -183,9 +192,16 @@ export class BoardLiveSource {
   writeHeaders(operationId: string, reservation = this.reservation) {
     this.current();
     if (!this.connected) throw new Error('Live recovery requires reconciliation');
+    if (reservation?.startsWith('local-')) throw new Error('Local actions require a fresh server reservation.');
     return { 'X-Dali-Connection': this.connectionId!, 'X-Dali-Operation': operationId, ...(reservation ? { 'X-Dali-Reservation': reservation } : {}) };
   }
   async acquire(objectIds: string[]) {
+    this.current();
+    if (this.localEditingAllowed) {
+      if (this.localAction || !objectIds.length) throw new Error('Finish the current local action first.');
+      this.localAction = `local-${crypto.randomUUID()}`; this.reservedObjects = new Set(objectIds); this.createdObjects.clear();
+      return this.localAction;
+    }
     if (!this.connected) throw new Error('Live source unavailable');
     const connection = this.connectionId;
     const result = await this.request('reserve', { connectionId: connection, objectIds });
@@ -195,6 +211,11 @@ export class BoardLiveSource {
     return result.token;
   }
   async release(token: string) {
+    if (this.localAction === token) {
+      try { await this.options.preserveLocal!(); }
+      finally { if (this.localAction === token) { this.localAction = undefined; this.reservedObjects.clear(); this.createdObjects.clear(); } }
+      return;
+    }
     if (this.connected) await this.request('release', { connectionId: this.connectionId, token });
     if (this.reservation === token) { this.reservation = undefined; this.reservedObjects.clear(); this.createdObjects.clear(); }
   }
