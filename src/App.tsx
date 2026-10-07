@@ -110,7 +110,7 @@ function BoardTarget({ member, target, onOpenBoards, onCopied, signOut }: { memb
   if (state === 'latest-error') return <><p role="status">Your local version is retained. Retry loading or return to versions.</p>{versions}</>;
   if (state === 'loading') return <><p role="status">{activeScope?.recoveryState === 'recovering' ? 'Recovering changes…' : activeScope?.phase === 'active' && activeScope.accountId === member.accountId && activeScope.boardId === target && activeScope.recoveryState === 'saved' ? 'Opening board…' : 'Checking access…'}</p>{versions}</>;
   if (state === 'expired') return <section><h1 ref={heading} tabIndex={-1}>Session expired — sign in to continue.</h1><a href={'/auth/start?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search)}>Sign in to continue</a></section>;
-  if (state === 'denied' && hasRecovery) return <RecoveryDenied accountId={member.accountId} boardId={target} />;
+  if (state === 'denied' && (hasRecovery || latestCandidate.current)) return <RecoveryDenied accountId={member.accountId} boardId={target} />;
   if (state === 'denied') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>You don't have access to this board</h1><p>Ask the board owner to grant access to your internal account.</p><a href="/">Back to your boards</a></section>;
   if (state === 'error') return <section className="session-recovery"><h1 ref={heading} tabIndex={-1}>We couldn't open this board.</h1><p role="alert">We couldn't open this board. Try again.</p><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/">Back to your boards</a></section>;
   return <><div className="djai-app" data-board-id={board!.summary.id}>

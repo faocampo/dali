@@ -29,10 +29,10 @@ export function RecoveryVersionDialog({ reason, onRestored, onCopied, onLatest, 
       else if (action === 'download') { await downloadChosenRecoveryCopy(); setDownloaded(true); }
       else if (action === 'latest') { await onLatest?.(); }
       else { const decision = await getRecoveryDecision(); await decision.authorize(); setUnverified(false); }
-    } catch {
+    } catch (cause) {
       setFailed(action);
       setError(action === 'copy' ? 'Your private copy could not be created. Your local work is still here.' : action === 'download' ? 'The local copy could not be prepared. Your work is still here.' : action === 'latest' ? 'The latest board could not be loaded. Your local work is still here.' : action === 'access' ? 'Access could not be checked. Try again when your connection is available.' : 'Your changes could not be recovered. Your local version is still here.');
-      if (!navigator.onLine || action === 'access') setUnverified(true);
+      if (!navigator.onLine || action === 'access' || cause instanceof Error && 'code' in cause && cause.code === 'RECOVERY_ACCESS_UNVERIFIED') setUnverified(true);
     } finally { busyRef.current = false; setBusy(undefined); }
   };
   return <>
@@ -40,7 +40,15 @@ export function RecoveryVersionDialog({ reason, onRestored, onCopied, onLatest, 
       <button ref={trigger} className="djai-ghost" aria-haspopup="dialog" onClick={() => setOpen(true)}>Review pending changes</button>
     </section>
     {open && createPortal(<dialog ref={dialog} className="session-recovery recovery-version-dialog" aria-labelledby="recovery-version-heading" aria-describedby="recovery-version-description" aria-busy={!!busy}
-      onCancel={event => { event.preventDefault(); close(); }} onKeyDown={event => event.stopPropagation()}>
+      onCancel={event => { event.preventDefault(); close(); }} onKeyDown={event => {
+        event.stopPropagation();
+        if (event.key !== 'Tab') return;
+        const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+        const first = buttons[0]; const last = buttons.at(-1);
+        if (!first) { event.preventDefault(); heading.current?.focus(); }
+        else if (event.shiftKey && (document.activeElement === first || document.activeElement === heading.current)) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }}>
       <h2 ref={heading} id="recovery-version-heading" tabIndex={-1}>{offer ? 'Download your local version?' : versionTitle}</h2>
       <p id="recovery-version-description">{offer ? 'Keep a recovery copy before loading the latest shared board. Loading without downloading discards this local version after the latest board opens successfully.' : reason === 'restored' ? 'This browser has pending edits. Restore them or load the latest shared board.' : 'Load the latest shared board, or create a private copy with your local changes.'}</p>
       {!offer && <p>Your local version is kept in this browser. Shared changes are paused until you decide.</p>}

@@ -244,3 +244,89 @@ for (const boundary of ['stage', 'document', 'image', 'commit'] as const) test(`
   } catch (error) { failure = error; throw error; }
   finally { f.interrupt(); await f.close(failure); }
 });
+
+test('@05-06-02 loading latest resolves only the chosen tab and keeps another complete candidate for explicit later review', async ({ browser, baseURL }) => {
+  const f = await divergentVersion(browser, baseURL!); let failure: unknown;
+  try {
+    const other = await f.editor.evaluate(() => new Promise<string[]>((resolve, reject) => {
+      const opening = indexedDB.open('dali-account-recovery-v1', 2); opening.onerror = () => reject(opening.error);
+      opening.onsuccess = () => {
+        const db = opening.result; const tx = db.transaction(['journal', 'checkpoints'], 'readwrite'); const ids: string[] = [];
+        const rows = tx.objectStore('journal').getAll(); rows.onsuccess = () => { for (const row of rows.result) { const id = crypto.randomUUID(); ids.push(id); tx.objectStore('journal').put({ ...row, id, tabId: 'synthetic-other-tab' }); } };
+        const checkpoints = tx.objectStore('checkpoints').getAll(); checkpoints.onsuccess = () => { for (const cp of checkpoints.result) tx.objectStore('checkpoints').put({ ...cp, id: JSON.stringify([cp.accountId, cp.boardId, cp.epoch, 'synthetic-other-tab']), tabId: 'synthetic-other-tab' }); };
+        tx.onabort = () => { db.close(); reject(tx.error); }; tx.oncomplete = () => { db.close(); resolve(ids.sort()); };
+      };
+    }));
+    expect(other.length).toBeGreaterThan(0);
+    const all = await journalRows(f.editor); const retainedOther = all.filter(row => other.includes(row.id));
+    await f.choice.getByRole('button', { name: 'Load latest changes', exact: true }).click();
+    const offer = f.editor.getByRole('dialog', { name: 'Download your local version?', exact: true });
+    await offer.getByRole('button', { name: 'Load latest without download', exact: true }).click(); await expect(offer).toHaveCount(0);
+    await expect(f.editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+    expect(await shapeBounds(f.editor, f.first)).toBe('[0,0,160,120]'); expect(await journalRows(f.editor)).toEqual(retainedOther);
+    await f.editor.reload(); await expect(f.choice).toBeVisible(); expect(await shapeBounds(f.editor, f.first)).toBe('[70,40,160,120]');
+    expect(await imageHashes(f.editor)).toHaveLength(1); expect(await journalRows(f.editor)).toEqual(retainedOther);
+    await f.choice.getByRole('button', { name: 'Load latest changes', exact: true }).click(); await offer.getByRole('button', { name: 'Load latest without download', exact: true }).click();
+    await expect(offer).toHaveCount(0); await expect(f.editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible(); expect(await journalRows(f.editor)).toEqual([]);
+    expect(f.identities.runtimeErrors).toEqual([]);
+  } catch (error) { failure = error; throw error; }
+  finally { f.interrupt(); await f.close(failure); }
+});
+
+for (const action of ['download', 'latest'] as const) test(`@05-06-02 ${action} source revocation retains the candidate and hides the decision`, async ({ browser, baseURL, browserName }) => {
+  const f = await divergentVersion(browser, baseURL!); let failure: unknown;
+  try {
+    await f.choice.getByRole('button', { name: 'Load latest changes', exact: true }).click();
+    const offer = f.editor.getByRole('dialog', { name: 'Download your local version?', exact: true });
+    const pattern = action === 'download' ? `**/api/boards/${f.board}` : '**/docs/*/pull';
+    await f.editor.route(pattern, async route => { f.service.database.prepare('DELETE FROM board_grants WHERE board_id=?').run(f.board); await route.continue(); });
+    const downloads: string[] = []; f.editor.on('download', download => downloads.push(download.suggestedFilename()));
+    await offer.getByRole('button', { name: action === 'download' ? 'Download local copy' : 'Load latest without download', exact: true }).click();
+    await expect(f.editor.getByRole('heading', { name: 'Your access has changed', exact: true })).toBeVisible(); await expect(f.editor.locator('editor-host')).toHaveCount(0); await expect(f.editor.getByRole('dialog')).toHaveCount(0);
+    expect(downloads).toEqual([]); expect(await journalRows(f.editor)).toEqual(f.retained);
+    expect(f.identities.runtimeErrors).toEqual(browserName !== 'firefox' ? ['editor: Failed to load resource: the server responded with a status of 404 (Not Found)'] : []); f.identities.runtimeErrors.length = 0;
+  } catch (error) { failure = error; throw error; }
+  finally { f.interrupt(); await f.close(failure); }
+});
+
+for (const access of ['offline', 'unverified'] as const) test(`@05-06-02 ${access} authority requires Check access before another recovery action`, async ({ browser, baseURL, browserName }) => {
+  const f = await divergentVersion(browser, baseURL!); let failure: unknown;
+  try {
+    if (access === 'offline') await f.identities.contexts.editor.setOffline(true);
+    else {
+      await f.editor.route(`**/api/boards/${f.board}`, route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+      await f.choice.getByRole('button', { name: 'Create private copy', exact: true }).click(); await expect(f.choice.getByRole('alert')).toBeVisible();
+    }
+    await expect(f.choice.getByRole('button', { name: /^(Create private copy|Retry copy)$/ })).toBeDisabled();
+    await expect(f.choice.getByRole('button', { name: 'Load latest changes', exact: true })).toBeDisabled();
+    await expect(f.choice.getByRole('button', { name: 'Check access', exact: true })).toBeEnabled(); expect(await journalRows(f.editor)).toEqual(f.retained);
+    if (access === 'offline') await f.identities.contexts.editor.setOffline(false); else await f.editor.unroute(`**/api/boards/${f.board}`);
+    await f.choice.getByRole('button', { name: 'Check access', exact: true }).click(); await expect(f.choice.getByRole('button', { name: 'Create private copy', exact: true })).toBeEnabled();
+    await expect(f.choice.getByRole('button', { name: 'Check access', exact: true })).toHaveCount(0); expect(await journalRows(f.editor)).toEqual(f.retained);
+    expect(f.identities.runtimeErrors).toEqual(access === 'unverified' && browserName !== 'firefox' ? ['editor: Failed to load resource: the server responded with a status of 503 (Service Unavailable)'] : []); f.identities.runtimeErrors.length = 0;
+  } catch (error) { failure = error; throw error; }
+  finally { f.interrupt(); await f.close(failure); }
+});
+
+test('@05-06-02 E4 E5 keyboard focus and 320px reflow keep every decision reachable', async ({ browser, baseURL }, testInfo) => {
+  const f = await divergentVersion(browser, baseURL!); let failure: unknown;
+  try {
+    for (const viewport of [{ width: 1280, height: 800 }, { width: 320, height: 640 }]) {
+      await f.editor.setViewportSize(viewport);
+      for (const surface of ['version', 'download'] as const) {
+        const dialog = f.editor.getByRole('dialog');
+        if (surface === 'download') await dialog.getByRole('button', { name: 'Load latest changes', exact: true }).click();
+        const bounds = await dialog.boundingBox(); expect(bounds).not.toBeNull(); expect(bounds!.x).toBeGreaterThanOrEqual(15); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width - 15);
+        expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+        for (const button of await dialog.getByRole('button').all()) { await button.scrollIntoViewIfNeeded(); await expect(button).toBeInViewport(); expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44); }
+        await dialog.getByRole('heading').focus();
+        for (let index = 0; index < 7; index++) { await f.editor.keyboard.press('Tab'); expect(await dialog.evaluate(el => el.contains(document.activeElement))).toBe(true); }
+        await dialog.evaluate(el => { el.scrollTop = 0; }); await f.editor.screenshot({ path: testInfo.outputPath(`recovery-${surface}-${viewport.width}.png`) });
+        if (surface === 'download') { await dialog.getByRole('button', { name: 'Back to versions', exact: true }).click(); await expect(dialog.getByRole('heading')).toBeFocused(); }
+      }
+    }
+    await f.editor.keyboard.press('Escape'); await expect(f.editor.getByRole('button', { name: 'Review pending changes', exact: true })).toBeFocused(); expect(await journalRows(f.editor)).toEqual(f.retained);
+    expect(f.identities.runtimeErrors).toEqual([]);
+  } catch (error) { failure = error; throw error; }
+  finally { f.interrupt(); await f.close(failure); }
+});

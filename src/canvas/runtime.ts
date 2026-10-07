@@ -588,7 +588,11 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
         const authority = await authorize(requestAbort.signal); assertCurrent();
         if (authority.descriptor.summary.role === 'viewer' || !authority.descriptor.capabilities.includes('duplicate') || !authority.descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
         return authority.descriptor;
-      } catch (error) { await accessFailed(error); throw error; }
+      } catch (error) {
+        await accessFailed(error);
+        if (!(error instanceof SourceAccessError || error instanceof RecoveryEpochError || error instanceof RecoveryStorageError)) throw Object.assign(new Error('Recovery access could not be checked'), { code: 'RECOVERY_ACCESS_UNVERIFIED', cause: error });
+        throw error;
+      }
     };
     return { candidate, assertCurrent, authorize: fresh, accessFailed,
       complete: async () => {
