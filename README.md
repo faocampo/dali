@@ -1,5 +1,7 @@
 # Dali
 
+Current status and manual continuation: [maintainer handoff](HANDOFF.md). Automated development is paused; no internal-pilot acceptance is claimed.
+
 Dali extends [DJAI Academy's Open Canvas](https://github.com/DJAI-Academy/djai-open-canvas/tree/27f8bb97b10984e04e48d7650d954d0a7ecd212c) (pinned upstream source) with an editable canvas and authenticated board library. Account boards use the application backend; earlier browser-local boards and images remain in IndexedDB and can be copied into an account. Clearing site data removes browser-local work.
 
 ## Run locally

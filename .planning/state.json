@@ -70,9 +70,9 @@
     }
   ],
   "next": {
-    "command": "/gsd:progress --next",
-    "label": "Advance to the next step",
-    "reason": "Phase 05 of 13 \u00b7 31% \u00b7 executing"
+    "command": "",
+    "label": "Manual maintainer handoff",
+    "reason": "Automated development stopped by the user on 2026-10-07. Phase 5 remains incomplete; consolidation and handoff only."
   },
-  "updated_at": "2026-10-07T01:47:36.033Z"
+  "updated_at": "2026-10-07T16:30:07Z"
 }

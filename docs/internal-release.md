@@ -1,5 +1,7 @@
 # Controlled internal release checklist and runbook
 
+Current consolidation results and manual ownership: [HANDOFF.md](../HANDOFF.md). Automated development is paused; historical continuation instructions are superseded.
+
 Status: **not ready for a collaborative internal pilot**. This document separates the approved v1 roadmap from the minimum evidence needed to expose a bounded internal capability. It does not approve a smaller release, enable collaboration generally, or authorize deployment.
 
 ## Capability and evidence inventory
