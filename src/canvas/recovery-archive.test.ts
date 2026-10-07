@@ -11,7 +11,7 @@ vi.mock('./runtime', () => {
     getTransformer: () => ({ docToSnapshot: () => fixture.snapshot,
       assetsManager: { getPathBlobIdMap: () => new Map(fixture.references.map(id => [id, id])), readFromBlob: async () => undefined },
       assets: new Map(fixture.references.map(id => [id, fixture.blob])), [Symbol.dispose]: () => undefined }) } });
-  return { getCanvasRuntime: async () => runtime(), getRecoveryRuntime: () => ({ runtime: runtime(), readLocalAsset: fixture.readAsset }), suspendAccessScope: () => { fixture.scope = { ...fixture.scope, phase: 'paused' }; } };
+  return { getActiveAccessScope: () => fixture.scope, getCanvasRuntime: async () => runtime(), getRecoveryRuntime: () => ({ runtime: runtime(), readLocalAsset: fixture.readAsset }), suspendAccessScope: () => { fixture.scope = { ...fixture.scope, phase: 'paused' }; } };
 });
 vi.mock('./account/mutation-guard', () => ({ accessScopeCurrent: () => true, canExportRecoveryScope: (scope: AccessScope) => fixture.scope.phase === 'active' && fixture.scope.role !== 'viewer' && fixture.scope.generation === scope.generation }));
 vi.mock('../auth/session', () => ({ getSessionState: () => ({ phase: 'authenticated', member: { accountId: fixture.accountId, expiresAt: fixture.expiresAt } }) }));

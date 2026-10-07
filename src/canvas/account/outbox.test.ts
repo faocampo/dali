@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { AccountJournal, acknowledgeRecords, acknowledgeRecoveredTitle, preserveRecoverySubmission, readCheckpoint, replayJournal, requestRecoveryStorage, titleIntentStore, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission, type JournalRecord } from './outbox';
+import { AccountJournal, acknowledgeRecords, acknowledgeRecoveredTitle, preserveRecoverySubmission, readCheckpoint, replayJournal, requestRecoveryStorage, titleIntentStore, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission, type JournalRecord, recoveryForkStore, resolveRecoveryCandidate, type RecoveryForkIntent } from './outbox';
 import { attachLocalCapture, RECOVERY_REPLAY_ORIGIN } from './local-capture';
 import * as Y from 'yjs';
 import { createHash } from 'node:crypto';
@@ -326,4 +326,34 @@ it('@04-02-02 epoch-less and stale journal records remain intact without network
     await expect(replayJournal(descriptor, 'member', new AbortController().signal)).rejects.toThrow('recovery state');
     expect(request).not.toHaveBeenCalled(); expect(db.rows.get(record.id)).toBe(record);
   }
+});
+
+
+it('@05-06-01 a durable fork intent is isolated and cannot change its frozen payload on retry', async () => {
+  const db = storage(); const store = recoveryForkStore(scope, 'tab-a');
+  const value: RecoveryForkIntent = { operationId: 'synthetic-fork', snapshotDigest: 'a'.repeat(64), title: 'Local version', candidateIds: ['local-row'], assets: { [imageKey]: { mime: 'image/png', data: new Uint8Array([0, 128, 255]) } },
+    snapshot: { type: 'page', meta: { id: 'content', title: 'Local version', createDate: 1, tags: [] }, blocks: { type: 'block', id: 'local-page', flavour: 'affine:page', props: {}, children: [] } } };
+  db.fail(true); await expect(store.write(value)).rejects.toThrow(); db.fail(false); expect(await store.read()).toBeUndefined();
+  await store.write(value); expect(await recoveryForkStore(scope, 'tab-a').read()).toEqual(value);
+  expect(await recoveryForkStore(scope, 'tab-b').read()).toBeUndefined(); expect(await recoveryForkStore({ ...scope, accountId: 'different' }, 'tab-a').read()).toBeUndefined();
+  for (const changed of [{ operationId: 'new-operation' }, { title: 'Changed title' }, { snapshot: { ...value.snapshot, meta: { ...value.snapshot.meta, title: 'Changed snapshot' } } }, { assets: { [imageKey]: { mime: 'image/png', data: new Uint8Array([9]) } } }]) {
+    await expect(store.write({ ...value, ...changed })).rejects.toThrow(); expect(await store.read()).toEqual(value);
+  }
+});
+
+it('@05-06-01 resolving a confirmed candidate retains other tabs and rejects newly arrived rows or titles atomically', async () => {
+  const db = storage(); const journal = new AccountJournal(scope, () => {}); const doc = new Y.Doc();
+  await journal.checkpoint({ root: { docId: 'root', data: Y.encodeStateAsUpdate(doc) }, content: { docId: 'content', data: Y.encodeStateAsUpdate(doc) }, title: 'Original', assets: {} });
+  const first = await journal.captureUpdate('content', new Uint8Array([0, 0]));
+  const foreign = { ...db.rows.get(first)!, id: 'other-tab-row', tabId: 'other-tab' }; db.rows.set(foreign.id, foreign);
+  const own = titleIntentStore(scope, journal.tabId); const other = titleIntentStore(scope, 'other-tab');
+  const title = { schemaVersion: 1 as const, accountId: scope.accountId, boardId: scope.boardId, epoch: scope.recoveryEpoch!, operationId: 'original-title', baseRevision: 1, title: 'Local name' };
+  await own.write(title); await other.write({ ...title, operationId: 'other-title' });
+  const candidate = { scope, tab: journal.tabId, ids: [first], titleOperationId: title.operationId };
+  const later = await journal.captureUpdate('content', new Uint8Array([0, 0]));
+  await expect(resolveRecoveryCandidate(candidate)).rejects.toThrow('local version changed'); expect(db.rows.size).toBe(3); expect(await own.read()).toMatchObject(title);
+  candidate.ids.push(later); await own.write({ ...title, operationId: 'later-title' });
+  await expect(resolveRecoveryCandidate(candidate)).rejects.toThrow('local title changed'); expect(db.rows.size).toBe(3); expect(await readCheckpoint(scope, journal.tabId)).toBeTruthy();
+  candidate.titleOperationId = 'later-title'; await resolveRecoveryCandidate(candidate);
+  expect([...db.rows.values()]).toEqual([foreign]); expect(await own.read()).toBeUndefined(); expect((await other.read())?.operationId).toBe('other-title'); expect(await readCheckpoint(scope, journal.tabId)).toBeUndefined(); doc.destroy();
 });

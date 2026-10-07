@@ -1,3 +1,4 @@
+import { isRecoveryForkKind, registerRecoveryForkRoutes } from './recovery-forks.js';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import * as Y from 'yjs';
@@ -21,6 +22,7 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
       mime TEXT NOT NULL, bytes BLOB NOT NULL, PRIMARY KEY(member_id,operation_id,blob_key),
       FOREIGN KEY(member_id,operation_id) REFERENCES import_staging(member_id,operation_id) ON DELETE CASCADE);
   ` }]);
+  registerRecoveryForkRoutes(app, config, database, now, beforeCommit);
   const previous = (member: string, id: string) => database.prepare('SELECT kind,status,board_id,result FROM operations WHERE member_id=? AND operation_id=?').get(member, id) as { kind: string; status: string; board_id: string; result: string } | undefined;
   const record = (member: string, id: string, kind: string, boardId: string, result: unknown, status = 'completed') => database.prepare('INSERT INTO operations(member_id,operation_id,kind,status,board_id,result) VALUES(?,?,?,?,?,?)').run(member, id, kind, status, boardId, JSON.stringify(result));
   const repository = new BlobRepository(database);
@@ -97,6 +99,8 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
       const current = stageFor(member!.accountId, request.params.operationId);
       if (!current) return reply.code(404).send({ code: 'STAGING_UNAVAILABLE' });
       if (!canStage(current, request, reply)) return;
+      const operation = previous(member!.accountId, request.params.operationId);
+      if (operation && isRecoveryForkKind(operation.kind) && current.root && (!current.root.equals(root) || !current.content?.equals(content))) return reply.code(409).send({ code: 'OPERATION_CONFLICT' });
       database.prepare('UPDATE import_staging SET root=?,content=? WHERE member_id=? AND operation_id=?').run(root, content, member!.accountId, request.params.operationId); return { acknowledged: true };
     })();
   });
@@ -126,13 +130,13 @@ export function registerImportRoutes(app: FastifyInstance, config: AuthConfig, d
       const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
       if (!requireRecoveryEpoch(database, request, reply)) return;
       const old = previous(member!.accountId, request.params.operationId);
-      if (old && !['import', 'duplicate'].includes(old.kind)) return reply.code(409).send({ code: 'OPERATION_CONFLICT' });
+      if (old && !['import', 'duplicate'].includes(old.kind) && !isRecoveryForkKind(old.kind)) return reply.code(409).send({ code: 'OPERATION_CONFLICT' });
       if (old?.status === 'completed') return operationReceipt(database, request, reply, request.params.operationId, now, true)?.result;
       const stage = stageFor(member!.accountId, request.params.operationId); if (!stage) return reply.code(404).send({ code: 'STAGING_UNAVAILABLE' });
       if (!canStage(stage, request, reply)) return;
       if (stage.source_id) {
         const source = requireBoardCapability(database, request, reply, stage.source_id, 'duplicate', now); if (!source) return;
-        if (source.revision !== stage.source_revision) return reply.code(409).send({ code: 'SOURCE_CHANGED' });
+        if (!old || !isRecoveryForkKind(old.kind) && source.revision !== stage.source_revision) return reply.code(409).send({ code: 'SOURCE_CHANGED' });
       }
       const blobs = database.prepare('SELECT blob_key,mime,bytes FROM import_staging_blobs WHERE member_id=? AND operation_id=?').all(member!.accountId, request.params.operationId) as { blob_key: string; mime: string; bytes: Buffer }[];
       if (!stage.root || !stage.content || JSON.stringify(blobs.map(b => b.blob_key).sort()) !== JSON.stringify((JSON.parse(stage.manifest) as string[]).sort())) return reply.code(409).send({ code: 'IMPORT_INCOMPLETE' });

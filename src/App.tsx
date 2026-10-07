@@ -45,7 +45,7 @@ function NewBoardTarget({ member, operationId }: { member: SessionDescriptor; op
   return error ? <section><p role="alert">We couldn't create this board. Try again.</p><button onClick={() => setRetry(value => value + 1)}>Try again</button><a href="/">Back to your boards</a></section> : <p role="status">Creating board…</p>;
 }
 
-function BoardTarget({ member, target, onOpenBoards, signOut }: { member: SessionDescriptor; target: string; onOpenBoards: () => void; signOut: () => Promise<void> }) {
+function BoardTarget({ member, target, onOpenBoards, onCopied, signOut }: { member: SessionDescriptor; target: string; onOpenBoards: () => void; onCopied: (boardId: string) => void; signOut: () => Promise<void> }) {
   const [state, setState] = useState<'loading' | 'denied' | 'expired' | 'error' | 'ready' | 'corrupt' | 'epoch-mismatch'>('loading');
   const activeScope = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
   const [restored, setRestored] = useState(false);
@@ -86,12 +86,14 @@ function BoardTarget({ member, target, onOpenBoards, signOut }: { member: Sessio
   return <div className="djai-app" data-board-id={board!.summary.id}>
     <Header boardTitle={activeScope?.title ?? board!.summary.title} board={board!} member={member} signOut={signOut} onBoardChanged={setBoard} onOpenBoards={onOpenBoards} onRenameBoard={board?.summary.role !== 'viewer' ? renameBoard : undefined} onOpenRestored={() => { setRestored(true); setRetry(value => value + 1); }} />
     <main className="djai-canvas-area"><BlockSuiteCanvas runtime={runtime!} /></main>
-    {activeScope?.recoveryChoice && <RecoveryVersionChoice reason={activeScope.recoveryChoice} onRestored={() => setRetry(value => value + 1)} />}
+    {activeScope?.recoveryChoice && <RecoveryVersionChoice reason={activeScope.recoveryChoice} onCopied={onCopied} onRestored={() => setRetry(value => value + 1)} />}
   </div>;
 }
 export default function App() {
   const session = useSyncExternalStore(subscribeSession, getSessionState);
   const [intent, setIntent] = useState(() => accountIntent());
+  const [recoveryNotice, setRecoveryNotice] = useState('');
+  useEffect(() => { if (!recoveryNotice) return; const timer = setTimeout(() => setRecoveryNotice(''), 12000); return () => clearTimeout(timer); }, [recoveryNotice]);
   const snapshot = useSyncExternalStore(subscribeSaveStatus, getAccountSaveSnapshot);
   const access = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
   const [destination, setDestination] = useState<{ run: () => void | Promise<void>; origin: HTMLElement | null; operation: NavigationOperation }>();
@@ -149,7 +151,8 @@ export default function App() {
     return () => { window.removeEventListener('popstate', changed); document.removeEventListener('click', clicked, true); };
   }, []);
   const openBoards = () => requestBoardNavigation(() => { window.history.pushState(null, '', '/'); setIntent({ kind: 'home' }); });
-  return <><AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId + session.revision} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId + session.revision} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} signOut={async () => { requestBoardNavigation(signOut, 'sign-out'); }} /> : <BoardLibrary key={member.accountId + session.revision} member={member} signOut={signOut} />}</AuthBoundary>
+  return <><AuthBoundary>{(member, signOut) => intent.kind === 'new' ? <NewBoardTarget key={member.accountId + session.revision} member={member} operationId={intent.operationId} /> : intent.kind === 'board' || intent.kind === 'invalid' ? <BoardTarget key={member.accountId + session.revision} member={member} target={intent.kind === 'board' ? intent.boardId : ''} onOpenBoards={openBoards} onCopied={boardId => { window.history.pushState(null, '', accountBoardUrl(boardId)); currentUrl.current = window.location.href; setRecoveryNotice('Private copy created.'); setIntent({ kind: 'board', boardId }); }} signOut={async () => { requestBoardNavigation(signOut, 'sign-out'); }} /> : <BoardLibrary key={member.accountId + session.revision} member={member} signOut={signOut} />}</AuthBoundary>
+    {recoveryNotice && <p className="recovery-copy-notice" role="status">{recoveryNotice}</p>}
     {destination && <LeaveRecoveryDialog preserved={!!snapshot?.preserved} busy={leaving} onStay={() => { const origin = destination.origin; pendingDestination.current = false; setDestination(undefined); requestAnimationFrame(() => { if (origin?.isConnected) origin.focus(); }); }} onLeave={() => { void finish(destination.run, true, destination.operation); }} />}
   </>;
 }

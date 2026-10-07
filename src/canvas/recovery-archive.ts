@@ -1,7 +1,8 @@
 import type { DocSnapshot } from '@blocksuite/store';
 import { getSessionState } from '../auth/session';
 import { validDescriptor } from '../boards/BoardLibrary';
-import { getRecoveryRuntime, suspendAccessScope, type AccessScope } from './runtime';
+import { getActiveAccessScope, getRecoveryRuntime, suspendAccessScope, type AccessScope } from './runtime';
+import { SourceAccessError } from './account/doc-source';
 import { canExportRecoveryScope } from './account/mutation-guard';
 import { buildSnapshotArchive, downloadBlob, safeFilename } from './export-board';
 import { validateMindmapDocument } from './mindmap-compatibility';
@@ -19,7 +20,7 @@ function assertAuthority(scope: AccessScope) {
 
 /** Capture completes synchronously. The transformer and live model are never retained. */
 export function captureRecoverySnapshot(): { captured: RecoverySnapshot; readAsset: (id: string) => Promise<Blob | null> } {
-  const { runtime, readLocalAsset } = getRecoveryRuntime(); const scope = runtime.scope;
+  const { runtime, readLocalAsset } = getRecoveryRuntime(); const scope = getActiveAccessScope()!;
   assertAuthority(scope); validateMindmapDocument(runtime.store);
   const transformer = runtime.store.getTransformer();
   try {
@@ -37,6 +38,30 @@ export function captureRecoverySnapshot(): { captured: RecoverySnapshot; readAss
     const captured = Object.freeze({ scope: Object.freeze({ ...scope }), capturedAt: Date.now(), title: snapshot.meta.title, snapshot: freezeSnapshot(structuredClone(snapshot)), references: Object.freeze(references) });
     return { captured, readAsset: async id => { assertAuthority(scope); const value = await readLocalAsset(id); assertAuthority(scope); return value; } };
   } finally { transformer[Symbol.dispose](); }
+}
+
+/** Online version decisions never use the legacy outage authorization fallback. */
+export async function readAuthorizedRecoveryAssets(capture: ReturnType<typeof captureRecoverySnapshot>, authorize: () => Promise<unknown>) {
+  const { captured, readAsset } = capture; const assets = new Map<string, Blob>();
+  await authorize();
+  for (const reference of captured.references) {
+    let blob = await readAsset(reference.id); assertAuthority(captured.scope);
+    if (!blob) {
+      await authorize();
+      const response = await fetch(`/api/boards/${encodeURIComponent(captured.scope.boardId)}/blobs/${encodeURIComponent(reference.id)}`, {
+        cache: 'no-store', credentials: 'same-origin', headers: { 'X-Dali-Account': captured.scope.accountId }, signal: AbortSignal.timeout(10000),
+      });
+      assertAuthority(captured.scope);
+      if ([401, 403, 404, 409].includes(response.status)) throw new SourceAccessError(response.status);
+      if (response.ok) blob = await response.blob();
+    }
+    if (!blob) throw new Error(`${reference.label}: image bytes are missing. Restore the image and retry.`);
+    const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()));
+    const hash = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_');
+    if (hash !== reference.id) throw new Error(`${reference.label}: the image copy could not be verified.`);
+    assertAuthority(captured.scope); assets.set(reference.id, blob);
+  }
+  await authorize(); return assets;
 }
 
 async function confirmAuthority(scope: AccessScope): Promise<boolean> {

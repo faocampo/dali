@@ -1,3 +1,4 @@
+import { isRecoveryForkKind } from './recovery-forks.js';
 import { registerCollaborationRoutes } from './collaboration.js';
 import { registerRecoveryBaselineRoutes } from './recovery-baseline.js';
 import { randomUUID } from 'node:crypto';
@@ -54,7 +55,7 @@ export function operationReceipt(database: AccountDatabase, request: FastifyRequ
   const member = currentSession(database, request, now); if (!requireExpectedMember(request, reply, member)) return;
   const operation = database.prepare('SELECT kind,status,board_id,result FROM operations WHERE member_id=? AND operation_id=?')
     .get(member!.accountId, operationId) as { kind: string; status: string; board_id: string; result: string } | undefined;
-  if (!operation || (importsOnly && !['import', 'duplicate'].includes(operation.kind))) return { status: 'unknown' };
+  if (!operation || (importsOnly && !['import', 'duplicate'].includes(operation.kind) && !isRecoveryForkKind(operation.kind))) return { status: 'unknown' };
   // A completed delete has no resource left to authorize and contains only its acknowledgment.
   if (operation.kind === 'delete' && operation.status === 'completed') return { status: operation.status, result: { deleted: true, boardId: operation.board_id } };
   const stored = JSON.parse(operation.result);
@@ -65,7 +66,7 @@ export function operationReceipt(database: AccountDatabase, request: FastifyRequ
     return { status: operation.status, result: stored };
   }
   // A finished copy belongs to its destination owner independently of the source's later role.
-  const boardId = ['import', 'duplicate'].includes(operation.kind) ? stored.summary?.id : operation.board_id;
+  const boardId = ['import', 'duplicate'].includes(operation.kind) || isRecoveryForkKind(operation.kind) ? stored.summary?.id : operation.board_id;
   const grant = operation.kind.startsWith('["grant",');
   const board = requireBoardCapability(database, request, reply, boardId, grant ? 'grants' : 'read', now); if (!board) return;
   if (grant) return { status: operation.status, result: grantState(database, boardId) };

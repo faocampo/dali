@@ -1,5 +1,6 @@
 import { validDocumentRevisionReceipt, type DocumentRevisionReceipt } from './title-intent';
 import type { BoardDescriptor } from '../../boards/BoardLibrary';
+import type { DocSnapshot } from '@blocksuite/store';
 import { SourceAccessError, RecoveryEpochError, validRecoveryEpoch } from './doc-source';
 import * as Y from 'yjs';
 import { validTitleIntent, type TitleIntent, type TitleStore } from './title-intent';
@@ -11,6 +12,13 @@ export type JournalRecord = JournalScope & { id: string; sequence: number; kind:
 export type RecoveryCheckpoint = { schemaVersion: 2; accountId: string; boardId: string; epoch: string; tabId: string;
   root: { docId: string; data: Uint8Array }; content: { docId: string; data: Uint8Array }; title: string;
   assets: Record<string, { mime?: string; data?: Uint8Array }>; shared?: SharedRecoveryBaseline };
+export type RecoveryCandidate = { scope: JournalScope; tab: string; ids: string[]; titleOperationId?: string };
+export type RecoveryForkIntent = {
+  operationId: string; snapshotDigest: string; title: string; snapshot: DocSnapshot;
+  assets: Record<string, { mime: string; data: Uint8Array }>;
+  candidateIds: string[]; titleOperationId?: string;
+  prepared?: { descriptor: BoardDescriptor; root: string; content: string; manifest: string[] };
+};
 export const recoveryDatabaseName = 'dali-account-recovery-v1';
 const tabId = (() => {
   const fresh = crypto.randomUUID();
@@ -257,6 +265,71 @@ export async function readCheckpoint(scope: JournalScope, tab: string): Promise<
         done(request.result);
       }
       catch (error) { abortWithFailure(tx, error); }
+    };
+  });
+}
+function assertForkIntent(value: RecoveryForkIntent, scope: JournalScope) {
+  if (!value || !bounded(value.operationId) || !/^[a-f0-9]{64}$/.test(value.snapshotDigest) || typeof value.title !== 'string' || !value.title || value.title.length > 4000 ||
+      !value.snapshot?.blocks || !value.snapshot.meta || !Array.isArray(value.candidateIds) || value.candidateIds.length > 10000 || !value.candidateIds.every(bounded) ||
+      value.titleOperationId !== undefined && !bounded(value.titleOperationId) || !value.assets || typeof value.assets !== 'object' || Array.isArray(value.assets)) throw new RecoveryStorageError('CORRUPT');
+  let total = 0; const keys = Object.keys(value.assets);
+  if (keys.length > 10000) throw new RecoveryStorageError('CORRUPT');
+  for (const [key, asset] of Object.entries(value.assets)) {
+    if (!/^[A-Za-z0-9_-]{43}=$/.test(key) || !asset || !(asset.data instanceof Uint8Array) || !['image/png', 'image/jpeg'].includes(asset.mime) || !asset.data.length || asset.data.length > 16 * 1024 * 1024) throw new RecoveryStorageError('CORRUPT');
+    total += asset.data.length;
+  }
+  if (total > 256 * 1024 * 1024) throw new RecoveryStorageError('CORRUPT');
+  if (value.prepared) {
+    const { descriptor: d, root, content, manifest } = value.prepared;
+    if (!d || d.summary?.accountId !== scope.accountId || d.summary.role !== 'owner' || d.summary.access !== 'private' || d.recoveryEpoch !== scope.recoveryEpoch ||
+        !bounded(d.summary.id) || !bounded(d.rootDocId) || !bounded(d.contentDocId) || d.rootDocId === d.contentDocId ||
+        typeof root !== 'string' || typeof content !== 'string' || !root || !content || root.length > 12 * 1024 * 1024 || content.length > 12 * 1024 * 1024 ||
+        !Array.isArray(manifest) || JSON.stringify([...manifest].sort()) !== JSON.stringify(keys.sort())) throw new RecoveryStorageError('CORRUPT');
+  }
+}
+/** Durable operation and transformed bytes survive transport failure and reload. */
+export function recoveryForkStore(scope: JournalScope, tab: string) {
+  assertScope(scope); if (!bounded(tab)) throw new RecoveryStorageError('CORRUPT');
+  const id = 'fork:' + checkpointId(scope, tab);
+  const readRow = (row: { value: RecoveryForkIntent } | undefined) => { if (row) assertForkIntent(row.value, scope); return row?.value; };
+  return {
+    read: () => transaction<RecoveryForkIntent | undefined>(['sequences'], 'readonly', (tx, done) => {
+      const request = tx.objectStore('sequences').get(id);
+      request.onsuccess = () => { try { done(readRow(request.result)); } catch (error) { abortWithFailure(tx, error); } };
+    }),
+    write: (value: RecoveryForkIntent) => transaction<RecoveryForkIntent>(['sequences'], 'readwrite', (tx, done) => {
+      assertForkIntent(value, scope); const store = tx.objectStore('sequences'); const request = store.get(id);
+      request.onsuccess = () => {
+        try {
+          const old = readRow(request.result);
+          if (old && (old.operationId !== value.operationId || old.snapshotDigest !== value.snapshotDigest || JSON.stringify(old.candidateIds) !== JSON.stringify(value.candidateIds) || old.titleOperationId !== value.titleOperationId || old.prepared && JSON.stringify(old.prepared) !== JSON.stringify(value.prepared))) throw new RecoveryStorageError('CORRUPT');
+          if (old && (old.title !== value.title || JSON.stringify(old.snapshot) !== JSON.stringify(value.snapshot) ||
+              JSON.stringify(Object.keys(old.assets).sort()) !== JSON.stringify(Object.keys(value.assets).sort()) ||
+              Object.entries(old.assets).some(([key, asset]) => asset.mime !== value.assets[key]!.mime || asset.data.length !== value.assets[key]!.data.length || asset.data.some((byte, index) => byte !== value.assets[key]!.data[index])))) throw new RecoveryStorageError('CORRUPT');
+          store.put({ id, value: structuredClone(value) }); done(value);
+        } catch (error) { abortWithFailure(tx, error); }
+      };
+    }),
+  };
+}
+/** Resolve only the exact displayed candidate after confirmed copy or hydration.
+ * New rows or a newer title in the same tab abort the entire transaction. */
+export async function resolveRecoveryCandidate(candidate: RecoveryCandidate) {
+  const { scope, tab, ids, titleOperationId } = candidate;
+  assertScope(scope); if (!bounded(tab) || ids.length > 10000 || !ids.every(bounded)) throw new RecoveryStorageError('CORRUPT');
+  return transaction<void>(['journal', 'checkpoints', 'sequences'], 'readwrite', (tx, done) => {
+    const journal = tx.objectStore('journal'); const sequences = tx.objectStore('sequences');
+    const records = journal.index('scope').getAll([scope.accountId, scope.boardId, scope.recoveryEpoch!]);
+    records.onsuccess = () => {
+      const selected = (records.result as JournalRecord[]).filter(row => row.tabId === tab);
+      if (selected.some(row => !validRecord(row)) || JSON.stringify(selected.map(row => row.id).sort()) !== JSON.stringify([...ids].sort())) { abortWithFailure(tx, new Error('The local version changed. Review it again.')); return; }
+      const titleId = 'title:' + checkpointId(scope, tab); const title = sequences.get(titleId);
+      title.onsuccess = () => {
+        if (title.result?.operationId !== titleOperationId || title.result && !validTitleIntent(title.result)) { abortWithFailure(tx, new Error('The local title changed. Review it again.')); return; }
+        for (const row of selected) journal.delete(row.id);
+        sequences.delete(titleId); sequences.delete('fork:' + checkpointId(scope, tab));
+        tx.objectStore('checkpoints').delete(checkpointId(scope, tab)); done(undefined);
+      };
     };
   });
 }

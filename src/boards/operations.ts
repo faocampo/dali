@@ -19,8 +19,10 @@ import {
 import { validDescriptor, type BoardDescriptor } from './BoardLibrary';
 import * as Y from 'yjs';
 import { createAccountWorkspace, createStagingWorkspace } from '../canvas/account/board-workspace';
-import { renameActiveBoard, synchronizeActiveBoard } from '../canvas/runtime';
-import { authenticatedRecoveryEpoch, RecoveryEpochError, validRecoveryEpoch } from '../canvas/account/doc-source';
+import { getRecoveryDecision, getRecoveryRuntime, renameActiveBoard, synchronizeActiveBoard, type RecoveryDecision } from '../canvas/runtime';
+import { authenticatedRecoveryEpoch, RecoveryEpochError, SourceAccessError, validRecoveryEpoch } from '../canvas/account/doc-source';
+import { captureRecoverySnapshot, readAuthorizedRecoveryAssets } from '../canvas/recovery-archive';
+import { recoveryForkStore, type RecoveryForkIntent } from '../canvas/account/outbox';
 
 export function validateBoardTitle(draft: string, acknowledged: string): string {
   const title = draft.trim() || acknowledged;
@@ -63,6 +65,95 @@ export function regenerateSurfaceIdentities<T>(snapshot: T): T {
     }));
   }
   return copy;
+}
+
+async function recoveryRequest(decision: RecoveryDecision, path: string, init: RequestInit = {}) {
+  decision.assertCurrent(); const { scope } = decision.candidate;
+  let response: Response;
+  try { response = await fetch(path, { ...init, credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(10000), headers: {
+    'X-Dali-Account': scope.accountId, 'X-Dali-Request': '1', 'X-Dali-Recovery-Epoch': scope.recoveryEpoch!, 'Content-Type': 'application/json', ...init.headers,
+  } }); } catch { throw new BoardActionError('The recovery operation could not be confirmed. Keep this tab open and retry.', true); }
+  decision.assertCurrent();
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({})) as { code?: string };
+    if (error.code === 'RECOVERY_EPOCH_MISMATCH' || error.code === 'RECOVERY_EPOCH_REQUIRED') throw new RecoveryEpochError(error.code);
+    if ([401, 403, 404].includes(response.status) || error.code === 'ACCOUNT_CHANGED') throw new SourceAccessError(response.status);
+    throw new BoardActionError('The private copy could not be confirmed. Keep your local version and retry.', response.status >= 500);
+  }
+  if (init.method && init.method !== 'GET' && response.headers.get('X-Dali-Recovery-Epoch') !== scope.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+  return response.json().catch(() => { throw new BoardActionError('The recovery response was incomplete. Retry to check its receipt.', true); });
+}
+function assertForkDestination(value: BoardDescriptor, accountId: string, epoch: string, id?: string) {
+  if (!validDescriptor(value, accountId) || value.recoveryEpoch !== epoch || value.summary.role !== 'owner' || value.summary.access !== 'private' ||
+      !value.capabilities.includes('write') || id !== undefined && value.summary.id !== id) throw new Error('The private copy response could not be verified.');
+}
+let recoveryCopyFlight: Promise<BoardDescriptor> | undefined;
+/** Freeze and persist the selected local version before submitting any stage.
+ * Neither a retry nor a later source edit recaptures or replaces its payload. */
+export function createPrivateRecoveryCopy(): Promise<BoardDescriptor> {
+  if (recoveryCopyFlight) return recoveryCopyFlight;
+  const capture = captureRecoverySnapshot();
+  const promise = (async () => {
+    const decision = await getRecoveryDecision(); const { candidate } = decision;
+    const store = recoveryForkStore(candidate.scope, candidate.tab);
+    try {
+      let intent = await store.read(); decision.assertCurrent();
+      if (intent && (JSON.stringify(intent.candidateIds) !== JSON.stringify(candidate.ids) || intent.titleOperationId !== candidate.titleOperationId)) throw new Error('The local version changed. Keep this tab open and review it again.');
+      if (!intent) {
+        const blobs = await readAuthorizedRecoveryAssets(capture, decision.authorize); decision.assertCurrent();
+        const snapshot = capture.captured.snapshot;
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(snapshot))));
+        const assets: RecoveryForkIntent['assets'] = {};
+        for (const [key, blob] of blobs) assets[key] = { mime: blob.type, data: new Uint8Array(await blob.arrayBuffer()) };
+        decision.assertCurrent();
+        intent = await store.write({ operationId: crypto.randomUUID(), title: capture.captured.title, snapshotDigest: Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join(''),
+          snapshot, assets, candidateIds: [...candidate.ids], titleOperationId: candidate.titleOperationId });
+      }
+      const operation = '/api/imports/' + encodeURIComponent(intent.operationId);
+      const check = () => recoveryRequest(decision, '/api/operations/' + encodeURIComponent(intent!.operationId)) as Promise<{ status: string; result?: BoardDescriptor }>;
+      const previous = await check();
+      if (previous.status === 'completed') {
+        assertForkDestination(previous.result!, candidate.scope.accountId, candidate.scope.recoveryEpoch!, intent.prepared?.descriptor.summary.id);
+        await decision.complete(); return previous.result!;
+      }
+      await decision.authorize();
+      const manifest = Object.keys(intent.assets).sort();
+      const staged = await recoveryRequest(decision, `/api/boards/${encodeURIComponent(candidate.scope.boardId)}/recovery-forks`, { method: 'POST',
+        body: JSON.stringify({ operationId: intent.operationId, title: intent.title, snapshotDigest: intent.snapshotDigest, manifest }) }) as { status: string; result: BoardDescriptor };
+      assertForkDestination(staged.result, candidate.scope.accountId, candidate.scope.recoveryEpoch!, intent.prepared?.descriptor.summary.id);
+      if (staged.status === 'completed') { await decision.complete(); return staged.result; }
+      if (staged.status !== 'staging') throw new Error('The private copy could not be prepared.');
+      if (!intent.prepared) {
+        const runtime = getRecoveryRuntime().runtime;
+        const workspace = createStagingWorkspace({ descriptor: staged.result, accountId: candidate.scope.accountId, generation: candidate.scope.generation, isCurrent: () => { decision.assertCurrent(); return true; } });
+        let transformer: ReturnType<typeof workspace.createImportTransformer> | undefined;
+        try {
+          for (const [key, asset] of Object.entries(intent.assets)) await workspace.blobSync.set(key, new Blob([new Uint8Array(asset.data)], { type: asset.mime }));
+          transformer = workspace.createImportTransformer(runtime.store.schema);
+          const copied = await transformer.snapshotToDoc(regenerateSurfaceIdentities(intent.snapshot));
+          if (!copied) throw new Error('The local version could not be copied.');
+          validateMindmapDocument(copied); copied.resetHistory(); decision.assertCurrent();
+          intent = await store.write({ ...intent, prepared: { descriptor: staged.result, manifest,
+            root: encodeBytes(Y.encodeStateAsUpdate(workspace.doc)), content: encodeBytes(Y.encodeStateAsUpdate(copied.spaceDoc)) } });
+        } finally { transformer?.[Symbol.dispose](); workspace.dispose(); }
+      }
+      await recoveryRequest(decision, operation + '/document', { method: 'PUT', body: JSON.stringify({ root: intent.prepared!.root, content: intent.prepared!.content, manifest }) });
+      for (const [key, asset] of Object.entries(intent.assets)) await recoveryRequest(decision, operation + '/blobs/' + encodeURIComponent(key), {
+        method: 'PUT', headers: { 'Content-Type': asset.mime }, body: new Blob([new Uint8Array(asset.data)], { type: asset.mime }),
+      });
+      let completed: BoardDescriptor;
+      try { completed = await recoveryRequest(decision, operation + '/commit', { method: 'POST', body: '{}' }) as BoardDescriptor; }
+      catch (error) {
+        if (!(error instanceof BoardActionError && error.uncertain)) throw error;
+        const known = await check(); if (known.status !== 'completed') throw error; completed = known.result!;
+      }
+      assertForkDestination(completed, candidate.scope.accountId, candidate.scope.recoveryEpoch!, intent.prepared!.descriptor.summary.id);
+      await decision.complete(); return completed;
+    } catch (error) { await decision.accessFailed(error); throw error; }
+  })();
+  recoveryCopyFlight = promise;
+  void promise.finally(() => { if (recoveryCopyFlight === promise) recoveryCopyFlight = undefined; }).catch(() => {});
+  return promise;
 }
 
 /** One user intent keeps one ID across transport failures and reconciliation. */

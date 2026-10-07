@@ -1,0 +1,43 @@
+.recovery-version-dialog {
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  padding: var(--dali-space-5);
+}
+.recovery-version-dialog .board-recovery__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dali-space-2);
+}
+.recovery-version-dialog .board-recovery__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dali-space-2);
+  white-space: normal;
+  min-height: 44px;
+  height: auto;
+}
+.recovery-version-dialog .dali-menu-icon { flex: none; }
+.recovery-version-dialog progress { width: 100%; accent-color: var(--dali-accent); }
+.recovery-copy-notice {
+  position: fixed;
+  inset-inline: 16px;
+  bottom: 80px;
+  z-index: 20;
+  width: fit-content;
+  max-width: calc(100vw - 32px);
+  margin-inline: auto;
+  padding: var(--dali-space-2) var(--dali-space-3);
+  border-radius: var(--dali-radius-control);
+  background: var(--dali-success-soft);
+  color: var(--dali-success);
+  pointer-events: none;
+}
+@media (max-width: 490px) {
+  .recovery-version-dialog { padding: var(--dali-space-4); }
+  .recovery-version-dialog .board-recovery__actions { flex-direction: column; }
+  .recovery-version-dialog .board-recovery__actions button { width: 100%; }
+}

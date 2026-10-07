@@ -11,6 +11,7 @@ import { acknowledgedUpdateCovered } from './account/acknowledged-update';
 import { getSessionState, interruptSession, revalidateSession } from '../auth/session';
 import { attachLocalCapture } from './account/local-capture';
 import { titleIntentStore, inspectPendingScopes, pendingTitleIntents, acknowledgeRecoveredTitle, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission } from './account/outbox';
+import { resolveRecoveryCandidate, type RecoveryCandidate } from './account/outbox';
 import { captureTitleIntent, replayTitleIntent, advanceLiveTitleIntent, validDocumentRevisionReceipt, validTitleIntent, type DocumentRevisionReceipt, bufferedTitleStore } from './account/title-intent';
 import { reconcileRecoveryReceipts, recoveryVersionsDiffer, validSharedRecoveryBaseline, type RecoveryReceipt, type SharedRecoveryBaseline } from './account/recovery-baseline';
 import { replayLiveCandidate, RecoveryChoiceError } from './account/live-recovery';
@@ -18,6 +19,16 @@ import { replayLiveCandidate, RecoveryChoiceError } from './account/live-recover
 let captureTitle: ((title: string) => Promise<void>) | undefined;
 let preserveTitle: (() => Promise<void>) | undefined;
 let confirmRestoredRecovery: (() => Promise<boolean>) | undefined;
+export type RecoveryDecision = {
+  candidate: RecoveryCandidate; assertCurrent: () => void;
+  authorize: () => Promise<BoardDescriptor>; accessFailed: (error: unknown) => Promise<void>;
+  complete: () => Promise<void>;
+};
+let acquireRecoveryDecision: (() => Promise<RecoveryDecision>) | undefined;
+export function getRecoveryDecision() {
+  if (!acquireRecoveryDecision) return Promise.reject(new Error('Review the retained local version before continuing.'));
+  return acquireRecoveryDecision();
+}
 export const restorePendingRecovery = () => confirmRestoredRecovery?.() ?? Promise.resolve(false);
 export async function renameActiveBoard(title: string) { if (!captureTitle) throw new Error('Board access is unavailable'); await captureTitle(title); }
 
@@ -120,6 +131,7 @@ export function disposeCanvasRuntime(expectedGeneration = scope?.generation): vo
   const old = current; current = null; pending = null;
   captureTitle = undefined; preserveTitle = undefined; replayDocumentCommit = undefined;
   confirmRestoredRecovery = undefined;
+  acquireRecoveryDecision = undefined;
   recoveryAssets = new Map();
   recovery?.dispose(); recovery = undefined;
   if (saveScope) dispatchSaveEvent({ type: 'recovery', scope: saveScope, state: 'disposed' });
@@ -536,6 +548,52 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
     restoredConsentTab = chosenTab; restoredConsentVersion = chosenConfirmation;
     try { await coordinator.retryRecovery(); return isCurrent() && getActiveAccessScope()?.recoveryState === 'saved'; }
     finally { restoredConsentTab = undefined; restoredConsentVersion = undefined; }
+  };
+  acquireRecoveryDecision = async () => {
+    const assertCurrent = () => {
+      const session = getSessionState();
+      if (!isCurrent() || !current || scope?.recoveryState !== 'choice' || !chosenTab || session.phase !== 'authenticated' ||
+          session.member?.accountId !== initial.accountId || session.member.expiresAt <= Date.now()) throw new Error('Recovery access changed. Reopen the board.');
+    };
+    assertCurrent(); await scopedJournal.preserve(); await titles.preserve(); assertCurrent();
+    const rows = await pendingRecords(initial.accountId, initial.boardId);
+    const titleRows = await pendingTitleIntents(initial.accountId, initial.boardId); assertCurrent();
+    const candidate: RecoveryCandidate = { scope: scopedJournal.scope, tab: chosenTab!,
+      ids: rows.filter(row => row.epoch === options.descriptor.recoveryEpoch && row.tabId === chosenTab).map(row => row.id).sort(),
+      titleOperationId: titleRows.find(row => row.epoch === options.descriptor.recoveryEpoch && row.tabId === chosenTab)?.operationId };
+    const accessFailed = async (error: unknown) => {
+      if (!isCurrent()) return;
+      if (error instanceof SourceAccessError) {
+        if ([403, 404].includes(error.status)) {
+          await markRecoveryPermissionLoss(scopedJournal.scope);
+          if (isCurrent()) {
+            dispatchSaveEvent({ type: 'recovery', scope: statusScope, state: 'denied' });
+            publish({ ...scope!, canWrite: false, recoveryChoice: undefined, recoveryState: 'denied' });
+          }
+        } else if (error.status === 401) await interruptSession();
+        else if (error.status === 409) await revalidateSession();
+      } else if (error instanceof RecoveryEpochError) {
+        dispatchSaveEvent({ type: 'recovery', scope: statusScope, state: 'epoch-mismatch' });
+        publish({ ...scope!, canWrite: false, recoveryChoice: undefined, recoveryState: 'epoch-mismatch' });
+      }
+    };
+    const fresh = async () => {
+      assertCurrent();
+      try {
+        const authority = await authorize(requestAbort.signal); assertCurrent();
+        if (authority.descriptor.summary.role === 'viewer' || !authority.descriptor.capabilities.includes('duplicate') || !authority.descriptor.capabilities.includes('write')) throw new SourceAccessError(403);
+        return authority.descriptor;
+      } catch (error) { await accessFailed(error); throw error; }
+    };
+    return { candidate, assertCurrent, authorize: fresh, accessFailed,
+      complete: async () => {
+        await fresh(); assertCurrent(); await resolveRecoveryCandidate(candidate); assertCurrent();
+        // Retire the selected local workspace before navigation can capture it again.
+        coordinator.dispose(); current!.captureUnacknowledged = () => [];
+        captureTitle = undefined; preserveTitle = undefined;
+        current!.workspace.docSync.forceStop(); current!.workspace.blobSync.stop();
+        publish({ ...scope!, phase: 'paused', canWrite: false, recoveryChoice: undefined });
+      } };
   };
   requestAbort.signal.addEventListener('abort', () => coordinator.dispose(), { once: true });
   const promise = coordinator.open().then(async authority => {

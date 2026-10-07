@@ -1,3 +1,4 @@
+import { isRecoveryForkKind } from '../boards/recovery-forks.js';
 import Database from 'better-sqlite3';
 import { validateStoredDocument } from '../boards/documents.js';
 import { IMAGE_LIMITS, validateStoredImage, validateImageBytes, validBlobKey } from '../boards/blobs.js';
@@ -68,10 +69,10 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
       const value = json(row.result);
       if (!value || typeof value !== 'object') throw new Error('Invalid receipt result');
       const knownBoard = (id: string) => exists('boards', id) || !!database!.prepare("SELECT 1 FROM operations WHERE kind='delete' AND status='completed' AND board_id=?").get(id);
-      if (row.status === 'completed' && row.kind !== 'delete' && !knownBoard(row.kind === 'duplicate' ? value.summary?.id : row.board_id)) throw new Error('Missing receipt resource');
+      if (row.status === 'completed' && row.kind !== 'delete' && !knownBoard((row.kind === 'duplicate' || isRecoveryForkKind(row.kind)) ? value.summary?.id : row.board_id)) throw new Error('Missing receipt resource');
       if (row.kind === 'delete') { if (value.deleted !== true || value.boardId !== row.board_id) throw new Error('Invalid deletion receipt'); }
       else if (['create', 'rename', 'import'].includes(row.kind)) { if (value.summary?.id !== row.board_id) throw new Error('Invalid board receipt'); }
-      else if (row.kind === 'duplicate') {
+      else if (row.kind === 'duplicate' || isRecoveryForkKind(row.kind)) {
         // A duplicate receipt records its source board separately from the destination descriptor.
         if (!bounded(value.summary?.id, 256) || !bounded(value.rootDocId, 256) || !bounded(value.contentDocId, 256) || value.rootDocId === value.contentDocId) throw new Error('Invalid duplicate receipt');
       }
@@ -81,7 +82,7 @@ export function validateBackupDatabase(path: string): { databaseVersion: number;
     for (const stage of database.prepare('SELECT * FROM import_staging').iterate() as Iterable<{ member_id: string; operation_id: string; source_id: string | null; descriptor: string; manifest: string; root: Buffer | null; content: Buffer | null }>) {
       const descriptor = json(stage.descriptor); const manifest = json(stage.manifest);
       const receipt = database.prepare("SELECT kind,board_id FROM operations WHERE member_id=? AND operation_id=? AND status='staging'").get(stage.member_id, stage.operation_id) as { kind: string; board_id: string } | undefined;
-      if (!exists('members', stage.member_id) || !receipt || receipt.board_id !== (receipt.kind === 'duplicate' ? stage.source_id : descriptor.summary?.id) || descriptor.summary?.accountId !== stage.member_id || !Array.isArray(manifest) || manifest.length > 10000 || !manifest.every(key => typeof key === 'string' && validBlobKey(key)) || new Set(manifest).size !== manifest.length) throw new Error('Invalid staged references');
+      if (!exists('members', stage.member_id) || !receipt || receipt.board_id !== ((receipt.kind === 'duplicate' || isRecoveryForkKind(receipt.kind)) ? stage.source_id : descriptor.summary?.id) || descriptor.summary?.accountId !== stage.member_id || !Array.isArray(manifest) || manifest.length > 10000 || !manifest.every(key => typeof key === 'string' && validBlobKey(key)) || new Set(manifest).size !== manifest.length) throw new Error('Invalid staged references');
       const binding = { root_doc_id: descriptor.rootDocId, content_doc_id: descriptor.contentDocId } as BoardRow;
       if (!bounded(binding.root_doc_id, 256) || !bounded(binding.content_doc_id, 256) || binding.root_doc_id === binding.content_doc_id || (!!stage.root !== !!stage.content)) throw new Error('Invalid staged binding');
       if (stage.root && stage.content) { validateStoredDocument(stage.root, binding, binding.root_doc_id); for (const key of validateStoredDocument(stage.content, binding, binding.content_doc_id)) if (!manifest.includes(key)) throw new Error('Invalid staged image reference'); }
