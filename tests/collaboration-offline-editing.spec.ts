@@ -19,21 +19,24 @@ async function moveOffline(page: Page, id: string, dx: number, dy: number) {
   await page.mouse.move(position.x + dx, position.y + dy, { steps: 8 }); await page.mouse.up();
 }
 
-for (const scenario of ['unchanged', 'divergent', 'quota', 'expired'] as const) test(`@05-05-02 new offline gestures remain private before ${scenario} reconnect`, async ({ browser, baseURL }) => {
+for (const scenario of ['unchanged', 'divergent', 'quota', 'expired', 'lost-at-authorize', 'lost-at-baseline', 'lost-at-reserve', 'lost-at-commit'] as const) test(`@05-05-02 new offline gestures remain private before ${scenario} reconnect`, async ({ browser, browserName, baseURL }) => {
   const service = await acceptanceService(baseURL!); const identities = await createIdentityContexts(browser, service.origin);
   let interrupt = () => {}; let failure: unknown;
   try {
-    const ownerContext = identities.contexts.owner; const editorContext = identities.contexts.editor;
+    const lostAccess = scenario.startsWith('lost-at-');
+    const ownerContext = lostAccess ? identities.contexts.editor : identities.contexts.owner;
+    const editorContext = lostAccess ? identities.contexts.owner : identities.contexts.editor;
+    const creatorContext = identities.contexts.owner;
     const owner = ownerContext.pages()[0]!; const editor = editorContext.pages()[0]!;
     if (scenario === 'expired') await owner.clock.install();
     const ownerAccount = (await (await ownerContext.request.get('/api/session')).json()).accountId;
     const editorAccount = (await (await editorContext.request.get('/api/session')).json()).accountId;
-    const created = await ownerContext.request.post('/api/boards', {
-      headers: { Origin: service.origin, 'X-Dali-Request': '1', 'X-Dali-Account': ownerAccount, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(service.database) },
+    const created = await creatorContext.request.post('/api/boards', {
+      headers: { Origin: service.origin, 'X-Dali-Request': '1', 'X-Dali-Account': lostAccess ? editorAccount : ownerAccount, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(service.database) },
       data: { operationId: randomUUID(), title: 'Synthetic offline editing' },
     });
     expect(created.status()).toBe(201); const board = (await created.json()).summary.id as string;
-    service.database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board, editorAccount, 'editor');
+    service.database.prepare('INSERT INTO board_grants(board_id,member_id,role) VALUES(?,?,?)').run(board, lostAccess ? ownerAccount : editorAccount, 'editor');
     const [shape, second] = await seedCollaborationShapes(owner, service.database, board);
     const interrupted = new Promise<void>(resolve => { interrupt = resolve; });
     await owner.route('**/live/poll', async route => { await interrupted; await route.fulfill({ status: 200, contentType: 'application/json', body: '{' }); });
@@ -52,6 +55,33 @@ for (const scenario of ['unchanged', 'divergent', 'quota', 'expired'] as const) 
     const retained = await journalRows(owner); expect(retained.length).toBeGreaterThan(0);
     expect(await shapeBounds(editor, shape!)).toBe(original); expect(writes).toEqual([]);
     await expect(owner.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+    if (lostAccess) {
+      const boundary = scenario === 'lost-at-authorize' ? `**/api/boards/${board}` : scenario === 'lost-at-baseline' ? '**/recovery/baseline' : scenario === 'lost-at-reserve' ? '**/live/reserve' : '**/docs/*/push';
+      let rejected: { status: number; code?: string } | undefined;
+      await owner.route(boundary, async route => {
+        if (rejected) { await route.continue(); return; }
+        service.database.prepare("UPDATE board_grants SET role='viewer',revision=revision+1 WHERE board_id=? AND member_id=?").run(board, ownerAccount);
+        const response = await route.fetch(); const body = await response.json(); rejected = { status: response.status(), code: body.code };
+        await route.fulfill({ response });
+      });
+      await owner.unroute('**/live/poll'); await owner.getByRole('button', { name: 'Reconnect', exact: true }).click();
+      await expect(owner.getByRole('heading', { name: 'Your access has changed', exact: true })).toBeVisible();
+      expect(rejected?.status).toBe(scenario === 'lost-at-authorize' ? 200 : 403);
+      expect(await shapeBounds(editor, shape!)).toBe(original);
+      expect(await journalRows(owner)).toEqual(expect.arrayContaining(retained));
+      await owner.unroute(boundary);
+      service.database.prepare("UPDATE board_grants SET role='editor',revision=revision+1 WHERE board_id=? AND member_id=?").run(board, ownerAccount);
+      const beforeChoice = writes.length; owner.once('dialog', dialog => dialog.accept()); await owner.reload();
+      const choice = owner.getByRole('dialog', { name: 'Editing access restored', exact: true });
+      await expect(choice).toBeVisible(); expect(writes).toHaveLength(beforeChoice);
+      expect(await shapeBounds(owner, shape!)).toBe('[90,50,160,120]'); expect(await shapeBounds(editor, shape!)).toBe(original);
+      await choice.getByRole('button', { name: 'Restore pending edits', exact: true }).click();
+      await expect(owner.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+      await expect.poll(() => shapeBounds(editor, shape!)).toBe('[90,50,160,120]');
+      await expect.poll(() => journalRows(owner)).toEqual([]);
+      expect(identities.runtimeErrors).toEqual(scenario !== 'lost-at-authorize' && browserName !== 'firefox' ? ['editor: Failed to load resource: the server responded with a status of 403 (Forbidden)'] : []);
+      identities.runtimeErrors.length = 0; return;
+    }
     if (scenario === 'quota' || scenario === 'expired') {
       if (scenario === 'expired') {
         await owner.clock.fastForward(86400001);

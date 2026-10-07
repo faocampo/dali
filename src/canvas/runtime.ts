@@ -309,6 +309,8 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       const descriptor = await response.json() as BoardDescriptor;
       if (!isCurrent() || signal.aborted || !validDescriptor(descriptor, options.accountId) || descriptor.summary.id !== initial.boardId) throw new SourceAccessError(409);
       if (descriptor.recoveryEpoch !== options.descriptor.recoveryEpoch) throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+      if (current && initial.role !== 'viewer' && descriptor.liveEnabled && (descriptor.summary.role === 'viewer' || !descriptor.capabilities.includes('write')))
+        await markRecoveryPermissionLoss(scopedJournal.scope);
       return { ...member, descriptor };
   };
   const coordinator = recovery = new RecoveryCoordinator({
@@ -358,6 +360,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (!response.ok) {
         const result = await response.json().catch(() => ({})) as { code?: string };
         if (result.code === 'RECOVERY_EPOCH_MISMATCH') throw new RecoveryEpochError('RECOVERY_EPOCH_MISMATCH');
+        if ([403, 404].includes(response.status)) await markRecoveryPermissionLoss(scopedJournal.scope);
         if ([401, 403, 404, 409].includes(response.status)) throw new SourceAccessError(response.status);
         throw new Error('Recovery baseline unavailable');
       }
@@ -374,6 +377,9 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
         try {
           await replayLiveCandidate({ ...options, boardId: initial.boardId, rootDocId: authority.descriptor.rootDocId, contentDocId: authority.descriptor.contentDocId,
             scope: scopedJournal.scope, tab, baseline: latest, rows: candidateRows, signal, isCurrent, getRecoveryEpoch: () => authority.descriptor.recoveryEpoch,
+            // The coordinator preserves loss of access before publishing denied.
+            // An external callback must not unmount this candidate first.
+            onAuthorizationLost: undefined,
             liveTabId: originalLive?.transportTabId, acknowledge: (ids, revision) => scopedJournal.acknowledge(ids, revision), outcome: observeReplay, committed: documentCommit,
             ...(candidateTitle ? { title: { intent: candidateTitle, receipt: reconciled?.acknowledgedTitle } } : {}),
             acknowledgeTitle: async receipt => {
@@ -383,6 +389,8 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
             recoveredAction: (original, committed) => originalLive?.recoverAction(original, committed),
           });
         } catch (error) {
+          if (error instanceof SourceAccessError && [403, 404].includes(error.status) && isCurrent() && !signal.aborted)
+            await markRecoveryPermissionLoss(scopedJournal.scope);
           // A remote write can win after the initial comparison or at commit.
           // Keep the same isolated candidate and expose the fresh decision.
           if (error instanceof RecoveryChoiceError && isCurrent() && !signal.aborted)

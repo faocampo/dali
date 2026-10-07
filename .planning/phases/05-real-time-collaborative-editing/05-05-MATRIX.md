@@ -9,7 +9,7 @@ This matrix tracks the approved plan's remaining acceptance, not new scope or a 
 | Replay unchanged candidate with fresh reservations and transactional version check | Native unchanged/active replay, convergence, undo/redo, fresh gesture and reopen; server atomic CAS | Extend to images and the remaining interruption boundaries |
 | Changes after comparison or during commit | Two deterministic native remote-write races and server transaction races | Retain in final matrix |
 | Pending and acknowledged titles | Three native title cases, exact server rename proof and atomic per-tab cleanup | Retain in final matrix |
-| Restored write permission requires choice | Native previously recorded loss/restoration; consent bound to marker version and candidate tab | Late loss during authorization/baseline/reservation/commit needs runtime evidence |
+| Restored write permission requires choice | Native previously recorded loss/restoration; consent bound to marker version and candidate tab | Four late-loss native cases now pass through explicit restoration and convergence; resumed native editing is being checked |
 | Concurrent tab candidates remain distinct | Journal/title unit partitioning and scoped receipt proofs | Native concurrent candidate/recovery race remains pending |
 | Account/generation change cancels callbacks | Coordinator/source tests reject stale scope and late replies | Native held-recovery response across navigation/account change remains pending |
 | Epoch and restored-server fences | Server baseline rejects wrong epoch; existing generic recovery tests | Native collaborative candidate across restore and replay boundary remains pending |
