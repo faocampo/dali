@@ -79,6 +79,11 @@ for (const scenario of ['unchanged', 'divergent', 'quota', 'expired', 'lost-at-a
       await expect(owner.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
       await expect.poll(() => shapeBounds(editor, shape!)).toBe('[90,50,160,120]');
       await expect.poll(() => journalRows(owner)).toEqual([]);
+      await expect(owner.getByRole('button', { name: 'People on this board: 2', exact: true })).toBeVisible();
+      const released = owner.waitForResponse(response => response.url().endsWith('/live/release') && response.ok());
+      await moveNativeShape(owner, second!, 25); await released;
+      await expect.poll(() => shapeBounds(editor, second!)).toBe('[425,40,160,120]');
+      await owner.reload(); expect(await shapeBounds(owner, shape!)).toBe('[90,50,160,120]'); expect(await shapeBounds(owner, second!)).toBe('[425,40,160,120]');
       expect(identities.runtimeErrors).toEqual(scenario !== 'lost-at-authorize' && browserName !== 'firefox' ? ['editor: Failed to load resource: the server responded with a status of 403 (Forbidden)'] : []);
       identities.runtimeErrors.length = 0; return;
     }

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { BoardLiveSource } from './live-source';
 import { BoardBlobSource } from './blob-source';
 import { RecoveryEpochError } from './doc-source';
 
@@ -7,6 +8,18 @@ const epoch = '11111111-1111-4111-8111-111111111111';
 const options = () => ({ boardId: 'board', rootDocId: 'root', contentDocId: 'content', accountId: 'member', generation: 1, isCurrent: () => true, getRecoveryEpoch: () => epoch });
 const image = () => new Blob(['synthetic-raster'], { type: 'image/png' });
 describe('BoardBlobSource', () => {
+  it('@05-05-02 disconnected live images remain durable locally without publication or acknowledgment', async () => {
+    const live = new BoardLiveSource(options()); const bytes = image(); const ack = vi.fn();
+    const fetcher = vi.fn<typeof fetch>(async () => Response.json({ acknowledged: true, key }, { headers: { 'X-Dali-Recovery-Epoch': epoch } }));
+    const source = new BoardBlobSource({ ...options(), live, durableLocalBlobs: true,
+      onPendingBlob: async () => 'retained-image', onAcknowledged: ack, fetch: fetcher });
+    try {
+      expect(await source.set(key, bytes)).toBe(key); expect(await source.get(key)).toBe(bytes);
+      expect(fetcher).not.toHaveBeenCalled(); expect(ack).not.toHaveBeenCalled();
+      await expect(source.delete(key)).rejects.toThrow('disconnected'); expect(fetcher).not.toHaveBeenCalled();
+    } finally { source.dispose(); live.dispose(); }
+  });
+
   it('@05-02-02 live document publication waits for retained image acknowledgment', async () => {
     let resolve!: (response: Response) => void;
     const source = new BoardBlobSource({ ...options(), durableLocalBlobs: true,

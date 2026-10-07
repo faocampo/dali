@@ -1,3 +1,5 @@
+import { syntheticCanaries } from '../../tests/access-fixtures.js';
+import { imageHash } from './blobs.js';
 import { readRecoveryEpoch } from '../storage/recovery-state.js';
 import { afterEach, beforeEach } from 'vitest';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -159,4 +161,28 @@ describe('authorized recovery baseline', () => {
     expect(response.statusCode).toBe(409); expect(response.json().code).toBe('RECOVERY_DIVERGED'); expect(bytes()).toEqual(committed);
     expect(database.prepare('SELECT 1 FROM document_receipts WHERE operation_id=?').get(owner['x-dali-operation'])).toBeUndefined();
   });
+  it.each(['rename', 'epoch'] as const)('@05-05-02 image recovery held across %s change cannot publish bytes', async boundary => {
+    const wire = (await snapshot()).json();
+    const baseline = { ...wire, root: { ...wire.root, data: new Uint8Array(Buffer.from(wire.root.data, 'base64')) }, content: { ...wire.content, data: new Uint8Array(Buffer.from(wire.content.data, 'base64')) } } as SharedRecoveryBaseline;
+    const png = syntheticCanaries().imageBytes; const key = imageHash(png);
+    let entered!: () => void; let release!: () => void;
+    const waiting = new Promise<void>(resolve => { entered = resolve; }); const held = new Promise<void>(resolve => { release = resolve; });
+    barrier = async () => { entered(); await held; };
+    const pending = Promise.resolve(app.inject({ method: 'PUT', url: `/api/boards/${board.summary.id}/blobs/${encodeURIComponent(key)}`,
+      headers: { ...headers(), 'content-type': 'image/png', 'x-dali-recovery-baseline': await recoveryFingerprint(baseline) }, payload: png }));
+    await waiting;
+    try {
+      barrier = async () => {};
+      if (boundary === 'rename') {
+        const renamed = await app.inject({ method: 'PATCH', url: `/api/boards/${board.summary.id}`, headers: headers('editor'),
+          payload: { operationId: randomUUID(), revision: wire.revision, title: 'Foreign name wins image race' } });
+        expect(renamed.statusCode).toBe(200);
+      } else database.prepare('UPDATE recovery_state SET epoch=?').run(randomUUID());
+    } finally { release(); }
+    const result = await pending;
+    expect(result.statusCode).toBe(409); expect(result.json().code).toBe(boundary === 'rename' ? 'RECOVERY_DIVERGED' : 'RECOVERY_EPOCH_MISMATCH');
+    expect(database.prepare('SELECT blob_key FROM board_blobs WHERE board_id=?').all(board.summary.id)).toEqual([]);
+    expect(bytes()).toEqual(Buffer.from(wire.content.data, 'base64'));
+  });
+
 });

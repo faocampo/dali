@@ -91,7 +91,7 @@ export class BoardWorkspace implements Workspace {
         else this.dispose();
       } };
     if (mode === 'account' && d.liveSupported && !options.recoveryBaseline) this.live = new BoardLiveSource(sourceOptions);
-    this.blobs = new BoardBlobSource(sourceOptions);
+    this.blobs = new BoardBlobSource({ ...sourceOptions, live: this.live });
     this.source = new BoardDocSource({ ...sourceOptions, live: this.live,
       beforeDocumentWrite: async (id, data, live) => {
         if (live) await this.blobs.waitForPendingUploads();

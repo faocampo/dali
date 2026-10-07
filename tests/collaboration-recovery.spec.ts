@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import { acceptanceService, createIdentityContexts } from './access-fixtures';
 import { seedCollaborationShapes, moveNativeShape, shapeBounds } from './collaboration-fixtures';
-import { journalRows } from './recovery-fixtures';
+import { journalRows, failRecoveryStorage, restoreRecoveryStorage } from './recovery-fixtures';
 import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { editBoardTitle } from './app-menu';
 
-for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-unchanged', 'active-replay-receipt', 'active-check-race', 'active-commit-race', 'unchanged', 'restored'] as const) test(`@05-05-${['active', 'active-unchanged', 'active-replay-receipt', 'active-check-race', 'active-commit-race', 'unchanged', 'restored'].includes(scenario) ? '02' : '01'} ${scenario} pending work opens an isolated version choice before server hydration or replay`, async ({ browser, browserName, baseURL }, testInfo) => {
+for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-unchanged', 'active-replay-receipt', 'active-replay-quota', 'active-check-race', 'active-commit-race', 'unchanged', 'restored'] as const) test(`@05-05-${['active', 'active-unchanged', 'active-replay-receipt', 'active-replay-quota', 'active-check-race', 'active-commit-race', 'unchanged', 'restored'].includes(scenario) ? '02' : '01'} ${scenario} pending work opens an isolated version choice before server hydration or replay`, async ({ browser, browserName, baseURL }, testInfo) => {
   const service = await acceptanceService(baseURL!); const identities = await createIdentityContexts(browser, service.origin);
   let failure: unknown; let release: (() => void) | undefined; let breakPoll: (() => void) | undefined;
   try {
@@ -65,12 +65,12 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-u
         tx.oncomplete = () => { db.close(); resolve(); }; tx.onabort = () => reject(tx.error);
       };
     }));
-    if (!['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt', 'active-check-race', 'active-commit-race'].includes(scenario)) {
+    if (!['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt', 'active-replay-quota', 'active-check-race', 'active-commit-race'].includes(scenario)) {
       const released = editor.waitForResponse(response => response.url().endsWith('/live/release') && response.ok());
       await moveNativeShape(editor, second!, 45); await released;
     }
     let remote = await shapeBounds(editor, second!);
-    expect(remote === otherOriginal).toBe(['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt', 'active-check-race', 'active-commit-race'].includes(scenario));
+    expect(remote === otherOriginal).toBe(['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt', 'active-replay-quota', 'active-check-race', 'active-commit-race'].includes(scenario));
     if (scenario === 'restored') {
       service.database.prepare("UPDATE board_grants SET role='viewer',revision=revision+1 WHERE board_id=? AND member_id=?").run(board, ownerAccount);
       await owner.goto(`/?board=${board}`); await expect(owner.locator('editor-host')).toBeVisible();
@@ -83,10 +83,11 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-u
     const replayed: string[] = [];
     owner.on('request', request => { if (/\/docs\/[^/]+\/push$/.test(new URL(request.url()).pathname)) replayed.push(request.url()); });
     let lostReplay = false;
-    if (scenario === 'active-replay-receipt') await owner.route('**/docs/*/push', async route => {
+    if (scenario === 'active-replay-receipt' || scenario === 'active-replay-quota') await owner.route('**/docs/*/push', async route => {
       if (lostReplay) { await route.continue(); return; }
       lostReplay = true; const response = await route.fetch(); expect(response.ok()).toBe(true);
-      await route.fulfill({ response, body: '{' });
+      if (scenario === 'active-replay-quota') { await failRecoveryStorage(owner, 'quota'); await route.fulfill({ response }); }
+      else await route.fulfill({ response, body: '{' });
     });
     let rejectedReplay: { status: number; code: string } | undefined;
     if (scenario === 'active-check-race' || scenario === 'active-commit-race') {
@@ -108,14 +109,32 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-u
     const comparisonResult = await (await comparison).json();
     if (scenario === 'own-receipt') expect(comparisonResult.receipts.length).toBeGreaterThan(0);
     await expect(owner.locator('editor-host')).toBeVisible();
-    if (scenario === 'unchanged' || scenario === 'active-unchanged' || scenario === 'active-replay-receipt') {
+    if (scenario === 'active-replay-quota') {
+      await expect(owner.getByRole('button', { name: 'Editing paused, Open save details', exact: true })).toBeVisible();
+      await expect.poll(() => shapeBounds(editor, shape!)).toBe(moved);
+      expect(await journalRows(owner)).toEqual(expect.arrayContaining(retained));
+      expect(replayed).toHaveLength(1);
+      await restoreRecoveryStorage(owner);
+      await owner.getByRole('button', { name: 'Editing paused, Open save details', exact: true }).click();
+      await owner.getByRole('button', { name: 'Retry saving', exact: true }).click();
+      await expect(owner.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+      await owner.keyboard.press('Escape');
+    }
+    if (scenario === 'unchanged' || scenario === 'active-unchanged' || scenario === 'active-replay-receipt' || scenario === 'active-replay-quota') {
       await expect(owner.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
       expect(await shapeBounds(owner, shape!)).toBe(moved);
       await expect.poll(() => shapeBounds(editor, shape!)).toBe(moved);
       // Reconnecting DocEngine may still acknowledge an idempotent root send
       // after the visible content is covered. Wait for that durable cleanup.
       await expect.poll(() => journalRows(owner)).toEqual([]);
-      if (scenario === 'active-replay-receipt') {
+      if (scenario === 'unchanged') {
+        await expect(owner.getByRole('button', { name: 'People on this board: 2', exact: true })).toBeVisible();
+        const released = owner.waitForResponse(response => response.url().endsWith('/live/release') && response.ok());
+        await moveNativeShape(owner, second!, 25); await released;
+        await expect.poll(() => shapeBounds(editor, second!)).toBe('[425,40,160,120]');
+        await owner.reload(); expect(await shapeBounds(owner, shape!)).toBe(moved); expect(await shapeBounds(owner, second!)).toBe('[425,40,160,120]');
+      }
+      if (scenario === 'active-replay-receipt' || scenario === 'active-replay-quota') {
         expect(lostReplay).toBe(true); expect(replayed).toHaveLength(1);
         await owner.unroute('**/docs/*/push'); await owner.getByRole('button', { name: 'Reconnect', exact: true }).click();
       }

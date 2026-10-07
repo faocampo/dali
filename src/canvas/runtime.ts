@@ -517,7 +517,12 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (recoveryState === 'storage-paused') { pauseRecoveryStorage(error); return; }
       if (recoveryState === 'saved' && storagePaused) {
         storagePaused = false;
-        if (current) { current.store.readonly = false; current.workspace.docSync.start(); }
+        if (current) {
+          current.store.readonly = false;
+          // A recovered receipt does not reconnect the original live transport.
+          // Its reconnect callback restarts native sync after admission.
+          if (!current.workspace.live || current.workspace.live.connected) current.workspace.docSync.start();
+        }
       }
       const blocked = storagePaused || quarantined || ['choice', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(recoveryState);
       if (current && blocked) current.store.readonly = true;

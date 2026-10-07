@@ -23,6 +23,7 @@ export class BoardBlobSource implements BlobSource {
   }
   private async request(method: 'GET' | 'PUT' | 'DELETE', key?: string, value?: Blob, epoch?: string) {
     this.assertCurrent(method !== 'GET');
+    if (method !== 'GET' && this.options.live && !this.options.live.connected) throw new Error('Live editing is disconnected. Keep this image locally until recovery.');
     if (key !== undefined && !/^[A-Za-z0-9_-]{43}=?$/.test(key)) throw new Error('Image key unavailable');
     const response = await (this.options.fetch ?? fetch)(`/api/boards/${encodeURIComponent(this.options.boardId)}/blobs${key === undefined ? '' : '/' + encodeURIComponent(key)}`, {
       method, credentials: 'same-origin', cache: 'no-store', signal: this.options.signal,
@@ -59,6 +60,10 @@ export class BoardBlobSource implements BlobSource {
     const epoch = sourceRecoveryEpoch(this.options);
     this.pending.set(key, value);
     const token = await this.options.onPendingBlob?.(key, value);
+    this.assertCurrent(true);
+    // Local admission is durable, but grants no permission to publish while
+    // live recovery is disconnected/checking. The version gate owns replay.
+    if (this.options.durableLocalBlobs && token && this.options.live && !this.options.live.connected) return key;
     const attempt = crypto.randomUUID(); this.options.onImageOutcome?.(key, 'sending', attempt);
     const upload = async () => {
       try {

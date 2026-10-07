@@ -24,6 +24,13 @@ export async function shapeBounds(page: Page, id: string) {
   }, id);
 }
 export async function moveNativeShape(page: Page, id: string, dx: number, dy = 40) {
+  return moveShape(page, id, dx, dy, true);
+}
+/** Native outage input has no remote reservation response to await. */
+export async function moveLocalShape(page: Page, id: string, dx: number, dy = 40) {
+  return moveShape(page, id, dx, dy, false);
+}
+async function moveShape(page: Page, id: string, dx: number, dy: number, reserve: boolean) {
   await expect(page.locator('affine-edgeless-root')).toBeVisible();
   const position = await page.locator('affine-edgeless-root').evaluate((element, objectId) => {
     const gfx = (element as HTMLElement & { gfx: GfxController }).gfx;
@@ -33,7 +40,7 @@ export async function moveNativeShape(page: Page, id: string, dx: number, dy = 4
     const rect = element.getBoundingClientRect();
     return { x: p[0] + rect.left, y: p[1] + rect.top };
   }, id);
-  const reserved = page.waitForResponse(response => response.url().endsWith('/live/reserve') && response.ok(), { timeout: 10000 });
+  const reserved = reserve ? page.waitForResponse(response => response.url().endsWith('/live/reserve') && response.ok(), { timeout: 10000 }) : Promise.resolve();
   await page.mouse.move(position.x, position.y); await page.mouse.down();
   await reserved;
   await page.mouse.move(position.x + dx, position.y + dy, { steps: 8 }); await page.mouse.up();
