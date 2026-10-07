@@ -23,29 +23,51 @@ coverage:
   - id: RECOVERY-ISOLATION
     description: Divergent, unknown and legacy candidates remain separate from shared hydration and replay.
     verification:
-      - {kind: unit, ref: src/canvas/account/recovery-baseline.test.ts, status: pass}
-      - {kind: e2e, ref: "tests/collaboration-recovery.spec.ts#@05-05-01", status: pass}
+      - kind: unit
+        ref: src/canvas/account/recovery-baseline.test.ts
+        status: pass
+      - kind: e2e
+        ref: "tests/collaboration-recovery.spec.ts#@05-05-01"
+        status: pass
     human_judgment: false
   - id: RECOVERY-REPLAY
     description: Fresh reservations and transaction comparisons admit unchanged work; exact own receipts reconcile lost responses and personal history.
     verification:
-      - {kind: integration, ref: server/boards/recovery-baseline.test.ts, status: pass}
-      - {kind: e2e, ref: "tests/collaboration-recovery.spec.ts#@05-05-02", status: pass}
+      - kind: integration
+        ref: server/boards/recovery-baseline.test.ts
+        status: pass
+      - kind: e2e
+        ref: "tests/collaboration-recovery.spec.ts#@05-05-02"
+        status: pass
     human_judgment: false
   - id: RECOVERY-OFFLINE
     description: New explicit outage gestures and images remain local; restored permission requires explicit consent at every replay boundary.
     verification:
-      - {kind: unit, ref: src/canvas/account/live-source.test.ts, status: pass}
-      - {kind: unit, ref: src/canvas/account/blob-source.test.ts, status: pass}
-      - {kind: e2e, ref: tests/collaboration-offline-editing.spec.ts, status: pass}
-      - {kind: e2e, ref: tests/collaboration-recovery-boundaries.spec.ts, status: pass}
+      - kind: unit
+        ref: src/canvas/account/live-source.test.ts
+        status: pass
+      - kind: unit
+        ref: src/canvas/account/blob-source.test.ts
+        status: pass
+      - kind: e2e
+        ref: tests/collaboration-offline-editing.spec.ts
+        status: pass
+      - kind: e2e
+        ref: tests/collaboration-recovery-boundaries.spec.ts
+        status: pass
     human_judgment: false
   - id: RECOVERY-LIFETIME
     description: Separate tabs, changed account, navigation, real restored epochs and post-commit storage failures retain only the correct candidate and cancel stale work.
     verification:
-      - {kind: e2e, ref: tests/collaboration-recovery-boundaries.spec.ts, status: pass}
-      - {kind: e2e, ref: tests/collaboration-recovery-restore.spec.ts, status: pass}
-      - {kind: e2e, ref: "tests/collaboration-recovery.spec.ts#active-replay-quota", status: pass}
+      - kind: e2e
+        ref: tests/collaboration-recovery-boundaries.spec.ts
+        status: pass
+      - kind: e2e
+        ref: tests/collaboration-recovery-restore.spec.ts
+        status: pass
+      - kind: e2e
+        ref: "tests/collaboration-recovery.spec.ts#active-replay-quota"
+        status: pass
     human_judgment: false
 completed: 2026-10-07
 status: automated_verified
