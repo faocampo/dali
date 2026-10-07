@@ -13,7 +13,7 @@ import { attachLocalCapture } from './account/local-capture';
 import { titleIntentStore, inspectPendingScopes, pendingTitleIntents, acknowledgeRecoveredTitle, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission } from './account/outbox';
 import { captureTitleIntent, replayTitleIntent, advanceLiveTitleIntent, validDocumentRevisionReceipt, validTitleIntent, type DocumentRevisionReceipt, bufferedTitleStore } from './account/title-intent';
 import { reconcileRecoveryReceipts, recoveryVersionsDiffer, validSharedRecoveryBaseline, type RecoveryReceipt, type SharedRecoveryBaseline } from './account/recovery-baseline';
-import { replayLiveCandidate } from './account/live-recovery';
+import { replayLiveCandidate, RecoveryChoiceError } from './account/live-recovery';
 
 let captureTitle: ((title: string) => Promise<void>) | undefined;
 let preserveTitle: (() => Promise<void>) | undefined;
@@ -371,16 +371,24 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (expected && !recoveryVersionsDiffer(expected, latest) && (!confirmation || restoredConsentTab === tab && restoredConsentVersion === confirmation)) {
         const originalLive = current?.workspace.live;
         for (const action of reconciled!.recoveredActions) originalLive?.recoverAction(action.original, action.committed);
-        await replayLiveCandidate({ ...options, boardId: initial.boardId, rootDocId: authority.descriptor.rootDocId, contentDocId: authority.descriptor.contentDocId,
-          scope: scopedJournal.scope, tab, baseline: latest, rows: candidateRows, signal, isCurrent, getRecoveryEpoch: () => authority.descriptor.recoveryEpoch,
-          liveTabId: originalLive?.transportTabId, acknowledge: (ids, revision) => scopedJournal.acknowledge(ids, revision), outcome: observeReplay, committed: documentCommit,
-          ...(candidateTitle ? { title: { intent: candidateTitle, receipt: reconciled?.acknowledgedTitle } } : {}),
-          acknowledgeTitle: async receipt => {
-            await acknowledgeRecoveredTitle(scopedJournal.scope, tab, receipt);
-            if (isCurrent()) dispatchSaveEvent({ type: 'title', scope: statusScope, id: receipt.operationId, outcome: 'acknowledged', at: Date.now() });
-          },
-          recoveredAction: (original, committed) => originalLive?.recoverAction(original, committed),
-        });
+        try {
+          await replayLiveCandidate({ ...options, boardId: initial.boardId, rootDocId: authority.descriptor.rootDocId, contentDocId: authority.descriptor.contentDocId,
+            scope: scopedJournal.scope, tab, baseline: latest, rows: candidateRows, signal, isCurrent, getRecoveryEpoch: () => authority.descriptor.recoveryEpoch,
+            liveTabId: originalLive?.transportTabId, acknowledge: (ids, revision) => scopedJournal.acknowledge(ids, revision), outcome: observeReplay, committed: documentCommit,
+            ...(candidateTitle ? { title: { intent: candidateTitle, receipt: reconciled?.acknowledgedTitle } } : {}),
+            acknowledgeTitle: async receipt => {
+              await acknowledgeRecoveredTitle(scopedJournal.scope, tab, receipt);
+              if (isCurrent()) dispatchSaveEvent({ type: 'title', scope: statusScope, id: receipt.operationId, outcome: 'acknowledged', at: Date.now() });
+            },
+            recoveredAction: (original, committed) => originalLive?.recoverAction(original, committed),
+          });
+        } catch (error) {
+          // A remote write can win after the initial comparison or at commit.
+          // Keep the same isolated candidate and expose the fresh decision.
+          if (error instanceof RecoveryChoiceError && isCurrent() && !signal.aborted)
+            publish({ ...scope!, title: candidateTitle?.title ?? checkpoint.title, recoveryChoice: error.reason });
+          throw error;
+        }
         if (!isCurrent() || signal.aborted) throw new Error('Stale recovered version');
         const remaining = await pendingRecords(initial.accountId, initial.boardId);
         const remainingTitles = await pendingTitleIntents(initial.accountId, initial.boardId);

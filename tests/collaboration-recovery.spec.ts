@@ -6,7 +6,7 @@ import { journalRows } from './recovery-fixtures';
 import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { editBoardTitle } from './app-menu';
 
-for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-unchanged', 'active-replay-receipt', 'unchanged', 'restored'] as const) test(`@05-05-${['active', 'active-unchanged', 'active-replay-receipt', 'unchanged', 'restored'].includes(scenario) ? '02' : '01'} ${scenario} pending work opens an isolated version choice before server hydration or replay`, async ({ browser, baseURL }, testInfo) => {
+for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-unchanged', 'active-replay-receipt', 'active-check-race', 'active-commit-race', 'unchanged', 'restored'] as const) test(`@05-05-${['active', 'active-unchanged', 'active-replay-receipt', 'active-check-race', 'active-commit-race', 'unchanged', 'restored'].includes(scenario) ? '02' : '01'} ${scenario} pending work opens an isolated version choice before server hydration or replay`, async ({ browser, browserName, baseURL }, testInfo) => {
   const service = await acceptanceService(baseURL!); const identities = await createIdentityContexts(browser, service.origin);
   let failure: unknown; let release: (() => void) | undefined; let breakPoll: (() => void) | undefined;
   try {
@@ -65,12 +65,12 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-u
         tx.oncomplete = () => { db.close(); resolve(); }; tx.onabort = () => reject(tx.error);
       };
     }));
-    if (!['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt'].includes(scenario)) {
+    if (!['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt', 'active-check-race', 'active-commit-race'].includes(scenario)) {
       const released = editor.waitForResponse(response => response.url().endsWith('/live/release') && response.ok());
       await moveNativeShape(editor, second!, 45); await released;
     }
-    const remote = await shapeBounds(editor, second!);
-    expect(remote === otherOriginal).toBe(['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt'].includes(scenario));
+    let remote = await shapeBounds(editor, second!);
+    expect(remote === otherOriginal).toBe(['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt', 'active-check-race', 'active-commit-race'].includes(scenario));
     if (scenario === 'restored') {
       service.database.prepare("UPDATE board_grants SET role='viewer',revision=revision+1 WHERE board_id=? AND member_id=?").run(board, ownerAccount);
       await owner.goto(`/?board=${board}`); await expect(owner.locator('editor-host')).toBeVisible();
@@ -88,6 +88,20 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-u
       lostReplay = true; const response = await route.fetch(); expect(response.ok()).toBe(true);
       await route.fulfill({ response, body: '{' });
     });
+    let rejectedReplay: { status: number; code: string } | undefined;
+    if (scenario === 'active-check-race' || scenario === 'active-commit-race') {
+      let raced = false;
+      await owner.route(scenario === 'active-check-race' ? '**/recovery/baseline' : '**/docs/*/push', async route => {
+        if (raced) { await route.continue(); return; } raced = true;
+        const comparison = scenario === 'active-check-race' ? await route.fetch() : undefined;
+        const released = editor.waitForResponse(response => response.url().endsWith('/live/release') && response.ok());
+        await moveNativeShape(editor, second!, 45); await released;
+        remote = await shapeBounds(editor, second!); expect(remote).not.toBe(otherOriginal);
+        const result = comparison ?? await route.fetch();
+        if (scenario === 'active-commit-race') rejectedReplay = { status: result.status(), code: (await result.json()).code };
+        await route.fulfill({ response: result });
+      });
+    }
     const comparison = owner.waitForResponse(response => response.url().endsWith('/recovery/baseline') && response.ok(), { timeout: 20000 });
     if (scenario.startsWith('active')) await owner.getByRole('button', { name: 'Reconnect', exact: true }).click();
     else await owner.goto(`/?board=${board}`);
@@ -144,7 +158,8 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-u
     expect(await shapeBounds(owner, second!)).toBe(otherOriginal);
     expect(await shapeBounds(editor, shape!)).toBe(scenario === 'own-receipt' ? moved : original);
     expect(await shapeBounds(editor, second!)).toBe(remote);
-    expect(replayed).toEqual([]);
+    expect(replayed).toHaveLength(scenario === 'active-commit-race' ? 1 : 0);
+    if (scenario === 'active-commit-race') expect(rejectedReplay).toEqual({ status: 409, code: 'RECOVERY_DIVERGED' });
     expect(await journalRows(owner)).toEqual(expect.arrayContaining(retained));
     await decision.getByRole('button', { name: 'Decide later', exact: true }).click();
     await expect(decision).toHaveCount(0);
@@ -152,8 +167,9 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-u
     await owner.getByRole('button', { name: 'Review pending changes', exact: true }).click();
     await expect(decision).toBeVisible(); await owner.keyboard.press('Escape'); await expect(decision).toHaveCount(0);
     await expect(owner.getByRole('button', { name: 'Review pending changes', exact: true })).toBeFocused();
-    expect(replayed).toEqual([]);
-    expect(identities.runtimeErrors).toEqual([]);
+    expect(replayed).toHaveLength(scenario === 'active-commit-race' ? 1 : 0);
+    expect(identities.runtimeErrors).toEqual(scenario === 'active-commit-race' && browserName !== 'firefox' ? ['owner: Failed to load resource: the server responded with a status of 409 (Conflict)'] : []);
+    identities.runtimeErrors.length = 0;
   } catch (error) { failure = error; throw error; }
   finally { release?.(); breakPoll?.(); try { await identities.close(); } catch (error) { if (!failure) throw error; } finally { await service.close(); } }
 });

@@ -7,7 +7,11 @@ import { canonicalRecoveryUpdate, recoveryDigest, recoveryFingerprint, recoveryV
 import { validDocumentRevisionReceipt, validTitleIntent, type TitleIntent, type DocumentRevisionReceipt } from './title-intent';
 import { validDescriptor } from '../../boards/BoardLibrary';
 
-const choice = () => Object.assign(new Error('The shared board changed. Choose a recovery version.'), { code: 'RECOVERY_CHOICE' });
+export class RecoveryChoiceError extends Error {
+  readonly code = 'RECOVERY_CHOICE';
+  constructor(readonly reason: 'divergent' | 'unknown') { super('Choose a recovery version before saving pending work.'); }
+}
+const choice = (reason: 'divergent' | 'unknown' = 'unknown') => new RecoveryChoiceError(reason);
 /** Replays one selected tab only, using fresh leases and commit-time canvas CAS. */
 export async function replayLiveCandidate(options: SourceOptions & {
   scope: JournalScope; tab: string; baseline: SharedRecoveryBaseline; rows: readonly JournalRecord[];
@@ -32,7 +36,7 @@ export async function replayLiveCandidate(options: SourceOptions & {
     current(); const response = await (options.fetch ?? fetch)(path, { ...init, credentials: 'same-origin', cache: 'no-store', signal: options.signal }); current();
     if (!response.ok) {
       const result = await response.json().catch(() => ({})) as { code?: string };
-      if (result.code === 'RECOVERY_DIVERGED') throw choice();
+      if (result.code === 'RECOVERY_DIVERGED') throw choice('divergent');
       if (result.code === 'RECOVERY_EPOCH_MISMATCH' || result.code === 'RECOVERY_EPOCH_REQUIRED') throw new RecoveryEpochError(result.code);
       if ([401, 403, 404].includes(response.status)) throw new SourceAccessError(response.status);
       throw new Error('Recovery could not be saved');
@@ -45,7 +49,8 @@ export async function replayLiveCandidate(options: SourceOptions & {
     const intent = options.title?.intent;
     if (intent && (!validTitleIntent(intent) || intent.accountId !== options.accountId || intent.boardId !== options.boardId || intent.epoch !== expected.epoch || intent.tabId !== options.tab)) throw choice();
     await live.start(() => {}, () => {}); current();
-    if (!connected || recoveryVersionsDiffer(expected, connected)) throw choice();
+    if (!connected) throw choice();
+    if (recoveryVersionsDiffer(expected, connected)) throw choice('divergent');
     const base = `/api/boards/${encodeURIComponent(options.boardId)}`;
     for (const row of options.rows.filter(row => row.kind === 'blob')) {
       current(); const operation = crypto.randomUUID(); await options.outcome(row, 'sending', operation);
