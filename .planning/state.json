@@ -1,0 +1,78 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "1",
+      "name": "Editable Canvas and Image Portability",
+      "status": "complete"
+    },
+    {
+      "number": "2",
+      "name": "Daily Mind Maps",
+      "status": "complete"
+    },
+    {
+      "number": "3",
+      "name": "Okta and Board Access",
+      "status": "complete"
+    },
+    {
+      "number": "4",
+      "name": "Durable Boards and Recovery",
+      "status": "complete"
+    },
+    {
+      "number": "5",
+      "name": "Real-Time Collaborative Editing",
+      "status": "in_progress"
+    },
+    {
+      "number": "6",
+      "name": "Follow Me",
+      "status": "pending"
+    },
+    {
+      "number": "7",
+      "name": "Entity Comments",
+      "status": "pending"
+    },
+    {
+      "number": "8",
+      "name": "Shared Timer",
+      "status": "pending"
+    },
+    {
+      "number": "9",
+      "name": "Voting",
+      "status": "pending"
+    },
+    {
+      "number": "10",
+      "name": "Reusable Product and Roadmap Templates",
+      "status": "pending"
+    },
+    {
+      "number": "11",
+      "name": "Editable Mockups",
+      "status": "pending"
+    },
+    {
+      "number": "12",
+      "name": "Technical Diagram Palettes",
+      "status": "pending"
+    },
+    {
+      "number": "13",
+      "name": "Manual Gantt Widget",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "",
+    "label": "Manual maintainer handoff",
+    "reason": "Automated development stopped by the user on 2026-10-07. Phase 5 remains incomplete; consolidation and handoff only."
+  },
+  "updated_at": "2026-10-07T16:30:07Z"
+}

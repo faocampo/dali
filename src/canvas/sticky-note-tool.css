@@ -1,0 +1,16 @@
+.sticky-note-tool {
+  display: grid; place-content: center; width: 40px; height: 40px; flex-shrink: 0;
+  border: 0; border-radius: 8px; background: transparent; color: var(--board-ink); cursor: pointer;
+}
+.sticky-note-tool[aria-expanded='true'] { background: var(--dali-accent-soft); color: var(--dali-accent); }
+.sticky-note-palette {
+  position: fixed; z-index: 100; width: 240px; max-width: calc(100vw - 16px);
+  box-sizing: border-box; padding: 16px; border: 1px solid var(--dali-line);
+  border-radius: var(--board-radius); background: var(--board-surface); color: var(--board-ink); box-shadow: var(--board-shadow);
+}
+.sticky-note-palette p { margin: 6px 0 14px; font-size: 12px; }
+.sticky-note-palette__colors { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.sticky-note-palette__colors button { display: grid; justify-items: center; gap: 5px; padding: 4px 0; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 10px; cursor: pointer; }
+.sticky-note-palette__colors button > span:first-child { width: 32px; height: 32px; border-radius: 6px; border: 1px solid rgb(0 0 0 / 16%); box-shadow: 0 2px 2px rgb(0 0 0 / 6%); }
+.sticky-note-palette__colors button:hover { background: var(--dali-accent-soft); }
+.sticky-note-palette__colors button:focus-visible { outline: 2px solid var(--dali-accent); outline-offset: 2px; }

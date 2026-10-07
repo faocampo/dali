@@ -1,0 +1,22 @@
+# Private operator configuration belongs outside this repository.
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+node_modules/
+dist/
+.DS_Store
+.planning/research/.cache/
+playwright-report/
+test-results/
+
+# Local workflow runtime artifacts
+.gsd/

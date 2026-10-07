@@ -1,0 +1,9 @@
+{
+  "command": "node --test-reporter=tap scripts/deployment-smoke.mjs --self-test",
+  "exitCode": 1,
+  "output": "TAP version 13\n# Subtest: rejects multiple writers\nnot ok 1 - rejects multiple writers\n  ---\n  duration_ms: 0.704167\n  type: 'test'\n  location: 'scripts/deployment-smoke.mjs:14:9'\n  failureType: 'testCodeFailure'\n  error: 'Missing expected exception: rejects multiple writers'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected:\n  operator: 'throws'\n  stack: |-\n    TestContext.<anonymous> (file://scripts/deployment-smoke.mjs:15:12)\n    Test.runInAsyncScope (node:async_hooks:226:14)\n    Test.run (node:internal/test_runner/test:1397:25)\n    Test.start (node:internal/test_runner/test:1257:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17)\n    async selfTest (file://scripts/deployment-smoke.mjs:14:3)\n    async file://scripts/deployment-smoke.mjs:19:43\n  ...\n1..1\n# tests 1\n# suites 0\n# pass 0\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 4.559083\n",
+  "targetTest": "rejects multiple writers",
+  "targetFile": "scripts/deployment-smoke.mjs",
+  "expected": "multiple writers rejected",
+  "actual": "no exception"
+}

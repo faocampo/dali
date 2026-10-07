@@ -1,0 +1,21 @@
+.board-card__pending {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0 16px 16px;
+  min-width: 0;
+  color: var(--dali-warning);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.board-card__pending > span { flex: none; }
+.board-card__pending > div { min-width: 0; }
+.board-card__pending p { margin: 4px 0 0; }
+.board-library__recovery-status {
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.board-library__recovery-status:empty { margin: 0; }

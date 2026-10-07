@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.blocksuite-paths.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    // `paths` lives in tsconfig.blocksuite-paths.json (generated) -- it maps
+    // BlockSuite type resolution onto their shipped dist/*.d.ts.
+    "baseUrl": ".",
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["src", "tests", "server", "vite.config.ts", "playwright.config.ts"]
+}

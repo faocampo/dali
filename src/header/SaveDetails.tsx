@@ -1,0 +1,119 @@
+import { recoveryStorageMessage } from '../canvas/account/recovery';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import type { EditorHost } from '@blocksuite/affine/std';
+import { getActiveAccessScope, getRecoveryRuntime, retryRecovery, type AccessScope } from '../canvas/runtime';
+import { downloadRecoveryCopy } from '../canvas/recovery-archive';
+import type { ImageSaveRow, LocalSaveStatus, RecoveryDownloadState, SaveSnapshot } from '../canvas/save-status';
+import './save-details.css';
+
+const currentScope = (expected: AccessScope) => { const now = getActiveAccessScope(); return now?.phase === 'active' && now.accountId === expected.accountId && now.boardId === expected.boardId && now.generation === expected.generation; };
+function imageObject(id: string, scope: AccessScope) {
+  if (!currentScope(scope)) return;
+  const host = document.querySelector<EditorHost>('editor-host');
+  const model = host?.store.getBlocksByFlavour('affine:image').find(({ model }) => (model.props as { sourceId?: string }).sourceId === id)?.model;
+  return host && model ? { host, model } : undefined;
+}
+function ImageRow({ row, scope }: { row: ImageSaveRow; scope: AccessScope }) {
+  const [preview, setPreview] = useState<string>();
+  useEffect(() => {
+    let disposed = false; let url: string | undefined;
+    if (scope.role === 'viewer' || !currentScope(scope)) return;
+    try {
+      void getRecoveryRuntime().readLocalAsset(row.id).then(blob => {
+        if (disposed || !currentScope(scope) || !blob || !/^image\/(png|jpeg|webp|gif|avif)$/.test(blob.type)) return;
+        url = URL.createObjectURL(blob); setPreview(url);
+      }).catch(() => undefined);
+    } catch { /* A preview is optional; the stable name and status remain. */ }
+    return () => { disposed = true; if (url) URL.revokeObjectURL(url); };
+  }, [row.id, scope.accountId, scope.boardId, scope.generation, scope.role]);
+  return <li className="save-details-image">
+    {preview ? <img src={preview} alt="" onError={() => setPreview(undefined)} /> : <span className="save-details-preview" aria-hidden="true">▧</span>}
+    <div className="save-details-image-copy"><strong>{row.label}</strong><span>{({ waiting: 'Waiting to upload', uploading: 'Uploading…', failed: 'Image not saved', saved: 'Saved' })[row.state]}</span>
+      {!row.required && <span>Removal is waiting to save.</span>}
+    </div>
+  </li>;
+}
+
+export function saveDetailsCopy(status: LocalSaveStatus, snapshot?: SaveSnapshot, scope?: AccessScope | null) {
+  if (scope?.role === 'viewer' && scope.phase === 'active') {
+    if (scope.retainedPending === true) return { label: 'Your access has changed', message: 'Your access has changed. Pending changes have not been applied. Contact the board owner to restore editing access.' };
+    if (scope.retainedPending === 'unavailable') return { label: 'Recovery status unavailable', message: "You can view this board, but this browser could not check for pending changes. Keep this browser's data and reopen the board to check again." };
+    return { label: 'Read only', message: 'You can view this board. Editing requires access from the board owner.' };
+  }
+  const recovery = scope?.recoveryState;
+  if (recovery === 'choice') return { label: 'Changes pending', message: 'Your local version is kept separately. Use Review pending changes to choose how to continue.' };
+  if (recovery === 'storage-paused') return { label: 'Editing paused', message: recoveryStorageMessage(scope?.storageFailure) };
+  if (recovery === 'epoch-mismatch') return { label: 'Recovery needs attention', message: 'The server copy changed after a restore. Pending changes have been kept separately. Download a recovery copy before continuing with the restored board.' };
+  if (recovery === 'corrupt') return { label: 'Recovery needs attention', message: "These pending changes could not be opened safely. Keep this browser's data and contact your operator for recovery help." };
+  if (status.state === 'saved') return { label: 'Saved', message: 'All changes and images are saved to the server.' };
+  if (status.state === 'failed') return { label: status.label, message: status.label === 'Save failed' && !snapshot?.title?.failed && !Object.values(snapshot?.images ?? {}).some(row => row.state === 'failed') ? "We couldn't confirm that all board changes are saved. We'll retry automatically. You can retry now or download a recovery copy." : status.message };
+  if (snapshot?.recovery === 'checking-access') return { label: 'Checking access…', message: 'Checking your access before recovering changes.' };
+  if (snapshot?.retrying) return { label: 'Recovering changes…', message: 'Restoring changes kept in this browser and checking their save status.' };
+  if (snapshot?.preserved || snapshot?.recovery === 'pending') return { label: 'Changes waiting to save', message: snapshot.preserved ? "Changes are kept in this browser. We'll retry automatically when the service is available." : 'Some changes have not reached the server. Keep this tab open while we check local recovery.' };
+  return { label: status.label, message: 'Sending your latest changes and images to the server.' };
+}
+
+export function SaveDetails({ status, snapshot, scope, downloadStatus, trigger, onClose, onOpenRestored }: {
+  status: LocalSaveStatus; snapshot?: SaveSnapshot; scope: AccessScope | null; downloadStatus?: RecoveryDownloadState;
+  trigger: RefObject<HTMLButtonElement>; onClose: (restore?: boolean) => void; onOpenRestored?: () => void;
+}) {
+  const panel = useRef<HTMLDivElement>(null); const heading = useRef<HTMLHeadingElement>(null);
+  const retryButton = useRef<HTMLButtonElement>(null); const busyRef = useRef(false);
+  const [busy, setBusy] = useState(false); const [error, setError] = useState('');
+  const [retryFocused, setRetryFocused] = useState(false);
+  const [position, setPosition] = useState({ left: 16, top: 80, width: 384, maxHeight: 500 });
+  const imageLabels = useRef(new Map<string, string>());
+  const copy = saveDetailsCopy(status, snapshot, scope);
+  const permitted = !!scope && currentScope(scope) && scope.role !== 'viewer';
+  const images = permitted ? Object.values(snapshot?.images ?? {}).filter(row => row.required || row.wasRequired).map(row => {
+    const props = imageObject(row.id, scope!)?.model.props as { caption?: unknown } | undefined;
+    const caption = typeof props?.caption === 'string' ? props.caption.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 240) : '';
+    if (!imageLabels.current.has(row.id)) imageLabels.current.set(row.id, caption || row.label);
+    return { ...row, label: imageLabels.current.get(row.id)! };
+  }) : [];
+  const retryable = permitted && status.state !== 'saved' && !['choice', 'corrupt', 'epoch-mismatch', 'denied', 'expired'].includes(scope.recoveryState ?? '');
+  useLayoutEffect(() => { heading.current?.focus({ preventScroll: true }); }, []);
+  useLayoutEffect(() => {
+    const header = trigger.current?.closest('header');
+    const viewport = window.visualViewport;
+    const positionPanel = () => {
+      const width = viewport?.width ?? innerWidth, height = viewport?.height ?? innerHeight;
+      const x = viewport?.offsetLeft ?? 0, y = viewport?.offsetTop ?? 0;
+      const panelWidth = width <= 600 ? width - 32 : Math.min(384, width - 32);
+      const left = x + Math.max(16, Math.min((trigger.current?.getBoundingClientRect().left ?? 16) - x, width - panelWidth - 16));
+      const top = Math.max(y + 16, Math.min((header?.getBoundingClientRect().bottom ?? y + 64) + 8, y + height - 64));
+      setPosition({ left, top, width: panelWidth, maxHeight: Math.max(44, y + height - top - 16) });
+    };
+    positionPanel(); const observer = new ResizeObserver(positionPanel); if (header) observer.observe(header);
+    window.addEventListener('resize', positionPanel); viewport?.addEventListener('resize', positionPanel); viewport?.addEventListener('scroll', positionPanel);
+    return () => { observer.disconnect(); window.removeEventListener('resize', positionPanel); viewport?.removeEventListener('resize', positionPanel); viewport?.removeEventListener('scroll', positionPanel); };
+  }, [trigger]);
+  useLayoutEffect(() => {
+    if (!retryable && retryFocused) { heading.current?.focus({ preventScroll: true }); setRetryFocused(false); }
+  }, [retryable, retryFocused]);
+  useEffect(() => {
+    const outside = (event: Event) => { if (event.target instanceof Node && !panel.current?.contains(event.target) && !trigger.current?.contains(event.target)) onClose(false); };
+    document.addEventListener('pointerdown', outside); document.addEventListener('focusin', outside);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('focusin', outside); };
+  }, [onClose, trigger]);
+  const retry = async () => {
+    if (busyRef.current || !scope || !currentScope(scope)) return;
+    busyRef.current = true; setBusy(true); setError('');
+    try { await retryRecovery(); } catch { if (currentScope(scope)) setError('Changes still cannot be preserved or saved. Keep this tab open and download a recovery copy.'); }
+    finally { busyRef.current = false; if (currentScope(scope)) setBusy(false); }
+  };
+  return <div ref={panel} className="save-details" style={position} id="save-details" role="dialog" aria-labelledby="save-details-heading" onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') { event.preventDefault(); onClose(true); } }}>
+    <div className="save-details-heading"><h2 ref={heading} id="save-details-heading" tabIndex={-1}>Save details</h2><button type="button" aria-label="Close save details" onClick={() => onClose(true)}>×</button></div>
+    <p>{copy.message}</p>
+    {scope?.role !== 'viewer' && <p className="save-details-time">{status.savedAt ? `Last saved to the server: ${new Date(status.savedAt).toLocaleString()}` : 'No server save confirmed yet.'}</p>}
+    {!!images.length && <section aria-label="Image save status"><p>Image uploads are tracked separately from board changes.</p><h3>{images.length === 1 ? '1 image' : `${images.length} images`}</h3><ul>{images.map(row => <ImageRow key={row.id} row={row} scope={scope!} />)}</ul></section>}
+    {(busy || snapshot?.retrying) && <p>Retrying…</p>}
+    {error && <p role="alert">{error}</p>}
+    {permitted && downloadStatus && downloadStatus.phase !== 'idle' && <p className="save-details-download" role={downloadStatus.phase === 'error' ? 'alert' : undefined}>{downloadStatus.label}{downloadStatus.message && ` ${downloadStatus.message}`}</p>}
+    <div className="save-details-actions">
+      {(retryable || retryFocused) && <button ref={retryButton} type="button" aria-disabled={busy || !retryable} onFocus={() => setRetryFocused(true)} onBlur={() => setRetryFocused(false)} onClick={() => { if (retryable) void retry(); }}>{scope?.recoveryState === 'storage-paused' ? 'Retry saving' : 'Retry now'}</button>}
+      {permitted && <button type="button" className={status.state === 'failed' ? 'save-details-primary' : undefined} disabled={downloadStatus?.phase === 'preparing'} onClick={() => void downloadRecoveryCopy().catch(() => undefined)}>Download recovery copy</button>}
+      {permitted && scope?.recoveryState === 'epoch-mismatch' && onOpenRestored && <button type="button" onClick={onOpenRestored}>Open restored board</button>}
+    </div>
+  </div>;
+}

@@ -1,0 +1,329 @@
+import { fitContent } from '@blocksuite/affine/gfx/shape';
+import { createElementsFromClipboardDataCommand } from '@blocksuite/affine/blocks/root';
+import { EdgelessCRUDIdentifier } from '@blocksuite/affine/blocks/surface';
+import { MindmapElementModel, ShapeElementModel } from '@blocksuite/affine/model';
+import type { EditorHost } from '@blocksuite/affine/std';
+import { GfxControllerIdentifier, isGfxGroupCompatibleModel, type GfxModel } from '@blocksuite/affine/std/gfx';
+import type { Store } from '@blocksuite/affine/store';
+import { createGroupCommand, createGroupFromSelectedCommand, ungroupCommand } from '@blocksuite/affine-gfx-group';
+import { canvasModelVisible, mindmapArrangementReason, mindmapOwner, nativeMindmapState } from './selection-summary';
+import { validateMindmapState } from './mindmap-state';
+import { convertMindmapBranch, installMindmapBranchClipboard } from './mindmap-node-copy';
+
+const MAX_COPY_ELEMENTS = 10_000;
+const copySources = new WeakMap<EditorHost, () => boolean>();
+
+/** Validate the existing serialized native representation before native conversion writes. */
+export function validateMindmapCopyData(values: readonly unknown[]): void {
+  const records = values as Record<string, unknown>[];
+  if (!records.some(value => value?.type === 'mindmap')) return;
+  if (records.length > MAX_COPY_ELEMENTS) throw new Error('The copied mind map is too large.');
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const value of records) {
+    if (!value || typeof value !== 'object' || typeof value.id !== 'string' || byId.has(value.id)) throw new Error('The copied mind map has invalid identities.');
+    byId.set(value.id, value);
+    if (typeof value.type === 'string') {
+      const bound: unknown = typeof value.xywh === 'string' ? JSON.parse(value.xywh) : null;
+      if (!Array.isArray(bound) || bound.length !== 4 || !bound.every(n => typeof n === 'number' && Number.isFinite(n)) || bound[2] < 0 || bound[3] < 0) throw new Error('The copied mind map has invalid geometry.');
+    }
+  }
+  const claimed = new Set<string>();
+  for (const record of records.filter(value => value.type === 'mindmap')) {
+    if (!record.children || typeof record.children !== 'object' || Array.isArray(record.children)) throw new Error('The copied mind map has invalid hierarchy.');
+    const entries = Object.entries(record.children) as [string, { parent?: string; index: string; collapsed?: boolean }][];
+    if (!entries.length || entries.length > MAX_COPY_ELEMENTS) throw new Error('The copied mind map has invalid topic count.');
+    const details = new Map(entries);
+    for (const [id, detail] of entries) {
+      if (claimed.has(id) || byId.get(id)?.type !== 'shape' || !detail || typeof detail.index !== 'string' ||
+          (detail.collapsed !== undefined && typeof detail.collapsed !== 'boolean') ||
+          (detail.parent !== undefined && (typeof detail.parent !== 'string' || !details.has(detail.parent)))) throw new Error('The copied mind map has invalid topic details.');
+      claimed.add(id);
+    }
+    // Authorize the same hierarchy that editing, visibility and export consume,
+    // before native conversion can persist any topic or recursively build a tree.
+    const state = validateMindmapState(entries.map(([id, detail]) => ({
+      ...detail, id, bounds: JSON.parse(byId.get(id)!.xywh as string) as number[],
+    })));
+    if ([...state.depth.values()].some(depth => depth > 128)) throw new Error('The copied mind map is too deeply nested.');
+  }
+}
+
+export function validateMindmapDocument(store: Store): void {
+  const surface = store.getBlocksByFlavour('affine:surface')[0]?.model as { elementModels?: { serialize(): unknown }[] } | undefined;
+  validateMindmapCopyData(surface?.elementModels?.map(model => model.serialize()) ?? []);
+}
+
+/** Source identity is captured by the caller, independently of later selection changes. */
+export function nativeCopySourcesValid(host: EditorHost, source: readonly GfxModel[], store: Store): boolean {
+  if (!host.isConnected || host.store !== store || store.readonly || !source.length) return false;
+  const gfx = host.std.get(GfxControllerIdentifier);
+  const visited = new Set<string>();
+  const pending = [...source];
+  while (pending.length) {
+    const model = pending.pop()!;
+    if (visited.has(model.id)) continue;
+    if (visited.size >= MAX_COPY_ELEMENTS || model.isLocked() || (gfx.surface?.getElementById(model.id) ?? store.getModelById(model.id)) !== model) return false;
+    visited.add(model.id);
+    if (isGfxGroupCompatibleModel(model)) pending.push(...model.childElements);
+  }
+  return true;
+}
+
+export async function withNativeCopySources(host: EditorHost, source: readonly GfxModel[], action: () => Promise<void>): Promise<void> {
+  const store = host.store;
+  const guard = () => nativeCopySourcesValid(host, source, store);
+  if (!guard()) return;
+  validateMindmapDocument(store);
+  copySources.set(host, guard);
+  try { await action(); }
+  finally { if (copySources.get(host) === guard) copySources.delete(host); }
+}
+
+function installCopyBoundary(host: EditorHost): () => void {
+  const store = host.store;
+  const manager = host.std.command;
+  const nativeExec = manager.exec;
+  const crud = host.std.get(EdgelessCRUDIdentifier);
+  const nativeAdd = crud.addElement;
+  const nativeRemove = crud.removeElement;
+  let removing = false;
+  let active = true;
+  const disposeBranchClipboard = installMindmapBranchClipboard(host, validateMindmapCopyData);
+  const current = () => active && host.isConnected && host.store === store && !store.readonly && (copySources.get(host)?.() ?? true);
+  manager.exec = ((command, input) => {
+    if ((command as unknown) === createGroupCommand) {
+      const gfx = host.std.get(GfxControllerIdentifier);
+      const models = ((input as { elements: (string | GfxModel)[] }).elements ?? []).map(value =>
+        typeof value === 'string' ? gfx.getElementById<GfxModel>(value) : value).filter((model): model is GfxModel => !!model);
+      if (!nativeCopySourcesValid(host, models, store) || mindmapArrangementReason(models)) return [false, { std: host.std }];
+    }
+    if (((command as unknown) === createGroupFromSelectedCommand || (command as unknown) === ungroupCommand) &&
+        mindmapArrangementReason(host.std.get(GfxControllerIdentifier).selection.selectedElements)) return [false, { std: host.std }];
+    if ((command as unknown) === createElementsFromClipboardDataCommand) {
+      try {
+        if (!current()) return [false, { std: host.std }];
+        validateMindmapCopyData((input as { elementsRawData: unknown[] }).elementsRawData);
+        const branch = convertMindmapBranch(host, input as Parameters<typeof convertMindmapBranch>[1], (records, created) => {
+          const add = crud.addElement;
+          crud.addElement = ((...args: Parameters<typeof add>) => {
+            const id = add.apply(crud, args);
+            if (id && records.includes(args[1] as typeof records[number])) created.add(id);
+            return id;
+          }) as typeof add;
+          try {
+            // Branch records are primitive shapes/maps: pinned native conversion
+            // creates them synchronously, before its returned promise resolves.
+            const [, result] = nativeExec(command, { ...input, elementsRawData: records } as typeof input);
+            return (result as unknown as { createdElementsPromise: ReturnType<Parameters<typeof convertMindmapBranch>[2]> }).createdElementsPromise;
+          } finally { crud.addElement = add; }
+        }, validateMindmapCopyData);
+        if (branch) return [true, { std: host.std, createdElementsPromise: branch }];
+      } catch { return [false, { std: host.std }]; }
+    }
+    return nativeExec(command, input);
+  }) as typeof manager.exec;
+  crud.addElement = ((...args: Parameters<typeof crud.addElement>) => {
+    if (!current()) throw new Error('The copy destination is no longer editable.');
+    return nativeAdd.apply(crud, args);
+  }) as typeof crud.addElement;
+  crud.removeElement = value => {
+    if (removing) { nativeRemove.call(crud, value); return; }
+    const model = typeof value === 'string' ? crud.getElementById(value) : value;
+    if (!model || !current() || !nativeCopySourcesValid(host, [model], store)) return;
+    const map = mindmapOwner(model);
+    if (map) {
+      try {
+        const state = nativeMindmapState(map);
+        if ([...state.byId.keys()].some(id => map.surface.getElementById(id)!.isLocked()) ||
+            [...state.depth.values()].some(depth => depth > 128)) return;
+      } catch { return; }
+    }
+    removing = true;
+    try { nativeRemove.call(crud, value); } finally { removing = false; }
+  };
+  return () => { active = false; disposeBranchClipboard(); manager.exec = nativeExec; crud.addElement = nativeAdd; crud.removeElement = nativeRemove; copySources.delete(host); };
+}
+
+/** Validate native membership before any adapter writes; no secondary tree schema. */
+function shapes(map: MindmapElementModel): ShapeElementModel[] {
+  const result: ShapeElementModel[] = [];
+  let roots = 0;
+  for (const [id, detail] of map.children) {
+    const shape = map.surface.getElementById(id);
+    if (!(shape instanceof ShapeElementModel) || ![shape.x, shape.y, shape.w, shape.h].every(Number.isFinite)) {
+      throw new Error('The mind map contains invalid topic geometry.');
+    }
+    if (!detail.parent) roots++;
+    const visited = new Set([id]);
+    let parent = detail.parent;
+    while (parent) {
+      if (visited.has(parent) || !map.children.has(parent)) throw new Error('The mind map contains invalid topic parents.');
+      visited.add(parent);
+      parent = map.children.get(parent)!.parent;
+    }
+    result.push(shape);
+  }
+  if (result.length && roots !== 1) throw new Error('The mind map must contain one central topic.');
+  return result;
+}
+
+function installModel(host: EditorHost, map: MindmapElementModel) {
+  let active = true;
+  let arranging = false;
+  let style = map.style;
+  let direction = map.layoutType;
+  const original = { layout: map.layout, setLayoutMethod: map.setLayoutMethod,
+    requestLayout: map.requestLayout, toggleCollapse: map.toggleCollapse, buildTree: map.buildTree };
+  const nativeLayout = map.layout.bind(map);
+  const nativeSetLayout = map.setLayoutMethod.bind(map);
+  const nativeCollapse = map.toggleCollapse.bind(map);
+  const nativeBuildTree = map.buildTree.bind(map);
+  map.buildTree = () => { nativeBuildTree(); direction = map.layoutType; };
+  const children = map.children;
+  const nativeChildSet = children.set;
+  // Native watchLayoutType rewrites child records even during history replay.
+  // Yjs replays its own items directly; suppress only these observer-side writes
+  // so they cannot create an extra redo item or erase restored collapse fields.
+  children.set = (id, detail) => {
+    if (host.store.history.undoManager.undoing || host.store.history.undoManager.redoing) return detail;
+    // The upstream Layout toolbar reaches the native direction watcher directly.
+    // During its rebuild retain all existing child metadata, including collapsed.
+    const value = map.layoutType !== direction ? { ...children.get(id), ...detail } : detail;
+    nativeChildSet.call(children, id, value);
+    return value;
+  };
+  const writable = () => active && host.isConnected && !host.store.readonly &&
+    !host.store.history.undoManager.undoing && !host.store.history.undoManager.redoing &&
+    map.surface.getElementById(map.id) === map && !map.isLocked();
+
+  map.layout = (tree = map.tree, options = {}) => {
+    if (!writable() || arranging || !tree?.element) return;
+    const nodes = shapes(map);
+    if (nodes.some(node => node.isLocked())) return;
+    const state = nativeMindmapState(map);
+    if ([...state.depth.values()].some(depth => depth > 128)) throw new Error('The mind map is too deep to arrange.');
+    const fields = nodes.map(node => ({ node, values: new Map(node.yMap.entries()) }));
+    const anchor = { x: map.tree.element.x, y: map.tree.element.y };
+    const previousStyle = style;
+    const typography = nodes.map(node => ({ node, fontSize: node.fontSize, fontWeight: node.fontWeight, color: node.color }));
+    arranging = true;
+    try {
+      // A preset can change native shapes/branches. Existing text fields stay authoritative.
+      if (style !== map.style) {
+        nativeLayout(tree, { ...options, applyStyle: true, stashed: false });
+        style = map.style;
+      }
+      for (const { node, ...text } of typography) {
+        Object.assign(node, text);
+        fitContent(node);
+      }
+      nativeLayout(tree, { ...options, applyStyle: false, stashed: false });
+      const dx = anchor.x - map.tree.element.x;
+      const dy = anchor.y - map.tree.element.y;
+      if (dx || dy) for (const node of nodes) node.xywh = `[${node.x + dx},${node.y + dy},${node.w},${node.h}]`;
+      shapes(map);
+    } catch (cause) {
+      for (const { node, values } of fields) {
+        for (const key of [...node.yMap.keys()]) if (!values.has(key)) node.yMap.delete(key);
+        for (const [key, value] of values) if (node.yMap.get(key) !== value) node.yMap.set(key, value);
+      }
+      style = previousStyle;
+      throw cause;
+    } finally { arranging = false; }
+  };
+  // The native view supplies this delegate on creation and on subsequent remounts.
+  map.setLayoutMethod = method => { if (active) nativeSetLayout(method); };
+  // Every model request is drained synchronously; an old captured callback still checks lifecycle.
+  map.requestLayout = () => { if (writable()) map.layout(); };
+  map.toggleCollapse = (node, _options = {}) => {
+    if (!writable() || !map.children.has(node.id)) return;
+    const nodes = shapes(map);
+    if (nodes.some(shape => shape.isLocked())) return;
+    const details = [...map.children].map(([id, detail]) => [id, { ...detail }] as const);
+    const fields = nodes.map(shape => ({ shape, xywh: shape.xywh, hidden: shape.hidden,
+      fontSize: shape.fontSize, fontWeight: shape.fontWeight, color: shape.color }));
+    let failure: unknown;
+    host.store.captureSync();
+    host.store.transact(() => {
+      try {
+        nativeCollapse(node, { layout: false });
+        map.buildTree();
+        map.layout();
+        shapes(map);
+      } catch (cause) {
+        failure = cause;
+        for (const [id, detail] of details) map.children.set(id, detail);
+        for (const { shape, ...props } of fields) Object.assign(shape, props);
+        map.buildTree();
+      }
+    });
+    host.store.captureSync();
+    if (failure) throw failure;
+  };
+  return () => {
+    active = false;
+    children.set = nativeChildSet;
+    Object.assign(map, original);
+  };
+}
+
+/** Scope all adapters to the mounted document; disposal invalidates retained callbacks. */
+export function installMindmapCompatibility(host: EditorHost): () => void {
+  const gfx = host.std.get(GfxControllerIdentifier);
+  const surface = gfx.surface;
+  if (!surface) return () => {};
+  const nativeSearch = gfx.grid.search;
+  gfx.grid.search = ((...args: Parameters<typeof nativeSearch>) => {
+    const candidates = nativeSearch.apply(gfx.grid, args);
+    const visible = [...candidates].filter(model => canvasModelVisible(model as GfxModel));
+    // The pinned runtime returns arrays; some exported declarations expose Set.
+    // Preserve the actual native container contract for all grid consumers.
+    return Array.isArray(candidates) ? visible : new Set(visible);
+  }) as typeof nativeSearch;
+  const nativeSet = gfx.selection.set;
+  let selecting = false;
+  const visibleIds = (ids: string[]) => [...new Set(ids.flatMap(id => {
+    const model = gfx.getElementById<GfxModel>(id);
+    if (!model) return [];
+    if (canvasModelVisible(model)) return [id];
+    const map = mindmapOwner(model);
+    if (!map) return [];
+    try { const ancestor = nativeMindmapState(map).hiddenAncestor.get(id); return ancestor ? [ancestor] : []; }
+    catch { return []; }
+  }))];
+  gfx.selection.set = selection => {
+    if (Array.isArray(selection)) {
+      nativeSet.call(gfx.selection, selection);
+      return;
+    }
+    nativeSet.call(gfx.selection, { ...selection, elements: visibleIds(selection.elements) });
+  };
+  const syncSelection = () => {
+    if (selecting) return;
+    const before = gfx.selection.selectedElements.map(model => model.id);
+    const after = visibleIds(before);
+    if (before.join('|') !== after.join('|')) {
+      selecting = true;
+      try { gfx.selection.set({ elements: after, editing: false }); } finally { selecting = false; }
+    }
+  };
+  const selectionChanged = gfx.selection.slots.updated.subscribe(syncSelection);
+  const visibilityChanged = surface.elementUpdated.subscribe(({ props }) => { if ('hidden' in props) syncSelection(); });
+  const disposeCopyBoundary = installCopyBoundary(host);
+  const disposers = new Map<string, () => void>();
+  const attach = (id: string) => {
+    const model = surface.getElementById(id);
+    if (model instanceof MindmapElementModel && !disposers.has(id)) disposers.set(id, installModel(host, model));
+  };
+  surface.elementModels.forEach(model => attach(model.id));
+  const added = surface.elementAdded.subscribe(({ id }) => attach(id));
+  const removed = surface.elementRemoved.subscribe(({ id }) => { disposers.get(id)?.(); disposers.delete(id); });
+  return () => {
+    gfx.grid.search = nativeSearch;
+    gfx.selection.set = nativeSet;
+    selectionChanged.unsubscribe(); visibilityChanged.unsubscribe();
+    disposeCopyBoundary();
+    added.unsubscribe(); removed.unsubscribe();
+    disposers.forEach(dispose => dispose()); disposers.clear();
+  };
+}

@@ -1,0 +1,243 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "dali"
+  },
+  "spec": {
+    "replicas": 1,
+    "strategy": {
+      "type": "Recreate"
+    },
+    "selector": {
+      "matchLabels": {
+        "app": "dali"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "dali"
+        }
+      },
+      "spec": {
+        "automountServiceAccountToken": false,
+        "terminationGracePeriodSeconds": 60,
+        "securityContext": {
+          "runAsNonRoot": true,
+          "seccompProfile": {
+            "type": "RuntimeDefault"
+          }
+        },
+        "containers": [
+          {
+            "name": "app",
+            "image": "dali-app:release",
+            "imagePullPolicy": "IfNotPresent",
+            "securityContext": {
+              "runAsUser": 1000,
+              "runAsGroup": 1000,
+              "runAsNonRoot": true,
+              "readOnlyRootFilesystem": true,
+              "allowPrivilegeEscalation": false,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              },
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "envFrom": [
+              {
+                "configMapRef": {
+                  "name": "dali-config"
+                }
+              },
+              {
+                "secretRef": {
+                  "name": "dali-auth"
+                }
+              }
+            ],
+            "env": [
+              {
+                "name": "NODE_ENV",
+                "value": "production"
+              },
+              {
+                "name": "PORT",
+                "value": "3000"
+              },
+              {
+                "name": "DALI_TRUST_PROXY",
+                "value": "loopback"
+              },
+              {
+                "name": "DALI_DATABASE_PATH",
+                "value": "/data/boards.sqlite"
+              },
+              {
+                "name": "DALI_BACKUP_DIRECTORY",
+                "value": "/backups"
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "250m",
+                "memory": "512Mi"
+              },
+              "limits": {
+                "cpu": "2",
+                "memory": "2Gi"
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "live",
+                "mountPath": "/data"
+              },
+              {
+                "name": "backup",
+                "mountPath": "/backups"
+              },
+              {
+                "name": "app-tmp",
+                "mountPath": "/tmp"
+              }
+            ],
+            "startupProbe": {
+              "exec": {
+                "command": [
+                  "node",
+                  "-e",
+                  "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+                ]
+              },
+              "timeoutSeconds": 3,
+              "periodSeconds": 10,
+              "failureThreshold": 30
+            },
+            "readinessProbe": {
+              "exec": {
+                "command": [
+                  "node",
+                  "-e",
+                  "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+                ]
+              },
+              "timeoutSeconds": 3,
+              "periodSeconds": 10,
+              "failureThreshold": 3
+            },
+            "livenessProbe": {
+              "exec": {
+                "command": [
+                  "node",
+                  "-e",
+                  "fetch('http://127.0.0.1:3000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+                ]
+              },
+              "timeoutSeconds": 3,
+              "periodSeconds": 10,
+              "failureThreshold": 3
+            }
+          },
+          {
+            "name": "web",
+            "image": "dali-web:release",
+            "imagePullPolicy": "IfNotPresent",
+            "securityContext": {
+              "runAsUser": 101,
+              "runAsGroup": 101,
+              "runAsNonRoot": true,
+              "readOnlyRootFilesystem": true,
+              "allowPrivilegeEscalation": false,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              },
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "ports": [
+              {
+                "name": "http",
+                "containerPort": 8080
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "50m",
+                "memory": "32Mi"
+              },
+              "limits": {
+                "cpu": "500m",
+                "memory": "128Mi"
+              }
+            },
+            "volumeMounts": [
+              {
+                "name": "web-tmp",
+                "mountPath": "/tmp"
+              }
+            ],
+            "startupProbe": {
+              "httpGet": {
+                "path": "/health/ready",
+                "port": "http"
+              },
+              "periodSeconds": 10,
+              "failureThreshold": 30
+            },
+            "readinessProbe": {
+              "httpGet": {
+                "path": "/health/ready",
+                "port": "http"
+              },
+              "timeoutSeconds": 3,
+              "periodSeconds": 10
+            },
+            "livenessProbe": {
+              "httpGet": {
+                "path": "/",
+                "port": "http"
+              },
+              "timeoutSeconds": 3,
+              "periodSeconds": 10
+            }
+          }
+        ],
+        "volumes": [
+          {
+            "name": "live",
+            "persistentVolumeClaim": {
+              "claimName": "dali-live"
+            }
+          },
+          {
+            "name": "backup",
+            "persistentVolumeClaim": {
+              "claimName": "dali-backup"
+            }
+          },
+          {
+            "name": "app-tmp",
+            "emptyDir": {
+              "sizeLimit": "64Mi"
+            }
+          },
+          {
+            "name": "web-tmp",
+            "emptyDir": {
+              "sizeLimit": "64Mi"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

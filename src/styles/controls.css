@@ -1,0 +1,75 @@
+/* Shared application primitives. Low specificity lets component geometry win.
+   Scoped to app chrome: these rules never restyle text inside board objects. */
+:where(.djai-header, .board-library, .djai-panel, .board-action-dialog,
+  .session-recovery, .board-import-dialog, .selection-inspector, .canvas-feedback,
+  .image-crop-toolbar, .board-account) {
+  font-family: var(--dali-font);
+  font-size: var(--dali-text-md);
+  line-height: 1.5;
+  color: var(--dali-ink);
+}
+:where(.djai-header, .board-library, .djai-panel, .board-action-dialog,
+  .session-recovery, .board-import-dialog, .selection-inspector, .canvas-feedback,
+  .image-crop-toolbar, .board-account) :where(button, input, select, summary, textarea) {
+  box-sizing: border-box;
+  font-family: inherit;
+  accent-color: var(--dali-accent);
+  caret-color: var(--dali-accent);
+}
+:where(.board-action-dialog, .session-recovery, .board-import-dialog,
+  .selection-inspector, .image-crop-toolbar) :where(button) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dali-space-2);
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--dali-line);
+  border-radius: var(--dali-radius-control);
+  background: var(--dali-surface);
+  color: var(--dali-ink);
+  font-size: var(--dali-text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+:where(.board-action-dialog, .session-recovery, .board-import-dialog,
+  .selection-inspector, .image-crop-toolbar) :where(button:hover:not(:disabled)) {
+  background: var(--dali-hover);
+}
+:where(.djai-header, .board-library, .djai-panel, .board-action-dialog,
+  .session-recovery, .board-import-dialog, .selection-inspector, .canvas-feedback,
+  .image-crop-toolbar, .board-account, .canvas-tool-button, .canvas-viewport-controls,
+  .drawing-palette, .object-context-menu) :focus-visible {
+  outline: 2px solid var(--dali-accent);
+  outline-offset: 2px;
+}
+:where(.board-action-dialog, .session-recovery, .board-import-dialog,
+  .selection-inspector) :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), select, textarea) {
+  padding: 8px 12px;
+  border: 1px solid var(--dali-field-line);
+  border-radius: var(--dali-radius-control);
+  background: var(--dali-surface);
+  color: var(--dali-ink);
+  font-size: var(--dali-text-md);
+}
+:where(.djai-header, .board-library, .djai-panel, .board-action-dialog,
+  .session-recovery, .board-import-dialog, .selection-inspector) :disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+:where(.djai-header, .board-library, .djai-panel, .board-action-dialog,
+  .session-recovery, .board-import-dialog, .selection-inspector) ::placeholder {
+  color: var(--dali-muted);
+  opacity: 1;
+}
+:where(.djai-header, .board-library, .djai-panel, .board-action-dialog,
+  .session-recovery, .board-import-dialog, .selection-inspector) a {
+  text-underline-offset: 3px;
+}
+::selection { background: var(--dali-accent-soft); color: var(--dali-ink); }
+:root { scrollbar-color: var(--dali-field-line) transparent; scrollbar-width: thin; }
+:where(.djai-panel, .board-action-dialog, .session-recovery, .board-import-dialog) {
+  box-shadow: var(--dali-shadow-dialog);
+}
+.access-destructive { color: var(--dali-danger); }
+.access-destructive:hover:not(:disabled) { background: var(--dali-danger-soft); }

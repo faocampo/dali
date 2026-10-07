@@ -1,0 +1,44 @@
+{
+  "apiVersion": "networking.k8s.io/v1",
+  "kind": "Ingress",
+  "metadata": {
+    "name": "dali",
+    "annotations": {
+      "nginx.ingress.kubernetes.io/ssl-redirect": "true",
+      "nginx.ingress.kubernetes.io/force-ssl-redirect": "true",
+      "nginx.ingress.kubernetes.io/proxy-body-size": "20m"
+    }
+  },
+  "spec": {
+    "ingressClassName": "operator-ingress",
+    "tls": [
+      {
+        "hosts": [
+          "canvas.example.org"
+        ],
+        "secretName": "dali-tls"
+      }
+    ],
+    "rules": [
+      {
+        "host": "canvas.example.org",
+        "http": {
+          "paths": [
+            {
+              "path": "/",
+              "pathType": "Prefix",
+              "backend": {
+                "service": {
+                  "name": "dali",
+                  "port": {
+                    "number": 8080
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,104 @@
+import type { BoardLiveSource } from './live-source';
+import * as Y from 'yjs';
+import type { Store } from '@blocksuite/affine/store';
+import { getActiveAccessScope, subscribeAccessScope, type AccessScope } from '../runtime';
+const guards = new WeakMap<Store, { references: number; release: () => void }>();
+export const recoveryBlocksMutation = (scope: AccessScope) => ['choice', 'storage-paused', 'corrupt', 'epoch-mismatch', 'expired', 'denied'].includes(scope.recoveryState ?? '');
+export function canMutateCurrentScope(expected: AccessScope) { return accessScopeCurrent(expected, true); }
+export function canExportRecoveryScope(expected: AccessScope) { const current = getActiveAccessScope(); return accessScopeCurrent(expected) && current?.role !== 'viewer' && !['expired', 'denied', 'corrupt'].includes(current?.recoveryState ?? ''); }
+
+/** Captured authority never follows a new account, board, or runtime. */
+export function accessScopeCurrent(expected: AccessScope, write = false): boolean {
+  const current = getActiveAccessScope();
+  return current?.phase === 'active' && current.accountId === expected.accountId &&
+    current.boardId === expected.boardId && current.generation === expected.generation &&
+    (!write || (current.canWrite && current.role !== 'viewer' && !recoveryBlocksMutation(current)));
+}
+
+/**
+ * Pinned native model setters write directly to nested Y types. Guard the local
+ * mutation methods on this document's instances, including types added later.
+ * Applying authorized remote Yjs updates uses integration internals, so hydration
+ * remains possible. No rollback transaction or global prototype changes occur.
+ */
+export function installMutationGuard(store: Store, scope: AccessScope, live?: BoardLiveSource): () => void {
+  const existing = guards.get(store);
+  if (existing) { existing.references++; return existing.release; }
+  let active = true;
+  const writable = () => active && !store.readonly && accessScopeCurrent(scope, true);
+  const restores: (() => void)[] = [];
+  const visited = new WeakSet<object>();
+  const nativeIds = new WeakMap<object, string>();
+  const containers = new WeakSet<object>([store.spaceDoc.getMap('blocks')]);
+  const wrap = (target: object, name: string, denied: () => unknown = () => undefined) => {
+    const object = target as Record<string, unknown>;
+    const original = object[name];
+    if (typeof original !== 'function') return;
+    const own = Object.getOwnPropertyDescriptor(target, name);
+    const guarded = function(this: unknown, ...args: unknown[]) {
+      if (!writable()) return denied();
+      if (live) {
+        if (target instanceof Y.AbstractType) {
+          const id = nativeIds.get(target);
+          const removed = target instanceof Y.Map && name === 'delete' && typeof args[0] === 'string' ? nativeIds.get(target.get(args[0]) as object) : undefined;
+          const creating = target instanceof Y.Map && containers.has(target) && name === 'set' && typeof args[0] === 'string' && !target.has(args[0]) && live.creating;
+          const inserted = name === 'insert' ? args[1] : ['push', 'unshift'].includes(name) ? args[0] : undefined;
+          const childList = target instanceof Y.Array && Array.isArray(inserted) && inserted.every(item => typeof item === 'string' && live.allowsObject(item));
+          const childRemoval = target instanceof Y.Array && name === 'delete' && typeof args[0] === 'number' && target.toArray().slice(args[0], args[0] + (typeof args[1] === 'number' ? args[1] : 1)).every(item => typeof item === 'string' && live.allowsObject(item));
+          if ((!id || !live.allowsObject(id)) && (!removed || !live.allowsObject(removed)) && !creating && !childList && !childRemoval) return denied();
+          if (creating) live.registerCreated(args[0] as string);
+        } else if (!live.editing) return denied();
+      }
+      const result: unknown = Reflect.apply(original, this, args);
+      scan();
+      return result;
+    };
+    Object.defineProperty(target, name, { value: guarded, configurable: true, writable: true });
+    restores.push(() => { if (object[name] !== guarded) return; if (own) Object.defineProperty(target, name, own); else delete object[name]; });
+  };
+  const visit = (value: unknown, owner?: string): void => {
+    if (!(value instanceof Y.AbstractType)) return;
+    if (owner) nativeIds.set(value, owner);
+    if (!visited.has(value)) {
+      visited.add(value);
+      for (const name of ['set', 'delete', 'clear', 'insert', 'insertEmbed', 'format', 'applyDelta', 'push', 'unshift', 'setAttribute', 'removeAttribute'])
+        wrap(value, name, () => name === 'set' ? value : name === 'delete' ? false : undefined);
+    }
+    if (value instanceof Y.Map) for (const [key, child] of value.entries()) { if (value.get('type') === '$blocksuite:internal:native$' && key === 'value' && child instanceof Y.Map) containers.add(child); visit(child, child instanceof Y.Map && (containers.has(value) || ['shape', 'text', 'connector', 'brush', 'group'].includes(child.get('type') as string) || ['affine:note', 'affine:frame', 'affine:image', 'affine:edgeless-text', 'affine:paragraph', 'affine:list', 'djai:image-visual-edit'].includes(child.get('sys:flavour') as string)) ? key : owner); }
+    else if (value instanceof Y.Array || value instanceof Y.XmlFragment) for (const child of value.toArray()) visit(child, owner);
+    else if (value instanceof Y.Text) for (const delta of value.toDelta()) if (typeof delta.insert !== 'string') visit(delta.insert, owner);
+  };
+  const scan = () => { for (const type of store.spaceDoc.share.values()) visit(type); };
+  scan();
+  for (const name of ['transact', 'addBlock', 'updateBlock', 'deleteBlock', 'moveBlocks', 'undo', 'redo', 'captureSync']) wrap(store, name);
+  wrap(store.history.undoManager, 'undo'); wrap(store.history.undoManager, 'redo');
+  const update = () => scan();
+  store.spaceDoc.on('afterTransaction', update);
+  const unsubscribe = subscribeAccessScope(() => { if (!accessScopeCurrent(scope, true)) store.readonly = true; });
+  const entry = { references: 1, release: () => {
+    if (--entry.references > 0) return;
+    active = false; unsubscribe(); store.spaceDoc.off('afterTransaction', update);
+    restores.reverse().forEach(restore => restore()); guards.delete(store);
+  } };
+  guards.set(store, entry);
+  return entry.release;
+}
+
+/** Read-only navigation keeps pointer, wheel, select-all and copy dispatch. */
+export function installReadOnlyInputs(host: HTMLElement, store: Store, scope: AccessScope): () => void {
+  const stop = (event: Event) => {
+    if (!store.readonly && accessScopeCurrent(scope, true)) return;
+    const target = event.composedPath()[0];
+    if (!event.composedPath().includes(host) && target instanceof Element && target.closest('input, textarea, button, select, [role=dialog]')) return;
+    if (event instanceof KeyboardEvent) {
+      const modifier = event.ctrlKey || event.metaKey;
+      if (['Escape', 'Tab', ' ', 'Shift', 'Control', 'Meta', 'Alt'].includes(event.key) ||
+          (modifier && ['a', 'c', '+', '-', '0', '1', '='].includes(event.key.toLowerCase())) || event.key.startsWith('Arrow') || (event.key === 'Tab' && event.shiftKey)) return;
+      if (!event.composedPath().includes(host) && target !== document.body) return;
+    }
+    event.preventDefault(); event.stopImmediatePropagation();
+  };
+  const names = ['keydown', 'beforeinput', 'paste', 'cut', 'drop', 'compositionstart'] as const;
+  names.forEach(name => document.addEventListener(name, stop, true));
+  return () => names.forEach(name => document.removeEventListener(name, stop, true));
+}

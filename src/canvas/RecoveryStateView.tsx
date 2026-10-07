@@ -1,0 +1,32 @@
+import { useRef, useState } from 'react';
+import type { RecoveryOutcome } from './account/recovery';
+import type { RecoveryDownloadState } from './save-status';
+
+export { RecoveryVersionDialog as RecoveryVersionChoice } from './RecoveryVersionDialog';
+
+export function RecoveryStateView({ state, retry, openRestored, download, downloadStatus, compact = false }: {
+  state: RecoveryOutcome; retry?: () => void | Promise<unknown>; openRestored?: () => void; download?: () => Promise<unknown>; compact?: boolean;
+  downloadStatus?: RecoveryDownloadState;
+}) {
+  const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [expanded, setExpanded] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  if (state === 'saved') return null;
+  const title = state === 'storage-paused' ? 'Editing paused' : ['corrupt', 'epoch-mismatch'].includes(state) ? 'Recovery needs attention' : state === 'denied' ? 'Your access has changed' : state === 'pending' ? 'Changes waiting to save' : 'Recovering changes…';
+  const message = state === 'storage-paused' ? 'This browser cannot preserve more changes. Keep this tab open. Download a recovery copy, allow storage for this site, then retry saving.' : state === 'epoch-mismatch' ? 'The server copy changed after a restore. Pending changes have been kept separately. Download a recovery copy before continuing with the restored board.' : state === 'corrupt' ? "These pending changes could not be opened safely. Keep this browser's data and contact your operator for recovery help." : state === 'denied' ? 'Your access has changed. Pending changes have not been applied. Contact the board owner to restore editing access.' : 'Changes are being kept for this account while saving is retried.';
+  const run = async (action: () => void | Promise<unknown>) => { if (busy) return; setBusy(true); setError(''); try { await action(); } catch { setError('Changes still cannot be preserved or saved. Keep this tab open and download a recovery copy.'); } finally { setBusy(false); } };
+  return <section className={compact ? 'board-recovery board-recovery--compact' : 'board-recovery'} aria-label="Board recovery" onKeyDown={event => {
+    if (event.key === 'Escape' && compact && expanded) { event.preventDefault(); event.stopPropagation(); setExpanded(false); trigger.current?.focus(); }
+  }}>
+    {compact ? <button ref={trigger} className="djai-ghost" aria-expanded={expanded} aria-controls="board-recovery-details" onClick={() => setExpanded(value => !value)}>{title}</button> : <h1>{title}</h1>}
+    <div id="board-recovery-details" hidden={compact && !expanded}>
+      <p role="status">{message}</p>{error && <p role="alert">{error}</p>}
+      {downloadStatus && <p role={downloadStatus.phase === 'error' ? 'alert' : 'status'} style={{ overflowWrap: 'anywhere' }}>{downloadStatus.label}{downloadStatus.message && ` ${downloadStatus.message}`}</p>}
+      <div className="board-recovery__actions">
+        {retry && !['corrupt', 'epoch-mismatch', 'denied'].includes(state) && <button disabled={busy} onClick={() => { void run(retry); }}>{state === 'storage-paused' ? 'Retry saving' : 'Retry now'}</button>}
+        {download && <button disabled={downloadStatus?.phase === 'preparing'} onClick={() => { void download().catch(() => undefined); }}>Download recovery copy</button>}
+        {state === 'epoch-mismatch' && openRestored && <button disabled={busy} onClick={openRestored}>Open restored board</button>}
+        {!compact && <a href="/">Back to your boards</a>}
+      </div>
+    </div>
+  </section>;
+}

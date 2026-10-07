@@ -1,0 +1,43 @@
+{
+  "runtime": "codex",
+  "mode": "yolo",
+  "granularity": "fine",
+  "parallelization": true,
+  "commit_docs": true,
+  "model_profile": "adaptive",
+  "model_profile_overrides": {
+    "codex": {
+      "opus": {
+        "model": "gpt-6-astra",
+        "reasoning_effort": "xhigh"
+      },
+      "sonnet": {
+        "model": "gpt-6-astra",
+        "reasoning_effort": "medium"
+      },
+      "haiku": {
+        "model": "gpt-6-astra",
+        "reasoning_effort": "low"
+      }
+    }
+  },
+  "effort": {
+    "agent_overrides": {},
+    "routing_tier_defaults": {
+      "heavy": "xhigh",
+      "standard": "medium",
+      "light": "low"
+    }
+  },
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "nyquist_validation": true,
+    "auto_advance": false,
+    "_auto_chain_active": false
+  },
+  "ship": {
+    "pr_body_sections": []
+  }
+}
