@@ -24,7 +24,7 @@ Existing single-user undo or generic recovery must not be presented as completio
 | 05-02 reservations | Native action admission, complete object dependencies, cancellation and release; sequential-format repair in this stabilization slice | Deterministic and combined gates pass; remote issue #1 remains unchanged for maintainer disposition |
 | 05-03 presence | Server-derived identities/roles, account aggregation, editor cursor/selection overlays, publication retry and explicit original-session disconnect | Automated plan gate passes; native browser-chrome zoom and phase-level human UX acceptance remain |
 | 05-04 personal history | Complete text/operation capture, server provenance, conflict-safe inverse checks and clean reconnect verified; final 98/98 Chromium, 26/26 cross-browser history, 265 client and unchanged 375 server tests pass | Automated plan complete; pending-work recovery remains 05-05 and whole-phase/human acceptance remains open; [revision-scoped evidence](../.planning/phases/05-real-time-collaborative-editing/05-04-SUMMARY.md) retains failed matrix and targeted corrections |
-| 05-05 divergent recovery | Phase 4 local preservation and generic recovery exist | Durable shared baseline/receipt reconciliation, no automatic divergent merge, decision flow and race-safe unchanged-baseline replay |
+| 05-05 divergent recovery | Isolated per-tab candidates, exact document/title receipts, fresh reservations with transactional version checks, restored-write consent, recovered personal history and new local outage gestures implemented; [execution evidence](../.planning/phases/05-real-time-collaborative-editing/05-05-EXECUTION.md) | Remaining concurrent-tab, authority/account/generation/epoch, restored-server, image and storage-race matrix; plan remains incomplete |
 | 05-06 private recovery copy | Generic authorized copy/export primitives exist | Whole local snapshot and assets forked privately; latest-version/download/cancel flow with scoped cleanup and renewed authority |
 | 05-07 active access transitions | Direct API capability checks and live reauthorization exist | Verified downgrade/revocation/restoration UX, pending-work isolation and queued/held request matrix |
 | 05-08 collaborative mind maps | Single-user native hierarchy and layout exist | Complete structural reservation/validation, concurrent branch editing and durable hierarchy acceptance |
@@ -69,12 +69,16 @@ npm run typecheck
 npm run typecheck:server
 npm test
 npm run test:server -- --maxWorkers=1
-npm exec playwright test -- tests/collaboration.spec.ts tests/collaboration-reservations.spec.ts tests/collaboration-formatting-race.spec.ts tests/collaboration-pointer-race.spec.ts tests/collaboration-presence.spec.ts tests/collaboration-history.spec.ts tests/collaboration-history-reconnect.spec.ts tests/collaboration-history-reservation.spec.ts tests/canvas-arrangement.spec.ts tests/image-visual-edits.spec.ts tests/ui-refinements.spec.ts tests/restored-viewer.spec.ts --project=prod
+npm exec playwright test -- tests/collaboration.spec.ts tests/collaboration-reservations.spec.ts tests/collaboration-formatting-race.spec.ts tests/collaboration-pointer-race.spec.ts tests/collaboration-presence.spec.ts tests/collaboration-history.spec.ts tests/collaboration-history-reconnect.spec.ts tests/collaboration-history-reservation.spec.ts tests/collaboration-recovery.spec.ts tests/collaboration-offline-editing.spec.ts tests/canvas-arrangement.spec.ts tests/image-visual-edits.spec.ts tests/ui-refinements.spec.ts tests/restored-viewer.spec.ts --project=prod
 ```
 
 Example with isolated ports: `DALI_TEST_PORT_OFFSET=2000 npm exec playwright test -- tests/collaboration-history.spec.ts --project=prod`. Keep the same offset for every fixture launched by that command.
 
 Repeat the applicable native gates with `--project=prod-firefox` and `--project=prod-webkit`. The current suites above cover delivered slices; they do not replace the remaining Phase 5 recovery, access, mind-map and load suites. Check the selected-test inventory before interpreting success. Record command, source revision, counts, skips/retries and failures. Keep raw machine paths and private operator evidence outside publishable history.
+
+## Local review sessions
+
+Pin a review session to its exact source revision and keep ongoing development in a separate checkout. If a person may retain work between restarts, use a dedicated on-disk SQLite database and verify reopening the same boards after a controlled restart. In-memory acceptance fixtures intentionally lose their data when the owning process stops; a fresh synthetic seed is a new session, not a restoration. Preserve available data and establish the intended recovery source before restarting an interrupted manual review. Do not substitute another checkout's database when its migrations differ.
 
 ## Launch, observation and rollback
 

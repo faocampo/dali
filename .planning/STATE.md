@@ -2,11 +2,11 @@
 gsd_state_version: "1.0"
 current_plan: 5
 status: in_progress
-stopped_at: Plan 05-04 automated verification complete; proceed with 05-05 divergence-aware recovery
-last_updated: "2026-10-06T20:18:07+00:00"
-last_activity: 2026-10-06
-last_activity_desc: Personal history verified with 98 Chromium, 26 cross-browser history, corrected roster 2/2 and client 265/265
-state_head: 8dc921c5fd3569d23e0ae5a81a69a3135dcb56db
+stopped_at: Plan 05-05 in progress; recovery checkpoint 8157503 verified, remaining acceptance matrix open
+last_updated: "2026-10-07T00:46:04+00:00"
+last_activity: 2026-10-07
+last_activity_desc: Recovery checkpoint verified with 33 Chromium, 285 client, 386 serialized server and both typechecks; 05-05 remains incomplete
+state_head: 815750346d13e95048ae334e1bbae46623b1b630
 progress:
   total_phases: 13
   completed_phases: 4
@@ -25,6 +25,8 @@ See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
 **Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 05 divergence-aware recovery
+
+Plan 05-05 is **in progress** at `8157503`. Isolated recovery candidates, exact document/title receipts, fresh-reservation replay with transactional version checks, recovered personal history and new local outage gestures have current evidence: **33/33 selected Chromium**, **285/285 client**, **386/386 serialized server** and both typechecks. The new outage/race increment also passes **12/12 Firefox/WebKit**, zero skips/retries. Concurrent candidates, late authority/account/generation/epoch changes, restored-server and image/storage race coverage remain open in [05-05-MATRIX.md](phases/05-real-time-collaborative-editing/05-05-MATRIX.md). Plan/phase completion counts below are unchanged; no pilot readiness is claimed.
 
 Plan 05-04 has verified automated acceptance. Complete native text/operation capture, account/tab property provenance, transactional inverse protection, conflict skipping and clean reconnect are implemented. Final integrated Chromium at `8dc921c` passes **98/98**; all thirteen history cases pass in Firefox and WebKit (**26/26**). The expanded history/presence matrix passed 41/42 and exposed missing synthetic roster heartbeats; its corrected case passes **2/2**. The final full Firefox/WebKit matrix on `8dc921c` then passes **42/42**. Full client passes **265/265**, both static checks pass, and unchanged server source retains **375/375**. Original failures are preserved. Continue the approved 05-05 plan; no whole-phase or release acceptance is claimed. See [05-04-SUMMARY.md](phases/05-real-time-collaborative-editing/05-04-SUMMARY.md).
 
