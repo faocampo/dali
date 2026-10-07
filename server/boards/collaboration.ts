@@ -9,7 +9,7 @@ import { documentBytes } from './documents.js';
 import { initializeBackupSchedule, readRecoveryEpoch } from '../storage/recovery-state.js';
 import * as Y from 'yjs';
 import { nativeObjectIds, nativeReservationTargets } from './change-footprint.js';
-import { acknowledgedAction, historyEligible } from './history-provenance.js';
+import { acknowledgedAction, acknowledgedActions, historyEligible } from './history-provenance.js';
 
 export { CollaborationBroker } from './reservations.js';
 import { CollaborationBroker, type LiveConnection } from './reservations.js';
@@ -136,16 +136,19 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
     }
     return { token };
   });
-  app.post<{ Params: Params; Body: { connectionId?: unknown; token?: unknown; actionId?: unknown } }>('/api/boards/:boardId/live/history', {
+  app.post<{ Params: Params; Body: { connectionId?: unknown; token?: unknown; actionId?: unknown; recoveredActionIds?: unknown } }>('/api/boards/:boardId/live/history', {
     bodyLimit: 4096, onRequest: async (request, reply) => { requireMutation(request, reply, config, ['application/json']); },
   }, async (request, reply) => {
     const board = requireBoardCapability(database, request, reply, request.params.boardId, 'write', now); if (!board) return;
     const { connectionId, token, actionId } = request.body ?? {};
     if (!bounded(connectionId) || !bounded(token) || !bounded(actionId)) return reply.code(400).send({ code: 'INVALID_HISTORY' });
+    const recovered = request.body.recoveredActionIds ?? [];
+    if (!Array.isArray(recovered) || recovered.length > 32 || !recovered.every(bounded) || new Set(recovered).size !== recovered.length || recovered.includes(actionId)) return reply.code(400).send({ code: 'INVALID_HISTORY' });
+    const actionIds = [actionId, ...recovered];
     const connection = broker.find(connectionId, board.id, request.headers['x-dali-account'] as string);
     if (!connection) return reply.code(409).send({ code: 'CONNECTION_EXPIRED' });
     return database.transaction(() => {
-      const properties = acknowledgedAction(database, connection, actionId);
+      const properties = acknowledgedActions(database, connection, actionIds);
       if (!historyEligible(database, connection, properties)) return { eligible: false };
       const doc = new Y.Doc();
       try {
@@ -158,7 +161,7 @@ export function registerCollaborationRoutes(app: FastifyInstance, config: AuthCo
         if (!broker.owns(connection, token, [...new Set(targets)])) return reply.code(409).send({ code: 'RESERVATION_REQUIRED' });
         // A lease already used for a normal action cannot retroactively become
         // a historical inverse. Bind once; every later push rechecks the guard.
-        if (acknowledgedAction(database, connection, token).length || !broker.bindHistory(connection, token, actionId)) return reply.code(409).send({ code: 'INVALID_HISTORY' });
+        if (acknowledgedAction(database, connection, token).length || !broker.bindHistory(connection, token, actionIds)) return reply.code(409).send({ code: 'INVALID_HISTORY' });
         return { eligible: true };
       } finally { doc.destroy(); }
     })();

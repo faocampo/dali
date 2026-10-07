@@ -7,7 +7,7 @@ import { advanceSharedBaseline, canonicalRecoveryUpdate, validRecoveryAttempt, v
 
 export type JournalScope = { accountId: string; boardId: string; generation: number; recoveryEpoch?: string };
 export type JournalRecord = JournalScope & { id: string; sequence: number; kind: 'document' | 'blob'; resource: string; data: Uint8Array | Blob; mime?: string;
-  schemaVersion?: number; epoch?: string; tabId?: string; coveredIds?: string[]; attempt?: RecoveryAttempt; actionId?: string };
+  schemaVersion?: number; epoch?: string; tabId?: string; coveredIds?: string[]; attempt?: RecoveryAttempt; actionId?: string; recoveryActionId?: string };
 export type RecoveryCheckpoint = { schemaVersion: 2; accountId: string; boardId: string; epoch: string; tabId: string;
   root: { docId: string; data: Uint8Array }; content: { docId: string; data: Uint8Array }; title: string;
   assets: Record<string, { mime?: string; data?: Uint8Array }>; shared?: SharedRecoveryBaseline };
@@ -51,6 +51,7 @@ function assertScope(scope: JournalScope) {
 }
 export function validRecord(record: JournalRecord): boolean {
   if (record.actionId !== undefined && !bounded(record.actionId)) return false;
+  if (record.recoveryActionId !== undefined && (!bounded(record.recoveryActionId) || record.kind !== 'document' || !record.attempt)) return false;
   if (record.attempt !== undefined && (record.kind !== 'document' || !validRecoveryAttempt(record.attempt))) return false;
   if (record.schemaVersion !== 2 || !validRecoveryEpoch(record.epoch) || record.epoch !== record.recoveryEpoch || !bounded(record.id) || !bounded(record.tabId) || !bounded(record.accountId) || !bounded(record.boardId) || !bounded(record.resource) || !Number.isSafeInteger(record.sequence) || record.sequence < 1 || !Array.isArray(record.coveredIds) || record.coveredIds.length > 10000 || !record.coveredIds.every(bounded)) return false;
   if (!(record.data instanceof Uint8Array || record.data instanceof Blob)) return false;
@@ -359,11 +360,11 @@ async function persistRecord(record: JournalRecord) {
   });
 }
 /** A retry's exact bytes and identity survive reload before any network send. */
-export async function preserveRecoverySubmission(scope: JournalScope, tab: string, records: readonly JournalRecord[], data: Uint8Array, attempt: RecoveryAttempt) {
+export async function preserveRecoverySubmission(scope: JournalScope, tab: string, records: readonly JournalRecord[], data: Uint8Array, attempt: RecoveryAttempt, recoveryActionId?: string) {
   assertScope(scope);
-  if (!records.length || records.length > 10000 || !bounded(tab) || !validRecoveryAttempt(attempt) || records.some(row => !validRecord(row) || !matchesScope(row, scope) || row.tabId !== tab || row.kind !== 'document' || row.resource !== records[0]!.resource)) throw new RecoveryStorageError('CORRUPT');
+  if (!records.length || records.length > 10000 || !bounded(tab) || !validRecoveryAttempt(attempt) || recoveryActionId !== undefined && !bounded(recoveryActionId) || records.some(row => !validRecord(row) || !matchesScope(row, scope) || row.tabId !== tab || row.kind !== 'document' || row.resource !== records[0]!.resource || row.actionId !== records[0]!.actionId)) throw new RecoveryStorageError('CORRUPT');
   const record: JournalRecord = { ...scope, schemaVersion: 2, epoch: scope.recoveryEpoch, tabId: tab, id: crypto.randomUUID(), sequence: 0, kind: 'document', resource: records[0]!.resource,
-    data: new Uint8Array(data), attempt: { ...attempt }, coveredIds: records.map(row => row.id), ...(records[0]!.actionId ? { actionId: records[0]!.actionId } : {}) };
+    data: new Uint8Array(data), attempt: { ...attempt }, coveredIds: records.map(row => row.id), ...(records[0]!.actionId ? { actionId: records[0]!.actionId } : {}), ...(recoveryActionId ? { recoveryActionId } : {}) };
   await persistRecord(record);
   return record;
 }

@@ -8,6 +8,23 @@ function pending(signal?: AbortSignal | null) {
   return new Promise<Response>((_resolve, reject) => signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true }));
 }
 describe('generation-scoped live snapshots', () => {
+  it('@05-05-02 retains the original and every recovered action identity for personal history', async () => {
+    const request = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+      if (String(url).endsWith('/connect')) return Response.json({ connectionId: 'connection', revision: 3, epoch, root: update, content: update });
+      if (String(url).endsWith('/reserve')) return Response.json({ token: 'fresh-history-lease' });
+      if (String(url).endsWith('/history')) return Response.json({ eligible: true });
+      if (String(url).endsWith('/disconnect')) return Response.json({ acknowledged: true });
+      return pending(init?.signal);
+    });
+    const live = new BoardLiveSource({ ...scope, fetch: request });
+    try {
+      await live.start(() => {}, () => {}); await live.acquire(['shape']);
+      live.recoverAction('original', 'fragment-one'); live.recoverAction('original', 'fragment-two'); live.recoverAction('original', 'fragment-one');
+      expect(await live.authorizeHistory('original')).toBe(true);
+      const body = JSON.parse(request.mock.calls.find(([url]) => String(url).endsWith('/history'))![1]!.body as string);
+      expect(body).toMatchObject({ actionId: 'original', recoveredActionIds: ['fragment-one', 'fragment-two'] });
+    } finally { live.dispose(); }
+  });
   it('retires a known interrupted connection without waiting for server heartbeat expiry', async () => {
     const disconnected = vi.fn();
     const request = vi.fn<typeof fetch>().mockImplementation(async url => {

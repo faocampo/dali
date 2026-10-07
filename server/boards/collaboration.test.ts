@@ -165,6 +165,31 @@ describe('authenticated live collaboration', () => {
     return { owner: await connect('owner', 'owner-tab'), editor: await connect('editor', 'editor-tab'), connect };
   }
 
+  it.each(['complete', 'intervening-foreign', 'other-tab', 'unknown-fragment'] as const)('@05-05-02 partial action recovery preserves original provenance: %s', async scenario => {
+    const f = await historyFixture(); const { owner, editor } = f;
+    const original = await owner.reserve();
+    expect((await owner.push(original, shape => shape.set('xywh', '[30,0,100,100]'))).statusCode).toBe(200);
+    await owner.call('release', { token: original });
+    if (scenario === 'intervening-foreign') {
+      const foreign = await editor.reserve(); expect((await editor.push(foreign, shape => shape.set('xywh', '[60,0,100,100]'))).statusCode).toBe(200);
+      await editor.call('release', { token: foreign });
+    }
+    const recovery = scenario === 'other-tab' ? await f.connect('owner', 'other-recovery-tab') : await f.connect('owner', 'owner-tab');
+    const fragment = await recovery.reserve();
+    expect((await recovery.push(fragment, shape => shape.set('fillColor', 'blue'))).statusCode).toBe(200);
+    await recovery.call('release', { token: fragment });
+    const resumed = await f.connect('owner', 'owner-tab'); const token = await resumed.reserve();
+    const saved = Buffer.from(bytes());
+    const result = await resumed.call('history', { token, actionId: original, recoveredActionIds: [scenario === 'unknown-fragment' ? randomUUID() : fragment] });
+    expect(result.statusCode).toBe(200); expect(result.json()).toEqual({ eligible: scenario === 'complete' });
+    if (scenario === 'complete') {
+      const inverse = await resumed.push(token, shape => { shape.set('xywh', '[0,0,100,100]'); shape.set('fillColor', 'red'); });
+      expect(inverse.statusCode).toBe(200);
+      const properties = database.prepare('SELECT action_id,property,revision FROM document_action_properties WHERE action_id IN (?,?) ORDER BY revision').all(original, fragment) as { action_id: string; property: string; revision: number }[];
+      expect(properties.map(row => row.property)).toEqual(['xywh', 'fillColor']); expect(properties[0]!.revision).toBeLessThan(properties[1]!.revision);
+    } else expect(bytes()).toEqual(saved);
+  });
+
   it('@05-04-01 admits an independent-property inverse and rejects additional unacknowledged paths', async () => {
     const { owner, editor } = await historyFixture();
     const actionId = await owner.reserve();

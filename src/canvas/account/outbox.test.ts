@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { AccountJournal, acknowledgeRecords, acknowledgeRecoveredTitle, readCheckpoint, replayJournal, requestRecoveryStorage, titleIntentStore, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission, type JournalRecord } from './outbox';
+import { AccountJournal, acknowledgeRecords, acknowledgeRecoveredTitle, preserveRecoverySubmission, readCheckpoint, replayJournal, requestRecoveryStorage, titleIntentStore, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission, type JournalRecord } from './outbox';
 import { attachLocalCapture, RECOVERY_REPLAY_ORIGIN } from './local-capture';
 import * as Y from 'yjs';
 import { createHash } from 'node:crypto';
@@ -103,6 +103,16 @@ it('@05-05-01 records remote baseline updates without losing pending local edits
   expect(restored.getMap('shapes').toJSON()).toEqual({ a: 3, b: 7 });
   expect(db.rows.has(localId)).toBe(true);
   root.destroy(); content.destroy(); local.destroy(); restored.destroy();
+});
+it('@05-05-02 a replay preserves its action identity before sending and keeps originals on storage failure', async () => {
+  const db = storage(); const journal = new AccountJournal(scope, () => {}); const doc = new Y.Doc(); doc.getText('text').insert(0, 'Synthetic recovery');
+  const data = Y.encodeStateAsUpdate(doc); const id = await journal.captureUpdate('content', data, 'original-action');
+  const original = structuredClone(db.rows.get(id)!); const attempt = { tabId: 'original-transport', operationId: 'recovery-operation', digest: await recoveryDigest(data) };
+  const submission = await preserveRecoverySubmission(scope, journal.tabId, [original], data, attempt, 'committed-fragment');
+  expect(db.rows.get(submission.id)).toMatchObject({ actionId: 'original-action', recoveryActionId: 'committed-fragment', attempt, coveredIds: [id] });
+  expect(db.rows.get(id)).toEqual(original); const preserved = [...db.rows.keys()]; db.fail(true);
+  await expect(preserveRecoverySubmission(scope, journal.tabId, [original], data, attempt, 'another-fragment')).rejects.toThrow();
+  expect([...db.rows.keys()]).toEqual(preserved); expect(db.rows.get(id)).toEqual(original); doc.destroy();
 });
 it('@05-05-01 exact transport identities persist separately and cannot be compacted into another receipt', async () => {
   const db = storage(); const journal = new AccountJournal(scope, () => {}); const doc = new Y.Doc(); doc.getText('text').insert(0, 'Synthetic uncertain update');

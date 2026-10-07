@@ -370,6 +370,7 @@ export function getCanvasRuntime(options?: AccountWorkspaceOptions): Promise<Can
       if (!isCurrent() || signal.aborted) throw new Error('Stale recovery decision');
       if (expected && !recoveryVersionsDiffer(expected, latest) && (!confirmation || restoredConsentTab === tab && restoredConsentVersion === confirmation)) {
         const originalLive = current?.workspace.live;
+        for (const action of reconciled!.recoveredActions) originalLive?.recoverAction(action.original, action.committed);
         await replayLiveCandidate({ ...options, boardId: initial.boardId, rootDocId: authority.descriptor.rootDocId, contentDocId: authority.descriptor.contentDocId,
           scope: scopedJournal.scope, tab, baseline: latest, rows: candidateRows, signal, isCurrent, getRecoveryEpoch: () => authority.descriptor.recoveryEpoch,
           liveTabId: originalLive?.transportTabId, acknowledge: (ids, revision) => scopedJournal.acknowledge(ids, revision), outcome: observeReplay, committed: documentCommit,

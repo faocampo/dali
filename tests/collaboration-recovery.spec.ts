@@ -6,7 +6,7 @@ import { journalRows } from './recovery-fixtures';
 import { readRecoveryEpoch } from '../server/storage/recovery-state';
 import { editBoardTitle } from './app-menu';
 
-for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'unchanged', 'restored'] as const) test(`@05-05-${['active', 'unchanged', 'restored'].includes(scenario) ? '02' : '01'} ${scenario} pending work opens an isolated version choice before server hydration or replay`, async ({ browser, baseURL }, testInfo) => {
+for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'active-unchanged', 'active-replay-receipt', 'unchanged', 'restored'] as const) test(`@05-05-${['active', 'active-unchanged', 'active-replay-receipt', 'unchanged', 'restored'].includes(scenario) ? '02' : '01'} ${scenario} pending work opens an isolated version choice before server hydration or replay`, async ({ browser, baseURL }, testInfo) => {
   const service = await acceptanceService(baseURL!); const identities = await createIdentityContexts(browser, service.origin);
   let failure: unknown; let release: (() => void) | undefined; let breakPoll: (() => void) | undefined;
   try {
@@ -52,7 +52,7 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'unchange
     release!();
     await expect.poll(async () => (await journalRows(owner)).length).toBeGreaterThan(0);
     const retained = await journalRows(owner);
-    if (scenario !== 'active') {
+    if (!scenario.startsWith('active')) {
       const left = service.acknowledgedDisconnects(ownerAccount);
       owner.once('dialog', dialog => dialog.accept()); await owner.goto('/');
       await expect.poll(() => service.acknowledgedDisconnects(ownerAccount)).toBeGreaterThan(left);
@@ -65,12 +65,12 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'unchange
         tx.oncomplete = () => { db.close(); resolve(); }; tx.onabort = () => reject(tx.error);
       };
     }));
-    if (!['unchanged', 'restored'].includes(scenario)) {
+    if (!['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt'].includes(scenario)) {
       const released = editor.waitForResponse(response => response.url().endsWith('/live/release') && response.ok());
       await moveNativeShape(editor, second!, 45); await released;
     }
     const remote = await shapeBounds(editor, second!);
-    expect(remote === otherOriginal).toBe(['unchanged', 'restored'].includes(scenario));
+    expect(remote === otherOriginal).toBe(['unchanged', 'restored', 'active-unchanged', 'active-replay-receipt'].includes(scenario));
     if (scenario === 'restored') {
       service.database.prepare("UPDATE board_grants SET role='viewer',revision=revision+1 WHERE board_id=? AND member_id=?").run(board, ownerAccount);
       await owner.goto(`/?board=${board}`); await expect(owner.locator('editor-host')).toBeVisible();
@@ -82,17 +82,41 @@ for (const scenario of ['disjoint', 'legacy', 'own-receipt', 'active', 'unchange
     if (scenario === 'legacy') await owner.setViewportSize({ width: 390, height: 740 });
     const replayed: string[] = [];
     owner.on('request', request => { if (/\/docs\/[^/]+\/push$/.test(new URL(request.url()).pathname)) replayed.push(request.url()); });
+    let lostReplay = false;
+    if (scenario === 'active-replay-receipt') await owner.route('**/docs/*/push', async route => {
+      if (lostReplay) { await route.continue(); return; }
+      lostReplay = true; const response = await route.fetch(); expect(response.ok()).toBe(true);
+      await route.fulfill({ response, body: '{' });
+    });
     const comparison = owner.waitForResponse(response => response.url().endsWith('/recovery/baseline') && response.ok(), { timeout: 20000 });
-    if (scenario === 'active') await owner.getByRole('button', { name: 'Reconnect', exact: true }).click();
+    if (scenario.startsWith('active')) await owner.getByRole('button', { name: 'Reconnect', exact: true }).click();
     else await owner.goto(`/?board=${board}`);
     const comparisonResult = await (await comparison).json();
     if (scenario === 'own-receipt') expect(comparisonResult.receipts.length).toBeGreaterThan(0);
     await expect(owner.locator('editor-host')).toBeVisible();
-    if (scenario === 'unchanged') {
+    if (scenario === 'unchanged' || scenario === 'active-unchanged' || scenario === 'active-replay-receipt') {
       await expect(owner.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
       expect(await shapeBounds(owner, shape!)).toBe(moved);
       await expect.poll(() => shapeBounds(editor, shape!)).toBe(moved);
-      expect(await journalRows(owner)).toEqual([]);
+      // Reconnecting DocEngine may still acknowledge an idempotent root send
+      // after the visible content is covered. Wait for that durable cleanup.
+      await expect.poll(() => journalRows(owner)).toEqual([]);
+      if (scenario === 'active-replay-receipt') {
+        expect(lostReplay).toBe(true); expect(replayed).toHaveLength(1);
+        await owner.unroute('**/docs/*/push'); await owner.getByRole('button', { name: 'Reconnect', exact: true }).click();
+      }
+      if (scenario.startsWith('active')) {
+        await expect(owner.getByRole('button', { name: 'Reconnect', exact: true })).toHaveCount(0);
+        await owner.getByRole('button', { name: 'Undo', exact: true }).click();
+        for (const page of [owner, editor]) await expect.poll(() => shapeBounds(page, shape!)).toBe(original);
+        await owner.getByRole('button', { name: 'Redo', exact: true }).click();
+        for (const page of [owner, editor]) await expect.poll(() => shapeBounds(page, shape!)).toBe(moved);
+        const released = owner.waitForResponse(response => response.url().endsWith('/live/release') && response.ok());
+        await moveNativeShape(owner, second!, 25); await released;
+        const next = await shapeBounds(owner, second!); await expect.poll(() => shapeBounds(editor, second!)).toBe(next);
+        await expect(owner.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+        await owner.reload(); expect(await shapeBounds(owner, shape!)).toBe(moved); expect(await shapeBounds(owner, second!)).toBe(next);
+      }
       expect(identities.runtimeErrors).toEqual([]);
       return;
     }

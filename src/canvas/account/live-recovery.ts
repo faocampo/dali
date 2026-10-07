@@ -84,7 +84,7 @@ export async function replayLiveCandidate(options: SourceOptions & {
       const token = ids.length ? await live.acquire([...new Set(ids)]) : undefined;
       try {
         const operationId = crypto.randomUUID(); const attempt = { tabId: live.transportTabId, operationId, digest: await recoveryDigest(data) };
-        const submission = await preserve(() => preserveRecoverySubmission(options.scope, options.tab, rows, data, attempt)); current();
+        const submission = await preserve(() => preserveRecoverySubmission(options.scope, options.tab, rows, data, attempt, token)); current();
         await options.outcome(submission, 'sending', operationId);
         try {
           const result = await request(`${base}/docs/${encodeURIComponent(first.resource)}/push`, { method: 'POST', headers: { ...headers(), ...live.writeHeaders(operationId), 'Content-Type': 'application/octet-stream', 'X-Dali-Recovery-Baseline': await recoveryFingerprint(expected) }, body: new Uint8Array(data) });

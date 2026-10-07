@@ -17,6 +17,23 @@ export function acknowledgedAction(database: AccountDatabase, connection: LiveCo
     .all(connection.boardId, connection.accountId, connection.tabId, actionId) as AcknowledgedProperty[];
 }
 
+/** Recovery may commit different properties under fresh leases. Keep each
+ * property's actual last revision; never promote old paths to a newer commit. */
+export function acknowledgedActions(database: AccountDatabase, connection: LiveConnection, actionIds: readonly string[]): AcknowledgedProperty[] {
+  const merged = new Map<string, AcknowledgedProperty>();
+  for (const [index, actionId] of actionIds.entries()) {
+    const properties = acknowledgedAction(database, connection, actionId);
+    // The original action may have been entirely offline. A claimed committed
+    // recovery fragment must belong to this exact account, board and tab.
+    if (index > 0 && !properties.length) return [];
+    for (const property of properties) {
+      const key = JSON.stringify([property.objectId, property.property]);
+      if ((merged.get(key)?.revision ?? -1) < property.revision) merged.set(key, property);
+    }
+  }
+  return [...merged.values()];
+}
+
 export function historyEligible(database: AccountDatabase, connection: LiveConnection, properties: AcknowledgedProperty[]): boolean {
   if (!properties.length) return false;
   const later = database.prepare(`SELECT 1 FROM document_action_properties WHERE board_id=? AND object_id=?
@@ -25,8 +42,8 @@ export function historyEligible(database: AccountDatabase, connection: LiveConne
 }
 
 /** Validate actual inverse paths again in the same transaction as persistence. */
-export function admitsHistoryInverse(database: AccountDatabase, connection: LiveConnection, actionId: string, changes: NativeProperty[]): boolean {
-  const properties = acknowledgedAction(database, connection, actionId);
+export function admitsHistoryInverse(database: AccountDatabase, connection: LiveConnection, actionIds: readonly string[], changes: NativeProperty[]): boolean {
+  const properties = acknowledgedActions(database, connection, actionIds);
   return historyEligible(database, connection, properties) && changes.every(change => properties.some(original =>
     original.objectId === change.objectId && (original.property === '*' || original.property === change.property)));
 }

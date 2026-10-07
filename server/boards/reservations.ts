@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 export type LiveConnection = Readonly<{ id: string; boardId: string; accountId: string; tabId: string }>;
 type ConnectionState = { connection: LiveConnection; seen: number };
-type Reservation = { connectionId: string; objects: Set<string>; historyAction?: string };
+type Reservation = { connectionId: string; objects: Set<string>; historyAction?: readonly string[] };
 const CONNECTION_TIMEOUT = 30_000;
 const MAX_OBJECTS = 10_000;
 /** Ephemeral fencing state. Durable document receipts remain in SQLite. */
@@ -64,14 +64,14 @@ export class CollaborationBroker {
     const reservation = this.reservations.get(token);
     return reservation?.connectionId === connection.id && objectIds.length > 0 && objectIds.every(id => reservation.objects.has(id));
   }
-  bindHistory(connection: LiveConnection, token: string, actionId: string): boolean {
+  bindHistory(connection: LiveConnection, token: string, actionIds: readonly string[]): boolean {
     this.sweep();
     const lease = this.reservations.get(token);
-    if (this.connections.get(connection.id)?.connection !== connection || lease?.connectionId !== connection.id || token === actionId ||
-      (lease.historyAction && lease.historyAction !== actionId)) return false;
-    lease.historyAction = actionId; return true;
+    if (this.connections.get(connection.id)?.connection !== connection || lease?.connectionId !== connection.id || actionIds.includes(token) ||
+      (lease.historyAction && JSON.stringify(lease.historyAction) !== JSON.stringify(actionIds))) return false;
+    lease.historyAction = Object.freeze([...actionIds]); return true;
   }
-  historyAction(connection: LiveConnection, token: string): string | undefined {
+  historyAction(connection: LiveConnection, token: string): readonly string[] | undefined {
     this.sweep();
     const lease = this.reservations.get(token);
     return this.connections.get(connection.id)?.connection === connection && lease?.connectionId === connection.id ? lease.historyAction : undefined;

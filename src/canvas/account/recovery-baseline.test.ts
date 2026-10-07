@@ -24,15 +24,18 @@ it('@05-05-01 treats disjoint remote edits, ABA, title-only edits and unknown le
 it('@05-05-01 reconciles a lost own acknowledgement without mutating or accepting divergent candidate bytes', async () => {
   const base = fixture(); const original = structuredClone(base); const own = change(base, 'a', 5); const local = change(own.baseline, 'a', 10); const immutable = structuredClone(local.baseline);
   const attempt = { tabId: 'original-tab', operationId: 'own-operation', digest: await recoveryDigest(own.update) };
-  const row = { id: 'submission', resource: 'content', data: own.update, attempt, coveredIds: ['local-event'] };
+  const row = { id: 'submission', resource: 'content', data: own.update, attempt, coveredIds: ['local-event'], actionId: 'original-action', recoveryActionId: 'committed-fragment' };
   const receipt = { ...attempt, docId: 'content', previousRevision: 1, revision: 2 };
   const result = await reconcileRecoveryReceipts(base, [row], [receipt]);
   expect(result.acknowledgedIds).toEqual(['submission', 'local-event']);
+  expect(result.recoveredActions).toEqual([{ original: 'original-action', committed: 'committed-fragment' }]);
   expect(recoveryVersionsDiffer(result.baseline, own.baseline)).toBe(false);
   expect(recoveryVersionsDiffer(result.baseline, change(own.baseline, 'b', 7).baseline)).toBe(true);
   expect(local.baseline).toEqual(immutable); expect(base).toEqual(original);
-  for (const altered of [{ ...receipt, tabId: 'other-tab' }, { ...receipt, digest: '0'.repeat(64) }, { ...receipt, docId: 'root' }])
-    expect((await reconcileRecoveryReceipts(base, [row], [altered])).acknowledgedIds).toEqual([]);
+  for (const altered of [{ ...receipt, tabId: 'other-tab' }, { ...receipt, digest: '0'.repeat(64) }, { ...receipt, docId: 'root' }]) {
+    const ignored = await reconcileRecoveryReceipts(base, [row], [altered]);
+    expect(ignored.acknowledgedIds).toEqual([]); expect(ignored.recoveredActions).toEqual([]);
+  }
   expect((await reconcileRecoveryReceipts(base, [{ ...row, data: local.update }], [receipt])).acknowledgedIds).toEqual([]);
 });
 it('@05-05-01 an older poll cannot erase a newer committed operation or acknowledged title', () => {

@@ -51,9 +51,13 @@ export class BoardLiveSource {
   private interrupted = false;
   private started = false;
   private readonly tabId: string;
-  private recoveredActions = new Map<string, string>();
+  private recoveredActions = new Map<string, Set<string> | null>();
   get transportTabId() { return this.tabId; }
-  recoverAction(original: string, committed: string) { this.recoveredActions.set(original, committed); }
+  recoverAction(original: string, committed: string) {
+    if (original === committed || this.recoveredActions.get(original) === null) return;
+    const fragments = this.recoveredActions.get(original) ?? new Set<string>(); fragments.add(committed);
+    this.recoveredActions.set(original, fragments.size > 32 ? null : fragments);
+  }
   private epoch?: string;
   private readonly abort = () => this.dispose();
   constructor(private options: SourceOptions) {
@@ -197,7 +201,9 @@ export class BoardLiveSource {
   async authorizeHistory(actionId: string): Promise<boolean> {
     if (!this.connected || !this.reservation) throw new Error('History needs fresh editing access.');
     const connection = this.connectionId; const token = this.reservation;
-    const result = await this.request('history', { connectionId: connection, token, actionId: this.recoveredActions.get(actionId) ?? actionId });
+    const fragments = this.recoveredActions.get(actionId);
+    if (fragments === null) throw new Error('This recovered history action has too many fragments. Your current canvas is unchanged.');
+    const result = await this.request('history', { connectionId: connection, token, actionId, ...(fragments ? { recoveredActionIds: [...fragments] } : {}) });
     if (!this.connected || connection !== this.connectionId || token !== this.reservation) throw new Error('History response is stale. Try the action again.');
     if (typeof result.eligible !== 'boolean') throw new Error('Invalid history authorization');
     return result.eligible;
