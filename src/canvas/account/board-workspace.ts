@@ -4,7 +4,7 @@ import type { Doc, ExtensionType, Schema, Workspace } from '@blocksuite/affine/s
 import { StoreExtensionManager } from '@blocksuite/affine/ext-loader';
 import { BlobEngine, DocEngine, DocEngineStep, NoopDocSource } from '@blocksuite/affine/sync';
 import type { BlobSource } from '@blocksuite/affine/sync';
-import { replaceIdMiddleware } from '@blocksuite/affine/shared/adapters';
+import { replaceBoardIdentities } from './import-identities';
 import { NoopLogger } from '@blocksuite/affine/global/utils';
 import { Subject } from 'rxjs';
 import { Awareness } from 'y-protocols/awareness.js';
@@ -186,7 +186,7 @@ export class BoardWorkspace implements Workspace {
     if (this.mode !== 'staging' || this.collections.size) throw new Error('Staging is already initialized');
     let first = true;
     return new Transformer({ schema,
-      middlewares: [replaceIdMiddleware(() => { if (first) { first = false; return this.options.descriptor.contentDocId; } return this.idGenerator(); })],
+      middlewares: [replaceBoardIdentities(() => { if (first) { first = false; return this.options.descriptor.contentDocId; } return this.idGenerator(); })],
       blobCRUD: { get: key => this.blobSync.get(key), set: (key, blob) => this.blobSync.set(key, blob),
         list: () => this.blobSync.list(), delete: key => { this.assertCurrent(); this.memoryBlobs.delete(key); } },
       docCRUD: { create: id => this.createDoc(id).getStore(), get: id => this.getDoc(id)?.getStore() ?? null, delete: id => this.removeDoc(id) },

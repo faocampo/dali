@@ -1,3 +1,4 @@
+import { prepareRichRecoverySeed, richRecoveryCanvas, recoveryAssetHashes } from './collaboration-fork-native';
 import type { EditorHost } from '@blocksuite/affine/std';
 import { randomUUID, createHash } from 'node:crypto';
 import type { Browser, Page } from '@playwright/test';
@@ -54,7 +55,7 @@ async function imageHashes(page: Page) {
 async function shapes(page: Page) {
   return page.locator('affine-edgeless-root').evaluate(element => (element as HTMLElement & { gfx: GfxController }).gfx.surface!.elementModels.filter(model => model.type === 'shape').map(model => ({ id: model.id, xywh: model.xywh })).sort((a, b) => a.xywh.localeCompare(b.xywh)));
 }
-for (const receipt of ['acknowledged', 'lost-response'] as const) test(`@05-06-01 ${receipt} creates a private local canvas and image copy without changing the shared source`, async ({ browser, baseURL }) => {
+for (const receipt of ['acknowledged', 'lost-response', 'lost-response-after-reload'] as const) test(`@05-06-01 ${receipt} creates a private local canvas and image copy without changing the shared source`, async ({ browser, baseURL, browserName }) => {
   const f = await fixture(browser, baseURL!); const local = f.editor; const peer = f.owner;
   const interrupt = await holdPoll(local); let release = () => {}; let failure: unknown;
   try {
@@ -72,15 +73,24 @@ for (const receipt of ['acknowledged', 'lost-response'] as const) test(`@05-06-0
     const sharedBytes = f.service.database.prepare('SELECT doc_id,update_bytes FROM board_documents WHERE board_id=? ORDER BY doc_id').all(f.board);
     const sourceWrites: string[] = []; local.on('request', req => { if (req.url().includes(`/api/boards/${f.board}/`) && /\/(push|blobs)\b/.test(req.url()) && ['POST', 'PUT'].includes(req.method())) sourceWrites.push(req.url()); });
     let entered!: () => void; const waiting = new Promise<void>(resolve => { entered = resolve; }); const held = new Promise<void>(resolve => { release = resolve; });
-    const commits: string[] = [];
-    await local.route('**/api/imports/*/commit', async route => { commits.push(route.request().url()); entered(); await held; const response = await route.fetch(); expect(response.status()).toBe(200); await route.fulfill(receipt === 'lost-response' ? { response, body: '{' } : { response }); });
+    const commits: string[] = []; let committed = false;
+    if (receipt === 'lost-response-after-reload') await local.route('**/api/operations/*', route => committed ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }) : route.continue());
+    await local.route('**/api/imports/*/commit', async route => { commits.push(route.request().url()); entered(); await held; const response = await route.fetch(); expect(response.status()).toBe(200); committed = true; await route.fulfill(receipt !== 'acknowledged' ? { response, body: '{' } : { response }); });
     const create = choice.getByRole('button', { name: 'Create private copy', exact: true });
     await expect(create).toBeEnabled(); await create.click(); await waiting;
     await expect(choice.getByRole('status')).toContainText('Creating private copy'); await expect(create).toBeDisabled();
     await create.evaluate(button => (button as HTMLButtonElement).click());
     expect(await journalRows(local)).toEqual(expect.arrayContaining(retained));
     expect(f.service.database.prepare('SELECT id FROM boards').all()).toHaveLength(1);
-    release(); await expect(local.getByRole('status').filter({ hasText: 'Private copy created' })).toBeVisible();
+    release();
+    if (receipt === 'lost-response-after-reload') {
+      await expect(choice.getByRole('alert')).toContainText('Your local work is still here');
+      expect(await journalRows(local)).toEqual(expect.arrayContaining(retained));
+      expect(f.service.database.prepare('SELECT id FROM boards').all()).toHaveLength(2);
+      await local.reload(); await expect(choice).toBeVisible();
+      await local.unroute('**/api/operations/*'); await choice.getByRole('button', { name: 'Create private copy', exact: true }).click();
+    }
+    await expect(local.getByRole('status').filter({ hasText: 'Private copy created' })).toBeVisible();
     await expect(local.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
     const copied = new URL(local.url()).searchParams.get('board')!; expect(copied).not.toBe(f.board);
     const copiedShapes = await shapes(local); expect(copiedShapes.map(s => s.xywh)).toEqual(localShapes.map(s => s.xywh)); expect(copiedShapes.every(s => localShapes.every(before => before.id !== s.id))).toBe(true);
@@ -93,7 +103,36 @@ for (const receipt of ['acknowledged', 'lost-response'] as const) test(`@05-06-0
     expect(await shapeBounds(peer, f.first)).toBe('[0,0,160,120]'); expect(await imageHashes(peer)).toEqual([]); expect(sourceWrites).toEqual([]); expect(commits).toHaveLength(1);
     await local.reload(); await expect(local.locator('affine-edgeless-root')).toBeVisible(); expect(await imageHashes(local)).toEqual(hashes); expect(await shapes(local)).toEqual(copiedShapes);
     expect((await f.ownerContext.request.get(`/api/boards/${copied}`, { headers: { 'X-Dali-Account': f.account } })).status()).toBe(404);
-    expect(f.identities.runtimeErrors).toEqual([]);
+    expect(f.identities.runtimeErrors).toEqual(receipt === 'lost-response-after-reload' && browserName !== 'firefox' ? ['editor: Failed to load resource: the server responded with a status of 503 (Service Unavailable)'] : []);
+    f.identities.runtimeErrors.length = 0;
   } catch (error) { failure = error; throw error; }
   finally { release(); interrupt(); await f.close(failure); }
+});
+
+test('@05-06-01 private fork retains whole local map groups connectors and original edited-image pixels', async ({ browser, baseURL }) => {
+  const f = await fixture(browser, baseURL!); let interrupt = () => {}; let failure: unknown;
+  try {
+    f.service.database.prepare('UPDATE boards SET live_enabled=0 WHERE id=?').run(f.board);
+    await f.owner.goto(`/?board=${f.board}`); await expect(f.owner.locator('affine-edgeless-root')).toBeVisible();
+    await prepareRichRecoverySeed(f.owner); await f.owner.goto('/'); f.service.database.prepare('UPDATE boards SET live_enabled=1 WHERE id=?').run(f.board);
+    interrupt = await holdPoll(f.editor); await openBoard([f.editor, f.owner], f.board); interrupt();
+    await expect(f.editor.getByRole('button', { name: 'Reconnect', exact: true })).toBeVisible();
+    await f.editor.locator('input[type=file][accept="image/*"]').setInputFiles({ name: 'Local second.png', mimeType: 'image/png', buffer: syntheticCanaries().imageBytes });
+    await expect.poll(async () => (await imageHashes(f.editor)).length).toBe(2); const before = await richRecoveryCanvas(f.editor); const hashes = await recoveryAssetHashes(f.editor); expect(hashes).toHaveLength(3);
+    expect(before.snapshot.edits.every(edit => edit.validImage)).toBe(true);
+    const current = await f.ownerContext.request.get(`/api/boards/${f.board}`, { headers: { 'X-Dali-Account': f.account } }); expect(current.status()).toBe(200);
+    const revision = (await current.json()).revision;
+    const renamed = await f.ownerContext.request.patch(`/api/boards/${f.board}`, { headers: { Origin: f.service.origin, 'X-Dali-Request': '1', 'X-Dali-Account': f.account, 'X-Dali-Recovery-Epoch': readRecoveryEpoch(f.service.database) }, data: { operationId: randomUUID(), revision, title: 'Later shared title' } }); expect(renamed.status()).toBe(200);
+    const source = f.service.database.prepare('SELECT doc_id,update_bytes FROM board_documents WHERE board_id=? ORDER BY doc_id').all(f.board);
+    await f.editor.unroute('**/live/poll'); await f.editor.getByRole('button', { name: 'Reconnect', exact: true }).click();
+    const dialog = f.editor.getByRole('dialog', { name: 'This board changed while you were away', exact: true }); await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Create private copy', exact: true }).click();
+    await expect(f.editor.getByRole('status').filter({ hasText: 'Private copy created' })).toBeVisible();
+    await expect(f.editor.getByRole('button', { name: 'Saved, Open save details', exact: true })).toBeVisible();
+    const after = await richRecoveryCanvas(f.editor); expect(after.snapshot).toEqual(before.snapshot); expect(after.ids.every(id => !before.ids.includes(id))).toBe(true); expect(await recoveryAssetHashes(f.editor)).toEqual(hashes);
+    expect(f.service.database.prepare('SELECT doc_id,update_bytes FROM board_documents WHERE board_id=? ORDER BY doc_id').all(f.board)).toEqual(source);
+    await f.editor.reload(); await expect(f.editor.locator('affine-edgeless-root')).toBeVisible(); expect((await richRecoveryCanvas(f.editor)).snapshot).toEqual(before.snapshot);
+    expect(await recoveryAssetHashes(f.editor)).toEqual(hashes); expect(f.identities.runtimeErrors).toEqual([]);
+  } catch (error) { failure = error; throw error; }
+  finally { interrupt(); await f.close(failure); }
 });
