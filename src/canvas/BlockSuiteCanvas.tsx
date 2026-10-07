@@ -28,7 +28,8 @@ import { installArrangementShortcuts } from './arrangement';
 import type { ResourceController } from '@blocksuite/affine/components/resource';
 import { renderBoardPresentation } from './presentation-export';
 
-export default function BlockSuiteCanvas({ runtime }: { runtime: CanvasRuntime }) {
+export default function BlockSuiteCanvas({ runtime, onReady, onMountError }: { runtime: CanvasRuntime; onReady?: () => void | Promise<void>; onMountError?: (error: unknown) => void }) {
+  const callbacks = useRef({ onReady, onMountError }); callbacks.current = { onReady, onMountError };
   const ref = useRef<HTMLDivElement>(null);
   const scope = useSyncExternalStore(subscribeAccessScope, getActiveAccessScope);
   const writable = scope?.canWrite && scope.phase === 'active';
@@ -71,7 +72,7 @@ export default function BlockSuiteCanvas({ runtime }: { runtime: CanvasRuntime }
     const controller = new AbortController();
 
     mountEdgelessEditor(el, runtime, controller.signal)
-      .then((h) => {
+      .then(async (h) => {
         // StrictMode double-invokes effects. The workspace and document are
         // created once in the shared runtime, so a cancelled mount only has a
         // view to throw away -- it can never leave a duplicate board behind.
@@ -82,12 +83,14 @@ export default function BlockSuiteCanvas({ runtime }: { runtime: CanvasRuntime }
         handle = h;
         disposeMindmaps = installMindmapCompatibility(h.host);
         setHost(h.host);
+        await callbacks.current.onReady?.();
       })
       .catch((cause: unknown) => {
         if (cancelled) return;
         // Without this the failure is an unhandled rejection and the user gets
         // a blank screen with no explanation.
         setError(cause instanceof Error ? cause : new Error(String(cause)));
+        callbacks.current.onMountError?.(cause);
       });
 
     return () => {

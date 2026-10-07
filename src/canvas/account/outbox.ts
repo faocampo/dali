@@ -314,21 +314,40 @@ export function recoveryForkStore(scope: JournalScope, tab: string) {
 }
 /** Resolve only the exact displayed candidate after confirmed copy or hydration.
  * New rows or a newer title in the same tab abort the entire transaction. */
-export async function resolveRecoveryCandidate(candidate: RecoveryCandidate) {
+export async function resolveRecoveryCandidate(candidate: RecoveryCandidate, latest?: { checkpoint?: RecoveryCheckpoint; assertCurrent: () => void }) {
   const { scope, tab, ids, titleOperationId } = candidate;
   assertScope(scope); if (!bounded(tab) || ids.length > 10000 || !ids.every(bounded)) throw new RecoveryStorageError('CORRUPT');
+  const replacement = latest?.checkpoint ? structuredClone(latest.checkpoint) : undefined;
+  if (replacement) {
+    assertCheckpoint(replacement);
+    if (replacement.accountId !== scope.accountId || replacement.boardId !== scope.boardId || replacement.epoch !== scope.recoveryEpoch) throw new RecoveryStorageError('CORRUPT');
+  }
+  latest?.assertCurrent();
   return transaction<void>(['journal', 'checkpoints', 'sequences'], 'readwrite', (tx, done) => {
     const journal = tx.objectStore('journal'); const sequences = tx.objectStore('sequences');
     const records = journal.index('scope').getAll([scope.accountId, scope.boardId, scope.recoveryEpoch!]);
     records.onsuccess = () => {
+      try { latest?.assertCurrent(); } catch (error) { abortWithFailure(tx, error); return; }
       const selected = (records.result as JournalRecord[]).filter(row => row.tabId === tab);
+      if (replacement && replacement.tabId !== tab && (records.result as JournalRecord[]).some(row => row.tabId === replacement.tabId)) { abortWithFailure(tx, new Error('New local changes arrived')); return; }
       if (selected.some(row => !validRecord(row)) || JSON.stringify(selected.map(row => row.id).sort()) !== JSON.stringify([...ids].sort())) { abortWithFailure(tx, new Error('The local version changed. Review it again.')); return; }
       const titleId = 'title:' + checkpointId(scope, tab); const title = sequences.get(titleId);
       title.onsuccess = () => {
         if (title.result?.operationId !== titleOperationId || title.result && !validTitleIntent(title.result)) { abortWithFailure(tx, new Error('The local title changed. Review it again.')); return; }
-        for (const row of selected) journal.delete(row.id);
-        sequences.delete(titleId); sequences.delete('fork:' + checkpointId(scope, tab));
-        tx.objectStore('checkpoints').delete(checkpointId(scope, tab)); done(undefined);
+        const finish = () => {
+          try {
+            latest?.assertCurrent();
+            for (const row of selected) journal.delete(row.id);
+            sequences.delete(titleId); sequences.delete('fork:' + checkpointId(scope, tab));
+            const checkpoints = tx.objectStore('checkpoints'); checkpoints.delete(checkpointId(scope, tab));
+            if (replacement) checkpoints.put({ ...replacement, id: checkpointId(scope, replacement.tabId) });
+            done(undefined);
+          } catch (error) { abortWithFailure(tx, error); }
+        };
+        if (replacement && replacement.tabId !== tab) {
+          const otherTitle = sequences.get('title:' + checkpointId(scope, replacement.tabId));
+          otherTitle.onsuccess = () => { if (otherTitle.result) abortWithFailure(tx, new Error('New local title arrived')); else finish(); };
+        } else finish();
       };
     };
   });
@@ -533,6 +552,12 @@ export class AccountJournal {
         } catch (error) { abortWithFailure(tx, error); }
       };
     });
+  }
+  /** Adopt only a checkpoint already committed with candidate resolution. */
+  adoptCheckpoint(value: RecoveryCheckpoint) {
+    assertCheckpoint(value);
+    if (value.accountId !== this.scope.accountId || value.boardId !== this.scope.boardId || value.epoch !== this.scope.recoveryEpoch || value.tabId !== tabId) throw new RecoveryStorageError('CORRUPT');
+    this.baseline = structuredClone(value); this.baselinePending = false;
   }
   async checkpoint(value: Pick<RecoveryCheckpoint, 'root' | 'content' | 'title' | 'assets'>) {
     const baseline: RecoveryCheckpoint = { ...structuredClone(value), schemaVersion: 2, accountId: this.scope.accountId, boardId: this.scope.boardId, epoch: this.scope.recoveryEpoch!, tabId };

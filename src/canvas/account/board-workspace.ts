@@ -15,6 +15,7 @@ import { BoardDocSource, type SourceOptions } from './doc-source';
 import { BoardBlobSource, type BlobSourceOptions } from './blob-source';
 import { BoardDoc } from './board-doc';
 import { BoardMeta } from './board-meta';
+import type { RecoveryCandidate } from './outbox';
 
 export type AccountWorkspaceOptions = Omit<SourceOptions, 'boardId' | 'rootDocId' | 'contentDocId' | 'readonly'> & Pick<BlobSourceOptions, 'onPendingBlob' | 'onFetchedBlob'> & {
   descriptor: BoardDescriptor;
@@ -22,6 +23,8 @@ export type AccountWorkspaceOptions = Omit<SourceOptions, 'boardId' | 'rootDocId
   recoveryBaseline?: { root: Uint8Array; content: Uint8Array; assets: Map<string, Blob> };
   recoveryQuarantined?: boolean;
   openRestored?: boolean;
+  recoveryLatest?: RecoveryCandidate;
+  deferSync?: boolean;
 };
 
 /** One authorized root/content pair, with no cross-board caches or network awareness. */
@@ -170,7 +173,7 @@ export class BoardWorkspace implements Workspace {
         Y.applyUpdate(target, bytes, this.source.name);
         this.options.onDocumentOutcome?.(id, bytes, 'loaded', crypto.randomUUID());
       }, () => { this.docSync.forceStop(); });
-      if (!this.readonly) { this.docSync.start(); if (!baseline) await this.waitForSynced(); }
+      if (!this.readonly && !this.options.deferSync) { this.docSync.start(); if (!baseline) await this.waitForSynced(); }
       this.assertCurrent();
       return this;
     } catch (error) { this.dispose(); throw error; } finally { clearTimeout(timeout); }

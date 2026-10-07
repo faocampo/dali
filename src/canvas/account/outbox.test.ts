@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { AccountJournal, acknowledgeRecords, acknowledgeRecoveredTitle, preserveRecoverySubmission, readCheckpoint, replayJournal, requestRecoveryStorage, titleIntentStore, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission, type JournalRecord, recoveryForkStore, resolveRecoveryCandidate, type RecoveryForkIntent } from './outbox';
+import { AccountJournal, acknowledgeRecords, acknowledgeRecoveredTitle, preserveRecoverySubmission, readCheckpoint, replayJournal, requestRecoveryStorage, titleIntentStore, markRecoveryPermissionLoss, recoveryPermissionConfirmation, resolveRecoveryPermission, type JournalRecord, recoveryForkStore, resolveRecoveryCandidate, type RecoveryForkIntent, type RecoveryCheckpoint } from './outbox';
 import { attachLocalCapture, RECOVERY_REPLAY_ORIGIN } from './local-capture';
 import * as Y from 'yjs';
 import { createHash } from 'node:crypto';
@@ -356,4 +356,21 @@ it('@05-06-01 resolving a confirmed candidate retains other tabs and rejects new
   await expect(resolveRecoveryCandidate(candidate)).rejects.toThrow('local title changed'); expect(db.rows.size).toBe(3); expect(await readCheckpoint(scope, journal.tabId)).toBeTruthy();
   candidate.titleOperationId = 'later-title'; await resolveRecoveryCandidate(candidate);
   expect([...db.rows.values()]).toEqual([foreign]); expect(await own.read()).toBeUndefined(); expect((await other.read())?.operationId).toBe('other-title'); expect(await readCheckpoint(scope, journal.tabId)).toBeUndefined(); doc.destroy();
+});
+
+for (const boundary of ['quota', 'stale', 'success'] as const) it(`@05-06-02 latest checkpoint replacement is atomic at ${boundary}`, async () => {
+  const db = storage(); const journal = new AccountJournal(scope, () => {}); const doc = new Y.Doc();
+  const original = { root: { docId: 'root', data: Y.encodeStateAsUpdate(doc) }, content: { docId: 'content', data: Y.encodeStateAsUpdate(doc) }, title: 'Local version', assets: {} };
+  await journal.checkpoint(original); const id = await journal.captureUpdate('content', new Uint8Array([0, 0]));
+  const other = { ...db.rows.get(id)!, id: 'other', tabId: 'other-tab' }; db.rows.set(other.id, other);
+  const checkpoint: RecoveryCheckpoint = { ...original, schemaVersion: 2, accountId: scope.accountId, boardId: scope.boardId, epoch: scope.recoveryEpoch!, tabId: journal.tabId, title: 'Latest version' };
+  let current = true; if (boundary === 'quota') db.fail(true);
+  const run = resolveRecoveryCandidate({ scope, tab: journal.tabId, ids: [id] }, { checkpoint, assertCurrent: () => { if (!current) throw new Error('Stale latest decision'); } });
+  if (boundary === 'stale') current = false;
+  if (boundary !== 'success') {
+    await expect(run).rejects.toThrow(); expect([...db.rows.keys()]).toEqual([id, other.id]); expect((await readCheckpoint(scope, journal.tabId))?.title).toBe('Local version');
+  } else {
+    await run; expect([...db.rows.values()]).toEqual([other]); expect((await readCheckpoint(scope, journal.tabId))?.title).toBe('Latest version');
+  }
+  doc.destroy();
 });

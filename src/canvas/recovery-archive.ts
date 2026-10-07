@@ -1,7 +1,7 @@
 import type { DocSnapshot } from '@blocksuite/store';
 import { getSessionState } from '../auth/session';
 import { validDescriptor } from '../boards/BoardLibrary';
-import { getActiveAccessScope, getRecoveryRuntime, suspendAccessScope, type AccessScope } from './runtime';
+import { getActiveAccessScope, getRecoveryDecision, getRecoveryRuntime, suspendAccessScope, type AccessScope } from './runtime';
 import { SourceAccessError } from './account/doc-source';
 import { canExportRecoveryScope } from './account/mutation-guard';
 import { buildSnapshotArchive, downloadBlob, safeFilename } from './export-board';
@@ -52,7 +52,8 @@ export async function readAuthorizedRecoveryAssets(capture: ReturnType<typeof ca
         cache: 'no-store', credentials: 'same-origin', headers: { 'X-Dali-Account': captured.scope.accountId }, signal: AbortSignal.timeout(10000),
       });
       assertAuthority(captured.scope);
-      if ([401, 403, 404, 409].includes(response.status)) throw new SourceAccessError(response.status);
+      if (response.status === 404) await authorize(); // Missing bytes alone do not prove access loss.
+      else if ([401, 403, 409].includes(response.status)) throw new SourceAccessError(response.status);
       if (response.ok) blob = await response.blob();
     }
     if (!blob) throw new Error(`${reference.label}: image bytes are missing. Restore the image and retry.`);
@@ -62,6 +63,17 @@ export async function readAuthorizedRecoveryAssets(capture: ReturnType<typeof ca
     assertAuthority(captured.scope); assets.set(reference.id, blob);
   }
   await authorize(); return assets;
+}
+
+/** E5 explicitly requires fresh authority; browser initiation is the only claim. */
+export async function downloadChosenRecoveryCopy() {
+  const capture = captureRecoverySnapshot(); const decision = await getRecoveryDecision();
+  try {
+    const assets = await readAuthorizedRecoveryAssets(capture, decision.authorize); decision.assertCurrent();
+    const blob = await buildSnapshotArchive(capture.captured.snapshot, assets, capture.captured.references);
+    await decision.authorize(); decision.assertCurrent();
+    downloadBlob(blob, `${safeFilename(capture.captured.title)}-recovery-${new Date(capture.captured.capturedAt).toISOString().replace(/:/g, '-')}.bs.zip`);
+  } catch (error) { await decision.accessFailed(error); throw error; }
 }
 
 async function confirmAuthority(scope: AccessScope): Promise<boolean> {
