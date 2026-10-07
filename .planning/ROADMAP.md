@@ -263,7 +263,7 @@ All three tasks are complete within the accepted local scope. The local Kubernet
   4. When an owner revokes access, the affected member's active and reconnected sessions cannot continue unauthorized reads or writes, including direct synchronization and image requests and attempted queued writes. (COL-04)
   5. Participants can concurrently edit a mind map and later save and reopen it with its hierarchy and content intact. (MIND-05)
 
-**Plans**: 9 plans in 9 sequential waves
+**Plans**: 5/9 plans executed in 9 sequential waves
 **Wave 1**
 - [x] 05-01-PLAN.md — Live native editing tracer
 
@@ -277,7 +277,7 @@ All three tasks are complete within the accepted local scope. The local Kubernet
 - [x] 05-04-PLAN.md — Personal undo and redo
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 05-05-PLAN.md — Divergence-aware recovery
+- [x] 05-05-PLAN.md — Divergence-aware recovery
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [ ] 05-06-PLAN.md — Private recovery copy and latest-version flow
@@ -501,7 +501,7 @@ The initial release includes ordinary-object roadmap compositions and reusable r
 | 2. Daily Mind Maps | 9/9 | Complete    | 2026-09-15 |
 | 3. Okta and Board Access | 12/12 | Complete    | 2026-09-25 |
 | 4. Durable Boards and Recovery | 17/17 | Validated with approved deferrals | 2026-09-29 |
-| 5. Real-Time Collaborative Editing | 4/9 | In progress | - |
+| 5. Real-Time Collaborative Editing | 5/9 | In progress | - |
 | 6. Follow Me | 0/TBD | Not started | - |
 | 7. Entity Comments | 0/TBD | Not started | - |
 | 8. Shared Timer | 0/TBD | Not started | - |
@@ -616,7 +616,6 @@ Plans:
 Plans:
 
 - [ ] TBD (promote with $gsd-review-backlog when ready)
-
 
 ### Phase 999.8: Sequential font size and Bold formatting fix (BACKLOG)
 

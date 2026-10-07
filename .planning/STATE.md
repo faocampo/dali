@@ -1,17 +1,17 @@
 ---
 gsd_state_version: "1.0"
-current_plan: 5
+current_plan: 6
 status: in_progress
-stopped_at: Plan 05-05 in progress; recovery checkpoint 8157503 verified, remaining acceptance matrix open
-last_updated: "2026-10-07T00:46:04+00:00"
+stopped_at: Plan 05-05 automated verification complete; executing approved plan 05-06
+last_updated: "2026-10-07T01:47:36.808Z"
 last_activity: 2026-10-07
-last_activity_desc: Recovery checkpoint verified with 33 Chromium, 285 client, 386 serialized server and both typechecks; 05-05 remains incomplete
-state_head: 815750346d13e95048ae334e1bbae46623b1b630
+last_activity_desc: Plan 05-05 verified with 48 Chromium, 60 Firefox/WebKit, 286 client, 388 server and both typechecks; executing 05-06
+state_head: 189ba04af0226946ade95f5ee22c18070440e46c
 progress:
   total_phases: 13
   completed_phases: 4
   total_plans: 52
-  completed_plans: 47
+  completed_plans: 48
   percent: 31
 current_phase: 05
 current_phase_name: Real-Time Collaborative Editing
@@ -24,22 +24,22 @@ current_phase_name: Real-Time Collaborative Editing
 See: [PROJECT.md](PROJECT.md) (project scope and decisions; updated 2026-09-25).
 
 **Core value:** Product and engineering teams can collaboratively turn ideas into clear product and technical plans on a shared, editable canvas that supports their daily work well enough to replace Miro.
-**Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 05 divergence-aware recovery
+**Current focus:** Phase 05 — Real-Time Collaborative Editing; plan 06 private recovery copy and latest-version flow
 
-Plan 05-05 is **in progress** at `8157503`. Isolated recovery candidates, exact document/title receipts, fresh-reservation replay with transactional version checks, recovered personal history and new local outage gestures have current evidence: **33/33 selected Chromium**, **285/285 client**, **386/386 serialized server** and both typechecks. The new outage/race increment also passes **12/12 Firefox/WebKit**, zero skips/retries. Concurrent candidates, late authority/account/generation/epoch changes, restored-server and image/storage race coverage remain open in [05-05-MATRIX.md](phases/05-real-time-collaborative-editing/05-05-MATRIX.md). Plan/phase completion counts below are unchanged; no pilot readiness is claimed.
+Plan 05-05 has **verified automated acceptance** at product `ab0b8a7`, documented in `189ba04`. Final evidence: **48/48 integrated Chromium**, **60/60 Firefox/WebKit**, **286/286 client**, **388/388 serialized server** and both TypeScript checks. Browser gates have zero skips/retries or unexpected errors. Isolated versions, exact receipts, fresh transactional replay, restored-write consent, local outage images, concurrent tabs, stale callbacks, actual restore and storage races are covered in [05-05-SUMMARY.md](phases/05-real-time-collaborative-editing/05-05-SUMMARY.md). Continue approved 05-06 private copy/latest/download implementation immediately. COL-03, Phase 5 and pilot acceptance remain open.
 
-Plan 05-04 has verified automated acceptance. Complete native text/operation capture, account/tab property provenance, transactional inverse protection, conflict skipping and clean reconnect are implemented. Final integrated Chromium at `8dc921c` passes **98/98**; all thirteen history cases pass in Firefox and WebKit (**26/26**). The expanded history/presence matrix passed 41/42 and exposed missing synthetic roster heartbeats; its corrected case passes **2/2**. The final full Firefox/WebKit matrix on `8dc921c` then passes **42/42**. Full client passes **265/265**, both static checks pass, and unchanged server source retains **375/375**. Original failures are preserved. Continue the approved 05-05 plan; no whole-phase or release acceptance is claimed. See [05-04-SUMMARY.md](phases/05-real-time-collaborative-editing/05-04-SUMMARY.md).
+Plan 05-04 has verified automated acceptance. Complete native text/operation capture, account/tab property provenance, transactional inverse protection, conflict skipping and clean reconnect are implemented. Final integrated Chromium at `8dc921c` passes **98/98**; all thirteen history cases pass in Firefox and WebKit (**26/26**). The expanded history/presence matrix passed 41/42 and exposed missing synthetic roster heartbeats; its corrected case passes **2/2**. The final full Firefox/WebKit matrix on `8dc921c` then passes **42/42**. Full client passes **265/265**, both static checks pass, and unchanged server source retains **375/375**. Original failures are preserved. Continue the approved 05-06 plan; no whole-phase or release acceptance is claimed. See [05-04-SUMMARY.md](phases/05-real-time-collaborative-editing/05-04-SUMMARY.md).
 
 ## Current Position
 
-Current Plan: 5
+Current Plan: 6
 Total Plans in Phase: 9
 
 Phase 4 is validated by the user on 2026-09-29 with the remaining WebKit fix deferred to 999.7. All 17 plans are dispositioned; acceptance explicitly retains the 2,051/2,052 full-run result and earlier approved deferrals.
 
 Next phase: 05 — Real-Time Collaborative Editing.
-Status: Plans 05-01 through 05-04 have verified automated gates. Consecutive typography, pointer admission after release, presence projection/retry/retirement and personal history now have deterministic and integrated evidence. The remote issue remains unchanged. Failure history and original scope limits remain in the resumption and execution reports. Continue 05-05 through 05-09; no pilot readiness or general collaboration activation is claimed.
-Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 47/52 currently planned plans dispositioned; four of nine Phase 5 plans verified.
+Status: Plans 05-01 through 05-05 have verified automated gates. Consecutive typography, pointer admission after release, presence projection/retry/retirement and personal history now have deterministic and integrated evidence. The remote issue remains unchanged. Failure history and original scope limits remain in the resumption and execution reports. Continue 05-06 through 05-09; no pilot readiness or general collaboration activation is claimed.
+Progress: 4/13 phases accepted ([███░░░░░░░] 31%); 48/52 currently planned plans dispositioned; five of nine Phase 5 plans verified.
 
 ## Historical prerequisite verification
 
@@ -166,9 +166,9 @@ See [PROJECT.md](PROJECT.md) (validated capabilities and full decision history) 
 
 ## Session Continuity
 
-Last session: 2026-10-06
-Stopped at: Plan 05-04 automated verification complete; next plan 05-05
-Resume file: .planning/phases/05-real-time-collaborative-editing/05-04-SUMMARY.md
+Last session: 2026-10-07T01:47:36.707Z
+Stopped at: Plan 05-05 automated verification complete; executing approved plan 05-06
+Resume file: .planning/phases/05-real-time-collaborative-editing/05-06-PLAN.md
 Next action: Execute 05-05 divergent recovery, beginning with isolated local candidate reconstruction and a current-authority baseline gate before title replay, server hydration or document drain. The old retry-choice checkpoint is superseded by the user's continuation authorization. Do not infer completion of 05-05 through 05-09 or a controlled internal release from the stabilization results. The historical 2,051/2,052 Phase 4 gate and approved 999.7 deferral remain unchanged.
 
 ## Phase 1 verification outcome

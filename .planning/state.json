@@ -21,12 +21,12 @@
     {
       "number": "4",
       "name": "Durable Boards and Recovery",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "5",
       "name": "Real-Time Collaborative Editing",
-      "status": "pending"
+      "status": "in_progress"
     },
     {
       "number": "6",
@@ -70,9 +70,9 @@
     }
   ],
   "next": {
-    "command": "/gsd:execute-phase 5",
-    "label": "Resolve presence verification checkpoint",
-    "reason": "Plan 05-03 native pan projection failed after two repairs; retry, skip or stop choice pending"
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step",
+    "reason": "Phase 05 of 13 \u00b7 31% \u00b7 executing"
   },
-  "updated_at": "2026-10-05T23:07:02.093975+00:00"
+  "updated_at": "2026-10-07T01:47:36.033Z"
 }

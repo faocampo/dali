@@ -9,7 +9,7 @@ created: "2026-10-02"
 
 # Phase 5 — Validation Strategy
 
-Strategy derived from research and approved UI contract, mapped to nine executable plans. Plans 05-01 and 05-02 have recorded execution evidence; verified 05-03 stabilization is documented in [the resumption report](05-RESUMPTION-2026-10-06.md). Plan 05-04 has [verified automated evidence](05-04-SUMMARY.md); plans 05-05 through 05-09 remain pending. Whole-phase validation is incomplete.
+Strategy derived from research and approved UI contract, mapped to nine executable plans. Plans 05-01 and 05-02 have recorded execution evidence; verified 05-03 stabilization is documented in [the resumption report](05-RESUMPTION-2026-10-06.md). Plan 05-04 has [verified automated evidence](05-04-SUMMARY.md); plan 05-05 has [verified automated evidence](05-05-SUMMARY.md); plans 05-06 through 05-09 remain pending. Whole-phase validation is incomplete.
 
 ## Test Infrastructure
 
@@ -80,8 +80,8 @@ All listed new suites are created by the owning task before its command runs. Wa
 | 05-03-02 | 3 | COL-02 | T-05-03 | `npm exec playwright test -- tests/collaboration-presence.spec.ts --project=prod --grep @05-03-02` | Automated gate passed; see 05-03-SUMMARY.md and resumption evidence |
 | 05-04-01 | 4 | CAN-03 | T-05-04 | `npm exec playwright test -- tests/collaboration-history.spec.ts --project=prod --grep @05-04-01` | Pass; see [05-04 summary](05-04-SUMMARY.md); whole-phase requirement remains open |
 | 05-04-02 | 4 | CAN-03 | T-05-04 | `npm exec playwright test -- tests/collaboration-history.spec.ts tests/collaboration-history-reconnect.spec.ts tests/collaboration-history-reservation.spec.ts --project=prod --grep @05-04-02` | Pass; see [05-04 summary](05-04-SUMMARY.md); whole-phase requirement remains open |
-| 05-05-01 | 5 | COL-03 | T-05-05 | `npm exec playwright test -- tests/collaboration-recovery.spec.ts --project=prod --grep @05-05-01` | Pending; new suite owned by plan 05 |
-| 05-05-02 | 5 | COL-03 | T-05-05 | `npm exec playwright test -- tests/collaboration-recovery.spec.ts --project=prod --grep @05-05-02` | Pending; new suite owned by plan 05 |
+| 05-05-01 | 5 | COL-03 | T-05-05 | `npm exec playwright test -- tests/collaboration-recovery.spec.ts --project=prod --grep @05-05-01` | Passed; 30 current recovery cases in each engine within final 48 Chromium / 60 Firefox-WebKit gates, plus 286 client, 388 server and both typechecks at ab0b8a7 |
+| 05-05-02 | 5 | COL-03 | T-05-05 | `npm exec playwright test -- tests/collaboration-recovery.spec.ts --project=prod --grep @05-05-02` | Passed; 30 current recovery cases in each engine within final 48 Chromium / 60 Firefox-WebKit gates, plus 286 client, 388 server and both typechecks at ab0b8a7 |
 | 05-06-01 | 6 | COL-03 | T-05-06 | `npm exec playwright test -- tests/collaboration-fork.spec.ts --project=prod --grep @05-06-01` | Pending; new suite owned by plan 06 |
 | 05-06-02 | 6 | COL-03 | T-05-06 | `npm exec playwright test -- tests/collaboration-fork.spec.ts --project=prod --grep @05-06-02` | Pending; new suite owned by plan 06 |
 | 05-07-01 | 7 | COL-04, COL-03 | T-05-07 | `npm exec playwright test -- tests/collaboration-access.spec.ts --project=prod --grep @05-07-01` | Pending; new suite owned by plan 07 |
